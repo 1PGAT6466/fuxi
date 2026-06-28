@@ -11,7 +11,10 @@ from typing import Dict, Optional
 
 from src.hypothalamus.meridian import Meridian, Signal, SignalPriority
 from src.hypothalamus.brain import Brain
-from src.hypothalamus.organs.stomach import StomachAgent
+try:
+    from src.hypothalamus.organs.stomach import StomachAgent
+except ImportError:
+    StomachAgent = None  # stomach 已迁至装载机
 from src.hypothalamus.organs.spleen import SpleenAgent
 from src.hypothalamus.organs.lung import LungAgent
 from src.hypothalamus.organs.liver import LiverAgent
@@ -50,7 +53,7 @@ class Fuxi:
         self.brain: Optional[Brain] = None
         
         # 器官
-        self.stomach: Optional[StomachAgent] = None
+        self.stomach = None  # stomach 已迁至装载机
         self.spleen: Optional[SpleenAgent] = None
         self.lung: Optional[LungAgent] = None
         self.liver: Optional[LiverAgent] = None
@@ -79,7 +82,8 @@ class Fuxi:
         self.brain = Brain(self.meridian)
         logger.info("🧠 大脑已觉醒")
         
-        self.stomach = StomachAgent(self.meridian)
+        if StomachAgent:
+            self.stomach = StomachAgent(self.meridian)
         logger.info("🍽️ 胃已就绪")
         
         self.spleen = SpleenAgent(self.meridian)
@@ -126,7 +130,8 @@ class Fuxi:
         await self.lung.start_breathing()
         await self.kidney.start_filtering()
         await self.nose.start_sniffing()
-        await self.stomach.start()
+        if self.stomach:
+            await self.stomach.start()
         await self.skeleton.start_scanning()
         await self.brain.start_pulsing()
         await self.liver.start_filtering()

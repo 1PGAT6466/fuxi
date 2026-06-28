@@ -35,8 +35,12 @@ async def health():
     # 安全获取向量数
     vector_count = 0
     try:
+        def _get_vector_count():
+            from src.db.vector_store import get_vector_store
+            vs = get_vector_store()
+            return vs.count if vs else 0
         vector_count = await asyncio.wait_for(
-            asyncio.to_thread(lambda: __import__('src.db.vector_store', fromlist=['count_chunks']).count_chunks()),
+            asyncio.to_thread(_get_vector_count),
             timeout=5.0
         )
     except (asyncio.TimeoutError, Exception):
