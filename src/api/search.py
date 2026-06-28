@@ -5,6 +5,7 @@ routers/search.py — 搜索路由（v10.0）
 import asyncio
 from src.services.audit import log_audit
 import logging
+logger = logging.getLogger(__name__)
 import os, time, json, hashlib
 
 from datetime import datetime

@@ -230,7 +230,7 @@ class VectorStore:
     persist = lambda self: None
 
     def count_chunks(self) -> int:
-        return self.count
+        return self.count()
 
 
 # ============ 全局单例 ============
