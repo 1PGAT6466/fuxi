@@ -20,6 +20,8 @@ from src.services.query_router import route_query
 from src.db.memory_store import get_store
 from src.services.query_resolver import resolve_query, compress_history
 from src.services.security import sanitize_user_input
+from src.services.feature_flags import load_flags
+from src.hypothalamus.brain import Instinct
 from src.config import TERMS_FILE, AI_TIMEOUT_SECONDS
 
 import aiohttp
@@ -418,13 +420,62 @@ async def chat(body: ChatRequest, request: Request):
 
 @router.post("/api/chat/agent")
 async def chat_agent(body: ChatRequest):
-    """Agentic RAG: Plan, Execute+Reflect, Generate"""
+    """Agentic RAG: Brain Instinct 路由 + 太极 Agent 深度推理"""
     q = body.query.strip()
     if not q:
         raise HTTPException(status_code=400, detail="查询不能为空")
+
+    # 安全检查
+    safe_q = sanitize_user_input(q)
+    if safe_q is None:
+        raise HTTPException(status_code=400, detail="请求包含不安全内容")
+
+    flags = load_flags()
+    t0 = time.time()
+
+    # Step 1: Brain Instinct 意图分类（零延迟）
+    intent = Instinct.classify_intent(q, [h.get("content", "") for h in body.history[-4:]])
+    complexity = Instinct.estimate_complexity(q, intent)
+    primary_intent = intent.get("intent", "general_search")
+
+    # Step 2: 路由决策
+    SIMPLE_INTENTS = {"definition", "numeric_lookup", "material_selector", "table_query"}
+    use_brain_direct = (
+        flags.get("brain_direct_route", True)
+        and primary_intent in SIMPLE_INTENTS
+        and complexity <= 2
+    )
+
+    if use_brain_direct:
+        # 简单查询 → Brain 直接路由（0.1-0.3s）
+        try:
+            from src.services.retrieval import hybrid_search
+            from src.services.llm import call_deepseek
+            results = await hybrid_search(q, load_chunks(), top_k=5)
+            ctx = "\n".join([r.get("text", "")[:300] for r in results[:3]])
+            prompt = f"基于以下信息简洁回答：\n{ctx}\n\n问题：{q}"
+            answer = await call_deepseek(prompt)
+            latency = int((time.time() - t0) * 1000)
+            return {
+                "answer": answer or "未能生成回答",
+                "mode": "instinct",
+                "intent": primary_intent,
+                "complexity": complexity,
+                "sources": results[:3],
+                "latency_ms": latency,
+            }
+        except Exception as e:
+            logger.warning(f"Brain direct route failed: {e}, falling back to agent")
+
+    # 复杂查询 → 太极 Agent 深度推理
     try:
         from src.services.agentic_rag_v2 import agentic_search as agentic_rag_main
         result = await agentic_rag_main(query=q)
+        latency = int((time.time() - t0) * 1000)
+        result["mode"] = "agent"
+        result["intent"] = primary_intent
+        result["complexity"] = complexity
+        result["latency_ms"] = latency
         return result
     except Exception as e:
         return {"answer": f"Agent 执行异常: {str(e)[:200]}", "mode": "agent_error"}

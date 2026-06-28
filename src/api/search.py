@@ -72,33 +72,16 @@ async def search(q: str = Query(...), top_k: int = 15, page: int = 1, page_size:
         except (asyncio.TimeoutError, Exception):
             return []
     
+    # 加载 Feature Flags
     try:
-        from src.services.crag import retrieve_with_correction
-        crag_result = await retrieve_with_correction(
-            query=q,
-            retriever=lambda qq, kk=top_k: _search_with_rewrite(qq, kk, skip_cache=True),
-            top_k=top_k,
-            max_retries=1
-        )
-        results = crag_result["docs"]
-        if crag_result["degraded"]:
-            inc_counter("kb_crag_degraded_total")
-    except Exception as e:
-        import logging; logging.getLogger(__name__).exception("Exception in routers/search.py")
-        import traceback, logging
-        logging.getLogger(__name__).error(f'hybrid_search failed: {e}\n{traceback.format_exc()}')
+        from src.services.feature_flags import load_flags
+        _flags = load_flags()
+    except Exception:
+        _flags = {}
+
+    # CRAG 检索校验环（受 crag_rewrite flag 控制）
+    if _flags.get("crag_rewrite", True):
         try:
-            results = await hybrid_search(q, load_chunks(), category, file_type, date_from, date_to, top_k)
-        except Exception as e2:
-            import logging; logging.getLogger(__name__).exception("Exception in routers/search.py")
-            logging.getLogger(__name__).error(f'hybrid_search retry also failed: {e2}')
-            results = []
-    # P1.1.2: Self-RAG 相关性校验
-    try:
-        from src.services.self_rag import check_relevance
-        sr = await check_relevance(q, results)
-        if not sr["is_relevant"]:
-            logger.info(f"[Self-RAG] 低相关性，触发 CRAG 改写: {sr['reason']}")
             from src.services.crag import retrieve_with_correction
             crag_result = await retrieve_with_correction(
                 query=q,
@@ -106,10 +89,41 @@ async def search(q: str = Query(...), top_k: int = 15, page: int = 1, page_size:
                 top_k=top_k,
                 max_retries=1
             )
-            if crag_result["docs"]:
-                results = crag_result["docs"]
-    except Exception as e:
-        logger.warning(f"[Self-RAG] 校验失败，使用原始结果: {e}")
+            results = crag_result["docs"]
+            if crag_result["degraded"]:
+                inc_counter("kb_crag_degraded_total")
+        except Exception as e:
+            logger.warning(f'[CRAG] 校验失败，回退基础检索: {e}')
+            try:
+                results = await hybrid_search(q, load_chunks(), category, file_type, date_from, date_to, top_k)
+            except Exception as e2:
+                logger.error(f'hybrid_search also failed: {e2}')
+                results = []
+    else:
+        try:
+            results = await hybrid_search(q, load_chunks(), category, file_type, date_from, date_to, top_k)
+        except Exception as e:
+            logger.error(f'hybrid_search failed: {e}')
+            results = []
+
+    # Self-RAG 相关性校验（受 self_rag_check flag 控制）
+    if _flags.get("self_rag_check", True):
+        try:
+            from src.services.self_rag import check_relevance
+            sr = await check_relevance(q, results)
+            if not sr["is_relevant"]:
+                logger.info(f"[Self-RAG] 低相关性，触发 CRAG 改写: {sr['reason']}")
+                from src.services.crag import retrieve_with_correction
+                crag_result = await retrieve_with_correction(
+                    query=q,
+                    retriever=lambda qq, kk=top_k: _search_with_rewrite(qq, kk, skip_cache=True),
+                    top_k=top_k,
+                    max_retries=1
+                )
+                if crag_result["docs"]:
+                    results = crag_result["docs"]
+        except Exception as e:
+            logger.warning(f"[Self-RAG] 校验失败，使用原始结果: {e}")
     
     inc_counter("kb_search_requests_total")
     observe_histogram("kb_search_latency_seconds", time.time() - t0)
