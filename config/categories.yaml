@@ -1,0 +1,163 @@
+# ============================================================
+# 宝利根知识平台 — 统一分类体系 v1.0
+# 加载端: yggdrasil-clean / yggdrasil-server 共享
+# 设计目标: 95% 分类准确率
+# ============================================================
+
+version: "1.0"
+description: "宝利根知识平台统一分类规则 — 单一事实来源"
+
+# ----- 一级分类 -----
+categories:
+  - id: 模具设计
+    priority: 10
+    description: 模具设计相关的设计标准、结构、图样、工艺
+    ext_match: [".stp", ".step", ".dwg", ".dxf", ".prt", ".asm"]
+    keywords_file: [模具, 导柱, 导套, 顶针, 滑块, 浇口, 分型面, 模架, 型腔, 注塑模具,
+                    塑胶模具, 双色模具, 压铸模具, 冲压模具, 锻模, 吹塑, 模具设计大典]
+    keywords_content: [模具, 导柱, 导套, 顶针, 滑块, 浇口, 分型面, 模架, 型腔]
+
+  - id: 连接器设计
+    priority: 9
+    description: 连接器产品设计文档、规范、工艺流程
+    keywords_file: [连接器, Connector, Fakra, Mini-Fakra, 端子, housing, 板端, 线端,
+                    插针, 防水]
+    keywords_content: [连接器, Connector, 端子, Fakra, housing, 塑胶, 防水]
+    patterns: ['Fakra', 'Connector', 'Mini.?Fakra', '端子', 'housing', '防水', '板端', '线端']
+
+  - id: 机械设计
+    priority: 8
+    description: 通用机械设计手册、标准、设计过程
+    keywords_file: [机械设计, 非标准机械, 机械工程师, 设计过程, 设计手册, 机械大典]
+    keywords_content: [机械设计, 公差, 形位公差, 表面粗糙度, 齿轮, 凸轮, 轴承]
+
+  - id: 标准件库
+    priority: 7
+    description: 标准件选型、BOM、厂商清单
+    keywords_file: [标准件, BOM, MISUMI, 米思米, 选型手册, 库存优先选用, 厂商, 物料清单]
+    keywords_content: [标准件, BOM, MISUMI, 伺服电机, HG-KN, 厂商, 物料清单, GUC, PRJ,
+                      标准插针头, 加工件, 滚珠轴承]
+    patterns: ['GUC', 'PRJ', 'Tool\s*Spec', 'MISUMI', 'C-FL', 'C-SB', 'C-LM']
+
+  - id: 电气自动化
+    priority: 8
+    description: 电气设计、PLC、自动化产线
+    keywords_file: [PLC, 传感器, 伺服, 变频, 电磁阀, 气缸, 自动化产线, 电气]
+    keywords_content: [PLC, 传感器, 伺服, 变频, 电磁阀, 气缸, PROFINET, NPN, PNP, 自动化]
+    ext_match: [".awl", ".scl"]
+
+  - id: IT网络
+    priority: 8
+    description: 网络建设、拓扑、设备配置
+    keywords_file: [网络, 交换机, 路由, 拓扑, 配置, VLAN, 防火墙, IP, 子网, WiFi]
+    keywords_content: [VLAN, 子网, 网关, DHCP, 路由, 交换机, 拓扑, interface, trunk, OSPF,
+                      BGP, ACL, NAT, 静态路由, STP, Eth-Trunk, 无线, AP, AC, SSID]
+    ext_match: [".cfg", ".conf", ".ini"]
+    sub_categories:
+      - 交换路由
+      - 网络拓扑
+      - 无线网络
+      - 网络安全
+      - IP地址与DNS
+      - 服务器与存储
+      - 监控与运维
+      - 弱电与布线
+
+  - id: 工程技术规范
+    priority: 7
+    description: 注塑成型、材料、工艺标准
+    keywords_file: [注塑, 成型, 工艺, 材料, 表面处理, 塑料]
+    keywords_content: [注塑, 成型, 模温, 料筒, 干燥, 收缩率, LCP, PA66, PBT, POM, 塑料]
+
+  - id: 品质测量
+    priority: 7
+    description: 品质测量、三坐标、GR&R
+    keywords_file: [三坐标, 蔡司, 品质, 测量, 质量, CPK, GRR, 检测]
+    keywords_content: [三坐标, 蔡司, CONTURA, CALYPSO, 位置度, 平面度, GR&R, CPK]
+
+  - id: 供应商管理
+    priority: 6
+    description: 采购、合同、供应商
+    keywords_file: [采购, 报价, 合同, 供应商, 交货, 付款]
+    keywords_content: [采购, 报价, 合同, 供应商, 交货, 付款]
+    ext_match: [".xlsx", ".xls"]
+
+  - id: 行政人事
+    priority: 5
+    description: 公司制度、人事行政
+    keywords_file: [考勤, 请假, 薪资, 人事, 报销, 制度, 行政, 组织架构]
+    keywords_content: [考勤, 请假, 薪资, 人事, 报销, 制度]
+
+  - id: 财务文档
+    priority: 5
+    description: 财务、预算、税务
+    keywords_file: [财务, 预算, 税务, 审计, 发票, 费控]
+    keywords_content: [财务, 预算, 税务, 审计, 发票]
+
+  - id: 项目管理
+    priority: 5
+    description: 项目文档、进度、甘特图
+    keywords_file: [项目, 甘特, 里程碑, WBS, 进度, 计划]
+    keywords_content: [项目, 甘特, 里程碑, WBS, 进度, 计划]
+
+  - id: 技术文档
+    priority: 4
+    description: 通用技术资料、培训材料
+    keywords_file: [手册, 指南, 教程, 说明, PROE, Creo, SolidWorks, 设计规则]
+
+  - id: 办公文档
+    priority: 3
+    description: 通用办公文件、PPT、Word
+    keywords_file: [PPT, 课件, 报告, 总结, 表格]
+
+  - id: 操作手册
+    priority: 6
+    description: 软件操作手册、系统使用说明
+    keywords_file: [泛微, E-cology, ecology, weaver, 协同管理平台, 前端使用手册, 后台维护手册,
+                    组织权限, 流程引擎, 门户引擎, 内容引擎, 建模引擎, 移动引擎, 集成模块]
+    keywords_content: [泛微, E-cology, ecology, 协同管理平台]
+    weaver_sub_mapping:
+      组织权限中心: {file: [组织权限, 权限中心], content: [行政区域, 岗位设置, 人员卡片]}
+      流程引擎: {file: [流程引擎, workflow], content: [表单管理, 路径管理, 流程节点]}
+      内容引擎: {file: [内容引擎], content: [知识目录, 文档管理]}
+      门户引擎: {file: [门户引擎, portal], content: [门户维护]}
+      建模引擎: {file: [建模引擎], content: [协同管理平台]}
+      移动引擎: {file: [移动引擎, mobile], content: [EMobile]}
+      集成模块: {file: [集成模块, SAP], content: [系统集成]}
+      人事管理: {file: [人事], content: [人力资源, 人事卡片]}
+      知识管理: {file: [知识], content: [知识目录]}
+      客户管理: {file: [客户, crm], content: [客户卡片]}
+      项目管理: {file: [项目, project], content: [项目预算]}
+      资产管理: {file: [资产, asset], content: [资产调拨]}
+      财务预算: {file: [财务, 预算, 费控, 报销], content: [预算科目]}
+      公文管理: {file: [公文], content: [套红模板]}
+      会议管理: {file: [会议, meeting], content: [会议室]}
+      日程管理: {file: [日程, calendar], content: [日程安排]}
+      协作管理: {file: [协作], content: [协作区]}
+      通信管理: {file: [通信, im], content: [即时通讯]}
+      邮件管理: {file: [邮件, mail, email], content: [邮件模板]}
+      证照管理: {file: [证照, 版权], content: [证照管理]}
+      云平台: {file: [云平台, cloud], content: [云商店]}
+      系统参数: {file: [系统参数, sysconfig], content: [系统参数]}
+      其他功能: {file: [微博, 调查, 车辆, 相册], content: [微博, 调查]}
+
+  - id: 元数据
+    priority: 2
+    description: 归档文件、大型工具包、非文本资源
+    keywords_file: [.rar, .7z, .zip, .pkg, .exe, .dll, .cnsldb, .pkg]
+
+  - id: 通用办公
+    priority: 1
+    description: 兜底分类 — 无法归入以上任何类的文件
+
+  - id: WIKI文件
+    priority: -1
+    description: 内部知识库 Wiki 页面（特殊处理，不进普通分类）
+    keywords_file: [MEMORY.md, AGENTS.md, SOUL.md, IDENTITY.md]
+
+# ----- 材料工程子类（未来扩展用） -----
+deep_fallback:
+  "材料工程 > 金属材料":
+    patterns: ['合金', '相图', '不锈钢', '热处理', '淬火', '马氏体', '奥氏体', 'ASM\s*Handbook', 'Casting']
+  "制造工艺 > SMT贴片":
+    patterns: ['SMT', '贴片', 'PCB', '回流焊', '锡膏', 'AOI', 'SPI', '点胶', '發料']

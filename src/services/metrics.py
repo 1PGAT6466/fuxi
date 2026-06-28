@@ -1,0 +1,126 @@
+"""
+metrics.py — Prometheus 指标暴露 (v1.43)
+提供 /api/metrics 端点，输出：
+  - 请求计数、延迟分布、错误率
+  - 缓存命中率、搜索延迟
+  - 向量存储状态、chunk 计数
+  - Token 消耗统计
+"""
+import time
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, REGISTRY
+
+# ── 请求级指标 ──
+http_requests_total = Counter(
+    'fuxi_http_requests_total', 'HTTP 请求总数',
+    ['method', 'endpoint', 'status']
+)
+http_request_duration_seconds = Histogram(
+    'fuxi_http_request_duration_seconds', 'HTTP 请求延迟',
+    ['method', 'endpoint'],
+    buckets=[0.01, 0.05, 0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0, 30.0]
+)
+
+# ── 搜索指标 ──
+search_requests_total = Counter(
+    'fuxi_search_requests_total', '搜索请求总数',
+    ['status']  # success / empty / error
+)
+search_duration_seconds = Histogram(
+    'fuxi_search_duration_seconds', '搜索延迟',
+    buckets=[0.1, 0.5, 1.0, 2.0, 5.0, 10.0, 30.0, 60.0]
+)
+search_result_count = Histogram(
+    'fuxi_search_result_count', '搜索结果数',
+    buckets=[0, 1, 3, 5, 10, 20, 50]
+)
+
+# ── 缓存指标 ──
+cache_hits_total = Counter('fuxi_cache_hits_total', '缓存命中数', ['level'])
+cache_misses_total = Counter('fuxi_cache_misses_total', '缓存未命中数')
+
+# ── 向量存储指标 ──
+vector_store_chunks = Gauge('fuxi_vector_store_chunks', '向量库 chunk 数')
+sqlite_chunks = Gauge('fuxi_sqlite_chunks', 'SQLite chunk 数')
+vector_store_health = Gauge('fuxi_vector_store_health', '向量库健康状态 (1=正常, 0=异常)')
+
+# ── Token 消耗 ──
+token_consumed_total = Counter(
+    'fuxi_token_consumed_total', 'Token 消耗总数',
+    ['model', 'type']  # input / output
+)
+token_cost_total = Counter(
+    'fuxi_token_cost_total', 'Token 累计费用(USD)',
+    ['model']
+)
+
+# ── LLM 调用指标 ──
+llm_requests_total = Counter(
+    'fuxi_llm_requests_total', 'LLM 调用总数',
+    ['model', 'status']
+)
+llm_duration_seconds = Histogram(
+    'fuxi_llm_duration_seconds', 'LLM 调用延迟',
+    ['model'],
+    buckets=[0.5, 1.0, 2.0, 5.0, 10.0, 20.0, 30.0]
+)
+
+# ── 反馈指标 ──
+feedback_total = Counter(
+    'fuxi_feedback_total', '用户反馈总数',
+    ['action']  # useful / useless / click / copy
+)
+
+# ── 器官健康指标 ──
+organ_health = Gauge('fuxi_organ_health', '器官健康状态 (1=正常, 0=异常)', ['organ'])
+
+
+def record_search(status: str, duration_s: float, result_count: int):
+    """记录一次搜索"""
+    search_requests_total.labels(status=status).inc()
+    search_duration_seconds.observe(duration_s)
+    search_result_count.observe(result_count)
+
+
+def record_cache(hit: bool, level: str = "L1"):
+    """记录缓存命中/未命中"""
+    if hit:
+        cache_hits_total.labels(level=level).inc()
+    else:
+        cache_misses_total.inc()
+
+
+def record_llm(model: str, status: str, duration_s: float, tokens_in: int = 0, tokens_out: int = 0):
+    """记录 LLM 调用"""
+    llm_requests_total.labels(model=model, status=status).inc()
+    llm_duration_seconds.labels(model=model).observe(duration_s)
+    if tokens_in:
+        token_consumed_total.labels(model=model, type='input').inc(tokens_in)
+    if tokens_out:
+        token_consumed_total.labels(model=model, type='output').inc(tokens_out)
+
+
+def record_feedback(action: str):
+    """记录用户反馈"""
+    feedback_total.labels(action=action).inc()
+
+
+def update_store_stats(sqlite_count: int = 0, vector_count: int = 0):
+    """更新存储统计"""
+    sqlite_chunks.set(sqlite_count)
+    vector_store_chunks.set(vector_count)
+    vector_store_health.set(1 if vector_count > 0 else 0)
+
+
+def get_metrics_response() -> bytes:
+    """获取 Prometheus 格式的指标数据"""
+    return generate_latest(REGISTRY)
+
+
+# ── 兼容旧调用接口 ──
+def inc_counter(name: str, value: int = 1):
+    """兼容旧版计数器调用"""
+    pass  # 已由 prometheus_client 的 Counter 替代
+
+def observe_histogram(name: str, value: float):
+    """兼容旧版直方图调用"""
+    pass  # 已由 prometheus_client 的 Histogram 替代

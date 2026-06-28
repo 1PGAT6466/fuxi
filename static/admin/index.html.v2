@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>伏羲 4.2 · 内世界</title>
+<style>
+:root {
+  --bg: #FFF5EB;
+  --bg-card: #FFFFFF;
+  --bg-side: #FFE4CC;
+  --orange: #FF6900;
+  --orange-light: #FF8C3A;
+  --orange-dim: rgba(255,105,0,0.1);
+  --border: rgba(255,105,0,0.12);
+  --border-active: rgba(255,105,0,0.3);
+  --text: #2D1F10;
+  --text-dim: #8C6E4A;
+  --text-light: #B89B7A;
+  --wood: #4a9e6e;
+  --fire: #c2593a;
+  --earth: #c4a45a;
+  --metal: #d4c5b9;
+  --water: #3a5070;
+  --radius: 14px;
+  --shadow: 0 2px 12px rgba(255,105,0,0.08);
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: "Microsoft YaHei","PingFang SC","Noto Sans SC",system-ui,sans-serif;
+  min-height:100vh;
+}
+h1,h2,h3{font-weight:600;letter-spacing:.02em;}
+
+/* 顶栏 */
+.topbar {
+  background: var(--bg-card);
+  border-bottom: 1px solid var(--border);
+  padding: 0 28px;
+  height: 56px;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  position:sticky;
+  top:0;
+  z-index:100;
+  box-shadow: var(--shadow);
+}
+.topbar h1 {
+  font-size:20px;
+  color: var(--orange);
+  letter-spacing:.04em;
+}
+.topbar h1 span { color:var(--text-dim); font-size:13px; margin-left:10px; font-weight:400; }
+.topbar-nav { display:flex; gap:6px; }
+.tab-btn {
+  padding: 8px 20px;
+  border-radius: 22px;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-dim);
+  transition: all .2s;
+  font-family: inherit;
+}
+.tab-btn:hover { background: var(--orange-dim); color: var(--orange); }
+.tab-btn.active { background: var(--orange); color: #fff; font-weight:600; }
+
+/* 布局 */
+.layout { display:flex; min-height:calc(100vh - 56px); }
+.sidebar {
+  width:260px;
+  background: var(--bg-side);
+  border-right:1px solid var(--border);
+  padding:20px 0;
+  flex-shrink:0;
+}
+.cat-item {
+  padding: 10px 24px;
+  cursor: pointer;
+  font-size: 13px;
+  color: var(--text-dim);
+  border-left: 3px solid transparent;
+  transition: all .2s;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.cat-item:hover { background: var(--orange-dim); color: var(--text); }
+.cat-item.active { background: var(--orange-dim); color: var(--orange); border-left-color: var(--orange); font-weight: 600; }
+.cat-count { background: var(--orange-dim); color: var(--orange); padding: 2px 8px; border-radius: 10px; font-size: 11px; }
+.main { flex:1; padding:24px; overflow-y:auto; max-height:calc(100vh - 56px); }
+
+/* 卡片 */
+.card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  padding: 20px;
+  margin-bottom: 16px;
+  box-shadow: var(--shadow);
+}
+.card h3 { font-size:15px; color: var(--orange); margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+
+/* 上传区 */
+.upload-zone {
+  border: 2px dashed var(--border-active);
+  border-radius: var(--radius);
+  padding: 32px;
+  text-align: center;
+  cursor: pointer;
+  transition: all .2s;
+}
+.upload-zone:hover { background: var(--orange-dim); border-color: var(--orange); }
+.upload-zone.dragover { background: var(--orange-dim); border-color: var(--orange); }
+.upload-zone p { color: var(--text-dim); font-size:14px; margin-top:8px; }
+.upload-icon { font-size: 40px; }
+
+input[type="file"] { display:none; }
+
+/* 文件/Wiki/图谱列表 */
+.item-row {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  padding: 10px 14px;
+  border-bottom: 1px solid var(--border);
+  font-size:13px;
+  gap:10px;
+}
+.item-row:last-child { border-bottom:none; }
+.item-name { flex:1; color: var(--text); cursor:pointer; }
+.item-name:hover { color: var(--orange); }
+.item-cat { color: var(--orange-light); font-size:11px; background: var(--orange-dim); padding: 2px 8px; border-radius: 8px; white-space:nowrap; }
+.item-actions { display:flex; gap:6px; }
+.action-btn {
+  padding: 4px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--border);
+  background: var(--bg-card);
+  cursor: pointer;
+  font-size: 11px;
+  color: var(--text-dim);
+  transition: all .2s;
+  font-family: inherit;
+}
+.action-btn:hover { background: var(--orange-dim); color: var(--orange); border-color: var(--orange); }
+.action-btn.danger:hover { background: #fee; color: #d33; border-color: #d33; }
+
+/* 搜索 */
+.search-bar {
+  display:flex;
+  gap:8px;
+  margin-bottom:16px;
+}
+.search-bar input {
+  flex:1;
+  padding: 10px 16px;
+  border-radius: 22px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  font-size: 13px;
+  color: var(--text);
+  outline: none;
+  font-family: inherit;
+}
+.search-bar input:focus { border-color: var(--orange); }
+.search-bar button {
+  padding: 10px 20px;
+  border-radius: 22px;
+  background: var(--orange);
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  font-family: inherit;
+}
+
+/* 状态网格 */
+.stats-grid { display:grid; grid-template-columns: repeat(4, 1fr); gap:12px; }
+.stat-card {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  padding: 16px;
+  text-align: center;
+  box-shadow: var(--shadow);
+}
+.stat-value { font-size: 28px; font-weight: 700; color: var(--orange); }
+.stat-label { font-size: 12px; color: var(--text-dim); margin-top: 4px; }
+
+/* 九宫格简化版 */
+.bagua-mini { display:grid; grid-template-columns: repeat(3,1fr); gap:6px; }
+.bagua-cell {
+  padding: 10px;
+  border-radius: 10px;
+  background: var(--bg);
+  text-align: center;
+  border: 1px solid var(--border);
+  font-size: 12px;
+}
+.bagua-cell .sym { font-size: 22px; display:block; }
+.bagua-cell.alive { border-color: var(--orange); background: var(--orange-dim); }
+.bagua-cell.dead { opacity: 0.4; }
+
+/* 弹窗 */
+.modal-overlay {
+  display:none;
+  position:fixed;
+  inset:0;
+  background: rgba(0,0,0,0.4);
+  z-index:200;
+  align-items:center;
+  justify-content:center;
+}
+.modal-overlay.show { display:flex; }
+.modal {
+  background: var(--bg-card);
+  border-radius: var(--radius);
+  padding: 24px;
+  max-width: 700px;
+  max-height: 80vh;
+  overflow-y: auto;
+  width: 90%;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.15);
+}
+.modal h3 { color: var(--orange); margin-bottom:14px; }
+.modal pre { white-space:pre-wrap; font-size:12px; line-height:1.6; max-height:400px; overflow-y:auto; background:var(--bg); padding:12px; border-radius:8px; }
+.modal-close {
+  float: right;
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  color: var(--text-dim);
+}
+
+.empty-state { text-align:center; padding:40px; color:var(--text-dim); font-size:14px; }
+
+.loading { text-align:center; padding:20px; color:var(--text-dim); }
+.toast { position:fixed; bottom:24px; right:24px; background:var(--orange); color:#fff; padding:10px 20px; border-radius:22px; font-size:13px; z-index:300; opacity:0; transition:opacity .3s; }
+.toast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<!-- 顶栏 -->
+<nav class="topbar">
+  <h1>☰ 伏羲 4.2 <span>内世界·管理面板</span></h1>
+  <div class="topbar-nav">
+    <button class="tab-btn active" onclick="switchTab('upload')">📤 文件管理</button>
+    <button class="tab-btn" onclick="switchTab('wiki')">🧠 Wiki 知识</button>
+    <button class="tab-btn" onclick="switchTab('graph')">🕸️ 知识图谱</button>
+    <button class="tab-btn" onclick="switchTab('evaluation')">📊 搜索评测</button>
+    <button class="tab-btn" onclick="switchTab('feedback')">💬 用户反馈</button>
+    <button class="tab-btn" onclick="switchTab('status')">⚙️ 系统状态</button>
+  </div>
+</nav>
+
+<div class="layout">
+  <!-- 侧边栏：分类 -->
+  <aside class="sidebar" id="sidebar">
+    <div class="cat-item active" data-cat="" onclick="filterByCat('')">
+      <span>📋 全部</span><span class="cat-count" id="cat-count-all">0</span>
+    </div>
+    <div id="cat-list"></div>
+  </aside>
+
+  <!-- 主内容区 -->
+  <main class="main" id="main-content"></main>
+</div>
+
+<!-- 弹窗 -->
+<div class="modal-overlay" id="modal">
+  <div class="modal">
+    <button class="modal-close" onclick="closeModal()">✕</button>
+    <div id="modal-content"></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+let currentTab = 'upload';
+let currentCat = '';
+let allFiles = [];
+let allWiki = [];
+let allCategories = {};
+let adminToken = 'polygon-admin-2024';
+
+// ========== 工具函数 ==========
+async function api(url, opts={}) {
+  const h = opts.headers || {};
+  h['x-admin-token'] = adminToken;
+  const res = await fetch(API+url, {...opts, headers:h});
+  if (!res.ok) throw new Error(res.status);
+  return res.json();
+}
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+function closeModal() { document.getElementById('modal').classList.remove('show'); }
+
+function formatBytes(b) {
+  if (!b) return '0 B';
+  const u = ['B','KB','MB','GB'];
+  let i = 0;
+  while (b >= 1024 && i < 3) { b /= 1024; i++; }
+  return b.toFixed(1) + ' ' + u[i];
+}
+
+// ========== Tab 切换 ==========
+function switchTab(tab) {
+  currentTab = tab;
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  event.target.classList.add('active');
+  loadTab(tab);
+}
+
+async function loadTab(tab) {
+  switch(tab) {
+    case 'upload': await loadFiles(); break;
+    case 'wiki': await loadWiki(); break;
+    case 'graph': await loadGraph(); break;
+    case 'evaluation': renderEvaluation(); break;
+    case 'feedback': await loadFeedback(); break;
+    case 'status': await loadStatus(); break;
+  }
+  updateSidebar(tab);
+}
+
+// ========== 侧边栏分类 ==========
+function updateSidebar(tab) {
+  const sidebar = document.getElementById('sidebar');
+  const catList = document.getElementById('cat-list');
+  const items = tab === 'wiki' ? allWiki : allFiles;
+  
+  allCategories = {};
+  items.forEach(item => {
+    const cat = item.category || '未分类';
+    allCategories[cat] = (allCategories[cat] || 0) + 1;
+  });
+  
+  document.getElementById('cat-count-all').textContent = items.length;
+  
+  catList.innerHTML = Object.entries(allCategories).sort((a,b) => b[1]-a[1]).map(([cat, cnt]) => 
+    `<div class="cat-item" data-cat="${escapeHtml(cat)}" onclick="filterByCat('${escapeHtml(cat)}')">
+      <span>📂 ${escapeHtml(cat)}</span>
+      <span class="cat-count">${cnt}</span>
+    </div>`
+  ).join('');
+}
+
+function filterByCat(cat) {
+  currentCat = cat;
+  document.querySelectorAll('.cat-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.cat === cat);
+  });
+  currentTab === 'wiki' ? renderWikiList() : renderFileList();
+}
+
+function escapeHtml(s) {
+  const d = document.createElement('div');
+  d.textContent = s;
+  return d.innerHTML;
+}
+
+// ========== 文件管理 Tab ==========
+async function loadFiles() {
+  document.getElementById('main-content').innerHTML = '<div class="loading">加载中…</div>';
+  try {
+    const data = await api('/api/documents');
+    allFiles = data.files || data.documents || [];
+    if (allFiles.length && typeof allFiles[0] === 'object' && !allFiles[0].file_name) {
+      allFiles = Object.values(allFiles);
+    }
+  } catch(e) {
+    allFiles = [];
+  }
+  updateSidebar('upload');
+  renderFileList();
+}
+
+function renderFileList() {
+  const main = document.getElementById('main-content');
+  let files = currentCat ? allFiles.filter(f => (f.category||'未分类') === currentCat) : allFiles;
+  
+  let html = `
+    <div class="card">
+      <h3>📤 上传文件</h3>
+      <div class="upload-zone" id="upload-zone" onclick="document.getElementById('file-input').click()">
+        <div class="upload-icon">📁</div>
+        <p>点击上传或拖拽文件到此处</p>
+        <p style="font-size:11px;color:var(--text-light)">支持 PDF / DOCX / XLSX / TXT / MD / 图片 等</p>
+      </div>
+      <input type="file" id="file-input" multiple onchange="uploadFiles(this.files)" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.md,.csv,.json,.xml,.html,.htm,.jpg,.jpeg,.png,.gif,.bmp,.svg">
+    </div>
+    
+    <div class="card">
+      <h3>📋 文件列表 <span style="font-size:12px;color:var(--text-dim);font-weight:400">(${files.length} 个文件)</span></h3>
+      <div class="search-bar">
+        <input type="text" id="file-search" placeholder="搜索文件名…" oninput="searchFiles()">
+      </div>
+      <div id="file-list">${files.length === 0 ? '<div class="empty-state">暂无文件，请上传</div>' : ''}</div>
+    </div>`;
+  
+  main.innerHTML = html;
+  
+  // 上传拖拽
+  const zone = document.getElementById('upload-zone');
+  zone.addEventListener('dragover', e => { e.preventDefault(); zone.classList.add('dragover'); });
+  zone.addEventListener('dragleave', () => zone.classList.remove('dragover'));
+  zone.addEventListener('drop', e => { e.preventDefault(); zone.classList.remove('dragover'); uploadFiles(e.dataTransfer.files); });
+  
+  if (files.length > 0) renderFileRows(files);
+}
+
+function searchFiles() {
+  const q = document.getElementById('file-search').value.toLowerCase();
+  let files = currentCat ? allFiles.filter(f => (f.category||'未分类') === currentCat) : allFiles;
+  if (q) files = files.filter(f => (f.file_name||f.name||'').toLowerCase().includes(q));
+  renderFileRows(files);
+}
+
+function renderFileRows(files) {
+  const el = document.getElementById('file-list');
+  if (!el) return;
+  el.innerHTML = files.map(f => {
+    const name = f.file_name || f.name || 'unknown';
+    const cat = f.category || '未分类';
+    const hash = f.file_hash || f.hash || '';
+    return `<div class="item-row">
+      <span class="item-name" onclick="viewFile('${hash}')">📄 ${escapeHtml(name)}</span>
+      <span class="item-cat">${escapeHtml(cat)}</span>
+      <div class="item-actions">
+        <button class="action-btn" onclick="viewFile('${hash}')">👁 查看</button>
+        <button class="action-btn" onclick="downloadFile('${hash}')">⬇ 下载</button>
+        <button class="action-btn danger" onclick="deleteFile('${hash}','${escapeHtml(name)}')">🗑 删除</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function uploadFiles(fileList) {
+  const files = Array.from(fileList);
+  for (const file of files) {
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      toast(`上传中: ${file.name}…`);
+      const res = await fetch(API + '/api/upload', { method:'POST', body:form, headers:{'x-admin-token':adminToken} });
+      const data = await res.json();
+      if (data.ok) toast(`✅ ${file.name} 上传成功`);
+      else toast(`❌ ${file.name}: ${data.error||'失败'}`);
+    } catch(e) {
+      toast(`❌ ${file.name} 上传失败`);
+    }
+  }
+  setTimeout(loadFiles, 1500);
+}
+
+async function viewFile(hash) {
+  const modal = document.getElementById('modal');
+  document.getElementById('modal-content').innerHTML = '<div class="loading">加载中…</div>';
+  modal.classList.add('show');
+  try {
+    const data = await api('/api/view/' + hash);
+    document.getElementById('modal-content').innerHTML = `<h3>📄 文件内容</h3><pre>${escapeHtml(data.content||data.html||data.text||'无内容')}</pre>`;
+  } catch(e) {
+    document.getElementById('modal-content').innerHTML = '<h3>❌ 加载失败</h3><p>无法读取文件内容</p>';
+  }
+}
+
+function downloadFile(hash) {
+  window.open(API + '/api/download/' + hash, '_blank');
+}
+
+async function deleteFile(hash, name) {
+  if (!confirm(`确认删除 "${name}"？此操作不可恢复。`)) return;
+  try {
+    await api('/api/documents/' + hash, { method:'DELETE' });
+    toast(`已删除: ${name}`);
+    loadFiles();
+  } catch(e) {
+    toast('删除失败');
+  }
+}
+
+// ========== Wiki 管理 Tab ==========
+async function loadWiki() {
+  document.getElementById('main-content').innerHTML = '<div class="loading">加载中…</div>';
+  try {
+    const data = await api('/api/wiki/list');
+    allWiki = data.pages || data.wiki_pages || [];
+  } catch(e) {
+    allWiki = [];
+  }
+  updateSidebar('wiki');
+  renderWikiList();
+}
+
+function renderWikiList() {
+  const main = document.getElementById('main-content');
+  let pages = currentCat ? allWiki.filter(w => (w.category||'未分类') === currentCat) : allWiki;
+  
+  main.innerHTML = `
+    <div class="card">
+      <h3>🧠 Wiki 知识库 <span style="font-size:12px;color:var(--text-dim);font-weight:400">(${pages.length} 个条目)</span></h3>
+      <div class="search-bar">
+        <input type="text" id="wiki-search" placeholder="搜索 Wiki 条目…" oninput="searchWiki()">
+      </div>
+      <div id="wiki-list">${pages.length === 0 ? '<div class="empty-state">暂无 Wiki 条目，上传文件后自动提炼</div>' : ''}</div>
+    </div>`;
+  
+  if (pages.length > 0) renderWikiRows(pages);
+}
+
+function searchWiki() {
+  const q = document.getElementById('wiki-search').value.toLowerCase();
+  let pages = currentCat ? allWiki.filter(w => (w.category||'未分类') === currentCat) : allWiki;
+  if (q) pages = pages.filter(w => (w.title||'').toLowerCase().includes(q) || (w.summary||'').toLowerCase().includes(q));
+  renderWikiRows(pages);
+}
+
+function renderWikiRows(pages) {
+  const el = document.getElementById('wiki-list');
+  if (!el) return;
+  el.innerHTML = pages.map(w => `
+    <div class="item-row">
+      <span class="item-name" onclick="viewWiki('${w.id}')">🧠 ${escapeHtml(w.title||'未命名')}</span>
+      <span class="item-cat">${escapeHtml(w.category||'未分类')}</span>
+      <div class="item-actions">
+        <button class="action-btn" onclick="viewWiki('${w.id}')">👁 查看</button>
+        <button class="action-btn danger" onclick="deleteWiki('${w.id}','${escapeHtml(w.title||'')}')">🗑 删除</button>
+      </div>
+    </div>`).join('');
+}
+
+async function viewWiki(id) {
+  const modal = document.getElementById('modal');
+  document.getElementById('modal-content').innerHTML = '<div class="loading">加载中…</div>';
+  modal.classList.add('show');
+  try {
+    const data = await api('/api/wiki/' + id);
+    document.getElementById('modal-content').innerHTML = `
+      <h3>🧠 ${escapeHtml(data.title||'')}</h3>
+      <p style="color:var(--text-dim);font-size:12px;margin-bottom:12px">分类: ${escapeHtml(data.category||'未分类')} | 质量: ${data.quality_score||'N/A'}</p>
+      <div style="max-height:400px;overflow-y:auto;line-height:1.8;font-size:13px">${data.content||data.summary||'无内容'}</div>
+    `;
+  } catch(e) {
+    document.getElementById('modal-content').innerHTML = '<h3>❌ 加载失败</h3>';
+  }
+}
+
+async function deleteWiki(id, title) {
+  if (!confirm(`确认删除 Wiki "${title}"？`)) return;
+  try {
+    await api('/api/wiki/' + id, { method:'DELETE' });
+    toast(`已删除: ${title}`);
+    loadWiki();
+  } catch(e) {
+    toast('删除失败');
+  }
+}
+
+// ========== 知识图谱 Tab ==========
+async function loadGraph() {
+  document.getElementById('main-content').innerHTML = '<div class="loading">加载中…</div>';
+  try {
+    const data = await api('/api/graph');
+    const nodes = data.nodes || {};
+    const edges = data.edges || [];
+    const cats = {};
+    Object.values(nodes).forEach(n => { const c = n.type||n.category||'其他'; cats[c] = (cats[c]||0)+1; });
+    
+    document.getElementById('main-content').innerHTML = `
+      <div class="card">
+        <h3>🕸️ 知识图谱</h3>
+        <div class="stats-grid" style="margin-bottom:16px;">
+          <div class="stat-card"><div class="stat-value">${Object.keys(nodes).length}</div><div class="stat-label">实体节点</div></div>
+          <div class="stat-card"><div class="stat-value">${edges.length}</div><div class="stat-label">关系边</div></div>
+          <div class="stat-card"><div class="stat-value">${Object.keys(cats).length}</div><div class="stat-label">分类数</div></div>
+          <div class="stat-card"><div class="stat-value">${nodes._stats?.total_entities||0}</div><div class="stat-label">链接实体</div></div>
+        </div>
+      </div>
+      
+      <div class="card">
+        <h3>📂 分类浏览</h3>
+        ${Object.keys(cats).length === 0 ? '<div class="empty-state">图谱中暂无数据</div>' : 
+          Object.entries(cats).sort((a,b)=>b[1]-a[1]).map(([cat,cnt]) => {
+            const items = Object.entries(nodes).filter(([_,n]) => (n.type||n.category||'其他') === cat).slice(0, 10);
+            return `<div style="margin-bottom:16px">
+              <h4 style="color:var(--orange);margin-bottom:8px">📂 ${escapeHtml(cat)} (${cnt})</h4>
+              ${items.map(([name, n]) => `<span style="display:inline-block;background:var(--orange-dim);color:var(--orange);padding:4px 12px;border-radius:18px;margin:2px;font-size:12px">${escapeHtml(name)}</span>`).join('')}
+              ${cnt > 10 ? `<span style="color:var(--text-dim);font-size:12px">…等 ${cnt} 个</span>` : ''}
+            </div>`;
+          }).join('')
+        }
+      </div>`;
+  } catch(e) {
+    document.getElementById('main-content').innerHTML = '<div class="card"><h3>🕸️ 知识图谱</h3><div class="empty-state">图谱服务暂不可用</div></div>';
+  }
+}
+
+// ========== 搜索评测 Tab ==========
+function renderEvaluation() {
+  document.getElementById('main-content').innerHTML = `
+    <div class="card">
+      <h3>📊 搜索评测</h3>
+      <p style="color:var(--text-dim);margin-bottom:16px">评测仪表板: <a href="/dashboard" target="_blank" style="color:var(--orange)">打开完整仪表板</a></p>
+      <div class="search-bar">
+        <input type="text" id="eval-query" placeholder="输入评测查询…" onkeypress="if(event.key==='Enter')runEvaluation()">
+        <button onclick="runEvaluation()">🔍 评测搜索</button>
+      </div>
+      <div id="eval-results"></div>
+    </div>`;
+}
+
+async function runEvaluation() {
+  const q = document.getElementById('eval-query').value.trim();
+  if (!q) return;
+  const el = document.getElementById('eval-results');
+  el.innerHTML = '<div class="loading">评测中…</div>';
+  try {
+    const t0 = performance.now();
+    const data = await api('/api/search?q=' + encodeURIComponent(q) + '&top_k=10');
+    const ms = (performance.now() - t0).toFixed(0);
+    const chunks = data.results || data.chunk_results || [];
+    const wikiRes = data.wiki_results || [];
+    
+    el.innerHTML = `
+      <div style="margin-top:12px">
+        <p style="color:var(--text-dim)">耗时: ${ms}ms | 结果: ${chunks.length + wikiRes.length} 条 | Wiki: ${wikiRes.length} 条</p>
+        
+        ${wikiRes.length > 0 ? `<h4 style="color:var(--orange);margin-top:12px">🧠 Wiki 匹配</h4>` + wikiRes.map(w => 
+          `<div class="item-row"><span class="item-name">🧠 ${escapeHtml(w._wiki_title||w.text||'')}</span><span style="color:var(--orange);font-size:12px">相关度: ${(w.score||0).toFixed(1)}</span></div>`
+        ).join('') : ''}
+        
+        <h4 style="color:var(--orange);margin-top:12px">📄 文档匹配</h4>
+        ${chunks.slice(0, 5).map(r => `
+          <div class="item-row">
+            <span class="item-name">📄 ${escapeHtml((r.file_name||'来源').substring(0,40))}</span>
+            <span class="item-cat">${escapeHtml(r.category||'未分类')}</span>
+            <span style="font-size:11px;color:var(--text-dim)">${(r.score||0).toFixed(1)}</span>
+          </div>
+        `).join('')}
+        ${chunks.length === 0 ? '<div class="empty-state">无匹配结果</div>' : ''}
+      </div>`;
+  } catch(e) {
+    el.innerHTML = '<div class="empty-state">评测失败: ' + e.message + '</div>';
+  }
+}
+
+// ========== 用户反馈 Tab ==========
+async function loadFeedback() {
+  document.getElementById('main-content').innerHTML = '<div class="loading">加载中…</div>';
+  try {
+    const data = await api('/api/feedback');
+    const items = data.feedbacks || data.items || [];
+    document.getElementById('main-content').innerHTML = `
+      <div class="card">
+        <h3>💬 用户反馈 <span style="font-size:12px;color:var(--text-dim);font-weight:400">(${items.length} 条)</span></h3>
+        ${items.length === 0 ? '<div class="empty-state">暂无用户反馈</div>' : 
+          items.slice(0, 50).map(f => `
+            <div class="item-row">
+              <span class="item-name">${escapeHtml(f.query||f.message||'').substring(0,60)}</span>
+              <span style="color:${f.useful ? 'var(--wood)' : 'var(--text-dim)'};font-size:12px">${f.useful ? '👍' : '👎'}</span>
+              <span style="font-size:11px;color:var(--text-light)">${f.timestamp||f.created_at||''}</span>
+            </div>`).join('')
+        }
+      </div>`;
+  } catch(e) {
+    document.getElementById('main-content').innerHTML = '<div class="card"><h3>💬 用户反馈</h3><div class="empty-state">暂无反馈数据</div></div>';
+  }
+}
+
+// ========== 系统状态 Tab ==========
+async function loadStatus() {
+  document.getElementById('main-content').innerHTML = '<div class="loading">加载中…</div>';
+  try {
+    const [v2, health, metrics] = await Promise.all([
+      api('/api/v2/status').catch(() => ({})),
+      api('/api/health').catch(() => ({})),
+      api('/api/admin/metrics-summary').catch(() => ({})),
+    ]);
+    
+    const bagua = v2.bagua || [];
+    document.getElementById('main-content').innerHTML = `
+      <div class="card">
+        <h3>⚙️ 服务器状态</h3>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-value">${health.version||v2.version||'4.2'}</div><div class="stat-label">版本</div></div>
+          <div class="stat-card"><div class="stat-value" style="color:${v2.health_score > 60 ? 'var(--wood)' : 'var(--fire)'}">${v2.health_score||0}</div><div class="stat-label">健康评分</div></div>
+          <div class="stat-card"><div class="stat-value">${v2.alive_organs||0}/${v2.total_organs_inner||0}</div><div class="stat-label">存活器官</div></div>
+          <div class="stat-card"><div class="stat-value">${health.chunks||v2.data?.chunks||0}</div><div class="stat-label">文档块</div></div>
+        </div>
+      </div>
+      
+      <div class="card">
+        <h3>☯ 八卦器官状态</h3>
+        <div class="bagua-mini">
+          ${bagua.map(b => `
+            <div class="bagua-cell ${b.alive ? 'alive' : 'dead'}">
+              <span class="sym">${b.symbol||'?'}</span>
+              ${b.organ_name||b.organ_id||''}
+            </div>`).join('')}
+        </div>
+      </div>
+      
+      <div class="card">
+        <h3>📊 可观测性</h3>
+        <div class="stats-grid">
+          <div class="stat-card"><div class="stat-value">${metrics.search?.total||0}</div><div class="stat-label">搜索请求</div></div>
+          <div class="stat-card"><div class="stat-value">${(metrics.search?.latency?.avg||0).toFixed(2)}s</div><div class="stat-label">平均延迟</div></div>
+          <div class="stat-card"><div class="stat-value">${metrics.data?.chunks||0}</div><div class="stat-label">Chunks</div></div>
+          <div class="stat-card"><div class="stat-value">${metrics.memory_mb||0} MB</div><div class="stat-label">内存</div></div>
+        </div>
+      </div>
+    `;
+  } catch(e) {
+    document.getElementById('main-content').innerHTML = '<div class="card"><h3>⚙️ 系统状态</h3><div class="empty-state">无法获取状态: ' + e.message + '</div></div>';
+  }
+}
+
+// ========== 初始化 ==========
+loadFiles();
+</script>
+</body>
+</html>

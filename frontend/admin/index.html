@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+<title>伏羲 4.2 · 内世界</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}html{font-size:14px;height:100%}
+body{background:#1a1a1a;color:#fff;font-family:"PingFang SC","Microsoft YaHei",sans-serif;height:100%;display:flex;overflow:hidden;line-height:1.5}
+#sd{width:56px;flex-shrink:0;display:flex;flex-direction:column;background:#242424;border-right:1px solid #333;align-items:center;padding:10px 0;gap:2px;z-index:20}
+#sd .logo{color:#ff6900;font-size:16px;font-weight:700;margin-bottom:10px;text-align:center}
+#sd .sep{width:28px;height:1px;background:#333;margin:4px 0}
+#sd .ni{width:40px;height:40px;display:flex;align-items:center;justify-content:center;border-radius:6px;cursor:pointer;font-size:14px;color:rgba(255,255,255,0.4);transition:all .15s;position:relative}
+#sd .ni:hover{background:#2a2a2a;color:#fff}
+#sd .ni.on{background:rgba(255,105,0,0.1);color:#ff6900}
+#sd .ni .tp{display:none;position:absolute;left:50px;top:50%;transform:translateY(-50%);background:#1a1a1a;color:#fff;padding:4px 10px;border-radius:4px;font-size:11px;white-space:nowrap;z-index:30;border:1px solid #333}
+#sd .ni:hover .tp{display:block}
+#sd .cats{flex:1;overflow-y:auto;padding:4px 0;width:100%}
+.ctag{text-align:center;padding:3px 2px;cursor:pointer;font-size:9px;color:rgba(255,255,255,0.4);transition:all .12s;line-height:1.2}
+.ctag:hover{color:#fff}.ctag.on{color:#ff6900;font-weight:600}.ctag .cnt{display:block;font-size:8px;opacity:.5}
+#main{flex:1;display:flex;flex-direction:column;overflow:hidden}
+#tbar{display:flex;align-items:center;justify-content:space-between;padding:0 20px;height:48px;flex-shrink:0;border-bottom:1px solid #333;background:#242424}
+#tbar .tt{font-size:15px;font-weight:600;color:#fff}#ctn{flex:1;overflow-y:auto;padding:20px 28px 28px}
+.pttl{font-size:18px;font-weight:600;color:#fff;margin-bottom:16px}
+.uzone{padding:32px;text-align:center;margin-bottom:16px;border:2px dashed #333;border-radius:6px;cursor:pointer;transition:all .2s;background:#242424}
+.uzone:hover{border-color:#ff6900;background:rgba(255,105,0,0.05)}
+.uzone .ic{font-size:32px;margin-bottom:6px}.uzone p{font-size:13px;color:rgba(255,255,255,0.65)}
+.uzone .sb{font-size:11px;color:rgba(255,255,255,0.4);margin-top:3px}
+.tbar2{display:flex;gap:8px;align-items:center;margin-bottom:14px}
+.sinp{flex:1;min-width:180px;padding:8px 14px;border:1px solid #333;border-radius:6px;background:#242424;font-size:13px;outline:none;color:#fff;transition:border-color .2s;font-family:inherit}
+.sinp:focus{border-color:#ff6900}.sinp::placeholder{color:rgba(255,255,255,0.4)}
+.btn{padding:6px 16px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:500;border:1px solid #333;background:#242424;color:rgba(255,255,255,0.65);transition:all .15s;white-space:nowrap;font-family:inherit}
+.btn:hover{border-color:#ff6900;color:#ff6900}
+.btn.pri{background:#ff6900;color:#fff;border-color:#ff6900}.btn.pri:hover{background:#ff8c33}
+.btn.sm{padding:4px 12px;font-size:11px}
+.flist{background:#242424;border:1px solid #333;border-radius:6px;overflow:hidden}
+.frow{display:flex;align-items:center;padding:10px 16px;gap:10px;border-bottom:1px solid #333;font-size:13px;transition:background .1s}
+.frow:last-child{border-bottom:none}.frow:hover{background:#2a2a2a}
+.frow .fn{flex:1;cursor:pointer;color:#fff;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;transition:color .12s}
+.frow .fn:hover{color:#ff6900}
+.frow .fc{font-size:10px;padding:2px 8px;border-radius:10px;background:rgba(255,105,0,0.1);color:#ff6900;flex-shrink:0}
+.frow .fm{font-size:11px;color:rgba(255,255,255,0.4);flex-shrink:0}
+.pgbox{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:14px}
+.pgbtn{padding:5px 14px;border-radius:6px;border:1px solid #333;background:#242424;cursor:pointer;font-size:12px;color:rgba(255,255,255,0.65);transition:all .12s;font-family:inherit}
+.pgbtn:hover:not(:disabled){border-color:#ff6900;color:#ff6900}
+.pgbtn.on{background:#ff6900;color:#fff;border-color:#ff6900}.pgbtn:disabled{opacity:.3;cursor:default}
+.pginfo{text-align:center;font-size:11px;color:rgba(255,255,255,0.4);margin-top:6px}
+.sgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:10px;margin-bottom:16px}
+.sbox{padding:18px 14px;text-align:center;background:#242424;border:1px solid #333;border-radius:6px}
+.sbox .sv{font-size:26px;font-weight:700;color:#ff6900}.sbox .sl{font-size:11px;color:rgba(255,255,255,0.65);margin-top:3px}
+.bgg{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:16px}
+.bc{padding:14px 8px;text-align:center;border-radius:6px;background:#242424;border:1px solid #333;font-size:12px}
+.bc .sym{font-size:24px;display:block;margin-bottom:3px}
+.bc.live{border-color:#ff6900;background:rgba(255,105,0,0.1)}
+.bc.dead{opacity:.25}.bc.mid{grid-column:2;border-color:#ff6900;background:rgba(255,105,0,0.1)}
+.mo{display:none;position:fixed;inset:0;background:rgba(0,0,0,0.6);backdrop-filter:blur(4px);z-index:200;align-items:center;justify-content:center}
+.mo.on{display:flex}
+.mb{background:#1a1a1a;border-radius:6px;padding:28px;max-width:720px;max-height:82vh;overflow-y:auto;width:94%;border:1px solid #333}
+.mb h3{color:#ff6900;margin-bottom:12px;font-size:15px}
+.mb pre{white-space:pre-wrap;font-size:12px;line-height:1.7;max-height:380px;overflow-y:auto;background:#242424;padding:14px;border-radius:4px;color:rgba(255,255,255,0.65)}
+.mc{float:right;background:none;border:none;font-size:20px;cursor:pointer;color:rgba(255,255,255,0.4)}
+.mc:hover{color:#fff}
+#toast{position:fixed;bottom:24px;right:24px;background:#fff;color:#1a1a1a;padding:10px 22px;border-radius:20px;font-size:12px;z-index:300;opacity:0;transform:translateY(8px);transition:all .25s;box-shadow:0 8px 24px rgba(0,0,0,0.2)}
+#toast.on{opacity:1;transform:translateY(0)}
+.emp{text-align:center;padding:32px;color:rgba(255,255,255,0.4);font-size:13px}
+.estats{font-size:12px;color:rgba(255,255,255,0.65);margin:8px 0}
+.eitem{display:flex;align-items:center;padding:7px 0;gap:8px;font-size:12px;border-bottom:1px solid #333}
+.ewiki{color:#ff6900}.esec{font-size:13px;color:#ff6900;margin:12px 0 4px;font-weight:600}
+.escore{font-size:10px;color:rgba(255,255,255,0.4);margin-left:auto}
+</style>
+</head>
+<body>
+<nav id="sd">
+<div class="logo">伏<br>羲</div>
+<div class="sep"></div>
+<div class="ni on" onclick="st('upload')">&#128196;<span class="tp">文件管理</span></div>
+<div class="ni" onclick="st('wiki')">&#129504;<span class="tp">Wiki 知识</span></div>
+<div class="ni" onclick="st('graph')">&#128381;<span class="tp">知识图谱</span></div>
+<div class="sep"></div>
+<div class="ni" onclick="st('eval')">&#128202;<span class="tp">搜索评测</span></div>
+<div class="ni" onclick="st('feedback')">&#128172;<span class="tp">用户反馈</span></div>
+<div class="ni" onclick="st('status')">&#9881;<span class="tp">系统状态</span></div>
+<div style="flex:1;min-height:8px"></div>
+<div class="cats" id="cats"></div>
+</nav>
+<div id="main"><div id="tbar"><span class="tt" id="tbar-tt">文件管理</span><span id="tbar-act"></span></div><div id="ctn"></div></div>
+<div class="mo" id="mo"><div class="mb"><button class="mc" onclick="cm()">&#10005;</button><div id="mbd"></div></div></div>
+<div id="toast"></div>
+<input type="file" id="fi" multiple onchange="up(this.files)" accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.md,.csv,.json,.xml,.html,.htm,.jpg,.jpeg,.png,.gif,.bmp,.svg" style="display:none">
+<input type="file" id="ffi" webkitdirectory multiple onchange="up(this.files)" style="display:none">
+
+<script>
+// ====== CONFIG ======
+var A = '';  // 相对路径，自动适配当前域名
+var PS = 30, tk = 'polygon-admin-2024';
+var ct = 'upload', cc = '', cp = 1, af = [], aw = [];
+
+// ====== 工具函数 ======
+function tm(m) {
+  var e = document.getElementById('toast');
+  e.textContent = m; e.classList.add('on');
+  setTimeout(function(){ e.classList.remove('on'); }, 2000);
+}
+function cm() { document.getElementById('mo').classList.remove('on'); }
+function es(s) { var d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
+
+// 统一 fetch 包装（带错误处理）
+async function api(u, o) {
+  o = o || {};
+  o.headers = o.headers || {};
+  o.headers['x-admin-token'] = tk;
+  try {
+    var r = await fetch(A + u, o);
+    if (!r.ok) {
+      var errText = '';
+      try { var ej = await r.json(); errText = ej.detail || ej.error || r.status; } catch(_) { errText = r.status; }
+      throw new Error(errText);
+    }
+    return r.json();
+  } catch(e) {
+    tm('请求失败: ' + e.message);
+    throw e;
+  }
+}
+
+// ====== 导航 ======
+function st(t) {
+  ct = t; cp = 1;
+  var icons = document.querySelectorAll('#sd .ni');
+  for (var i = 0; i < icons.length; i++) icons[i].classList.remove('on');
+  event.target.closest('.ni').classList.add('on');
+  var titles = {upload:'文件管理', wiki:'Wiki 知识', graph:'知识图谱', eval:'搜索评测', feedback:'用户反馈', status:'系统状态'};
+  document.getElementById('tbar-tt').textContent = titles[t] || t;
+  if (t === 'upload') lf();
+  else if (t === 'wiki') lw();
+  else if (t === 'graph') lg();
+  else if (t === 'eval') re();
+  else if (t === 'feedback') rf();
+  else if (t === 'status') rs();
+}
+
+// ====== 分类标签 ======
+function uc() {
+  var items = ct === 'wiki' ? aw : af;
+  var cnts = {};
+  items.forEach(function(i){ var c = i.category || '未分类'; cnts[c] = (cnts[c] || 0) + 1; });
+  document.getElementById('cat-all').textContent = items.length;
+  var h = '<div class="ctag on" onclick="fc(\'\')"><span>全部</span><span class="cnt" id="cat-all">' + items.length + '</span></div>';
+  Object.keys(cnts).sort(function(a,b){ return cnts[b] - cnts[a]; }).forEach(function(c) {
+    h += '<div class="ctag' + (cc === c ? ' on' : '') + '" onclick="fc(\'' + es(c).replace(/'/g, "\\'") + '\')"><span>' + es(c) + '</span><span class="cnt">' + cnts[c] + '</span></div>';
+  });
+  document.getElementById('cats').innerHTML = h;
+}
+
+function fc(c) {
+  cc = c; cp = 1;
+  var tags = document.querySelectorAll('.ctag');
+  for (var i = 0; i < tags.length; i++) tags[i].classList.remove('on');
+  event.target.closest('.ctag').classList.add('on');
+  if (ct === 'wiki') rww();
+  else rfw();
+}
+
+// ====== 文件管理 ======
+async function lf() {
+  document.getElementById('ctn').innerHTML = '<div class="emp">加载中…</div>';
+  try {
+    var d = await api('/api/documents?page_size=9999');
+    af = d.files || d.documents || [];
+    if (af.length && !af[0].file_name) af = Object.values(af);
+  } catch(e) { af = []; }
+  uc(); rfw();
+}
+
+function rfw() {
+  var m = document.getElementById('ctn');
+  var fs = cc ? af.filter(function(f){ return (f.category || '未分类') === cc; }) : af;
+  var tot = fs.length, tp = Math.ceil(tot / PS) || 1;
+  if (cp > tp) cp = tp;
+  var pag = fs.slice((cp - 1) * PS, cp * PS);
+  var pg = '';
+  if (tp > 1) {
+    pg = '<div class="pgbox"><button class="pgbtn" onclick="cp=Math.max(1,cp-1);rfw()" ' + (cp <= 1 ? 'disabled' : '') + '>&#8249;</button>';
+    for (var i = 1; i <= Math.min(tp, 10); i++) {
+      pg += '<button class="pgbtn' + (i === cp ? ' on' : '') + '" onclick="cp=' + i + ';rfw()">' + i + '</button>';
+    }
+    pg += '<button class="pgbtn" onclick="cp=Math.min(tp,cp+1);rfw()" ' + (cp >= tp ? 'disabled' : '') + '>&#8250;</button></div>';
+    pg += '<div class="pginfo">' + tot + ' 条 · 第 ' + cp + '/' + tp + ' 页</div>';
+  }
+  var upH = '<div class="uzone" id="uz" onclick="document.getElementById(\'fi\').click()"><div class="ic">&#128193;</div><p>点击或拖拽文件到此上传</p><p class="sb">支持 PDF · DOCX · XLSX · TXT · MD · 图片</p><button class="btn" style="margin-top:10px" onclick="event.stopPropagation();document.getElementById(\'ffi\').click()">&#128194; 上传文件夹</button></div>';
+  var tbH = '<div class="tbar2"><input type="text" class="sinp" id="fs" placeholder="搜索文件名…" oninput="sf()"></div>';
+  var flH = '<div class="flist" id="fl">' + (tot === 0 ? '<div class="emp">暂无文件，请上传</div>' : '') + '</div>';
+  m.innerHTML = upH + tbH + flH + pg;
+  var z = document.getElementById('uz');
+  if (z) {
+    z.addEventListener('dragover', function(e){ e.preventDefault(); z.style.borderColor = '#ff6900'; });
+    z.addEventListener('dragleave', function(){ z.style.borderColor = ''; });
+    z.addEventListener('drop', function(e){ e.preventDefault(); z.style.borderColor = ''; up(e.dataTransfer.files); });
+  }
+  if (tot > 0) rfl(pag);
+}
+
+function sf() {
+  var q = document.getElementById('fs').value.toLowerCase();
+  var fs = cc ? af.filter(function(f){ return (f.category || '未分类') === cc; }) : af;
+  if (q) fs = fs.filter(function(f){ return (f.file_name || f.name || '').toLowerCase().indexOf(q) !== -1; });
+  cp = 1; rfl(fs.slice(0, PS));
+}
+
+function rfl(fs) {
+  var el = document.getElementById('fl');
+  if (!el) return;
+  el.innerHTML = fs.map(function(f) {
+    var n = f.file_name || f.name || '?';
+    var c = f.category || '未分类';
+    var h = f.file_hash || f.hash || '';
+    var sz = f.file_size ? (f.file_size > 1048576 ? (f.file_size / 1048576).toFixed(1) + ' MB' : (f.file_size / 1024).toFixed(0) + ' KB') : '';
+    return '<div class="frow"><span class="fn" onclick="vf(\'' + h + '\')" title="' + es(n) + '">&#128196; ' + es(n) + '</span>' + (sz ? '<span class="fm">' + sz + '</span>' : '') + '<span class="fc">' + es(c) + '</span><button class="btn sm" onclick="vf(\'' + h + '\')">查看</button><button class="btn sm" onclick="dfh(\'' + h + '\')">下载</button></div>';
+  }).join('');
+}
+
+// ====== 上传 ======
+async function up(fl) {
+  for (var i = 0; i < fl.length; i++) {
+    var f = fl[i];
+    tm('上传中: ' + f.name);
+    var fd = new FormData();
+    fd.append('file', f);
+    try {
+      var r = await fetch(A + '/api/upload', { method: 'POST', body: fd, headers: { 'x-admin-token': tk } });
+      var d = await r.json();
+      tm(d.ok ? '✅ ' + f.name : '❌ ' + (d.error || '失败'));
+    } catch(e) {
+      tm('❌ 上传失败: ' + f.name + ' (' + e.message + ')');
+    }
+  }
+  setTimeout(lf, 1500);
+}
+
+// ====== 下载/查看 ======
+function dfh(h) { window.open(A + '/api/download/' + h, '_blank'); }
+
+async function vf(h) {
+  document.getElementById('mbd').innerHTML = '<div class="emp">加载中…</div>';
+  document.getElementById('mo').classList.add('on');
+  try {
+    var d = await api('/api/view/' + h);
+    document.getElementById('mbd').innerHTML = '<h3>&#128196; 文件内容</h3><pre>' + es(d.content || d.html || d.text || '无内容') + '</pre>';
+  } catch(e) {
+    document.getElementById('mbd').innerHTML = '<h3>&#10060; 加载失败</h3>';
+  }
+}
+
+// ====== Wiki ======
+async function lw() {
+  document.getElementById('ctn').innerHTML = '<div class="emp">加载中…</div>';
+  try {
+    var d = await api('/api/wiki/pages?limit=9999');
+    aw = d.pages || d.data || [];
+  } catch(e) { aw = []; }
+  uc(); rww();
+}
+
+function rww() {
+  var m = document.getElementById('ctn');
+  var ps = cc ? aw.filter(function(w){ return (w.category || '未分类') === cc; }) : aw;
+  var tot = ps.length, tp = Math.ceil(tot / PS) || 1;
+  if (cp > tp) cp = tp;
+  var pag = ps.slice((cp - 1) * PS, cp * PS);
+  var pg = '';
+  if (tp > 1) {
+    pg = '<div class="pgbox"><button class="pgbtn" onclick="cp=Math.max(1,cp-1);rww()" ' + (cp <= 1 ? 'disabled' : '') + '>&#8249;</button>';
+    for (var i = 1; i <= Math.min(tp, 10); i++) pg += '<button class="pgbtn' + (i === cp ? ' on' : '') + '" onclick="cp=' + i + ';rww()">' + i + '</button>';
+    pg += '<button class="pgbtn" onclick="cp=Math.min(tp,cp+1);rww()" ' + (cp >= tp ? 'disabled' : '') + '>&#8250;</button></div>';
+    pg += '<div class="pginfo">' + tot + ' 条 · 第 ' + cp + '/' + tp + ' 页</div>';
+  }
+  m.innerHTML = '<div class="tbar2"><input type="text" class="sinp" id="ws" placeholder="搜索 Wiki…" oninput="sw()"></div><div class="flist" id="wl">' + (tot === 0 ? '<div class="emp">暂无 Wiki 条目</div>' : '') + '</div>' + pg;
+  if (tot > 0) rwl(pag);
+}
+
+function sw() {
+  var q = document.getElementById('ws').value.toLowerCase();
+  var ps = cc ? aw.filter(function(w){ return (w.category || '未分类') === cc; }) : aw;
+  if (q) ps = ps.filter(function(w){ return (w.title || '').toLowerCase().indexOf(q) !== -1 || (w.summary || '').toLowerCase().indexOf(q) !== -1; });
+  cp = 1; rwl(ps.slice(0, PS));
+}
+
+function rwl(ps) {
+  var el = document.getElementById('wl');
+  if (!el) return;
+  el.innerHTML = ps.map(function(w) {
+    return '<div class="frow"><span class="fn" onclick="vw(\'' + w.id + '\')">&#129504; ' + es(w.title || '未命名') + '</span><span class="fc">' + es(w.category || '未分类') + '</span><button class="btn sm" onclick="vw(\'' + w.id + '\')">查看</button></div>';
+  }).join('');
+}
+
+async function vw(id) {
+  document.getElementById('mo').classList.add('on');
+  document.getElementById('mbd').innerHTML = '<div class="emp">加载中…</div>';
+  try {
+    var d = await api('/api/wiki/page/' + id);
+    document.getElementById('mbd').innerHTML = '<h3>&#129504; ' + es(d.title || '') + '</h3><p style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:8px">分类: ' + es(d.category || '未分类') + ' | 质量: ' + (d.quality_score || 'N/A') + '</p><div style="line-height:1.7;font-size:13px">' + (d.content || d.summary || '无内容') + '</div>';
+  } catch(e) {
+    document.getElementById('mbd').innerHTML = '<h3>&#10060; 加载失败</h3>';
+  }
+}
+
+// ====== 知识图谱 ======
+async function lg() {
+  document.getElementById('ctn').innerHTML = '<div class="emp">加载中…</div>';
+  try {
+    var d = await api('/api/graph');
+    var nodes = d.nodes || {}, edges = d.edges || [], cats = {};
+    Object.values(nodes).forEach(function(n){ var c = n.type || n.category || '其他'; cats[c] = (cats[c] || 0) + 1; });
+    var catHTML = '';
+    Object.keys(cats).sort(function(a,b){ return cats[b] - cats[a]; }).forEach(function(cat) {
+      var items = Object.entries(nodes).filter(function(e){ return (e[1].type || e[1].category || '其他') === cat; }).slice(0, 8);
+      catHTML += '<div style="margin-bottom:10px"><span style="color:#ff6900;font-weight:600;font-size:13px">&#128194; ' + es(cat) + ' (' + cats[cat] + ')</span><div style="margin-top:4px">' + items.map(function(e) {
+        return '<span style="display:inline-block;background:rgba(255,105,0,0.1);color:#ff6900;padding:2px 8px;border-radius:10px;margin:1px;font-size:10px">' + es(e[0]) + '</span>';
+      }).join('') + (cats[cat] > 8 ? ' <span style="font-size:10px;color:rgba(255,255,255,0.4)">…' + cats[cat] + '</span>' : '') + '</div></div>';
+    });
+    document.getElementById('ctn').innerHTML = '<div class="pttl">&#128381; 知识图谱</div><div class="sgrid"><div class="sbox"><div class="sv">' + Object.keys(nodes).length + '</div><div class="sl">实体节点</div></div><div class="sbox"><div class="sv">' + edges.length + '</div><div class="sl">关系边</div></div><div class="sbox"><div class="sv">' + Object.keys(cats).length + '</div><div class="sl">分类数</div></div></div>' + (Object.keys(cats).length === 0 ? '<div class="emp">暂无数据</div>' : '<div style="background:#242424;border:1px solid #333;border-radius:6px;padding:16px"><h3 style="font-size:14px;color:#fff;margin-bottom:10px">&#128194; 分类浏览</h3>' + catHTML + '</div>');
+  } catch(e) {
+    document.getElementById('ctn').innerHTML = '<div class="pttl">&#128381; 知识图谱</div><div class="emp">暂不可用</div>';
+  }
+}
+
+// ====== 搜索评测 ======
+function re() {
+  document.getElementById('ctn').innerHTML = '<div class="pttl">&#128202; 搜索评测</div><p style="font-size:12px;margin-bottom:12px"><a href="/dashboard" target="_blank" style="color:#ff6900;text-decoration:none">完整仪表板 &#8594;</a></p><div class="tbar2"><input type="text" class="sinp" id="eq" placeholder="输入查询…" onkeypress="if(event.key===\'Enter\')rune()"><button class="btn pri" onclick="rune()">搜索</button></div><div id="er"></div>';
+}
+
+async function rune() {
+  var q = document.getElementById('eq').value.trim();
+  if (!q) return;
+  var el = document.getElementById('er');
+  el.innerHTML = '<div class="emp">评测中…</div>';
+  var t0 = performance.now();
+  try {
+    var d = await api('/api/search?q=' + encodeURIComponent(q) + '&top_k=10');
+    var ms = (performance.now() - t0).toFixed(0);
+    var ch = d.results || d.chunk_results || [], wr = d.wiki_results || [];
+    var h = '<div class="estats">&#9201; ' + ms + 'ms · 文档 ' + ch.length + ' · Wiki ' + wr.length + '</div>';
+    if (wr.length > 0) {
+      h += '<div class="esec">&#129504; Wiki 结果</div>';
+      wr.forEach(function(w){ h += '<div class="eitem ewiki"><span>&#129504; ' + es((w._wiki_title || w.text || '').substring(0, 40)) + '</span><span class="escore">' + (w.score || 0).toFixed(1) + '</span></div>'; });
+    }
+    h += '<div class="esec">&#128196; 文档片段</div>';
+    if (ch.length === 0) h += '<div class="emp">无匹配</div>';
+    else ch.slice(0, 10).forEach(function(r){ h += '<div class="eitem"><span>&#128196; ' + es((r.file_name || '来源').substring(0, 35)) + '</span><span class="fc" style="font-size:9px">' + es(r.category || '?') + '</span><span class="escore">' + (r.score || 0).toFixed(1) + '</span></div>'; });
+    el.innerHTML = h;
+  } catch(e) {
+    el.innerHTML = '<div class="emp">评测失败: ' + es(e.message) + '</div>';
+  }
+}
+
+// ====== 用户反馈 ======
+async function rf() {
+  document.getElementById('ctn').innerHTML = '<div class="emp">加载中…</div>';
+  try {
+    var d = await api('/api/feedback/weekly');
+    var items = d.feedbacks || d.data || d.items || [];
+    var h = '<div class="pttl">&#128172; 用户反馈</div>';
+    if (items.length === 0) h += '<div class="emp">暂无反馈</div>';
+    else {
+      h += '<div class="flist">';
+      items.slice(0, 100).forEach(function(f) {
+        h += '<div class="frow"><span class="fn">' + es((f.query || f.question || '').substring(0, 45)) + '</span><span style="font-size:11px;color:' + (f.useful ? '#ff6900' : 'rgba(255,255,255,0.4)') + '">' + (f.useful ? '&#128077; 有用' : '&#128078; 无用') + '</span></div>';
+      });
+      h += '</div>';
+    }
+    document.getElementById('ctn').innerHTML = h;
+  } catch(e) {
+    document.getElementById('ctn').innerHTML = '<div class="pttl">&#128172; 用户反馈</div><div class="emp">暂无反馈</div>';
+  }
+}
+
+// ====== 系统状态 ======
+async function rs() {
+  document.getElementById('ctn').innerHTML = '<div class="emp">加载中…</div>';
+  try {
+    var P = await Promise.all([
+      api('/api/v2/status').catch(function(){ return {}; }),
+      api('/api/health').catch(function(){ return {}; })
+    ]);
+    var v = P[0], h = P[1];
+    var b = v.bagua || [], ext = v.extra_organs || [];
+    var stm = ext.find(function(e){ return e.organ_id === 'stomach'; }) || {};
+    var bc = function(x, id) {
+      var o = b.find(function(bb){ return bb.trigram === id; }) || {};
+      return '<div class="bc' + (o.alive ? ' live' : ' dead') + '"><span class="sym">' + x + '</span>' + (o.organ_name || id) + '<br><span style="font-size:9px;color:rgba(255,255,255,0.4)">' + (o.alive ? '存活' : '休眠') + '</span></div>';
+    };
+    document.getElementById('ctn').innerHTML = '<div class="pttl">&#9881; 系统状态</div><div class="sgrid"><div class="sbox"><div class="sv">' + (h.version || v.version || '4.2') + '</div><div class="sl">版本</div></div><div class="sbox"><div class="sv" style="color:' + (v.health_score > 60 ? '#ff6900' : '#d33') + '">' + (v.health_score || 0) + '</div><div class="sl">健康评分</div></div><div class="sbox"><div class="sv">' + (v.alive_organs || 0) + '/' + (v.total_organs_inner || 0) + '</div><div class="sl">存活器官</div></div><div class="sbox"><div class="sv">' + (h.chunks || (v.data ? v.data.chunks : 0) || 0) + '</div><div class="sl">文档块</div></div></div><div style="background:#242424;border:1px solid #333;border-radius:6px;padding:16px;margin-bottom:14px"><h3 style="font-size:14px;color:#fff;margin-bottom:10px">&#9775; 后天八卦九宫</h3><div class="bgg">' + bc('&#9776;', 'xun') + bc('&#9778;', 'li') + bc('&#9783;', 'kun') + bc('&#9779;', 'zhen') + '<div class="bc mid"><span class="sym">&#8853;</span>中宫·胃<br><span style="font-size:9px;color:rgba(255,255,255,0.4)">' + (stm.alive ? '存活' : '休眠') + '</span></div>' + bc('&#9781;', 'dui') + bc('&#9782;', 'gen') + bc('&#9777;', 'kan') + bc('&#9776;', 'qian') + '</div></div>';
+  } catch(e) {
+    document.getElementById('ctn').innerHTML = '<div class="pttl">&#9881; 系统状态</div><div class="emp">获取失败: ' + es(e.message) + '</div>';
+  }
+}
+
+// ====== 启动 ======
+uc();
+lf();
+setInterval(function(){ if (ct === 'status') rs(); }, 30000);
+</script>
+</body>
+</html>

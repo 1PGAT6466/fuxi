@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.eggs/
+*.egg
+
+# Virtual environment
+venv/
+.venv/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Environment
+.env
+.env.local
+
+# Data
+data/
+logs/
+uploads/
+*.db
+*.sqlite3
+*.tar.gz
+
+# Node
+node_modules/
+
+# Backup files
+*.bak*
+*_backup
+*.trunk_bak
+*.leaf_bak
+*.wt_backup
+
+# Frontend deploy target (source is frontend/, symlinked/copied to static/)
+frontend/static/
