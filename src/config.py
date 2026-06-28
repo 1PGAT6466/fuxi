@@ -48,17 +48,17 @@ PORT = int(os.getenv("KB_PORT", "8080"))
 EMBEDDER_URL = os.getenv("KB_EMBEDDER_URL", "http://localhost:8081")
 CORS_ORIGINS: List[str] = os.getenv(
     "KB_CORS_ORIGINS",
-    "http://172.25.30.200:8080,http://localhost:8080"
+    "${KB_SERVER_URL:-http://localhost:8080},http://localhost:8080"
 ).split(",")
 
 # ============ 安全 ============
-ADMIN_TOKEN = os.getenv("KB_ADMIN_TOKEN", "polygon-admin-2024")
+ADMIN_TOKEN = os.getenv("KB_ADMIN_TOKEN", "")
 MAX_FILE_MB = 200
 UPLOAD_MAX_MB = int(os.getenv("KB_UPLOAD_MAX_MB", "200"))
 AI_TIMEOUT_SECONDS = int(os.getenv("KB_AI_TIMEOUT", "30"))
 
 # ============ MiMo API 配置 ============
-MIMO_API_KEY = os.getenv("MIMO_API_KEY", "tp-criulddv9awgtbaahfjahtlcler9axttvjixgtblzir41rzu")
+MIMO_API_KEY = os.getenv("MIMO_API_KEY", "")
 MIMO_BASE_URL = os.getenv("MIMO_BASE_URL", "https://token-plan-cn.xiaomimimo.com/v1")
 MIMO_MODEL = os.getenv("MIMO_MODEL", "mimo-v2.5")
 MIMO_TIMEOUT = int(os.getenv("MIMO_TIMEOUT", "60"))

@@ -62,3 +62,52 @@ async def compress_context(ctx_parts, query, call_llm_fn=None, total_budget=4000
     ratio = sum(len(p) for p in compressed) / max(total_len, 1)
     logger.info(f"[Compress] Context: {total_len} -> {sum(len(p) for p in compressed)} chars ({ratio:.0%})")
     return compressed
+
+def extract_relevant_sentences(query: str, text: str, max_sentences: int = 5) -> str:
+    """句子级抽取压缩（零 LLM 成本）
+    
+    策略: TF-IDF 关键词重叠 → 取 top-N 相关句子
+    """
+    import re
+    from collections import Counter
+    
+    # 分词（中文按字符 2-gram）
+    def tokenize(s):
+        # 提取中文和英文单词
+        tokens = re.findall(r'[\u4e00-\u9fff]+|[a-zA-Z]+', s.lower())
+        # 中文 2-gram
+        for tok in tokens:
+            if re.match(r'[\u4e00-\u9fff]', tok):
+                for i in range(len(tok)-1):
+                    tokens.append(tok[i:i+2])
+            else:
+                tokens.append(tok.lower())
+        return [t for t in tokens if len(t) > 1]
+    
+    query_tokens = set(tokenize(query))
+    if not query_tokens:
+        return text[:1000]
+    
+    # 按句号/换行分句
+    sentences = re.split(r'[。！？\n;；]', text)
+    sentences = [s.strip() for s in sentences if len(s.strip()) > 10]
+    
+    if not sentences:
+        return text[:2000]
+    
+    # 计算每句与 query 的相关度
+    scored = []
+    for s in sentences:
+        s_tokens = tokenize(s)
+        overlap = len(query_tokens & set(s_tokens))
+        scored.append((overlap, s))
+    
+    scored.sort(reverse=True, key=lambda x: x[0])
+    
+    # 取 top-N
+    top_sentences = [s for _, s in scored[:max_sentences] if _ > 0]
+    
+    if not top_sentences:
+        return text[:2000]  # fallback: 前 2000 字符
+    
+    return '\n'.join(top_sentences)

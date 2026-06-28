@@ -421,7 +421,7 @@ def llm_classify(text: str) -> str:
                 "max_tokens": 20,
                 "temperature": 0.1
             },
-            headers={"Authorization": "Bearer tp-criulddv9awgtbaahfjahtlcler9axttvjixgtblzir41rzu"},
+            headers={"Authorization": "Bearer {os.getenv('MIMO_API_KEY', '')}"},
             timeout=10
         )
         return r.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()

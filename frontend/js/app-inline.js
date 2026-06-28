@@ -13,7 +13,7 @@ const API = '';
 let enableExternal = true;
 let chatHistory = [];
 let currentPanel = 'chat';
-const adminToken = 'polygon-admin-2024';
+const adminToken = (window.__ADMIN_TOKEN__ || '');
 
 // ========== 面板切换 ==========
 function switchPanel(name, fromPopState) {

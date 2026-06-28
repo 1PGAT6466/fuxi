@@ -169,7 +169,7 @@ async def download_file(file_hash: str):
     if file_name:
         # Try direct loader proxy
         try:
-            loader_url = "http://172.25.30.16:8090/api/download?path=" + urllib.parse.quote(file_name)
+            loader_url = LOADER_URL + "/api/download?path=" + urllib.parse.quote(file_name)
             req = urllib.request.Request(loader_url)
             with urllib.request.urlopen(req, timeout=15) as resp:
                 data = resp.read()
@@ -182,12 +182,12 @@ async def download_file(file_hash: str):
         try:
             simple_name = file_name.split("/")[-1]
             import requests, json as json_mod
-            r = requests.get("http://172.25.30.16:8090/api/files", timeout=10)
+            r = requests.get(LOADER_URL + "/api/files", timeout=10)
             for f in r.json().get("files", []):
                 if f.get("name", "") == simple_name:
                     lp = f.get("path", "").replace("\\", "/")
                     if lp:
-                        loader_url = "http://172.25.30.16:8090/api/download?path=" + urllib.parse.quote(lp)
+                        loader_url = LOADER_URL + "/api/download?path=" + urllib.parse.quote(lp)
                         req = urllib.request.Request(loader_url)
                         with urllib.request.urlopen(req, timeout=30) as resp:
                             data = resp.read()
@@ -241,7 +241,7 @@ async def view_file(file_hash: str):
         # 策略2: 装载机代理
         try:
             import urllib.request
-            proxy_url = "http://172.25.30.16:8090/api/download?path=" + urllib.parse.quote(file_name.replace("\\", "/"))
+            proxy_url = LOADER_URL + "/api/download?path=" + urllib.parse.quote(file_name.replace("\\", "/"))
             req = urllib.request.Request(proxy_url)
             with urllib.request.urlopen(req, timeout=10) as resp:
                 raw_bytes = resp.read()
@@ -303,7 +303,7 @@ async def raw_store_proxy(request: Request):
     content_type = request.headers.get("content-type", "")
     try:
         req = urllib.request.Request(
-            os.getenv("KB_RAW_STORE_URL", "http://172.25.30.10:8090/api/raw-store"),
+            os.getenv("KB_RAW_STORE_URL", LOADER_URL.replace(":8090", ":8090") + "/api/raw-store"),
             data=body,
             headers={"Content-Type": content_type}
         )

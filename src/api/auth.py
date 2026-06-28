@@ -8,7 +8,7 @@ from fastapi import Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
 # 认证 Token（从环境变量读取，默认值用于开发）
-API_TOKEN = os.getenv("FUXI_API_TOKEN", "fuxi-v1.43-token")
+API_TOKEN = os.getenv("FUXI_API_TOKEN", "")
 
 # 白名单路径（不需要认证）
 WHITELIST = {

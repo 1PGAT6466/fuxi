@@ -220,6 +220,32 @@ async def admin_metrics_summary():
 
 
 # ============ 启动 ============
+
+# v4.0: 代理路由 — 前端通过后端访问装载机
+@app.get("/api/proxy/loader/files")
+async def proxy_loader_files():
+    """代理: 获取装载机文件列表"""
+    import requests as _req
+    loader_url = os.getenv("LOADER_URL", "http://172.25.30.16:8090")
+    try:
+        r = _req.get(f"{loader_url}/api/files", timeout=10)
+        return r.json()
+    except Exception as e:
+        return {"error": str(e), "files": []}
+
+@app.post("/api/proxy/loader/upload")
+async def proxy_loader_upload(request: Request):
+    """代理: 上传文件到装载机"""
+    import requests as _req
+    loader_url = os.getenv("LOADER_URL", "http://172.25.30.16:8090")
+    body = await request.body()
+    try:
+        r = _req.post(f"{loader_url}/api/upload", data=body, timeout=30,
+                      headers={"Content-Type": request.headers.get("Content-Type", "multipart/form-data")})
+        return r.json()
+    except Exception as e:
+        return {"error": str(e)}
+
 if __name__ == "__main__":
     logger.info(f"伏羲·内世界 API v{VERSION} — http://0.0.0.0:{PORT}")
     uvicorn.run(

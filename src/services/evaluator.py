@@ -6,7 +6,8 @@ from typing import List, Dict
 
 logger = logging.getLogger(__name__)
 
-MIMO_API_KEY = "tp-criulddv9awgtbaahfjahtlcler9axttvjixgtblzir41rzu"
+import os
+MIMO_API_KEY = os.getenv("MIMO_API_KEY", "")
 MIMO_BASE_URL = "https://token-plan-cn.xiaomimimo.com/v1"
 
 

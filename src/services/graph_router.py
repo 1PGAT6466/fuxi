@@ -385,3 +385,19 @@ def expand_query_with_synonyms(query: str) -> str:
         if neighbors:
             query = query + ' ' + ' '.join(sorted(neighbors)[:5])
     return query
+
+def multi_hop_search(query: str, max_hops: int = 3) -> dict:
+    """多跳图搜索（GraphRAG 入口）"""
+    try:
+        from src.services.graph_traversal import multi_hop_traverse
+        # 先匹配实体
+        matched = fuzzy_match_entity(query, "")  # 直接找最匹配的
+        if not matched:
+            # 尝试 normalize
+            normalized = normalize_entity(query)
+            result = multi_hop_traverse(normalized, max_hops=max_hops)
+        else:
+            result = multi_hop_traverse(query, max_hops=max_hops)
+        return result
+    except ImportError:
+        return {"paths": [], "entities": [], "error": "graph_traversal not available"}

@@ -14,7 +14,7 @@ router = APIRouter(tags=["元数据中心"])
 
 # 元数据模式标记字段
 META_FLAG = "metadata_only"
-ADMIN_TOKEN = os.environ.get("KB_ADMIN_TOKEN", "polygon-admin-2024")
+ADMIN_TOKEN = os.environ.get("KB_ADMIN_TOKEN", "")
 
 
 def _check_admin_token(request: Request):
