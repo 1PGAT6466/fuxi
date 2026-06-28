@@ -194,7 +194,23 @@ async def graph_path(source: str, target: str):
     graph = load_graph()
     nodes = graph.get("nodes", {})
     edges = graph.get("edges", [])
-    path = _bfs_path(nodes, edges, source.upper(), target.upper())
+    
+    # Smart node matching: try exact, then partial match
+    def _find_node(name, nodes):
+        if name in nodes:
+            return name
+        upper = name.upper()
+        if upper in nodes:
+            return upper
+        # Partial match
+        for n in nodes:
+            if name in n or upper in n:
+                return n
+        return name
+    
+    src_key = _find_node(source, nodes)
+    tgt_key = _find_node(target, nodes)
+    path = _bfs_path(nodes, edges, src_key, tgt_key)
     if path:
         return {
             "source": source, "target": target, "path": path,
