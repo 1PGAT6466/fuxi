@@ -104,9 +104,9 @@ app.add_middleware(InputLimitMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],  # 内网环境全放开
-    allow_methods=["GET", "POST", "DELETE"],
-    allow_headers=["Content-Type", "x-admin-token"],
+    allow_origins=["*"],
+    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_headers=["Content-Type", "x-admin-token", "Authorization"],
 )
 app.add_middleware(GZipMiddleware, minimum_size=500)
 
@@ -208,13 +208,57 @@ async def update_feature_flag(name: str, request: Request):
     set_flag(name, value)
     return {"ok": True, "flag": name, "value": value}
 
+# ============ 认证 API ============
+from pydantic import BaseModel as _BM
+class _LoginReq(_BM):
+    username: str
+    password: str
+class _RegisterReq(_BM):
+    username: str
+    password: str
+    display_name: str = ""
+
+@app.post("/api/auth/login")
+async def auth_login(body: _LoginReq):
+    from src.api.auth import authenticate_user, _make_token
+    user = authenticate_user(body.username, body.password)
+    if not user:
+        raise HTTPException(401, "用户名或密码错误")
+    token = _make_token(user["username"], user["role"])
+    return {"token": token, "role": user["role"], "display_name": user["display_name"], "username": user["username"]}
+
+@app.post("/api/auth/register")
+async def auth_register(body: _RegisterReq):
+    from src.api.auth import register_user
+    result = register_user(body.username, body.password, "user", body.display_name)
+    if result.get("error"):
+        raise HTTPException(400, result["error"])
+    return result
+
+@app.get("/api/auth/me")
+async def auth_me(request: Request):
+    return {"username": getattr(request.state, "user", "anonymous"), "role": getattr(request.state, "role", "user")}
+
+# ============ 统一前端入口 ============
+from fastapi.responses import HTMLResponse, FileResponse
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page():
+    f = STATIC_DIR / "login.html"
+    return HTMLResponse(f.read_text(encoding="utf-8") if f.exists() else "<h1>login.html not found</h1>")
+
+@app.get("/", response_class=HTMLResponse)
+async def index_page():
+    f = STATIC_DIR / "index.html"
+    return HTMLResponse(f.read_text(encoding="utf-8") if f.exists() else "<h1>index.html not found</h1>")
+
+@app.get("/admin", response_class=HTMLResponse)
+async def admin_page():
+    f = STATIC_DIR / "index.html"
+    return HTMLResponse(f.read_text(encoding="utf-8") if f.exists() else "<h1>index.html not found</h1>")
+
 # 静态资源挂载
-app.mount("/static/css", StaticFiles(directory=str(STATIC_DIR / "css")), name="static_css")
-app.mount("/static/js", StaticFiles(directory=str(STATIC_DIR / "js")), name="static_js")
-# 兼容旧路径
-app.mount("/js", StaticFiles(directory=str(STATIC_DIR / "js")), name="static_js_legacy")
-app.mount("/static/admin/js", StaticFiles(directory=str(STATIC_DIR / "admin" / "js")), name="static_admin_js")
-app.mount("/static/admin", StaticFiles(directory=str(STATIC_DIR / "admin"), html=True), name="static_admin")
+app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
 
 # 管理面板路由 — /, /admin, /api/health, /api/stats, /api/admin/*
 # v1.41: 八卦体征端点
