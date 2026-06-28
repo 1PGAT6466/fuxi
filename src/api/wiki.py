@@ -473,11 +473,9 @@ from typing import Dict, Any, Optional
 async def wiki_list(search: Optional[str] = None) -> Dict[str, Any]:
     """获取 Wiki 页面列表"""
     try:
-        import sys
-        sys.path.insert(0, '/home/feng-shaoxuan/伏羲·内世界')
-        from src.services.wiki import get_all_wiki_pages
-        
-        pages = await get_all_wiki_pages()
+        from src.services.wiki import get_wiki_engine
+        engine = get_wiki_engine()
+        pages = engine.list_pages()
         if search:
             pages = [p for p in pages if search.lower() in p.get("title", "").lower()]
         

@@ -18,9 +18,14 @@ USERS_FILE = Path(os.getenv("FUXI_DATA_DIR", "data")) / "users.json"
 WHITELIST = {
     "/api/health", "/api/metrics", "/api/v2/status",
     "/api/auth/login", "/api/auth/register",
-    "/", "/favicon.ico", "/login", "/index.html",
+    "/", "/favicon.ico", "/login", "/index.html", "/login.html",
+    # 公共查询 API
+    "/api/search", "/api/search-history", "/api/chat", "/api/chat/agent", "/api/graph", "/api/graph/entities", "/api/graph/route",
+    "/api/wiki", "/api/wiki/list", "/api/wiki/page",
+    "/api/graph", "/api/graph/entities",
+    "/admin", "/admin/",
 }
-STATIC_PREFIXES = ("/static/", "/js/", "/css/", "/assets/", "/lib/")
+STATIC_PREFIXES = ("/static/", "/js/", "/css/", "/assets/", "/lib/", "/api/wiki/", "/api/graph/", "/api/search/", "/api/images/")
 
 
 def _hash_password(password: str, salt: str = "") -> str:
