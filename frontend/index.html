@@ -4,123 +4,680 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>伏羲 · 企业知识认知系统</title>
-<link rel="stylesheet" href="/static/css/style.css">
 <style>
-.role-badge{display:inline-block;padding:2px 8px;border-radius:10px;font-size:10px;font-weight:600;margin-left:8px}
-.role-badge.admin{background:rgba(255,103,0,0.15);color:#ff6700}
-.role-badge.user{background:rgba(32,168,216,0.15);color:#20a8d8}
-.user-info{display:flex;align-items:center;gap:8px;padding:12px 16px;border-top:1px solid var(--border)}
-.user-info .avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,#ff6700,#ff8c42);display:flex;align-items:center;justify-content:center;color:#fff;font-size:14px;font-weight:700}
-.user-info .name{font-size:13px;font-weight:600;flex:1}
-.user-info .logout{font-size:12px;color:var(--text3);cursor:pointer;padding:4px 8px;border-radius:6px}
-.user-info .logout:hover{background:rgba(229,57,53,0.1);color:#e53935}
-.nav-section.admin-only{display:none}
-body.is-admin .nav-section.admin-only{display:block}
-.nav-item.admin-only{display:none}
-body.is-admin .nav-item.admin-only{display:block}
-.page.admin-page{display:none}
-body.is-admin .page.admin-page{display:block}
-body.not-logged-in .sidebar,body.not-logged-in .main-area{display:none}
-body.not-logged-in::after{content:'请先登录';display:flex;align-items:center;justify-content:center;position:fixed;inset:0;background:#faf8f5;font-size:18px;color:#999;z-index:9999}
-.chat-container{display:flex;flex-direction:column;height:calc(100vh - 56px - 48px)}
-.chat-messages{flex:1;overflow-y:auto;padding:20px}
-.message{margin-bottom:16px;max-width:80%}
-.message.user{margin-left:auto}
-.bubble{padding:12px 16px;border-radius:12px;font-size:14px;line-height:1.7}
-.user-bubble{background:var(--pri,#ff6700);color:#fff;border-bottom-right-radius:4px}
-.ai-bubble{background:var(--card,#fff);border:1px solid var(--border,#e8e3dc);border-bottom-left-radius:4px}
-.sources{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;padding-left:16px}
-.source-tag{font-size:11px;padding:2px 8px;border-radius:10px;background:rgba(255,103,0,0.08);color:var(--pri,#ff6700)}
-.typing{color:var(--text3,#999);animation:blink 1s infinite}
-@keyframes blink{50%{opacity:.5}}
-.chat-input-area{padding:12px 20px;border-top:1px solid var(--border,#e8e3dc);background:var(--card,#fff)}
-.chat-input-wrap{display:flex;gap:8px;align-items:flex-end}
-.chat-input-wrap textarea{flex:1;padding:10px 14px;border:1px solid var(--border,#e8e3dc);border-radius:10px;font-size:14px;resize:none;outline:none;font-family:inherit;background:var(--bg,#faf8f5);max-height:120px}
-.chat-input-wrap textarea:focus{border-color:var(--pri,#ff6700)}
-.btn-send{padding:10px 20px;background:var(--pri,#ff6700);color:#fff;border:none;border-radius:10px;font-size:14px;font-weight:600;cursor:pointer}
-.btn-send:hover{opacity:.9}
-.search-box{display:flex;gap:8px;margin-bottom:20px}
-.search-box input{flex:1;padding:10px 14px;border:1px solid var(--border);border-radius:10px;font-size:14px;outline:none;background:var(--card)}
-.search-box button{padding:10px 20px;background:var(--pri);color:#fff;border:none;border-radius:10px;cursor:pointer}
-.result-card{background:var(--card);border:1px solid var(--border);border-radius:var(--radius);padding:16px;margin-bottom:12px}
-.result-title{font-weight:600;margin-bottom:6px}
-.result-text{font-size:13px;color:var(--text2);line-height:1.6}
-.result-meta{font-size:11px;color:var(--text3);margin-top:6px}
-.empty-state{text-align:center;padding:80px 20px;color:var(--text3)}
-.empty-icon{font-size:48px;margin-bottom:16px;opacity:.3}
-.stat-grid{display:grid;grid-template-template:repeat(auto-fit,minmax(200px,1fr));gap:14px;margin-bottom:24px}
-.stat-card{background:var(--card);border-radius:var(--radius);padding:18px 20px;box-shadow:var(--shadow);display:flex;align-items:center;gap:14px}
+/* ===== 小米设计语言 ===== */
+:root {
+  --pri:#ff6700;--pri-light:#fff4ed;--pri-dark:#e55d00;
+  --bg:#f5f5f7;--bg2:#eef0f3;--card:#fff;--card-hover:#fafafa;
+  --text:#1d1d1f;--text2:#6e6e73;--text3:#aeaeb2;--text4:#d2d2d7;
+  --border:#e5e5ea;--border-light:#f2f2f7;
+  --success:#34c759;--warning:#ff9500;--error:#ff3b30;--info:#007aff;
+  --shadow:0 1px 3px rgba(0,0,0,.06);--shadow-md:0 4px 14px rgba(0,0,0,.08);--shadow-lg:0 8px 30px rgba(0,0,0,.12);
+  --radius:12px;--radius-sm:8px;--radius-lg:16px;--radius-xl:20px;
+  --sidebar:260px;--topbar:56px;
+  --font:-apple-system,BlinkMacSystemFont,'SF Pro Display','PingFang SC','Helvetica Neue',sans-serif;
+  --ease:cubic-bezier(.25,.1,.25,1);
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:var(--font);background:var(--bg);color:var(--text);min-height:100vh;line-height:1.5;-webkit-font-smoothing:antialiased}
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-thumb{background:var(--text4);border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:var(--text3)}
+
+/* ===== 布局 ===== */
+.app{display:flex;min-height:100vh}
+.sidebar{width:var(--sidebar);background:var(--card);border-right:1px solid var(--border);position:fixed;top:0;left:0;bottom:0;display:flex;flex-direction:column;z-index:100;transition:transform .3s var(--ease)}
+.sidebar-header{padding:20px 24px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:12px}
+.logo{width:36px;height:36px;background:linear-gradient(135deg,var(--pri),#ff8c42);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:800;font-size:16px;box-shadow:0 2px 8px rgba(255,103,0,.25)}
+.logo-text{font-size:16px;font-weight:700;letter-spacing:1px}
+.nav{flex:1;overflow-y:auto;padding:12px 12px 0}
+.nav-group{margin-bottom:16px}
+.nav-label{font-size:11px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:1px;padding:0 12px;margin-bottom:6px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:var(--radius-sm);cursor:pointer;transition:all .15s var(--ease);font-size:13px;color:var(--text2);font-weight:500;position:relative;margin-bottom:2px}
+.nav-item:hover{background:var(--bg);color:var(--text)}
+.nav-item.active{background:var(--pri-light);color:var(--pri);font-weight:600}
+.nav-item.active::before{content:'';position:absolute;left:0;top:6px;bottom:6px;width:3px;background:var(--pri);border-radius:0 2px 2px 0}
+.nav-icon{font-size:16px;width:22px;text-align:center;flex-shrink:0}
+.nav-badge{margin-left:auto;font-size:10px;padding:2px 6px;border-radius:6px;background:var(--pri-light);color:var(--pri);font-weight:600}
+.nav-admin{display:none}
+body.is-admin .nav-admin{display:block}
+
+.sidebar-footer{padding:12px 16px;border-top:1px solid var(--border-light)}
+.user-row{display:flex;align-items:center;gap:10px}
+.user-avatar{width:32px;height:32px;border-radius:50%;background:linear-gradient(135deg,var(--pri),#ff8c42);display:flex;align-items:center;justify-content:center;color:#fff;font-size:13px;font-weight:700}
+.user-name{font-size:13px;font-weight:600;flex:1}
+.user-role{font-size:10px;padding:2px 6px;border-radius:4px;font-weight:600}
+.user-role.admin{background:var(--pri-light);color:var(--pri)}
+.user-role.user{background:#e8f5e9;color:var(--success)}
+.btn-logout{font-size:12px;color:var(--text3);cursor:pointer;padding:4px 8px;border-radius:6px;background:none;border:none}
+.btn-logout:hover{background:#fee;color:var(--error)}
+
+.main{margin-left:var(--sidebar);flex:1;display:flex;flex-direction:column;min-height:100vh}
+.topbar{height:var(--topbar);background:rgba(255,255,255,.85);backdrop-filter:saturate(180%) blur(20px);border-bottom:1px solid var(--border);display:flex;align-items:center;padding:0 24px;position:sticky;top:0;z-index:50}
+.topbar-title{font-size:15px;font-weight:600}
+.topbar-right{margin-left:auto;display:flex;align-items:center;gap:12px}
+.topbar-status{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:4px}
+.status-dot{width:6px;height:6px;border-radius:50%;background:var(--success)}
+.content{flex:1;padding:24px;overflow-y:auto}
+.page{display:none;animation:fadeUp .25s var(--ease)}
+.page.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+
+/* ===== 卡片 ===== */
+.card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);box-shadow:var(--shadow);transition:all .2s var(--ease)}
+.card:hover{box-shadow:var(--shadow-md)}
+.card-header{padding:16px 20px;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:10px}
+.card-header h3{font-size:14px;font-weight:600}
+.card-body{padding:20px}
+
+/* ===== 统计卡片 ===== */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px;margin-bottom:20px}
+.stat{background:var(--card);border-radius:var(--radius);padding:18px 20px;border:1px solid var(--border-light);box-shadow:var(--shadow);display:flex;align-items:center;gap:14px;transition:all .2s}
+.stat:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
+.stat-icon{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px}
+.stat-value{font-size:22px;font-weight:700;line-height:1}
+.stat-label{font-size:12px;color:var(--text3);margin-top:2px}
+
+/* ===== 按钮 ===== */
+.btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;transition:all .15s;border:none;font-family:var(--font)}
+.btn-primary{background:var(--pri);color:#fff}
+.btn-primary:hover{background:var(--pri-dark);transform:translateY(-1px);box-shadow:0 2px 8px rgba(255,103,0,.3)}
+.btn-ghost{background:transparent;color:var(--text2);border:1px solid var(--border)}
+.btn-ghost:hover{background:var(--bg);color:var(--text)}
+.btn-sm{padding:5px 10px;font-size:12px}
+.btn-icon{width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:8px;background:transparent;border:none;cursor:pointer;color:var(--text2)}
+.btn-icon:hover{background:var(--bg)}
+
+/* ===== 输入框 ===== */
+.input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:var(--font);background:var(--card);transition:all .15s;outline:none}
+.input:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(255,103,0,.1)}
+.input::placeholder{color:var(--text4)}
+.search-bar{display:flex;gap:8px}
+.search-bar .input{flex:1}
+
+/* ===== 对话 ===== */
+.chat-wrap{display:flex;flex-direction:column;height:calc(100vh - var(--topbar) - 48px)}
+.chat-msgs{flex:1;overflow-y:auto;padding:20px;display:flex;flex-direction:column;gap:16px}
+.msg{max-width:72%;display:flex;flex-direction:column;gap:4px}
+.msg.user{align-self:flex-end}
+.msg.ai{align-self:flex-start}
+.msg-bubble{padding:12px 16px;border-radius:var(--radius);font-size:14px;line-height:1.7;word-break:break-word}
+.msg.user .msg-bubble{background:var(--pri);color:#fff;border-bottom-right-radius:4px}
+.msg.ai .msg-bubble{background:var(--card);border:1px solid var(--border-light);border-bottom-left-radius:4px}
+.msg-meta{font-size:11px;color:var(--text3);display:flex;align-items:center;gap:8px}
+.msg-sources{display:flex;flex-wrap:wrap;gap:4px;margin-top:6px}
+.source-chip{font-size:11px;padding:2px 8px;border-radius:6px;background:var(--pri-light);color:var(--pri);cursor:pointer}
+.source-chip:hover{background:var(--pri);color:#fff}
+.msg-trace{margin-top:8px;background:var(--bg);border-radius:var(--radius-sm);padding:10px 14px;font-size:12px}
+.trace-step{display:flex;align-items:center;gap:8px;padding:4px 0;color:var(--text2)}
+.trace-step .tool{font-weight:600;color:var(--pri)}
+.trace-step .ms{color:var(--text3);margin-left:auto}
+.typing{color:var(--text3);font-size:13px;padding:12px 16px}
+.chat-input{padding:16px 20px;border-top:1px solid var(--border-light);background:var(--card)}
+.chat-input-row{display:flex;gap:8px;align-items:flex-end}
+.chat-input textarea{flex:1;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:var(--font);resize:none;outline:none;background:var(--bg);max-height:120px;line-height:1.5}
+.chat-input textarea:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(255,103,0,.1)}
+
+/* ===== 搜索结果 ===== */
+.result-list{display:flex;flex-direction:column;gap:12px}
+.result{background:var(--card);border:1px solid var(--border-light);border-radius:var(--radius);padding:16px 20px;transition:all .2s}
+.result:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
+.result-title{font-size:14px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.result-text{font-size:13px;color:var(--text2);line-height:1.7}
+.result-meta{font-size:11px;color:var(--text3);margin-top:8px;display:flex;gap:12px}
+
+/* ===== 图谱 ===== */
+.graph-wrap{height:calc(100vh - var(--topbar) - 120px);background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);position:relative;overflow:hidden}
+.graph-canvas{width:100%;height:100%}
+.graph-panel{position:absolute;top:16px;left:16px;width:260px;background:rgba(255,255,255,.95);backdrop-filter:blur(12px);border-radius:var(--radius);border:1px solid var(--border-light);box-shadow:var(--shadow-lg);padding:16px;max-height:calc(100% - 32px);overflow-y:auto}
+.graph-panel h4{font-size:13px;font-weight:600;margin-bottom:10px}
+.graph-entity{font-size:12px;color:var(--text2);padding:6px 0;border-bottom:1px solid var(--border-light)}
+.graph-entity:last-child{border:none}
+
+/* ===== Wiki ===== */
+.wiki-layout{display:grid;grid-template-columns:240px 1fr;gap:16px;height:calc(100vh - var(--topbar) - 120px)}
+.wiki-tree{background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);padding:16px;overflow-y:auto}
+.wiki-tree-item{padding:6px 10px;border-radius:6px;font-size:13px;cursor:pointer;color:var(--text2);transition:all .15s}
+.wiki-tree-item:hover{background:var(--bg);color:var(--text)}
+.wiki-tree-item.active{background:var(--pri-light);color:var(--pri);font-weight:600}
+.wiki-content{background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);padding:24px;overflow-y:auto}
+.wiki-content h1{font-size:20px;font-weight:700;margin-bottom:12px}
+.wiki-content h2{font-size:16px;font-weight:600;margin:16px 0 8px;color:var(--text)}
+.wiki-content p{font-size:14px;line-height:1.8;color:var(--text2);margin-bottom:12px}
+.wiki-content table{width:100%;border-collapse:collapse;font-size:13px;margin:12px 0}
+.wiki-content th{background:var(--bg);padding:8px 12px;text-align:left;font-weight:600;border-bottom:2px solid var(--border)}
+.wiki-content td{padding:8px 12px;border-bottom:1px solid var(--border-light)}
+
+/* ===== 文件管理 ===== */
+.file-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:14px}
+.file-card{background:var(--card);border:1px solid var(--border-light);border-radius:var(--radius);padding:16px;cursor:pointer;transition:all .2s}
+.file-card:hover{box-shadow:var(--shadow-md);transform:translateY(-2px)}
+.file-icon{font-size:28px;margin-bottom:10px}
+.file-name{font-size:13px;font-weight:600;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.file-meta{font-size:11px;color:var(--text3)}
+
+/* ===== 表格 ===== */
+.table-wrap{overflow-x:auto}
+table.data{width:100%;border-collapse:collapse;font-size:13px}
+table.data th{background:var(--bg);padding:10px 14px;text-align:left;font-weight:600;border-bottom:2px solid var(--border);position:sticky;top:0}
+table.data td{padding:10px 14px;border-bottom:1px solid var(--border-light)}
+table.data tr:hover{background:var(--bg)}
+
+/* ===== 开关 ===== */
+.toggle{position:relative;width:40px;height:22px;cursor:pointer}
+.toggle input{display:none}
+.toggle .slider{position:absolute;inset:0;background:var(--text4);border-radius:11px;transition:.2s}
+.toggle .slider::before{content:'';position:absolute;width:18px;height:18px;left:2px;top:2px;background:#fff;border-radius:50%;transition:.2s}
+.toggle input:checked+.slider{background:var(--pri)}
+.toggle input:checked+.slider::before{transform:translateX(18px)}
+
+/* ===== 登录页 ===== */
+.login-bg{min-height:100vh;background:linear-gradient(135deg,#1a1a2e,#16213e,#0f3460);display:flex;align-items:center;justify-content:center}
+.login-box{width:380px;background:rgba(255,255,255,.06);backdrop-filter:blur(24px);border:1px solid rgba(255,255,255,.1);border-radius:var(--radius-xl);padding:44px 36px;box-shadow:0 24px 60px rgba(0,0,0,.3)}
+.login-logo{text-align:center;margin-bottom:32px}
+.login-logo .logo{width:56px;height:56px;font-size:24px;margin:0 auto 12px;box-shadow:0 4px 16px rgba(255,103,0,.3)}
+.login-logo h1{font-size:20px;color:#fff;font-weight:700;letter-spacing:2px}
+.login-logo p{font-size:12px;color:rgba(255,255,255,.4);margin-top:4px}
+.login-form .form-group{margin-bottom:18px}
+.login-form label{display:block;font-size:12px;color:rgba(255,255,255,.5);margin-bottom:6px;font-weight:500}
+.login-form input{width:100%;padding:11px 14px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:var(--radius-sm);color:#fff;font-size:14px;outline:none;font-family:var(--font);transition:.2s}
+.login-form input:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(255,103,0,.15)}
+.login-form input::placeholder{color:rgba(255,255,255,.25)}
+.login-btn{width:100%;padding:12px;background:linear-gradient(135deg,var(--pri),#ff8c42);border:none;border-radius:var(--radius-sm);color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:var(--font);transition:.2s}
+.login-btn:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(255,103,0,.4)}
+.login-btn:disabled{opacity:.5;transform:none}
+.login-error{color:#ff6b6b;font-size:12px;text-align:center;margin-top:10px;min-height:18px}
+.login-toggle{text-align:center;margin-top:18px;font-size:12px;color:rgba(255,255,255,.4)}
+.login-toggle a{color:#ff8c42;cursor:pointer;text-decoration:none;font-weight:500}
+.login-version{text-align:center;margin-top:20px;font-size:10px;color:rgba(255,255,255,.15)}
+
+/* ===== 管理面板 ===== */
+.flag-row{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--border-light)}
+.flag-row:last-child{border:none}
+.flag-name{font-size:13px;font-weight:600;min-width:180px}
+.flag-desc{font-size:12px;color:var(--text3);flex:1}
+.organ-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px}
+.organ-card{background:var(--card);border:1px solid var(--border-light);border-radius:var(--radius);padding:16px;text-align:center;transition:.2s}
+.organ-card:hover{box-shadow:var(--shadow-md)}
+.organ-emoji{font-size:28px;margin-bottom:8px}
+.organ-name{font-size:12px;font-weight:600}
+.organ-status{font-size:11px;color:var(--text3);margin-top:4px}
+
+/* ===== 空状态 ===== */
+.empty{text-align:center;padding:60px 20px;color:var(--text3)}
+.empty-icon{font-size:40px;margin-bottom:12px;opacity:.4}
+.empty h3{font-size:15px;font-weight:600;color:var(--text2);margin-bottom:6px}
+.empty p{font-size:13px}
+
+/* ===== Toast ===== */
+.toast{position:fixed;top:20px;right:20px;padding:12px 20px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;color:#fff;z-index:9999;animation:slideIn .3s var(--ease);box-shadow:var(--shadow-lg)}
+.toast.success{background:var(--success)}
+.toast.error{background:var(--error)}
+.toast.info{background:var(--info)}
+@keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
+
+/* ===== 响应式 ===== */
+@media(max-width:768px){
+  .sidebar{transform:translateX(-100%)}
+  .sidebar.open{transform:none}
+  .main{margin-left:0}
+  .wiki-layout{grid-template-columns:1fr}
+  .stats{grid-template-columns:repeat(2,1fr)}
+}
 </style>
 </head>
-<body class="not-logged-in">
-<div class="sidebar">
-    <div class="sidebar-brand"><div class="logo-icon">☰</div><span>伏羲</span></div>
-    <div class="sidebar-nav">
-        <div class="nav-section">用户功能</div>
-        <div class="nav-item active" data-page="chat" onclick="switchPage('chat')"><span class="nav-icon">💬</span><span>智能对话</span></div>
-        <div class="nav-item" data-page="search" onclick="switchPage('search')"><span class="nav-icon">🔍</span><span>知识搜索</span></div>
-        <div class="nav-item" data-page="graph" onclick="switchPage('graph')"><span class="nav-icon">🕸️</span><span>知识图谱</span></div>
-        <div class="nav-item" data-page="wiki" onclick="switchPage('wiki')"><span class="nav-icon">📚</span><span>Wiki 知识</span></div>
-        <div class="nav-item" data-page="files" onclick="switchPage('files')"><span class="nav-icon">📁</span><span>文件管理</span></div>
-        <div class="nav-section admin-only">管理功能</div>
-        <div class="nav-item admin-only" data-page="admin-dashboard" onclick="switchPage('admin-dashboard')"><span class="nav-icon">📊</span><span>数据面板</span></div>
-        <div class="nav-item admin-only" data-page="admin-organs" onclick="switchPage('admin-organs')"><span class="nav-icon">🫀</span><span>器官状态</span></div>
-        <div class="nav-item admin-only" data-page="admin-eval" onclick="switchPage('admin-eval')"><span class="nav-icon">📈</span><span>评测报告</span></div>
-        <div class="nav-item admin-only" data-page="admin-flags" onclick="switchPage('admin-flags')"><span class="nav-icon">🚩</span><span>Feature Flags</span></div>
-        <div class="nav-item admin-only" data-page="admin-feedback" onclick="switchPage('admin-feedback')"><span class="nav-icon">💬</span><span>用户反馈</span></div>
+<body>
+
+<!-- ===== 登录页 ===== -->
+<div class="login-bg" id="loginPage">
+  <div class="login-box">
+    <div class="login-logo">
+      <div class="logo">☰</div>
+      <h1>伏 羲</h1>
+      <p>企业知识认知系统</p>
     </div>
-    <div class="user-info">
-        <div class="avatar" id="userAvatar">A</div>
-        <div class="name"><span id="userName">用户</span><span class="role-badge" id="roleBadge">user</span></div>
-        <span class="logout" onclick="logout()">退出</span>
+    <form class="login-form" id="loginForm">
+      <div class="form-group">
+        <label>用户名</label>
+        <input type="text" id="loginUser" placeholder="请输入用户名" autocomplete="username" required>
+      </div>
+      <div class="form-group">
+        <label>密码</label>
+        <input type="password" id="loginPass" placeholder="请输入密码" autocomplete="current-password" required>
+      </div>
+      <button type="submit" class="login-btn" id="loginBtn">登 录</button>
+      <div class="login-error" id="loginError"></div>
+    </form>
+    <div class="login-toggle">
+      <span id="toggleText">没有账号？</span>
+      <a id="toggleLink" onclick="toggleMode()">注册新账号</a>
     </div>
+    <div class="login-version">伏羲 RAG 4.0 · v1.44</div>
+  </div>
 </div>
-<div class="main-area">
+
+<!-- ===== 主应用 ===== -->
+<div class="app" id="mainApp" style="display:none">
+  <!-- 侧边栏 -->
+  <div class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+      <div class="logo">☰</div>
+      <span class="logo-text">伏羲</span>
+    </div>
+    <div class="nav">
+      <div class="nav-group">
+        <div class="nav-label">知识服务</div>
+        <div class="nav-item active" data-page="chat"><span class="nav-icon">💬</span>智能对话</div>
+        <div class="nav-item" data-page="search"><span class="nav-icon">🔍</span>知识搜索</div>
+        <div class="nav-item" data-page="graph"><span class="nav-icon">🕸️</span>知识图谱</div>
+        <div class="nav-item" data-page="wiki"><span class="nav-icon">📚</span>Wiki 知识</div>
+        <div class="nav-item" data-page="files"><span class="nav-icon">📁</span>文件管理</div>
+      </div>
+      <div class="nav-group nav-admin">
+        <div class="nav-label">系统管理</div>
+        <div class="nav-item" data-page="admin-overview"><span class="nav-icon">📊</span>系统概览</div>
+        <div class="nav-item" data-page="admin-organs"><span class="nav-icon">🫀</span>器官状态</div>
+        <div class="nav-item" data-page="admin-eval"><span class="nav-icon">📈</span>评测报告</div>
+        <div class="nav-item" data-page="admin-flags"><span class="nav-icon">🚩</span>Feature Flags</div>
+        <div class="nav-item" data-page="admin-feedback"><span class="nav-icon">💬</span>用户反馈</div>
+      </div>
+    </div>
+    <div class="sidebar-footer">
+      <div class="user-row">
+        <div class="user-avatar" id="userAvatar">A</div>
+        <div>
+          <div class="user-name" id="userName">用户</div>
+          <span class="user-role" id="userRole">user</span>
+        </div>
+        <button class="btn-logout" onclick="logout()">退出</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 主区域 -->
+  <div class="main">
     <div class="topbar">
-        <div class="topbar-title" id="pageTitle">智能对话</div>
-        <div class="topbar-actions"><span id="statusText"></span></div>
+      <div class="topbar-title" id="pageTitle">智能对话</div>
+      <div class="topbar-right">
+        <div class="topbar-status"><span class="status-dot"></span> 系统正常</div>
+      </div>
     </div>
     <div class="content">
-        <div class="page active" id="page-chat">
-            <div class="chat-container">
-                <div class="chat-messages" id="chatMessages"><div class="empty-state"><div class="empty-icon">☰</div><h3>有什么想问的？</h3><p>输入问题，伏羲会从知识库中检索并回答</p></div></div>
-                <div class="chat-input-area"><div class="chat-input-wrap"><textarea id="chatInput" placeholder="输入你的问题..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendMessage()}"></textarea><button class="btn-send" onclick="sendMessage()">发送</button></div></div>
+
+      <!-- ===== 对话页 ===== -->
+      <div class="page active" id="page-chat">
+        <div class="chat-wrap">
+          <div class="chat-msgs" id="chatMsgs">
+            <div class="empty" id="chatEmpty">
+              <div class="empty-icon">☰</div>
+              <h3>有什么想问的？</h3>
+              <p>输入问题，伏羲会从知识库中检索并回答</p>
             </div>
+          </div>
+          <div class="chat-input">
+            <div class="chat-input-row">
+              <textarea id="chatInput" placeholder="输入你的问题..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
+              <button class="btn btn-primary" onclick="sendChat()">发送</button>
+            </div>
+          </div>
         </div>
-        <div class="page" id="page-search"><div class="page-header"><h2>知识搜索</h2></div><div class="search-box"><input type="text" id="searchInput" placeholder="输入关键词..." onkeydown="if(event.key==='Enter')doSearch()"><button onclick="doSearch()">搜索</button></div><div id="searchResults"></div></div>
-        <div class="page" id="page-graph"><div class="page-header"><h2>知识图谱</h2></div><div id="graphContainer" style="height:500px;background:var(--card);border-radius:var(--radius);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--text3)">图谱加载中...</div></div>
-        <div class="page" id="page-wiki"><div class="page-header"><h2>Wiki 知识库</h2></div><div id="wikiContent"></div></div>
-        <div class="page" id="page-files"><div class="page-header"><h2>文件管理</h2></div><div id="filesContent"></div></div>
-        <div class="page admin-page" id="page-admin-dashboard"><div class="page-header"><h2>数据面板</h2></div><div id="dashboardContent"></div></div>
-        <div class="page admin-page" id="page-admin-organs"><div class="page-header"><h2>器官状态</h2></div><div id="organsContent"></div></div>
-        <div class="page admin-page" id="page-admin-eval"><div class="page-header"><h2>评测报告</h2></div><div id="evalContent"></div></div>
-        <div class="page admin-page" id="page-admin-flags"><div class="page-header"><h2>Feature Flags</h2></div><div id="flagsContent"></div></div>
-        <div class="page admin-page" id="page-admin-feedback"><div class="page-header"><h2>用户反馈</h2></div><div id="feedbackContent"></div></div>
+      </div>
+
+      <!-- ===== 搜索页 ===== -->
+      <div class="page" id="page-search">
+        <div class="search-bar" style="margin-bottom:20px">
+          <input class="input" type="text" id="searchInput" placeholder="输入关键词搜索..." onkeydown="if(event.key==='Enter')doSearch()">
+          <button class="btn btn-primary" onclick="doSearch()">搜索</button>
+        </div>
+        <div id="searchResults"></div>
+      </div>
+
+      <!-- ===== 图谱页 ===== -->
+      <div class="page" id="page-graph">
+        <div class="graph-wrap">
+          <canvas class="graph-canvas" id="graphCanvas"></canvas>
+          <div class="graph-panel" id="graphPanel">
+            <h4>🕸️ 知识图谱</h4>
+            <div class="search-bar" style="margin-bottom:12px">
+              <input class="input" type="text" id="graphSearch" placeholder="搜索实体..." onkeydown="if(event.key==='Enter')searchGraph()">
+            </div>
+            <div id="graphEntities"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== Wiki 页 ===== -->
+      <div class="page" id="page-wiki">
+        <div class="wiki-layout">
+          <div class="wiki-tree" id="wikiTree">
+            <div style="font-size:13px;font-weight:600;margin-bottom:12px">📚 目录</div>
+          </div>
+          <div class="wiki-content" id="wikiContent">
+            <div class="empty">
+              <div class="empty-icon">📚</div>
+              <h3>选择一个 Wiki 页面</h3>
+              <p>从左侧目录中选择要查看的知识页面</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== 文件管理页 ===== -->
+      <div class="page" id="page-files">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
+          <div class="search-bar" style="flex:1;max-width:400px">
+            <input class="input" type="text" id="fileSearch" placeholder="搜索文件...">
+          </div>
+          <button class="btn btn-primary" onclick="document.getElementById('fileUpload').click()">📤 上传文件</button>
+          <input type="file" id="fileUpload" style="display:none" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.md,.csv" onchange="uploadFiles(this.files)">
+        </div>
+        <div class="file-grid" id="fileGrid"></div>
+      </div>
+
+      <!-- ===== 管理面板：系统概览 ===== -->
+      <div class="page" id="page-admin-overview">
+        <div class="stats" id="overviewStats"></div>
+        <div class="card" style="margin-bottom:16px">
+          <div class="card-header"><h3>📊 系统指标</h3></div>
+          <div class="card-body" id="overviewMetrics">加载中...</div>
+        </div>
+      </div>
+
+      <!-- ===== 管理面板：器官状态 ===== -->
+      <div class="page" id="page-admin-organs">
+        <div class="organ-grid" id="organGrid"></div>
+      </div>
+
+      <!-- ===== 管理面板：评测报告 ===== -->
+      <div class="page" id="page-admin-eval">
+        <div class="stats" id="evalStats"></div>
+        <div class="card">
+          <div class="card-header"><h3>📈 评测详情</h3></div>
+          <div class="card-body" id="evalDetail">加载中...</div>
+        </div>
+      </div>
+
+      <!-- ===== 管理面板：Feature Flags ===== -->
+      <div class="page" id="page-admin-flags">
+        <div class="card">
+          <div class="card-header"><h3>🚩 Feature Flags</h3><span style="font-size:11px;color:var(--text3);margin-left:auto">修改后立即生效</span></div>
+          <div class="card-body" id="flagsList"></div>
+        </div>
+      </div>
+
+      <!-- ===== 管理面板：用户反馈 ===== -->
+      <div class="page" id="page-admin-feedback">
+        <div class="card">
+          <div class="card-header"><h3>💬 反馈列表</h3></div>
+          <div class="card-body" id="feedbackList">加载中...</div>
+        </div>
+      </div>
+
     </div>
+  </div>
 </div>
-<script src="/static/js/marked.min.js"></script>
-<script src="/static/js/dompurify.min.js"></script>
-<script src="/static/js/toast.js"></script>
+
 <script>
-const T='fuxi_token',U='***';
-function getToken(){return localStorage.getItem(T)||''}
-function getUser(){try{return JSON.parse(localStorage.getItem(U)||'{}')}catch(e){return{}}}
-function checkAuth(){const t=getToken();if(!t){window.location.href='/login';return false}fetch('/api/auth/me',{headers:{'Authorization':'Bearer '+t}}).then(r=>{if(!r.ok)throw new Error();return r.json()}).then(d=>{document.body.classList.remove('not-logged-in');document.getElementById('userName').textContent=d.username||'用户';document.getElementById('userAvatar').textContent=(d.username||'U')[0].toUpperCase();const role=d.role||'user';const badge=document.getElementById('roleBadge');badge.textContent=role==='admin'?'管理员':'用户';badge.className='role-badge '+role;if(role==='admin')document.body.classList.add('is-admin')}).catch(()=>{localStorage.removeItem(T);localStorage.removeItem(U);window.location.href='/login'});return true}
-function logout(){localStorage.removeItem(T);localStorage.removeItem(U);window.location.href='/login'}
-function apiFetch(url,opt){const t=getToken();opt=opt||{};opt.headers=opt.headers||{};if(t)opt.headers['Authorization']='Bearer '+t;if(!opt.headers['Content-Type']&&opt.body)opt.headers['Content-Type']='application/json';return fetch(url,opt)}
-const PAGE_TITLES={chat:'智能对话',search:'知识搜索',graph:'知识图谱',wiki:'Wiki 知识',files:'文件管理','admin-dashboard':'数据面板','admin-organs':'器官状态','admin-eval':'评测报告','admin-flags':'Feature Flags','admin-feedback':'用户反馈'};
-function switchPage(name){document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));const page=document.getElementById('page-'+name);if(page)page.classList.add('active');const nav=document.querySelector('.nav-item[data-page="'+name+'"]');if(nav)nav.classList.add('active');document.getElementById('pageTitle').textContent=PAGE_TITLES[name]||name;if(name==='admin-flags')loadFlags();if(name==='admin-organs')loadOrgans();if(name==='admin-dashboard')loadDashboard()}
+// ===== 认证 =====
+const TK='***',UK='***';
+function getToken(){return localStorage.getItem(TK)||''}
+function getUser(){try{return JSON.parse(localStorage.getItem(UK)||'{}')}catch(e){return{}}}
+function setAuth(token,user){localStorage.setItem(TK,token);localStorage.setItem(UK,JSON.stringify(user))}
+function clearAuth(){localStorage.removeItem(TK);localStorage.removeItem(UK)}
+
+async function api(url,opt){
+  const t=getToken();opt=opt||{};opt.headers=opt.headers||{};
+  if(t)opt.headers['Authorization']='Bearer '+t;
+  if(opt.body&&typeof opt.body==='object'&&!opt.headers['Content-Type']){opt.headers['Content-Type']='application/json';opt.body=JSON.stringify(opt.body)}
+  const r=await fetch(url,opt);
+  if(r.status===401){clearAuth();showLogin();throw new Error('未登录')}
+  if(r.status===403){toast('无权限访问','error');throw new Error('无权限')}
+  if(!r.ok)throw new Error('请求失败: '+r.status);
+  return r.json()
+}
+
+// ===== 登录 =====
+let isLoginMode=true;
+function toggleMode(){isLoginMode=!isLoginMode;document.getElementById('loginBtn').textContent=isLoginMode?'登 录':'注 册';document.getElementById('toggleText').textContent=isLoginMode?'没有账号？':'已有账号？';document.getElementById('toggleLink').textContent=isLoginMode?'注册新账号':'去登录';document.getElementById('loginError').textContent=''}
+
+document.getElementById('loginForm').addEventListener('submit',async e=>{
+  e.preventDefault();
+  const u=document.getElementById('loginUser').value.trim(),p=document.getElementById('loginPass').value;
+  if(!u||!p)return;
+  const btn=document.getElementById('loginBtn'),err=document.getElementById('loginError');
+  btn.disabled=true;btn.textContent=isLoginMode?'登录中...':'注册中...';err.textContent='';
+  try{
+    const ep=isLoginMode?'/api/auth/login':'/api/auth/register';
+    const d=await api(ep,{method:'POST',body:{username:u,password:p}});
+    if(isLoginMode){setAuth(d.token,{username:d.username,role:d.role,display_name:d.display_name});showApp()}else{err.style.color='#34c759';err.textContent='注册成功，请登录';isLoginMode=true;document.getElementById('loginBtn').textContent='登 录'}
+  }catch(e){err.textContent=e.message||'操作失败'}
+  finally{btn.disabled=false;btn.textContent=isLoginMode?'登 录':'注 册'}
+});
+
+function showLogin(){document.getElementById('loginPage').style.display='flex';document.getElementById('mainApp').style.display='none'}
+function showApp(){document.getElementById('loginPage').style.display='none';document.getElementById('mainApp').style.display='flex';initApp()}
+function logout(){clearAuth();showLogin()}
+
+// ===== 页面切换 =====
+const TITLES={chat:'智能对话',search:'知识搜索',graph:'知识图谱',wiki:'Wiki 知识',files:'文件管理','admin-overview':'系统概览','admin-organs':'器官状态','admin-eval':'评测报告','admin-flags':'Feature Flags','admin-feedback':'用户反馈'};
+
+function switchPage(name){
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
+  const page=document.getElementById('page-'+name);
+  if(page)page.classList.add('active');
+  const nav=document.querySelector(`.nav-item[data-page="${name}"]`);
+  if(nav)nav.classList.add('active');
+  document.getElementById('pageTitle').textContent=TITLES[name]||name;
+  // 懒加载
+  if(name==='graph')loadGraph();
+  if(name==='wiki')loadWikiTree();
+  if(name==='files')loadFiles();
+  if(name==='admin-overview')loadOverview();
+  if(name==='admin-organs')loadOrgans();
+  if(name==='admin-eval')loadEval();
+  if(name==='admin-flags')loadFlags();
+  if(name==='admin-feedback')loadFeedback();
+}
+
+document.querySelectorAll('.nav-item').forEach(item=>{
+  item.addEventListener('click',()=>switchPage(item.dataset.page));
+});
+
+// ===== 初始化 =====
+function initApp(){
+  const user=getUser();
+  document.getElementById('userName').textContent=user.display_name||user.username||'用户';
+  document.getElementById('userAvatar').textContent=(user.username||'U')[0].toUpperCase();
+  const role=user.role||'user';
+  const badge=document.getElementById('userRole');
+  badge.textContent=role==='admin'?'管理员':'用户';
+  badge.className='user-role '+role;
+  if(role==='admin')document.body.classList.add('is-admin');
+}
+
+// ===== 对话 =====
 let chatHistory=[];
-async function sendMessage(){const input=document.getElementById('chatInput');const q=input.value.trim();if(!q)return;input.value='';appendMessage('user',q);chatHistory.push({role:'user',content:q});const lid=appendMessage('loading','思考中...');try{const resp=await apiFetch('/api/chat',{method:'POST',body:JSON.stringify({query:q,history:chatHistory.slice(-6),stream:false})});const data=await resp.json();removeMessage(lid);const answer=data.answer||'未能生成回答';appendMessage('assistant',answer,data.sources);chatHistory.push({role:'assistant',content:answer})}catch(e){removeMessage(lid);appendMessage('error','请求失败: '+e.message)}}
-function appendMessage(role,content,sources){const c=document.getElementById('chatMessages');const empty=c.querySelector('.empty-state');if(empty)empty.remove();const id='msg-'+Date.now();const d=document.createElement('div');d.id=id;d.className='message '+role;if(role==='user'){d.innerHTML='<div class="bubble user-bubble">'+esc(content)+'</div>'}else if(role==='loading'){d.innerHTML='<div class="bubble ai-bubble"><span class="typing">☰ 思考中...</span></div>'}else if(role==='error'){d.innerHTML='<div class="bubble ai-bubble" style="color:#e53935">'+esc(content)+'</div>'}else{let h='<div class="bubble ai-bubble">'+(typeof marked!=='undefined'?marked.parse(content):content)+'</div>';if(sources&&sources.length){h+='<div class="sources>';sources.slice(0,5).forEach((s,i)=>{h+='<span class="source-tag">📄 '+esc(s.file_name||s.title||'Ref '+(i+1))+'</span>'});h+='</div>'}d.innerHTML=h}c.appendChild(d);c.scrollTop=c.scrollHeight;return id}
-function removeMessage(id){const el=document.getElementById(id);if(el)el.remove()}
+async function sendChat(){
+  const input=document.getElementById('chatInput');
+  const q=input.value.trim();if(!q)return;
+  input.value='';input.style.height='auto';
+  const empty=document.getElementById('chatEmpty');if(empty)empty.remove();
+  appendMsg('user',q);chatHistory.push({role:'user',content:q});
+  const lid=appendMsg('loading','☰ 思考中...');
+  try{
+    const d=await api('/api/chat',{method:'POST',body:{query:q,history:chatHistory.slice(-6),stream:false}});
+    removeMsg(lid);
+    const answer=d.answer||'未能生成回答';
+    appendMsg('ai',answer,d.sources,d.trace);
+    chatHistory.push({role:'assistant',content:answer});
+  }catch(e){removeMsg(lid);appendMsg('error','请求失败: '+e.message)}
+}
+
+function appendMsg(role,content,sources,trace){
+  const c=document.getElementById('chatMsgs');
+  const id='m-'+Date.now();
+  const div=document.createElement('div');div.id=id;div.className='msg '+role;
+  if(role==='user'){div.innerHTML=`<div class="msg-bubble">${esc(content)}</div>`}
+  else if(role==='loading'){div.innerHTML=`<div class="typing">${content}</div>`}
+  else if(role==='error'){div.innerHTML=`<div class="msg-bubble" style="color:var(--error)">${esc(content)}</div>`}
+  else{
+    let html=`<div class="msg-bubble">${typeof marked!=='undefined'?marked.parse(content):content}</div>`;
+    if(sources&&sources.length){html+=`<div class="msg-sources">${sources.slice(0,5).map((s,i)=>`<span class="source-chip">📄 ${esc(s.file_name||s.title||'Ref '+(i+1))}</span>`).join('')}</div>`}
+    if(trace&&trace.steps){html+=`<div class="msg-trace">${trace.steps.map(s=>`<div class="trace-step"><span class="tool">${s.tool||s.type}</span><span>${s.status||''}</span><span class="ms">${s.latency_ms?s.latency_ms.toFixed(0)+'ms':''}</span></div>`).join('')}</div>`}
+    div.innerHTML=html;
+  }
+  c.appendChild(div);c.scrollTop=c.scrollHeight;return id;
+}
+function removeMsg(id){const el=document.getElementById(id);if(el)el.remove()}
 function esc(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML}
-async function doSearch(){const q=document.getElementById('searchInput').value.trim();if(!q)return;const c=document.getElementById('searchResults');c.innerHTML='<p style="color:var(--text3)">搜索中...</p>';try{const r=await apiFetch('/api/search?q='+encodeURIComponent(q));const d=await r.json();const res=d.results||[];if(!res.length){c.innerHTML='<p style="color:var(--text3)">未找到结果</p>';return}c.innerHTML=res.map((r,i)=>'<div class="result-card"><div class="result-title">'+esc(r.file_name||'?')+'</div><div class="result-text">'+esc((r.text||'').substring(0,200))+'</div><div class="result-meta">Score: '+(r.score||0).toFixed(2)+'</div></div>').join('')}catch(e){c.innerHTML='<p style="color:#e53935">搜索失败</p>'}}
-async function loadFlags(){try{const r=await apiFetch('/api/feature-flags');const d=await r.json();const flags=d.flags||d.defaults||{};const c=document.getElementById('flagsContent');let h='<div class="stat-grid">';for(const[n,info]of Object.entries(flags)){const v=typeof info==='object'?info.value:info;const desc=typeof info==='object'?info.desc:'';h+='<div class="stat-card"><div><strong>'+n+'</strong><br><small>'+esc(desc)+'</small></div><label style="margin-left:auto"><input type="checkbox" '+(v?'checked':'')+' onchange="toggleFlag(\''+n+'\',this.checked)"></label></div>'}h+='</div>';c.innerHTML=h}catch(e){document.getElementById('flagsContent').innerHTML='<p>加载失败</p>'}}
-async function toggleFlag(n,v){await apiFetch('/api/feature-flags/'+n,{method:'PUT',body:JSON.stringify({value:v})});if(typeof showToast!=='undefined')showToast(n+' = '+v,'success')}
-async function loadOrgans(){try{const r=await apiFetch('/api/v2/status');const d=await r.json();const c=document.getElementById('organsContent');const organs=d.organs||[];let h='<div class="stat-grid">';organs.forEach(o=>{h+='<div class="stat-card"><span style="font-size:24px">'+(o.emoji||'🫀')+'</span><div><strong>'+(o.name||o.organ_id)+'</strong><br><small>'+(o.status||'ok')+'</small></div></div>'});h+='</div>';c.innerHTML=h}catch(e){document.getElementById('organsContent').innerHTML='<p>加载失败</p>'}}
-async function loadDashboard(){try{const r=await apiFetch('/api/admin/metrics-summary');const d=await r.json();document.getElementById('dashboardContent').innerHTML='<div class="stat-card"><pre>'+JSON.stringify(d,null,2).substring(0,500)+'</pre></div>'}catch(e){document.getElementById('dashboardContent').innerHTML='<p>加载失败</p>'}}
-checkAuth();
+
+// ===== 搜索 =====
+async function doSearch(){
+  const q=document.getElementById('searchInput').value.trim();if(!q)return;
+  const c=document.getElementById('searchResults');c.innerHTML='<div class="empty"><p>搜索中...</p></div>';
+  try{
+    const d=await api('/api/search?q='+encodeURIComponent(q));
+    const results=d.results||[];
+    if(!results.length){c.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><h3>未找到相关结果</h3><p>尝试换个关键词</p></div>';return}
+    c.innerHTML=`<div class="result-list">${results.map((r,i)=>`<div class="result"><div class="result-title">📄 ${esc(r.file_name||'?')}</div><div class="result-text">${esc((r.text||'').substring(0,300))}</div><div class="result-meta"><span>Score: ${(r.score||0).toFixed(2)}</span><span>Chunk #${r.chunk_index||0}</span></div></div>`).join('')}</div>`;
+  }catch(e){c.innerHTML='<div class="empty"><p style="color:var(--error)">搜索失败</p></div>'}
+}
+
+// ===== 图谱 =====
+async function loadGraph(){
+  try{
+    const d=await api('/api/graph');
+    const nodes=d.nodes||{};const edges=d.edges||[];
+    const container=document.getElementById('graphEntities');
+    const entries=Object.entries(nodes).slice(0,50);
+    container.innerHTML=entries.map(([name,v])=>`<div class="graph-entity"><span style="font-weight:600">${esc(name)}</span><span style="float:right;font-size:11px;color:var(--text3)">${v.type||''}</span></div>`).join('');
+    drawGraph(nodes,edges);
+  }catch(e){document.getElementById('graphEntities').innerHTML='<p style="color:var(--text3)">加载失败</p>'}
+}
+
+function drawGraph(nodes,edges){
+  const canvas=document.getElementById('graphCanvas');
+  const ctx=canvas.getContext('2d');
+  canvas.width=canvas.offsetWidth;canvas.height=canvas.offsetHeight;
+  const W=canvas.width,H=canvas.height;
+  ctx.clearRect(0,0,W,H);
+  const entries=Object.entries(nodes).slice(0,80);
+  const nodePos={};
+  entries.forEach(([name],i)=>{
+    const angle=(i/entries.length)*Math.PI*2;
+    const r=Math.min(W,H)*0.35;
+    nodePos[name]={x:W/2+Math.cos(angle)*r,y:H/2+Math.sin(angle)*r};
+  });
+  ctx.strokeStyle='#e5e5ea';ctx.lineWidth=1;
+  edges.forEach(e=>{
+    const s=nodePos[e.source],t=nodePos[e.target];
+    if(s&&t){ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(t.x,t.y);ctx.stroke()}
+  });
+  entries.forEach(([name,v])=>{
+    const p=nodePos[name];if(!p)return;
+    ctx.beginPath();ctx.arc(p.x,p.y,6,0,Math.PI*2);
+    ctx.fillStyle=v.type==='material'?'#4caf50':v.type==='device'?'#2196f3':v.type==='standard'?'#ff9800':'#9c27b0';
+    ctx.fill();
+    ctx.fillStyle='#1d1d1f';ctx.font='10px sans-serif';ctx.textAlign='center';
+    ctx.fillText(name.substring(0,8),p.x,p.y+16);
+  });
+}
+function searchGraph(){
+  const q=document.getElementById('graphSearch').value.trim();
+  if(q)api('/api/graph?entity='+encodeURIComponent(q)).then(loadGraph).catch(()=>{});
+}
+
+// ===== Wiki =====
+async function loadWikiTree(){
+  try{
+    const d=await api('/api/wiki/pages');
+    const pages=d.pages||d||[];
+    const tree=document.getElementById('wikiTree');
+    tree.innerHTML='<div style="font-size:13px;font-weight:600;margin-bottom:12px">📚 目录</div>'+pages.map(p=>`<div class="wiki-tree-item" onclick="loadWikiPage('${p.id||p.page_id}')">${esc(p.title||'未命名')}</div>`).join('');
+  }catch(e){}
+}
+async function loadWikiPage(id){
+  try{
+    const d=await api('/api/wiki/page/'+id);
+    const c=document.getElementById('wikiContent');
+    c.innerHTML=`<h1>${esc(d.title||'')}</h1><div>${typeof marked!=='undefined'?marked.parse(d.content||''):d.content||''}</div>`;
+    const active=document.querySelector('.wiki-tree-item.active');if(active)active.classList.remove('active');
+    document.querySelectorAll('.wiki-tree-item').forEach(t=>{if(t.textContent===d.title)t.classList.add('active')});
+  }catch(e){}
+}
+
+// ===== 文件管理 =====
+async function loadFiles(){
+  try{
+    const d=await api('/api/documents');
+    const files=d.files||d||[];
+    document.getElementById('fileGrid').innerHTML=files.map(f=>`<div class="file-card"><div class="file-icon">📄</div><div class="file-name">${esc(f.file_name||f.name||'?')}</div><div class="file-meta">${f.category||''} · ${f.chunks||0} chunks</div></div>`).join('')||'<div class="empty"><div class="empty-icon">📁</div><h3>暂无文件</h3><p>点击右上角上传</p></div>';
+  }catch(e){}
+}
+async function uploadFiles(files){
+  if(!files||!files.length)return;
+  for(const f of files){
+    const fd=new FormData();fd.append('file',f);
+    try{
+      toast('上传中: '+f.name,'info');
+      await fetch('/api/upload',{method:'POST',headers:{'Authorization':'Bearer '+getToken()},body:fd});
+      toast('上传成功: '+f.name,'success');
+    }catch(e){toast('上传失败: '+f.name,'error')}
+  }
+  loadFiles();
+}
+
+// ===== 管理面板 =====
+async function loadOverview(){
+  try{
+    const d=await api('/api/admin/metrics-summary');
+    document.getElementById('overviewMetrics').innerHTML=`<pre style="font-size:12px;color:var(--text2);white-space:pre-wrap">${JSON.stringify(d,null,2).substring(0,800)}</pre>`;
+  }catch(e){document.getElementById('overviewMetrics').innerHTML='<p>加载失败</p>'}
+}
+async function loadOrgans(){
+  try{
+    const d=await api('/api/v2/status');
+    const organs=d.organs||[];
+    document.getElementById('organGrid').innerHTML=organs.map(o=>`<div class="organ-card"><div class="organ-emoji">${o.emoji||'🫀'}</div><div class="organ-name">${esc(o.name||o.organ_id)}</div><div class="organ-status">${o.status||'ok'}</div></div>`).join('')||'<div class="empty"><p>无器官数据</p></div>';
+  }catch(e){document.getElementById('organGrid').innerHTML='<div class="empty"><p>加载失败</p></div>'}
+}
+async function loadEval(){
+  try{
+    const d=await api('/api/evaluation/overview');
+    document.getElementById('evalDetail').innerHTML=`<pre style="font-size:12px;color:var(--text2);white-space:pre-wrap">${JSON.stringify(d,null,2).substring(0,600)}</pre>`;
+  }catch(e){document.getElementById('evalDetail').innerHTML='<p>加载失败</p>'}
+}
+async function loadFlags(){
+  try{
+    const d=await api('/api/feature-flags');
+    const flags=d.flags||d.defaults||{};
+    document.getElementById('flagsList').innerHTML=Object.entries(flags).map(([name,info])=>{
+      const v=typeof info==='object'?info.value:info;
+      const desc=typeof info==='object'?info.desc:'';
+      return `<div class="flag-row"><span class="flag-name">${name}</span><span class="flag-desc">${esc(desc)}</span><label class="toggle"><input type="checkbox" ${v?'checked':''} onchange="toggleFlag('${name}',this.checked)"><span class="slider"></span></label></div>`;
+    }).join('');
+  }catch(e){document.getElementById('flagsList').innerHTML='<p>加载失败</p>'}
+}
+async function toggleFlag(name,value){await api('/api/feature-flags/'+name,{method:'PUT',body:{value}});toast(name+' = '+value,'success')}
+async function loadFeedback(){
+  try{
+    const d=await api('/api/feedback/weekly');
+    document.getElementById('feedbackList').innerHTML=`<pre style="font-size:12px;color:var(--text2);white-space:pre-wrap">${JSON.stringify(d,null,2).substring(0,600)}</pre>`;
+  }catch(e){document.getElementById('feedbackList').innerHTML='<p>加载失败</p>'}
+}
+
+// ===== Toast =====
+function toast(msg,type='info'){
+  const t=document.createElement('div');t.className='toast '+type;t.textContent=msg;
+  document.body.appendChild(t);setTimeout(()=>t.remove(),3000);
+}
+
+// ===== 初始化 =====
+if(getToken()){api('/api/auth/me').then(()=>showApp()).catch(()=>showLogin())}else{showLogin()}
+
+// textarea 自动高度
+document.getElementById('chatInput').addEventListener('input',function(){this.style.height='auto';this.style.height=Math.min(this.scrollHeight,120)+'px'});
 </script>
 </body>
 </html>
