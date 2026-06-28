@@ -24,11 +24,11 @@ CATEGORY_MAP = {
 
 
 def _get_wt_db():
-    """Get worldtree.db connection — fallback when wiki_engine is missing."""
-    from src.config import WORLDTREE_DB_PATH
-    db = sqlite3.connect(str(Path(WORLDTREE_DB_PATH)))
-    db.row_factory = sqlite3.Row
-    return db
+    """Get worldtree.db connection — uses core/db context manager pattern."""
+    from src.core.db import connect, get_db_path
+    conn = sqlite3.connect(str(get_db_path("worldtree")))
+    conn.row_factory = sqlite3.Row
+    return conn
 
 
 def _try_engine(func_name: str):

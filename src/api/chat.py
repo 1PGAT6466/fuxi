@@ -194,8 +194,8 @@ async def chat(body: ChatRequest, request: Request):
     _flags = load_flags()
     if _flags.get("query_planner", False):
         try:
-            from src.services.query_planner import plan_query
-            plan = plan_query(q)
+            from src.services.query_planner import plan_query_async
+            plan = await plan_query_async(q)
             if plan:
                 all_results = []
                 seen = set()

@@ -16,9 +16,11 @@ jobs:
       - name: Install deps
         run: pip install fastapi uvicorn chromadb requests pytest
       - name: Unit tests
-        run: python -m pytest tests/ -x --tb=short -q || echo "Some tests failed (expected without full env)"
+        run: python -m pytest tests/ -x --tb=short -q
+        continue-on-error: true
       - name: Smoke test (API)
-        run: python scripts/eval_smoke_lite.py || echo "API smoke test skipped (no server)"
+        run: python scripts/eval_smoke_lite.py
+        continue-on-error: true
       - name: Security check
         run: |
           echo "Checking for leaked keys..."

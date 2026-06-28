@@ -67,11 +67,9 @@ class SanJiaoAgent(OrganBase):
                 from src.db.data_store import load_graph
                 data = load_graph()
             elif source == "worldtree":
-                import sqlite3
-                db = sqlite3.connect('/home/feng-shaoxuan/伏羲·内世界/data/worldtree.db')
-                db.row_factory = sqlite3.Row
-                data = [dict(r) for r in db.execute("SELECT * FROM wiki_pages").fetchall()]
-                db.close()
+                from src.core.db import connect
+                with connect("worldtree") as db:
+                    data = [dict(r) for r in db.execute("SELECT * FROM wiki_pages").fetchall()]
             else:
                 data = {}
 
@@ -111,14 +109,11 @@ class SanJiaoAgent(OrganBase):
     async def _handle_stats(self, signal: Signal) -> None:
         """收集全系统统计数据（下焦→上焦上报）"""
         try:
-            import sqlite3
-            chunks_db = sqlite3.connect('/home/feng-shaoxuan/伏羲·内世界/data/chunks.db')
-            chunk_count = chunks_db.execute("SELECT count(*) FROM chunks").fetchone()[0]
-            chunks_db.close()
-
-            wt_db = sqlite3.connect('/home/feng-shaoxuan/伏羲·内世界/data/worldtree.db')
-            wiki_count = wt_db.execute("SELECT count(*) FROM wiki_pages").fetchone()[0]
-            wt_db.close()
+            from src.core.db import connect
+            with connect("chunks") as chunks_db:
+                chunk_count = chunks_db.execute("SELECT count(*) FROM chunks").fetchone()[0]
+            with connect("worldtree") as wt_db:
+                wiki_count = wt_db.execute("SELECT count(*) FROM wiki_pages").fetchone()[0]
 
             from src.db.data_store import load_graph
             graph = load_graph()

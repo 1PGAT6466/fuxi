@@ -145,24 +145,22 @@ async def download_file(file_hash: str):
     """下载原始文件 — 通过装载机代理"""
     import sqlite3, urllib.request, urllib.parse
     
-    db_path = str(DATA_DIR / "chunks.db")
+    from src.core.db import connect
     file_name = None
     
     try:
-        db = sqlite3.connect(db_path)
-        # Get longest file_name (one with path prefix)
-        row = db.execute(
-            "SELECT file_name FROM chunks WHERE file_hash LIKE ? AND status='active' ORDER BY LENGTH(file_name) DESC LIMIT 1",
-            (file_hash[:16] + "%",)
-        ).fetchone()
-        if not row and len(file_hash) > 16:
+        with connect("chunks") as db:
             row = db.execute(
-                "SELECT file_name FROM chunks WHERE file_hash=? AND status='active' ORDER BY LENGTH(file_name) DESC LIMIT 1",
-                (file_hash,)
+                "SELECT file_name FROM chunks WHERE file_hash LIKE ? AND status='active' ORDER BY LENGTH(file_name) DESC LIMIT 1",
+                (file_hash[:16] + "%",)
             ).fetchone()
-        if row:
-            file_name = row[0].replace("\\", "/")
-        db.close()
+            if not row and len(file_hash) > 16:
+                row = db.execute(
+                    "SELECT file_name FROM chunks WHERE file_hash=? AND status='active' ORDER BY LENGTH(file_name) DESC LIMIT 1",
+                    (file_hash,)
+                ).fetchone()
+            if row:
+                file_name = row[0].replace("\\", "/")
     except Exception as e:
         logger.warning(f"DB lookup failed: {e}")
     

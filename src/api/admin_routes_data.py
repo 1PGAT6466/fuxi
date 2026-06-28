@@ -48,13 +48,11 @@ async def admin_rebuild_vectors(request: Request):
 
     t0 = time.time()
     try:
-        db_path = DATA_DIR / "chunks.db"
-        conn = sqlite3.connect(str(db_path))
-        conn.row_factory = sqlite3.Row
-        rows = conn.execute(
-            "SELECT id, file_hash, file_name, category, chunk_index, text FROM chunks ORDER BY id"
-        ).fetchall()
-        conn.close()
+        from src.core.db import connect
+        with connect("chunks") as conn:
+            rows = conn.execute(
+                "SELECT id, file_hash, file_name, category, chunk_index, text FROM chunks ORDER BY id"
+            ).fetchall()
 
         if not rows:
             return {"ok": True, "message": "无数据可重建", "count": 0}

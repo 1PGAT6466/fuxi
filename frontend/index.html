@@ -420,10 +420,11 @@ table.data tr:hover{background:var(--bg)}
 <script>
 // ===== 认证 =====
 const TK='***',UK='***';
-function getToken(){return localStorage.getItem(TK)||''}
-function getUser(){try{return JSON.parse(localStorage.getItem(UK)||'{}')}catch(e){return{}}}
-function setAuth(token,user){localStorage.setItem(TK,token);localStorage.setItem(UK,JSON.stringify(user))}
-function clearAuth(){localStorage.removeItem(TK);localStorage.removeItem(UK)}
+const STORE=sessionStorage; // sessionStorage: 关闭浏览器即清除，比 localStorage 更安全
+function getToken(){return STORE.getItem(TK)||''}
+function getUser(){try{return JSON.parse(STORE.getItem(UK)||'{}')}catch(e){return{}}}
+function setAuth(token,user){STORE.setItem(TK,token);STORE.setItem(UK,JSON.stringify(user))}
+function clearAuth(){STORE.removeItem(TK);STORE.removeItem(UK)}
 
 async function api(url,opt){
   const t=getToken();opt=opt||{};opt.headers=opt.headers||{};

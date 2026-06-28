@@ -9,7 +9,11 @@ logger = logging.getLogger(__name__)
 
 
 class CacheManager:
-    """三层缓存管理器"""
+    """三层缓存管理器（带大小限制）"""
+
+    MAX_L1 = 1000   # L1 最大条目
+    MAX_L2 = 500    # L2 最大条目
+    MAX_L3 = 5000   # L3 最大条目
 
     def __init__(self):
         # L1: 精确匹配（md5 hash → results），TTL=1h
@@ -45,9 +49,11 @@ class CacheManager:
     def set_exact(self, query: str, results: list):
         key = self._key(query)
         self._exact[key] = (results, time.time())
-        if len(self._exact) > 1000:
-            oldest = min(self._exact, key=lambda k: self._exact[k][1])
-            del self._exact[oldest]
+        if len(self._exact) > self.MAX_L1:
+            # 淘汰最旧的 10%
+            sorted_keys = sorted(self._exact, key=lambda k: self._exact[k][1])
+            for k in sorted_keys[:self.MAX_L1 // 10]:
+                del self._exact[k]
 
     async def get_semantic(self, query: str) -> Optional[list]:
         """L2: 语义匹配"""
@@ -88,6 +94,11 @@ class CacheManager:
 
     def set_rerank_score(self, chunk_id: str, score: float):
         self._rerank[chunk_id] = score
+        if len(self._rerank) > self.MAX_L3:
+            # 淘汰最旧的 10%
+            keys = list(self._rerank.keys())
+            for k in keys[:self.MAX_L3 // 10]:
+                del self._rerank[k]
 
     def invalidate_doc(self, doc_hash: str):
         """补充5：文档更新时清除相关缓存"""

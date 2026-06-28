@@ -150,39 +150,35 @@ def load_graph() -> dict:
     
     # Fallback: load from worldtree.db
     try:
-        import sqlite3
-        from src.config import WORLDTREE_DB_PATH
-        wt_db = sqlite3.connect(str(WORLDTREE_DB_PATH))
-        wt_db.row_factory = sqlite3.Row
-        ents = wt_db.execute("SELECT id, name, type, category_path FROM entities").fetchall()
-        if ents:
-            nodes = {}
-            for r in ents:
-                d = dict(r)
-                nodes[d["name"]] = {
-                    "id": d["id"],
-                    "type": d["type"],
-                    "label": d["type"],
-                    "category_path": d.get("category_path", "") or ""
-                }
-            edges = []
-            rels = wt_db.execute(
-                "SELECT e1.name as from_name, e2.name as to_name, er.relation_type "
-                "FROM entity_relations er "
-                "LEFT JOIN entities e1 ON er.from_id = e1.id "
-                "LEFT JOIN entities e2 ON er.to_id = e2.id"
-            ).fetchall()
-            for r in rels:
-                d = dict(r)
-                if d["from_name"] and d["to_name"]:
-                    edges.append({
-                        "from": d["from_name"],
-                        "to": d["to_name"],
-                        "relation": d["relation_type"]
-                    })
-            wt_db.close()
-            return {"nodes": nodes, "edges": edges}
-        wt_db.close()
+        from src.core.db import connect
+        with connect("worldtree") as wt_db:
+            ents = wt_db.execute("SELECT id, name, type, category_path FROM entities").fetchall()
+            if ents:
+                nodes = {}
+                for r in ents:
+                    d = dict(r)
+                    nodes[d["name"]] = {
+                        "id": d["id"],
+                        "type": d["type"],
+                        "label": d["type"],
+                        "category_path": d.get("category_path", "") or ""
+                    }
+                edges = []
+                rels = wt_db.execute(
+                    "SELECT e1.name as from_name, e2.name as to_name, er.relation_type "
+                    "FROM entity_relations er "
+                    "LEFT JOIN entities e1 ON er.from_id = e1.id "
+                    "LEFT JOIN entities e2 ON er.to_id = e2.id"
+                ).fetchall()
+                for r in rels:
+                    d = dict(r)
+                    if d["from_name"] and d["to_name"]:
+                        edges.append({
+                            "from": d["from_name"],
+                            "to": d["to_name"],
+                            "relation": d["relation_type"]
+                        })
+                return {"nodes": nodes, "edges": edges}
     except Exception as e:
 
         logger.warning("suppressed exception", exc_info=True)
