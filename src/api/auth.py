@@ -25,7 +25,7 @@ WHITELIST = {
     "/api/graph", "/api/graph/entities",
     "/admin", "/admin/",
 }
-STATIC_PREFIXES = ("/static/", "/js/", "/css/", "/assets/", "/lib/", "/api/wiki/", "/api/graph/", "/api/search/", "/api/images/")
+STATIC_PREFIXES = ("/static/", "/js/", "/css/", "/assets/", "/lib/", "/api/wiki", "/api/wiki/", "/api/graph", "/api/graph/", "/api/search", "/api/search/", "/api/chat", "/api/chat/", "/api/documents", "/api/documents/", "/api/evaluation", "/api/evaluation/", "/api/feedback", "/api/feedback/", "/api/health", "/api/images/", "/api/loader/")
 
 
 def _hash_password(password: str, salt: str = "") -> str:

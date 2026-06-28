@@ -133,10 +133,9 @@ async def hybrid_search(query: str, chunks: list = None, category: str = "",
     # L1.5 + L2: HyDE + BM25 + 向量三路并行 (v10.1)
     async def _bm25_search():
         store = get_store()
-        r = store.hierarchical_search(rewritten, category, file_type, date_from, date_to,
-                                      summary_top_k=5, chunk_top_k=top_k * 3)
+        r = store.hierarchical_search(rewritten, summary_top_k=5, chunk_top_k=top_k * 3)
         if not r:
-            r = store.keyword_search(rewritten, category, file_type, date_from, date_to, top_k)
+            r = store.keyword_search(rewritten, top_k)
         return r
     
     async def _hyde_and_vector():

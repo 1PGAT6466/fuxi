@@ -99,6 +99,7 @@ setup_error_handlers(app)
 # ============ 中间件 ============
 # ── API 认证中间件 ──
 from src.api.auth import AuthMiddleware, InputLimitMiddleware
+from src.api.auth_routes import router as auth_router
 app.add_middleware(AuthMiddleware)
 app.add_middleware(InputLimitMiddleware)
 
@@ -130,6 +131,9 @@ app.include_router(search_router)
 # AI 对话路由 — /api/chat, /api/chat/agent
 from src.api.chat import router as chat_router
 app.include_router(chat_router)
+
+# Auth routes — /api/auth/login, /api/auth/register
+app.include_router(auth_router)
 
 # 文档管理路由 — /api/documents/*, /api/raw-store, /api/ingest-batch, /api/reindex, /api/reset
 from src.api.documents import router as documents_router

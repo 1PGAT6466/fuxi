@@ -80,17 +80,25 @@ async def search(q: str = Query(...), top_k: int = 15, page: int = 1, page_size:
         _flags = {}
 
     # CRAG 检索校验环（受 crag_rewrite flag 控制）
-    if _flags.get("crag_rewrite", True):
+    if _flags.get("crag_rewrite", False):
         try:
             from src.services.crag import retrieve_with_correction
             crag_result = await retrieve_with_correction(
                 query=q,
-                retriever=lambda qq, kk=top_k: _search_with_rewrite(qq, kk, skip_cache=True),
+                retriever=lambda qq, kk=top_k: _search_with_rewrite(q, kk, skip_cache=True),
                 top_k=top_k,
                 max_retries=1
             )
             results = crag_result["docs"]
-            if crag_result["degraded"]:
+            if crag_result["degraded"] and not results:
+                # CRAG 失败 → 回退直接检索
+                logger.warning("[CRAG] degraded, falling back to direct search")
+                try:
+                    results = await hybrid_search(q, load_chunks(), category, file_type, date_from, date_to, top_k)
+                except Exception as e2:
+                    logger.error(f"direct search also failed: {e2}")
+                    results = []
+            elif crag_result["degraded"]:
                 inc_counter("kb_crag_degraded_total")
         except Exception as e:
             logger.warning(f'[CRAG] 校验失败，回退基础检索: {e}')
@@ -107,7 +115,9 @@ async def search(q: str = Query(...), top_k: int = 15, page: int = 1, page_size:
             results = []
 
     # Self-RAG 相关性校验（受 self_rag_check flag 控制）
-    if _flags.get("self_rag_check", True):
+    # 注：仅在非 CRAG 回退路径下执行，避免死循环
+    _crag_already_ran = _flags.get("crag_rewrite", True)  # CRAG 在主路径已运行过
+    if _flags.get("self_rag_check", False) and not _crag_already_ran:
         try:
             from src.services.self_rag import check_relevance
             sr = await check_relevance(q, results)
@@ -116,7 +126,7 @@ async def search(q: str = Query(...), top_k: int = 15, page: int = 1, page_size:
                 from src.services.crag import retrieve_with_correction
                 crag_result = await retrieve_with_correction(
                     query=q,
-                    retriever=lambda qq, kk=top_k: _search_with_rewrite(qq, kk, skip_cache=True),
+                    retriever=lambda qq, kk=top_k: _search_with_rewrite(q, kk, skip_cache=True),
                     top_k=top_k,
                     max_retries=1
                 )
