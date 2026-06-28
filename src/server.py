@@ -189,6 +189,25 @@ from src.api.evolution import router as evolution_router
 app.include_router(evaluation_router)
 app.include_router(evolution_router)
 
+# ============ Feature Flag API ============
+from src.services.feature_flags import load_flags, set_flag, DEFAULT_FLAGS
+
+@app.get("/api/feature-flags")
+async def list_feature_flags():
+    """获取所有 Feature Flag 状态"""
+    return {"flags": load_flags(), "defaults": DEFAULT_FLAGS}
+
+@app.put("/api/feature-flags/{name}")
+async def update_feature_flag(name: str, request: Request):
+    """更新 Feature Flag"""
+    body = await request.json()
+    value = body.get("value", False)
+    if name not in DEFAULT_FLAGS:
+        from fastapi import HTTPException
+        raise HTTPException(404, f"未知 flag: {name}")
+    set_flag(name, value)
+    return {"ok": True, "flag": name, "value": value}
+
 # 静态资源挂载
 app.mount("/static/css", StaticFiles(directory=str(STATIC_DIR / "css")), name="static_css")
 app.mount("/static/js", StaticFiles(directory=str(STATIC_DIR / "js")), name="static_js")
@@ -206,7 +225,7 @@ app.include_router(v2_router)
 # ============ D5: Prometheus Metrics ============
 @app.get("/metrics")
 async def metrics():
-    """暴露 Prometheus 格式指标 — 浏览器直开 http://172.25.30.200:8080/metrics"""
+    """暴露 Prometheus 格式指标 — 浏览器直开 http://<host>:<port>/metrics"""
     from src.services.metrics import generate_metrics_text
     from fastapi.responses import PlainTextResponse
     return PlainTextResponse(generate_metrics_text(), media_type="text/plain; charset=utf-8")
@@ -226,7 +245,7 @@ async def admin_metrics_summary():
 async def proxy_loader_files():
     """代理: 获取装载机文件列表"""
     import requests as _req
-    loader_url = os.getenv("LOADER_URL", "http://172.25.30.16:8090")
+    loader_url = os.getenv("LOADER_URL", "http://127.0.0.1:8090")
     try:
         r = _req.get(f"{loader_url}/api/files", timeout=10)
         return r.json()
@@ -237,7 +256,7 @@ async def proxy_loader_files():
 async def proxy_loader_upload(request: Request):
     """代理: 上传文件到装载机"""
     import requests as _req
-    loader_url = os.getenv("LOADER_URL", "http://172.25.30.16:8090")
+    loader_url = os.getenv("LOADER_URL", "http://127.0.0.1:8090")
     body = await request.body()
     try:
         r = _req.post(f"{loader_url}/api/upload", data=body, timeout=30,

@@ -1,8 +1,8 @@
 """eval_smoke_lite.py — 轻量评测（无 LLM judge，纯召回率）"""
-import requests, time, json
+import requests, time, json, os
 
-API = "http://172.25.30.200:8080/api/search"
-TOKEN = "fuxi-v1.43-token"
+API = os.getenv("FUXI_API_URL", "http://localhost:8080/api/search")
+TOKEN = os.getenv("FUXI_API_TOKEN", "")
 
 # 30 条评测用例
 CASES = [

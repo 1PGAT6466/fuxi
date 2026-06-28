@@ -318,6 +318,12 @@ async def ingest_batch(body: IngestBatchRequest):
     if not body.chunks:
         return {"status": "empty", "file": body.file_name}
 
+    # 安全检查：路径穿越 + 非法文件名
+    if '..' in body.file_name or '/' in body.file_name or '\\' in body.file_name:
+        return {"status": "blocked", "file": body.file_name, "reason": "非法文件名（路径穿越）"}
+    if len(body.file_name) > 255:
+        return {"status": "blocked", "file": body.file_name, "reason": "文件名过长"}
+
     # v11.40 P0.1: 文件扩展名白名单 — 拒绝二进制 CAD/临时文件
     ALLOWED_CHUNK_EXTS = {".pdf", ".doc", ".docx", ".xls", ".xlsx", ".txt", ".md", ".csv", ".ppt", ".pptx"}
     BLOCKED_EXTS = {".sldprt", ".step", ".sldasm", ".ipt", ".cfg", ".zip", ".rar", ".7z", ".stp", ".igs", ".iges", ".dwg", ".dxf", ".stl", ".obj"}

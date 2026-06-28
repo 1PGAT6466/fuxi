@@ -1,6 +1,6 @@
 """
 kb-server 部署脚本
-在 kb-server (172.25.30.200) 上运行:
+在 kb-server (<server_host>) 上运行:
   python deploy.py [--restart]
 """
 import subprocess

@@ -306,7 +306,7 @@ async def _rerank_layer(query: str, candidates: list, top_k: int = 30) -> list:
     """P1: Cross-encoder 精排
     
     三级降级链:
-      1. SiliconFlow Qwen3-Reranker-8B (via proxy 172.25.30.10:8091)
+      1. SiliconFlow Qwen3-Reranker-8B (via proxy <proxy_host>)
       2. embedder_server /rerank 端点
       3. 本地 TF-IDF (jieba)
     """
