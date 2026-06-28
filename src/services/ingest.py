@@ -147,6 +147,15 @@ def _smart_chunk(text: str, size: int = 1200, overlap: int = 100) -> list:
         chunk = text[start:end].strip()
         if chunk and len(chunk) > 20:
             chunks.append(chunk)
+            # v4.0 表格结构化提取
+            try:
+                from src.services.table_parser import extract_tables_from_markdown
+                if chunk.get("text") and "|" in chunk["text"]:
+                    tables = extract_tables_from_markdown(chunk["text"])
+                    if tables:
+                        chunk["structured_table"] = tables[0]
+            except Exception:
+                pass
         
         start = end - overlap if end < text_len else text_len
     
