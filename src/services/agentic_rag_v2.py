@@ -273,7 +273,21 @@ async def _execute_tool(tool_call: Dict) -> str:
             return "未找到相关表格数据"
 
         elif func_name == "describe_image":
-            return f"图片描述功能暂不可用。图片路径: {args.get('image_path', '?')}"
+            image_path = args.get("image_path", "")
+            try:
+                from src.services.multimodal import transcribe_image
+                result = transcribe_image(image_path)
+                if result:
+                    return f"图片描述: {result}"
+                # Fallback: 从知识库搜索图片相关内容
+                from src.services.retrieval import hybrid_search
+                results = await hybrid_search(image_path, top_k=3)
+                img_results = [r for r in results if r.get("result_type") == "image" or "图片" in r.get("text", "")]
+                if img_results:
+                    return img_results[0].get("text", "")[:500]
+                return f"无法描述图片。路径: {image_path}"
+            except Exception as e:
+                return f"图片描述失败: {str(e)[:200]}"
 
         elif func_name == "clarify":
             return f"需要用户澄清: {args.get('question', '?')}"

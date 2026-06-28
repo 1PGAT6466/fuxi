@@ -715,9 +715,28 @@ def chunk_table(table_data: Dict) -> List[str]:
 
 
 def chunk_image(file_path: str, ocr_text: str = "") -> List[str]:
-    """图片：OCR 文字 + 图片路径作为一个 chunk"""
-    if ocr_text and len(ocr_text) > 20:
+    """图片：多模态转录 + OCR 文字
+    优先使用 Vision 模型转录图片内容，fallback 到 OCR，最终 fallback 到文件名
+    """
+    # 如果已有 OCR 文本且足够长，直接用
+    if ocr_text and len(ocr_text) > 50:
         return [ocr_text]
+    
+    # 尝试多模态 Vision 模型转录
+    try:
+        from src.services.multimodal import transcribe_image
+        transcription = transcribe_image(file_path)
+        if transcription and len(transcription) > 20:
+            logger.info(f"[multimodal] 图片转录成功: {Path(file_path).name} ({len(transcription)}字)")
+            return [f"[图片内容] {transcription}"]
+    except Exception as e:
+        logger.debug(f"[multimodal] 图片转录跳过: {e}")
+    
+    # Fallback: OCR 文本
+    if ocr_text and len(ocr_text) > 10:
+        return [ocr_text]
+    
+    # 最终 Fallback: 文件名占位
     return [f"[图片: {Path(file_path).name}]"]
 
 
