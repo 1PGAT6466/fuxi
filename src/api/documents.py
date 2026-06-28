@@ -462,6 +462,29 @@ async def ingest_batch(body: IngestBatchRequest):
         except Exception as e:
             logger.warning(f"[wiki] 自动提炼失败: {e}")
 
+    # 表格结构化索引
+    try:
+        from src.services.feature_flags import load_flags as _lf
+        if _lf().get("table_structured_search", False):
+            from src.services.table_parser import parse_table_to_rows
+            table_chunks = [c for c in new_chunks if "|" in c.get("text", "") and "---" in c.get("text", "")]
+            if table_chunks:
+                logger.info(f"[table] 发现 {len(table_chunks)} 个表格 chunk")
+    except Exception as e:
+        logger.warning(f"[table] 表格索引失败: {e}")
+
+    # 知识生命周期注册
+    try:
+        from src.services.knowledge_lifecycle import register_knowledge
+        for c in new_chunks[:5]:
+            register_knowledge(
+                entity_id=c.get("file_hash", "") + "_" + str(c.get("chunk_index", 0)),
+                source=body.file_name,
+                confidence=0.7
+            )
+    except Exception as e:
+        logger.warning(f"[lifecycle] 注册失败: {e}")
+
     return {"status": "ok", "file": body.file_name, "chunks": len(new_chunks)}
 
 

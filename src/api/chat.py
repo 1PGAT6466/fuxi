@@ -189,21 +189,42 @@ async def chat(body: ChatRequest, request: Request):
         _record_chat_memory(q, len(results), 'cached')
         return {"answer": cached, "sources": results, "mode": "cached"}
 
-    # 1. 混合检索（v10.1: 长问题自动拆解）
-    sub_queries = _decompose_query(q)
-    if len(sub_queries) > 1:
-        all_results = []
-        seen = set()
-        for sq in sub_queries[:3]:
-            r = await hybrid_search(sq, load_chunks(), top_k=5)
-            for item in r:
-                key = item.get("file_hash","") + str(item.get("chunk_index",0))
-                if key not in seen:
-                    seen.add(key)
-                    all_results.append(item)
-        results = all_results[:10]
-    else:
-        results = await hybrid_search(q, load_chunks(), top_k=5)
+    # 1. 混合检索（Query Planner + 自动拆解）
+    results = []
+    _flags = load_flags()
+    if _flags.get("query_planner", False):
+        try:
+            from src.services.query_planner import plan_query
+            plan = plan_query(q)
+            if plan:
+                all_results = []
+                seen = set()
+                for step in plan:
+                    r = await hybrid_search(step.query, load_chunks(), top_k=5)
+                    for item in r:
+                        key = item.get("file_hash","") + str(item.get("chunk_index",0))
+                        if key not in seen:
+                            seen.add(key)
+                            all_results.append(item)
+                results = all_results[:10]
+                logger.info(f"[chat] Query Planner: {len(plan)} steps → {len(results)} results")
+        except Exception as e:
+            logger.warning(f"[chat] Query Planner fallback: {e}")
+    if not results:
+        sub_queries = _decompose_query(q)
+        if len(sub_queries) > 1:
+            all_results = []
+            seen = set()
+            for sq in sub_queries[:3]:
+                r = await hybrid_search(sq, load_chunks(), top_k=5)
+                for item in r:
+                    key = item.get("file_hash","") + str(item.get("chunk_index",0))
+                    if key not in seen:
+                        seen.add(key)
+                        all_results.append(item)
+            results = all_results[:10]
+        else:
+            results = await hybrid_search(q, load_chunks(), top_k=5)
 
     # 1.5: Wiki 优先搜索（精炼知识优先，命中则替换同主题 chunk）
     wiki_pages = []
