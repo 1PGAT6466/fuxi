@@ -62,9 +62,24 @@ function appendMsg(role, content, sources, trace) {
     if (typeof DOMPurify !== 'undefined') rendered = DOMPurify.sanitize(rendered);
     var html = '<div class="msg-avatar">AI</div><div class="msg-bubble">' + rendered;
     if (sources && sources.length) {
-      html += '<div class="msg-sources">' + sources.slice(0, 5).map(function(s, i) {
-        return '<span class="source-chip">📄 ' + esc(s.file_name || s.title || 'Ref ' + (i + 1)) + '</span>';
-      }).join('') + '</div>';
+      html += '<div class="msg-sources">';
+      sources.slice(0, 5).forEach(function(s, i) {
+        var fh = s.file_hash || '';
+        var fn = esc(s.file_name || s.title || 'Ref ' + (i + 1));
+        var icon = fn.endsWith('.pdf') ? '📕' : (fn.endsWith('.doc') || fn.endsWith('.docx')) ? '📘' : (fn.endsWith('.xls') || fn.endsWith('.xlsx')) ? '📊' : '📄';
+        html += '<div class="source-card" style="display:inline-flex;align-items:center;gap:6px;padding:6px 12px;background:var(--card);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:12px;transition:all .15s" onmouseenter="this.style.borderColor=\'var(--mi-orange)\';this.style.background=\'rgba(255,103,0,0.04)\'" onmouseleave="this.style.borderColor=\'var(--border)\';this.style.background=\'var(--card)\'">';
+        html += '<span>' + icon + '</span>';
+        html += '<span style="max-width:180px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + fn + '</span>';
+        if (fh) {
+          html += '<span style="display:flex;gap:4px">';
+          html += '<a href="/api/view/' + encodeURIComponent(fh) + '" target="_blank" style="color:var(--mi-orange);text-decoration:none;font-weight:500" title="查看原文">查看</a>';
+          html += '<span style="color:var(--border)">|</span>';
+          html += '<a href="/api/download/' + encodeURIComponent(fh) + '" style="color:var(--mi-orange);text-decoration:none;font-weight:500" title="下载">下载</a>';
+          html += '</span>';
+        }
+        html += '</div>';
+      });
+      html += '</div>';
     }
     if (trace && trace.steps) {
       html += '<div class="msg-trace">' + trace.steps.map(function(s) {

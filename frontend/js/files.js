@@ -27,7 +27,10 @@ async function loadFiles(){
       grid.innerHTML=
         (cats.length>1?`<div style="margin-bottom:12px">${catBtns}</div>`:'')+
         '<div class="file-grid">'+
-        filtered.map(f=>`<div class="file-card" onclick="window.open('/api/view/'+encodeURIComponent('${f.file_hash||''}'),'_blank')"><div class="file-icon">${fileIcon(f.file_name)}</div><div class="file-name">${esc(f.file_name||'?')}</div><div class="file-meta">${esc(catLabel(f.category)||'未分类')}</div></div>`).join('')+
+        filtered.map(f=>{
+        var fh=f.file_hash||'';
+        var fn=esc(f.file_name||'?');
+        return '<div class="file-card" style="position:relative"><div class="file-icon">'+fileIcon(f.file_name)+'</div><div class="file-name">'+fn+'</div><div class="file-meta">'+esc(catLabel(f.category)||'未分类')+'</div><div style="display:flex;gap:8px;margin-top:10px">'+(fh?'<a href="/api/view/'+encodeURIComponent(fh)+'" target="_blank" class="btn btn-sm btn-ghost" style="font-size:11px;padding:4px 8px">👁 查看</a><a href="/api/download/'+encodeURIComponent(fh)+'" class="btn btn-sm btn-ghost" style="font-size:11px;padding:4px 8px">⬇ 下载</a>':'')+'<button class="btn btn-sm btn-ghost" style="font-size:11px;padding:4px 8px;color:var(--error)" onclick="event.stopPropagation();if(confirm(\'确认删除 '+fn.replace(/'/g,"\\'")+'？\')){fetch(\'/api/documents/'+fh+'\',{method:\'DELETE\'}).then(r=>r.json()).then(d=>{toast(\'已删除\',\'success\');loadFiles()}).catch(e=>toast(\'删除失败\',\'error\'))}">🗑 删除</button></div></div>'}).join('')+
         '</div>';
     };
     window._renderFiles('全部');
