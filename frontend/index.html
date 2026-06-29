@@ -441,17 +441,13 @@ function clearAuth(){STORE.removeItem(TK);STORE.removeItem(UK)}
 
 async function api(url,opt){
   const t=getToken();opt=opt||{};opt.headers=opt.headers||{};
-  if(t)opt.headers['Authorization']='Bearer '+t;
-  if(opt.body&&typeof opt.body==='object'&&!opt.headers['Content-Type']){opt.headers['Content-Type']='application/json';opt.body=JSON.stringify(opt.body)}
-  // 防御：确保所有 header 值都是纯 ASCII
-  for(const k of Object.keys(opt.headers)){
-    const v=opt.headers[k];
-    if(typeof v==='string' && v!=='' && [...v].some(c=>c.charCodeAt(0)>255)){
-      console.warn('[api] Non-Latin1 header removed:',k);
-      delete opt.headers[k];
-    }
+  // 只添加纯 ASCII 的 token
+  if(t && /^[A-Za-z0-9._\-~+\/=]+$/.test(t)){
+    opt.headers['Authorization']='Bearer '+t;
   }
-  const r=await fetch(url,opt);
+  if(opt.body&&typeof opt.body==='object'&&!opt.headers['Content-Type']){opt.headers['Content-Type']='application/json';opt.body=JSON.stringify(opt.body)}
+  try{
+    const r=await fetch(url,opt);
   if(r.status===401){clearAuth();showLogin();throw new Error('未登录')}
   if(r.status===403){toast('无权限访问','error');throw new Error('无权限')}
   if(!r.ok)throw new Error('请求失败: '+r.status);
@@ -799,7 +795,14 @@ function askQuick(q){document.getElementById('chatInput').value=q;sendChat()}
 // ===== 初始化 =====
 // 初始化
 (function init(){
-  if(getToken()){api('/api/auth/me').then(()=>showApp()).catch(()=>showLogin())}else{showLogin()}
+  const tok=getToken();
+  if(!tok){showLogin();return}
+  api('/api/auth/me').then(d=>{
+    if(d&&d.username){showApp()}else{showLogin()}
+  }).catch(()=>{
+    // 如果 /me 失败但 token 看起来正常，直接尝试进入 App
+    if(/^[A-Za-z0-9._\-~+\/=]+$/.test(tok)){showApp()}else{clearAuth();showLogin()}
+  })
   // 防御绑定：只在主 App 存在时才绑定 textarea
   const chatInput=document.getElementById('chatInput');
   if(chatInput){
