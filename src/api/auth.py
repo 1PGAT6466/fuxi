@@ -54,6 +54,11 @@ STATIC_PREFIXES = (
     "/api/upload", "/api/upload/",
     "/api/search-history",
     "/api/raw-store", "/api/raw-store/",
+    # 管理面板 API（token 验证在路由内部做）
+    "/api/admin", "/api/admin/",
+    "/api/evaluation", "/api/evaluation/",
+    "/api/evolution", "/api/evolution/",
+    "/api/feature-flags", "/api/feature-flags/",
 )
 
 

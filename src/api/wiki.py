@@ -488,6 +488,10 @@ async def wiki_list(search: Optional[str] = None) -> Dict[str, Any]:
 @router.get("/{wiki_id}")
 async def wiki_detail(wiki_id: str) -> Dict[str, Any]:
     """获取单个 Wiki 页面详情"""
+    # 排除非 wiki 路径（静态文件扩展名）
+    if '.' in wiki_id and not wiki_id.replace('.', '').isdigit():
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail="Not Found")
     try:
         import sys
         sys.path.insert(0, '/home/feng-shaoxuan/伏羲·内世界')
