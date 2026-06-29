@@ -39,6 +39,12 @@ function initApp() {
 (function init() {
   const tok = getToken();
   if (!tok) { showLogin(); return; }
+  // 清洗损坏的 token（含非 ASCII 字符的）
+  if (!/^[A-Za-z0-9._~+\/=]+$/.test(tok)) {
+    clearAuth();
+    showLogin();
+    return;
+  }
   api('/api/auth/me').then(d => {
     if (d && d.username) { showApp(); } else { showLogin(); }
   }).catch(() => { showLogin(); });

@@ -45,7 +45,10 @@ async function api(url, opt) {
   const t = getToken();
   opt = opt || {};
   opt.headers = opt.headers || {};
-  if (t) opt.headers['Authorization'] = 'Bearer ' + t;
+  // Token 安全校验：只允许纯 ASCII base64url 字符
+  if (t && /^[A-Za-z0-9._~+\/=]+$/.test(t)) {
+    opt.headers['Authorization'] = 'Bearer ' + t;
+  }
   if (opt.body && typeof opt.body === 'object' && !opt.headers['Content-Type']) {
     opt.headers['Content-Type'] = 'application/json';
     opt.body = JSON.stringify(opt.body);
