@@ -441,13 +441,9 @@ function clearAuth(){STORE.removeItem(TK);STORE.removeItem(UK)}
 
 async function api(url,opt){
   const t=getToken();opt=opt||{};opt.headers=opt.headers||{};
-  // 只添加纯 ASCII 的 token
-  if(t && /^[A-Za-z0-9._\-~+\/=]+$/.test(t)){
-    opt.headers['Authorization']='Bearer '+t;
-  }
+  if(t)opt.headers['Authorization']='Bearer '+t;
   if(opt.body&&typeof opt.body==='object'&&!opt.headers['Content-Type']){opt.headers['Content-Type']='application/json';opt.body=JSON.stringify(opt.body)}
-  try{
-    const r=await fetch(url,opt);
+  const r=await fetch(url,opt);
   if(r.status===401){clearAuth();showLogin();throw new Error('未登录')}
   if(r.status===403){toast('无权限访问','error');throw new Error('无权限')}
   if(!r.ok)throw new Error('请求失败: '+r.status);
@@ -685,7 +681,7 @@ async function uploadFiles(files){
     const fd=new FormData();fd.append('file',f);
     try{
       toast('上传中: '+f.name,'info');
-      await fetch('/api/upload',{method:'POST',headers:{'Authorization':'Bearer '+getToken()},body:fd});
+      const r2=await fetch('/api/upload',{method:'POST',headers:{'Authorization':'Bearer '+getToken()},body:fd}); if(!r2.ok)throw new Error('Upload failed: '+r2.status);
       toast('上传成功: '+f.name,'success');
     }catch(e){toast('上传失败: '+f.name,'error')}
   }
@@ -799,10 +795,7 @@ function askQuick(q){document.getElementById('chatInput').value=q;sendChat()}
   if(!tok){showLogin();return}
   api('/api/auth/me').then(d=>{
     if(d&&d.username){showApp()}else{showLogin()}
-  }).catch(()=>{
-    // 如果 /me 失败但 token 看起来正常，直接尝试进入 App
-    if(/^[A-Za-z0-9._\-~+\/=]+$/.test(tok)){showApp()}else{clearAuth();showLogin()}
-  })
+  }).catch(()=>{showLogin()})
   // 防御绑定：只在主 App 存在时才绑定 textarea
   const chatInput=document.getElementById('chatInput');
   if(chatInput){
