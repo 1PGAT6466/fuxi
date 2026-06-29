@@ -441,13 +441,12 @@ function clearAuth(){STORE.removeItem(TK);STORE.removeItem(UK)}
 
 async function api(url,opt){
   const t=getToken();opt=opt||{};opt.headers=opt.headers||{};
-  // 确保 token 只包含 ASCII 可打印字符
-  if(t&&/^[A-Za-z0-9._~+/-]+=*$/.test(t))opt.headers['Authorization']='Bearer '+t;
+  if(t)opt.headers['Authorization']='Bearer '+t;
   if(opt.body&&typeof opt.body==='object'&&!opt.headers['Content-Type']){opt.headers['Content-Type']='application/json';opt.body=JSON.stringify(opt.body)}
-  // 防御：确保所有 header 值都是 ISO-8859-1 安全字符串
+  // 防御：确保所有 header 值都是纯 ASCII
   for(const k of Object.keys(opt.headers)){
     const v=opt.headers[k];
-    if(typeof v==='string'&&!/^[ -ÿ]*$/.test(v)){
+    if(typeof v==='string' && v!=='' && [...v].some(c=>c.charCodeAt(0)>255)){
       console.warn('[api] Non-Latin1 header removed:',k);
       delete opt.headers[k];
     }
