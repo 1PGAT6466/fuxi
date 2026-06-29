@@ -55,6 +55,7 @@ CORS_ORIGINS: List[str] = os.getenv(
 ADMIN_TOKEN = os.getenv("KB_ADMIN_TOKEN", "")
 MAX_FILE_MB = 200
 UPLOAD_MAX_MB = int(os.getenv("KB_UPLOAD_MAX_MB", "200"))
+LOADER_URL = os.getenv("LOADER_URL", "http://172.25.30.16:8090")
 AI_TIMEOUT_SECONDS = int(os.getenv("KB_AI_TIMEOUT", "30"))
 
 # ============ MiMo API 配置 ============

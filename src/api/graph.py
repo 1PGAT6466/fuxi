@@ -182,8 +182,14 @@ async def graph_query(q: str = Query("")):
                 elif e["to"] == entity:
                     related.append({"from": e["from"], "relation": e["relation"]})
             results.append({"entity": entity, **info, "related": related[:10]})
+    # 兼容前端：同时返回 entities(list) 和 nodes(dict)
+    nodes_out = {}
+    for r in results[:20]:
+        name = r.pop("entity", "?")
+        nodes_out[name] = r
     return {
         "query": q, "type": "entity", "matches": len(results), "entities": results[:20],
+        "nodes": nodes_out, "edges": edges[:100],
         "total_nodes": len(nodes), "total_edges": len(edges)
     }
 

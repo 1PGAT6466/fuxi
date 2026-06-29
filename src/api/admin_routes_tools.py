@@ -12,8 +12,13 @@ router = APIRouter(tags=["admin-tools"])
 @router.get("/api/tools")
 async def tools():
     """获取工具列表"""
-    if TOOLS_DATA and TOOLS_DATA.is_file():
-        return {"ok": True, "data": json.loads(TOOLS_DATA.read_text(encoding="utf-8"))}
+    try:
+        if isinstance(TOOLS_DATA, list):
+            return {"ok": True, "data": TOOLS_DATA}
+        if hasattr(TOOLS_DATA, 'is_file') and TOOLS_DATA.is_file():
+            return {"ok": True, "data": json.loads(TOOLS_DATA.read_text(encoding="utf-8"))}
+    except Exception:
+        pass
     return {"ok": True, "data": []}
 
 

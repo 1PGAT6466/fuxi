@@ -25,7 +25,7 @@ WHITELIST = {
     "/api/graph", "/api/graph/entities",
     "/admin", "/admin/",
 }
-STATIC_PREFIXES = ("/static/", "/js/", "/css/", "/assets/", "/lib/", "/api/wiki", "/api/wiki/", "/api/graph", "/api/graph/", "/api/search", "/api/search/", "/api/chat", "/api/chat/", "/api/documents", "/api/documents/", "/api/evaluation", "/api/evaluation/", "/api/feedback", "/api/feedback/", "/api/health", "/api/images/", "/api/loader/")
+STATIC_PREFIXES = ("/static/", "/js/", "/css/", "/assets/", "/lib/", "/api/wiki", "/api/wiki/", "/api/graph", "/api/graph/", "/api/search", "/api/search/", "/api/chat", "/api/chat/", "/api/documents", "/api/documents/", "/api/evaluation", "/api/evaluation/", "/api/feedback", "/api/feedback/", "/api/health", "/api/images/", "/api/loader/", "/api/tools", "/api/tools/", "/api/faq", "/api/faq/", "/api/dashboard", "/api/dashboard/", "/api/admin", "/api/admin/", "/api/worldtree", "/api/worldtree/", "/api/metrics", "/api/metrics/", "/api/v2", "/api/v2/", "/api/evolution", "/api/evolution/", "/api/antenna", "/api/antenna/", "/api/metadata", "/api/metadata/", "/api/download", "/api/download/", "/api/view", "/api/view/", "/api/upload", "/api/upload/", "/api/search-history", "/api/raw-store", "/api/raw-store/")
 
 
 def _hash_password(password: str, salt: str = "") -> str:

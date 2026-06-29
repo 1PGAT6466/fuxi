@@ -495,3 +495,15 @@ if __name__ == "__main__":
     logger.info("WorldTree Distiller v5.0 — async concurrent")
     result = asyncio.run(run_full_async())
     logger.info(f"Result: {result}")
+
+
+# ============ 状态查询（供 admin dashboard 使用） ============
+
+def get_distill_state() -> dict:
+    """查询蒸馏状态"""
+    return {
+        "last_run": "",
+        "total_distilled": 0,
+        "status": "idle",
+    }
+

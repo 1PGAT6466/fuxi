@@ -16,7 +16,7 @@ from fastapi.responses import FileResponse, HTMLResponse, Response, StreamingRes
 
 from src.config import (
     DATA_DIR, UPLOAD_DIR, MAX_FILE_MB, ALLOWED_EXTENSIONS,
-    SENSITIVE_PATTERNS, ADMIN_TOKEN, STATIC_DIR
+    SENSITIVE_PATTERNS, ADMIN_TOKEN, STATIC_DIR, LOADER_URL
 )
 from src.db.data_store import load_chunks, log_search
 from src.services.ingest import _sanitize_filename, _classify_text, _audit_text, _clean_text, _generate_summary, _smart_chunk, _extract_text, _compute_file_hash

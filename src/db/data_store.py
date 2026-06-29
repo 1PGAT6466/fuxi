@@ -186,6 +186,12 @@ def load_graph() -> dict:
 
 
 def save_graph(graph: dict):
+    """保存知识图谱，空图不覆盖已有数据"""
+    nodes = graph.get("nodes", graph.get("entities", {}))
+    if not nodes and GRAPH_PATH.exists():
+        existing = json.loads(GRAPH_PATH.read_text(encoding="utf-8"))
+        if existing.get("nodes") or existing.get("entities"):
+            return  # 拒绝用空图覆盖
     GRAPH_PATH.write_text(json.dumps(graph, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
