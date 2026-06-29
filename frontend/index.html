@@ -554,9 +554,12 @@ async function doSearch(){
   const q=document.getElementById('searchInput').value.trim();if(!q)return;
   const c=document.getElementById('searchResults');c.innerHTML='<div class="empty"><p>搜索中...</p></div>';
   try{
-    const d=await api('/api/search?q='+encodeURIComponent(q));
-    const results=d.results||[];
-    if(!results.length){c.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><h3>未找到相关结果</h3><p>尝试换个关键词</p><div style="margin-top:16px">'+['流程引擎','权限配置','公文管理','表单设计','组织架构'].map(k=>`<span class="quick-q" onclick="document.getElementById('searchInput').value='${k}';doSearch()">${k}</span>`).join(' ')+'</div>';return}
+    const d=await api('/api/search?q='+encodeURIComponent(q)+'&page_size=20');
+    const wikiR=d.wiki_results||[],chunkR=d.chunk_results||[];
+    const results=[...wikiR,...chunkR];
+    // 显示图上下文提示
+    const gc=d.graph_context||d.reflection;
+    if(!results.length){c.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><h3>未找到相关结果</h3><p>尝试换个关键词</p><div style="margin-top:16px">'+['组织权限','人事管理','知识管理','公文管理','流程引擎'].map(k=>`<span class="quick-q" onclick="document.getElementById('searchInput').value='${k}';doSearch()">${k}</span>`).join(' ')+'</div>';return}
     c.innerHTML=`<div class="result-list">${results.map((r,i)=>{
       const score=(r.score||r._weighted_score||0);
       const pct=Math.min(100,Math.round(score*5));
@@ -759,10 +762,11 @@ async function loadFlags(){
   try{
     const d=await api('/api/feature-flags');
     const flags=d.flags||d.defaults||{};
-    document.getElementById('flagsList').innerHTML=Object.entries(flags).map(([name,info])=>{
-      const v=typeof info==='object'?info.value:info;
-      const desc=typeof info==='object'?info.desc:'';
-      return `<div class="flag-row"><span class="flag-name">${name}</span><span class="flag-desc">${esc(desc)}</span><label class="toggle"><input type="checkbox" ${v?'checked':''} onchange="toggleFlag('${name}',this.checked)"><span class="slider"></span></label></div>`;
+    const names={'graphrag_multi_hop':'图多跳遍历','query_rewrite':'查询改写','wiki_search':'Wiki搜索','table_view':'表格视图','rag_answer':'RAG回答','use_reranker':'Reranker重排','session_memory':'对话记忆','auto_clean':'自动清洗','feedback_loop':'反馈闭环'};
+    document.getElementById('flagsList').innerHTML=Object.entries(flags).map(([name,value])=>{
+      const v=typeof value==='object'?value.value:value;
+      const label=names[name]||name;
+      return `<div class="flag-row"><span class="flag-name">${label}</span><span class="flag-desc">${name}</span><label class="toggle"><input type="checkbox" ${v?'checked':''} onchange="toggleFlag('${name}',this.checked)"><span class="slider"></span></label></div>`;
     }).join('');
   }catch(e){document.getElementById('flagsList').innerHTML='<p>加载失败</p>'}
 }
@@ -770,9 +774,8 @@ async function toggleFlag(name,value){await api('/api/feature-flags/'+name,{meth
 async function loadFeedback(){
   try{
     const d=await api('/api/feedback/weekly');
-    // /api/feedback/weekly 返回 dict: {total: N, items: [...]} 或直接的列表
-    const items=Array.isArray(d)?d:(d.items||d.feedback_list||Object.values(d).filter(v=>typeof v==='object')||[]);
-    if(!Array.isArray(items)||!items.length){document.getElementById('feedbackList').innerHTML='<div class="empty"><div class="empty-icon">💬</div><h3>暂无反馈</h3><p>用户反馈将在这里展示</p></div>';return}
+    const items=Array.isArray(d)?d:(d.feedbacks||d.items||d.feedback_list||[]);
+    if(!Array.isArray(items)||!items.length){document.getElementById('feedbackList').innerHTML='<div class="empty"><div class="empty-icon">💬</div><h3>暂无反馈</h3><p>'+((d.message||'用户反馈将在这里展示'))+'</p></div>';return}
     document.getElementById('feedbackList').innerHTML=items.length?
       '<table class="data"><thead><tr><th>时间</th><th>查询</th><th>评分</th><th>反馈</th></tr></thead><tbody>'+items.slice(0,20).map(f=>'<tr><td style="white-space:nowrap">'+(f.timestamp||f.time||f.created_at||'').substring(0,16)+'</td><td>'+(f.query||f.question||f.text||'').substring(0,40)+'</td><td>'+(f.rating||f.score||'—')+'</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">'+(f.feedback||f.comment||f.content||'').substring(0,60)+'</td></tr>').join('')+'</tbody></table>':
       '<div class="empty"><div class="empty-icon">💬</div><h3>暂无反馈</h3><p>用户反馈将在这里展示</p></div>';
