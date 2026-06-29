@@ -109,7 +109,7 @@ function loadHomeStats(){
   }).catch(function(){});
 
   // Server status -> health strip
-  fetch('/api/admin/server-status').then(function(r){ return r.json(); }).then(function(d){
+  api('/api/admin/server-status').then(function(d){
     var cpu = d.cpu_percent || 0; var mem = d.memory_percent || 0;
     var disk = d.disk_percent || 0;
 
@@ -716,7 +716,7 @@ function uploadWikiFile(file){
 function searchWiki(){
   var q=document.getElementById('wikiSearchInput').value.trim(); if(!q) return loadWikiPages();
   fetch('/api/wiki/search?q='+encodeURIComponent(q)+'&limit=20').then(function(r){return r.json()}).then(function(d){
-    document.getElementById('wikiResults').innerHTML = (d.results||[]).map(function(p){
+    document.getElementById('wikiResults').innerHTML = (d.pages||d.results||[]).map(function(p){
       return '<div class="result-card" data-wiki-id="'+p.id+'" data-action="view" style="cursor:pointer;padding:16px;margin-bottom:8px">'+
         '<div style="font-weight:600;color:var(--pri)">'+escapeHtml(p.title)+'</div>'+
         '<div style="font-size:11px;color:var(--text3);margin-top:3px">'+(p.tags||[]).map(function(t){return '<span style="display:inline-block;background:var(--bg);padding:2px 8px;border-radius:4px;margin-right:4px;font-size:11px">'+escapeHtml(t)+'</span>'}).join('')+'</div>'+
@@ -858,7 +858,7 @@ function faqCatEmoji(cat){
   return m[cat]||'💡';
 }
 function loadFilters(){
-  fetch('/api/admin/stats').then(function(r){return r.json()}).then(function(d){
+  api('/api/admin/stats').then(function(d){
     var cats = d.categories||d.category_distribution||{};
     var sel = document.getElementById('chatFilter');
     Object.keys(cats).slice(0,10).forEach(function(c){ var opt=document.createElement('option'); opt.value=c; opt.textContent=c; sel.appendChild(opt); });

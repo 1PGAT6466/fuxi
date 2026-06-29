@@ -19,7 +19,7 @@ from chromadb.config import Settings as ChromaSettings
 logger = logging.getLogger(__name__)
 
 # ============ 配置 ============
-EMBEDDER_URL = os.getenv("KB_EMBEDDER_URL", "http://127.0.0.1:8081")
+from src.config import EMBEDDER_URL
 CHROMA_DIR = os.getenv("KB_CHROMA_DIR", "data/chromadb")
 COLLECTION_NAME = "kb_chunks"
 

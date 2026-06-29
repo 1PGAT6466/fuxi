@@ -1,13 +1,24 @@
 // ===== 图谱 =====
 async function loadGraph(){
+  var container=document.getElementById('graphEntities');
+  container.innerHTML='<div style="text-align:center;padding:20px"><div class="loading-dots">加载中<span>.</span><span>.</span><span>.</span></div></div>';
   try{
     const d=await api('/api/graph');
     const nodes=d.nodes||{};const edges=d.edges||[];
-    const container=document.getElementById('graphEntities');
     const entries=Object.entries(nodes).slice(0,50);
-    container.innerHTML=entries.map(([name,v])=>`<div class="graph-entity"><span style="font-weight:600">${esc(name)}</span><span style="float:right;font-size:11px;color:var(--text3)">${v.type||''}</span></div>`).join('');
+    if(!entries.length){
+      container.innerHTML='<div class="empty"><div class="empty-icon">🕸️</div><h3>知识图谱为空</h3><p>上传文档后系统会自动抽取实体和关系</p></div>';
+      var canvas=document.getElementById('graphCanvas');
+      var ctx=canvas.getContext('2d');
+      canvas.width=canvas.offsetWidth;canvas.height=canvas.offsetHeight;
+      ctx.clearRect(0,0,canvas.width,canvas.height);
+      return;
+    }
+    container.innerHTML=entries.map(([name,v])=>`<div class="graph-entity"><span style="font-weight:600">${esc(name)}</span><span style="float:right;font-size:11px;color:var(--text3)">${esc(v.type||'')}</span></div>`).join('');
     drawGraph(nodes,edges);
-  }catch(e){document.getElementById('graphEntities').innerHTML='<p style="color:var(--text3)">加载失败</p>'}
+  }catch(e){
+    container.innerHTML='<div class="empty"><div class="empty-icon">⚠️</div><h3>加载失败</h3><p>'+esc(e.message)+'</p><button class="btn btn-ghost btn-sm" onclick="loadGraph()" style="margin-top:8px">重试</button></div>';
+  }
 }
 
 function drawGraph(nodes,edges){
@@ -19,7 +30,6 @@ function drawGraph(nodes,edges){
   const entries=Object.entries(nodes).slice(0,20);
   if(!entries.length)return;
   const nodePos={};
-  // 自适应九宫布局（最多 20 节点 → 5列 × 4行）
   const cols=Math.min(entries.length,5),rows=Math.ceil(entries.length/cols);
   const cellW=W/(cols+1),cellH=Math.min(H/(rows+1),90);
   entries.forEach(([name],i)=>{
@@ -33,7 +43,6 @@ function drawGraph(nodes,edges){
     const label=name.length>8?name.substring(0,7)+'…':name;
     ctx.fillText(label,cx,cy+4);
   });
-  // 边：支持 from/to 和 source/target 两种格式
   edges.forEach(e=>{
     const fromKey=e.from||e.source||'';
     const toKey=e.to||e.target||'';
@@ -48,5 +57,18 @@ function drawGraph(nodes,edges){
 }
 function searchGraph(){
   const q=document.getElementById('graphSearch').value.trim();
-  if(q)api('/api/graph?entity='+encodeURIComponent(q)).then(loadGraph).catch(()=>{});
+  if(!q){loadGraph();return;}
+  api('/api/graph?entity='+encodeURIComponent(q)).then(function(d){
+    const nodes=d.nodes||{};const edges=d.edges||[];
+    const container=document.getElementById('graphEntities');
+    const entries=Object.entries(nodes).slice(0,50);
+    if(!entries.length){
+      container.innerHTML='<div style="padding:12px;text-align:center;color:var(--text3)">未找到相关实体</div>';
+      return;
+    }
+    container.innerHTML=entries.map(([name,v])=>`<div class="graph-entity"><span style="font-weight:600">${esc(name)}</span><span style="float:right;font-size:11px;color:var(--text3)">${esc(v.type||'')}</span></div>`).join('');
+    drawGraph(nodes,edges);
+  }).catch(function(e){
+    toast('图谱搜索失败: '+e.message,'error');
+  });
 }

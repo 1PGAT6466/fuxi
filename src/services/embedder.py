@@ -107,7 +107,7 @@ from typing import List
 import logging; logger = logging.getLogger(__name__)
 
 
-EMBEDDER_URL = os.getenv("KB_EMBEDDER_URL", "http://localhost:8081")
+from src.config import EMBEDDER_URL
 
 
 async def embed_text(text: str) -> list:

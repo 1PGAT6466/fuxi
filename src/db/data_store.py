@@ -16,8 +16,16 @@ from src.config import (
 
 # ============ Chunks ============
 
+_CHUNK_CACHE = {"data": None, "ts": 0}
+_CHUNK_CACHE_TTL = 30  # seconds
+
 def load_chunks(filter_junk: bool = True, limit: int = None, offset: int = 0) -> list:
-    """从 SQLite 分页加载 chunk（v10.3: 防止 OOM）"""
+    """从 SQLite 分页加载 chunk（带 30s TTL 缓存）"""
+    now = time.time()
+    if filter_junk and limit is None and offset == 0 and _CHUNK_CACHE["data"] is not None:
+        if now - _CHUNK_CACHE["ts"] < _CHUNK_CACHE_TTL:
+            return _CHUNK_CACHE["data"]
+
     store = get_store()
     chunks = store.get_all(limit=limit, offset=offset)
     if not filter_junk:
@@ -33,7 +41,19 @@ def load_chunks(filter_junk: bool = True, limit: int = None, offset: int = 0) ->
             if pat in fn:
                 return True
         return False
-    return [c for c in chunks if not _is_junk(c.get('file_name', ''))]
+    result = [c for c in chunks if not _is_junk(c.get('file_name', ''))]
+
+    if limit is None and offset == 0:
+        _CHUNK_CACHE["data"] = result
+        _CHUNK_CACHE["ts"] = now
+
+    return result
+
+
+def invalidate_chunk_cache():
+    """在数据写入/删除后调用，清除缓存"""
+    _CHUNK_CACHE["data"] = None
+    _CHUNK_CACHE["ts"] = 0
 
 
 def save_chunks(chunks: list):

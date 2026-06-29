@@ -46,16 +46,17 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
-from src.config import HOST, PORT, VERSION, CORS_ORIGINS
+from src.config import HOST, PORT, VERSION, CORS_ORIGINS, LOADER_URL
 
 # 静态资源目录指向 frontend/
 STATIC_DIR = _project_root / "frontend"
 
 # ============ 创建 FastAPI 应用 ============
 from fastapi.staticfiles import StaticFiles
+from src.config import VERSION as _VERSION
 app = FastAPI(
     title="伏羲·内世界 — 企业知识认知系统",
-    version="1.43",
+    version=_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
 )
@@ -71,10 +72,10 @@ async def _start_fuxi():
         _fuxi_instance = Fuxi()
         app.state.fuxi = _fuxi_instance
         app.state.meridian = _fuxi_instance.meridian
-        app.state.fuxi_version = "1.43"
+        app.state.fuxi_version = _VERSION
         app.state.fuxi_born_at = __import__('time').time()
         await _fuxi_instance.born()
-        logging.getLogger("server").info("[Fuxi] 伏羲 1.42 生命体已苏醒")
+        logging.getLogger("server").info(f"[Fuxi] 伏羲 {_VERSION} 生命体已苏醒")
     except Exception as e:
         logging.getLogger("server").error(f"[Fuxi] 启动失败: {e}")
 
@@ -105,7 +106,7 @@ app.add_middleware(InputLimitMiddleware)
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_methods=["GET", "POST", "PUT", "DELETE"],
     allow_headers=["Content-Type", "x-admin-token", "Authorization"],
 )
@@ -212,33 +213,7 @@ async def update_feature_flag(name: str, request: Request):
     set_flag(name, value)
     return {"ok": True, "flag": name, "value": value}
 
-# ============ 认证 API ============
-from pydantic import BaseModel as _BM
-class _LoginReq(_BM):
-    username: str
-    password: str
-class _RegisterReq(_BM):
-    username: str
-    password: str
-    display_name: str = ""
-
-@app.post("/api/auth/login")
-async def auth_login(body: _LoginReq):
-    from src.api.auth import authenticate_user, _make_token
-    user = authenticate_user(body.username, body.password)
-    if not user:
-        raise HTTPException(401, "用户名或密码错误")
-    token = _make_token(user["username"], user["role"])
-    return {"token": token, "role": user["role"], "display_name": user["display_name"], "username": user["username"]}
-
-@app.post("/api/auth/register")
-async def auth_register(body: _RegisterReq):
-    from src.api.auth import register_user
-    result = register_user(body.username, body.password, "user", body.display_name)
-    if result.get("error"):
-        raise HTTPException(400, result["error"])
-    return result
-
+# ============ 认证 API (仅 /api/auth/me, login/register 由 auth_routes.py 提供) ============
 @app.get("/api/auth/me")
 async def auth_me(request: Request):
     return {"username": getattr(request.state, "user", "anonymous"), "role": getattr(request.state, "role", "user")}
@@ -292,24 +267,28 @@ async def admin_metrics_summary():
 @app.get("/api/proxy/loader/files")
 async def proxy_loader_files():
     """代理: 获取装载机文件列表"""
-    import requests as _req
-    loader_url = os.getenv("LOADER_URL", "http://127.0.0.1:8090")
+    import aiohttp
     try:
-        r = _req.get(f"{loader_url}/api/files", timeout=10)
-        return r.json()
+        async with aiohttp.ClientSession() as session:
+            async with session.get(f"{LOADER_URL}/api/files", timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                return await resp.json()
     except Exception as e:
         return {"error": str(e), "files": []}
 
 @app.post("/api/proxy/loader/upload")
 async def proxy_loader_upload(request: Request):
     """代理: 上传文件到装载机"""
-    import requests as _req
-    loader_url = os.getenv("LOADER_URL", "http://127.0.0.1:8090")
+    import aiohttp
     body = await request.body()
     try:
-        r = _req.post(f"{loader_url}/api/upload", data=body, timeout=30,
-                      headers={"Content-Type": request.headers.get("Content-Type", "multipart/form-data")})
-        return r.json()
+        async with aiohttp.ClientSession() as session:
+            async with session.post(
+                f"{LOADER_URL}/api/upload",
+                data=body,
+                timeout=aiohttp.ClientTimeout(total=30),
+                headers={"Content-Type": request.headers.get("Content-Type", "multipart/form-data")}
+            ) as resp:
+                return await resp.json()
     except Exception as e:
         return {"error": str(e)}
 

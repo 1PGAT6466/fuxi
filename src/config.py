@@ -9,13 +9,14 @@ from pathlib import Path
 from typing import List
 
 # ============ 路径 ============
-BASE_DIR = Path(os.path.expanduser("~/kb-server"))
-DATA_DIR = BASE_DIR / "data"
+_project_root = Path(__file__).parent.parent
+BASE_DIR = Path(os.getenv("FUXI_DATA_DIR", str(_project_root / "data")))
+DATA_DIR = BASE_DIR
 FEEDBACK_DIR = BASE_DIR / "feedback_data"
 UPLOAD_DIR = BASE_DIR / "uploads"
 LOG_DIR = BASE_DIR / "logs"
 BACKUP_DIR = BASE_DIR / "backups"
-STATIC_DIR = BASE_DIR / "frontend"
+STATIC_DIR = _project_root / "frontend"
 ADMIN_DIR = STATIC_DIR / "admin"
 CONFIG_HISTORY_DIR = DATA_DIR / "config_history"
 
@@ -46,16 +47,14 @@ for d in [DATA_DIR, UPLOAD_DIR, LOG_DIR, BACKUP_DIR, STATIC_DIR, CONFIG_HISTORY_
 HOST = os.getenv("KB_HOST", "0.0.0.0")
 PORT = int(os.getenv("KB_PORT", "8080"))
 EMBEDDER_URL = os.getenv("KB_EMBEDDER_URL", "http://localhost:8081")
-CORS_ORIGINS: List[str] = os.getenv(
-    "KB_CORS_ORIGINS",
-    "${KB_SERVER_URL:-http://localhost:8080},http://localhost:8080"
-).split(",")
+_default_cors = f"http://localhost:{PORT},http://127.0.0.1:{PORT}"
+CORS_ORIGINS: List[str] = os.getenv("KB_CORS_ORIGINS", _default_cors).split(",")
 
 # ============ 安全 ============
 ADMIN_TOKEN = os.getenv("KB_ADMIN_TOKEN", "")
 MAX_FILE_MB = 200
 UPLOAD_MAX_MB = int(os.getenv("KB_UPLOAD_MAX_MB", "200"))
-LOADER_URL = os.getenv("LOADER_URL", "http://172.25.30.16:8090")
+LOADER_URL = os.getenv("LOADER_URL", "http://localhost:8090")
 AI_TIMEOUT_SECONDS = int(os.getenv("KB_AI_TIMEOUT", "30"))
 
 # ============ MiMo API 配置 ============
@@ -93,11 +92,11 @@ ALLOWED_EXTENSIONS = {
     ".txt", ".md", ".csv", ".docx", ".doc", ".xlsx", ".xls",
     ".pdf", ".pptx", ".ppt",
     ".cfg", ".log", ".ini", ".conf", ".json", ".xml", ".html", ".htm",
-    ".zip", ".wps", ".deb", ".dwg", ".dxf", ".stp", ".step", ".igs", ".iges",
+    ".zip", ".wps", ".dwg", ".dxf", ".stp", ".step", ".igs", ".iges",
     ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg",
     ".py", ".js", ".ts", ".java", ".c", ".cpp", ".h", ".sh", ".bat", ".ps1",
     ".yaml", ".yml",
-    ".exe", ".msi", ".apk", ".dmg", ".pkg", ".rpm", ".7z", ".rar", ".tar", ".gz",
+    ".7z", ".rar", ".tar", ".gz",
 }
 
 # ============ 敏感信息脱敏 ============

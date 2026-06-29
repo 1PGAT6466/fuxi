@@ -40,6 +40,8 @@ class HeartAgent(OrganBase):
         self._task = None
         self._last_health: Dict = {}
         self._anomalies: list = []
+        self._short_term: list = []
+        self._preferences: Dict = {}
 
         self.meridian.register_organ(
             self.organ_id, "心", "🫀",

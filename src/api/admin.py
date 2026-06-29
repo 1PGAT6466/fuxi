@@ -8,7 +8,8 @@ from pathlib import Path
 from fastapi import APIRouter, Request, HTTPException
 from fastapi.responses import HTMLResponse, FileResponse
 
-from src.config import STATIC_DIR, ADMIN_DIR, VERSION
+from src.config import VERSION
+STATIC_DIR = Path(__file__).parent.parent.parent / "frontend"
 
 router = APIRouter(tags=["admin"])
 

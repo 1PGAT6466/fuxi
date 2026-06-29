@@ -216,17 +216,20 @@ class WikiEngine:
     def search_by_title(self, query: str, limit: int = 5) -> list:
         """按标题关键词搜索"""
         conn = sqlite3.connect(self.db_path)
-        # SQLite LIKE 搜索
         keywords = query.split()
-        conditions = " OR ".join([f"title LIKE '%{kw}%'" for kw in keywords[:5]])
+        if not keywords:
+            conn.close()
+            return []
+        conditions = " OR ".join(["title LIKE ?" for _ in keywords[:5]])
+        params = [f"%{kw}%" for kw in keywords[:5]]
         cur = conn.execute(
             f"SELECT * FROM wiki_pages WHERE {conditions} ORDER BY quality_score DESC LIMIT ?",
-            (limit,)
+            params + [limit]
         )
         rows = cur.fetchall()
         conn.close()
         return [self._row_to_dict(r) for r in rows]
-    
+
     def search_content(self, query: str, limit: int = 5) -> list:
         """全文搜索 Wiki 内容（标题 + 正文 + 标签）"""
         conn = sqlite3.connect(self.db_path)
@@ -234,13 +237,14 @@ class WikiEngine:
         if not keywords:
             conn.close()
             return []
-        title_conds = " OR ".join([f"title LIKE '%{kw}%'" for kw in keywords])
-        content_conds = " OR ".join([f"content LIKE '%{kw}%'" for kw in keywords])
-        tag_conds = " OR ".join([f"tags LIKE '%{kw}%'" for kw in keywords])
-        sql = f"""SELECT * FROM wiki_pages WHERE 
+        title_conds = " OR ".join(["title LIKE ?" for _ in keywords])
+        content_conds = " OR ".join(["content LIKE ?" for _ in keywords])
+        tag_conds = " OR ".join(["tags LIKE ?" for _ in keywords])
+        sql = f"""SELECT * FROM wiki_pages WHERE
             ({title_conds}) OR ({content_conds}) OR ({tag_conds})
             ORDER BY quality_score DESC LIMIT ?"""
-        cur = conn.execute(sql, (limit,))
+        params = [f"%{kw}%" for kw in keywords] * 3
+        cur = conn.execute(sql, params + [limit])
         rows = cur.fetchall()
         conn.close()
         return [self._row_to_dict(r) for r in rows]

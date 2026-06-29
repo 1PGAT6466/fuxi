@@ -12,12 +12,12 @@ const TITLES = {
 function switchPage(name) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
-  const page = document.getElementById('page-' + name);
+  var page = document.getElementById('page-' + name);
   if (page) page.classList.add('active');
-  const nav = document.querySelector('.nav-item[data-page="' + name + '"]');
+  var nav = document.querySelector('.nav-item[data-page="' + name + '"]');
   if (nav) nav.classList.add('active');
   document.getElementById('pageTitle').textContent = TITLES[name] || name;
-  
+
   if (name === 'graph') loadGraph();
   if (name === 'wiki') loadWikiTree();
   if (name === 'files') { if (typeof loadFiles === 'function') loadFiles(); }
@@ -29,33 +29,56 @@ function switchPage(name) {
 }
 
 function initApp() {
-  document.querySelectorAll('.nav-item').forEach(n => {
-    n.addEventListener('click', () => switchPage(n.dataset.page));
+  var user = getUser();
+  var isAdmin = user.role === 'admin';
+  // 根据角色显示/隐藏管理菜单
+  var adminSections = document.querySelectorAll('.nav-admin');
+  adminSections.forEach(function(el) {
+    el.style.display = isAdmin ? 'block' : 'none';
   });
+
+  // 设置用户信息
+  var avatar = document.getElementById('userAvatar');
+  var userName = document.getElementById('userName');
+  var userRole = document.getElementById('userRole');
+  if (avatar) avatar.textContent = (user.display_name || user.username || 'U')[0].toUpperCase();
+  if (userName) userName.textContent = user.display_name || user.username || '用户';
+  if (userRole) {
+    userRole.textContent = isAdmin ? '管理员' : '普通用户';
+    userRole.className = 'role';
+  }
+
+  // 绑定导航点击事件
+  document.querySelectorAll('.nav-item').forEach(n => {
+    n.addEventListener('click', function() {
+      switchPage(this.dataset.page);
+    });
+  });
+
+  // 默认进入对话页
   switchPage('chat');
 }
 
 // 初始化
 (function init() {
-  const tok = getToken();
+  var tok = getToken();
   if (!tok) { showLogin(); return; }
-  // 清洗损坏的 token（含非 ASCII 字符的）
   if (!/^[A-Za-z0-9._~+\/=]+$/.test(tok)) {
     clearAuth();
     showLogin();
     return;
   }
-  api('/api/auth/me').then(d => {
+  api('/api/auth/me').then(function(d) {
     if (d && d.username) { showApp(); } else { showLogin(); }
-  }).catch(() => { showLogin(); });
+  }).catch(function() { showLogin(); });
 })();
 
 // textarea 自动高度
 (function() {
-  const chatInput = document.getElementById('chatInput');
+  var chatInput = document.getElementById('chatInput');
   if (chatInput) {
     chatInput.addEventListener('input', function() {
-      this.style.height = 'auto';
+      this.style.height = '22px';
       this.style.height = Math.min(this.scrollHeight, 120) + 'px';
     });
   }

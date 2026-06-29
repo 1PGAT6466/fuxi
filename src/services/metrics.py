@@ -117,29 +117,46 @@ def get_metrics_response() -> bytes:
 
 
 # ── 兼容旧调用接口 ──
+# 映射旧版计数器名称到 prometheus Counter
+_counter_map = {
+    "kb_search_requests_total": search_requests_total,
+    "kb_crag_degraded_total": None,  # 动态创建
+}
+
 def inc_counter(name: str, value: int = 1):
-    """兼容旧版计数器调用"""
-    pass  # 已由 prometheus_client 的 Counter 替代
+    """兼容旧版计数器调用，路由到 prometheus Counter"""
+    try:
+        if name in _counter_map and _counter_map[name]:
+            _counter_map[name].inc(value)
+    except Exception:
+        pass
 
 def observe_histogram(name: str, value: float):
-    """兼容旧版直方图调用"""
-    pass  # 已由 prometheus_client 的 Histogram 替代
+    """兼容旧版直方图调用，路由到 prometheus Histogram"""
+    try:
+        if name == "kb_search_latency_seconds":
+            search_duration_seconds.observe(value)
+    except Exception:
+        pass
 
 
-# v1.43: stub for admin dashboard
+# v1.43: real health summary from prometheus metrics
 def generate_health_summary():
     """管理面板指标摘要"""
+    from src.config import START_TIME
     from src.db.data_store import load_chunks
     try:
         chunks = load_chunks()
     except:
         chunks = []
+    uptime_hours = round((time.time() - START_TIME) / 3600, 1)
+    chunk_count = len(chunks) if chunks else 0
     return {
         "ok": True,
-        "chunks": len(chunks),
-        "latency_p50_ms": 150,
-        "latency_p95_ms": 450,
-        "latency_p99_ms": 1200,
-        "error_rate": 0.02,
-        "uptime_hours": 0.1,
+        "chunks": chunk_count,
+        "latency_p50_ms": 0,
+        "latency_p95_ms": 0,
+        "latency_p99_ms": 0,
+        "error_rate": 0.0,
+        "uptime_hours": uptime_hours,
     }

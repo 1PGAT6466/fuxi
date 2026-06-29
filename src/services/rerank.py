@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 # ============ DeepSeek Rerank ============
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 RERANK_VIA_PROXY = os.getenv("KB_RERANK_PROXY", "http://127.0.0.1:8091")
+from src.config import EMBEDDER_URL
 
 
 async def rerank_with_deepseek(query: str, candidates: list, top_k: int = 30) -> list:
@@ -79,7 +80,7 @@ async def rerank_with_embedder(query: str, candidates: list, top_k: int = 30) ->
 
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                "http://127.0.0.1:8081/rerank",
+                f"{EMBEDDER_URL}/rerank",
                 json={"query": query, "documents": documents, "top_k": min(top_k, len(documents))},
                 headers={"Content-Type": "application/json"},
                 timeout=aiohttp.ClientTimeout(total=10),

@@ -119,8 +119,10 @@ def _run_rag_eval() -> dict:
     
     # 通过 HTTP 调用本地搜索 API
     import urllib.request
+    from src.config import HOST, PORT
+    _server_url = f"http://{HOST if HOST != '0.0.0.0' else 'localhost'}:{PORT}"
     def search_fn(query, top_k=10):
-        url = f"http://localhost:8080/api/search?q={urllib.parse.quote(query)}&top_k={top_k}"
+        url = f"{_server_url}/api/search?q={urllib.parse.quote(query)}&top_k={top_k}"
         try:
             resp = urllib.request.urlopen(url, timeout=10)
             data = json.loads(resp.read())

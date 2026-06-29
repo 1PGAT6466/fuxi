@@ -41,7 +41,10 @@ async def search(q: str = Query(...), top_k: int = 15, page: int = 1, page_size:
             from src.services.metrics import record_search, record_cache
             record_cache(hit=True, level="L1")
             record_search("success", time.time()-t0, len(cached))
-            return {"results": cached[:page_size], "query": q, "page": 1, "page_size": page_size,
+            wiki_hits = [r for r in cached if r.get("_source") == "wiki"]
+            chunk_hits = [r for r in cached if r.get("_source") != "wiki"]
+            return {"wiki_results": wiki_hits[:page_size], "chunk_results": chunk_hits[:page_size],
+                    "results": cached[:page_size], "query": q, "page": 1, "page_size": page_size,
                     "total": len(cached), "total_pages": 1, "has_more": False, "_from_cache": True}
     except Exception as e:
 

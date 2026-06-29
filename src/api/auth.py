@@ -6,12 +6,17 @@ import os, json, time, hashlib, secrets, logging
 from pathlib import Path
 from typing import Optional, Dict
 
+import bcrypt
+
 from fastapi import Request, HTTPException
 from starlette.middleware.base import BaseHTTPMiddleware
 
 logger = logging.getLogger(__name__)
 
-JWT_SECRET = os.environ.get("FUXI_JWT_SECRET", "fuxi-default-secret-change-in-production")
+JWT_SECRET = os.environ.get("FUXI_JWT_SECRET", "")
+if not JWT_SECRET:
+    JWT_SECRET = "fuxi-default-secret-change-in-production"
+    logger.warning("[Auth] FUXI_JWT_SECRET 未设置，使用默认密钥（不安全！请在生产环境设置环境变量）")
 JWT_EXPIRE_HOURS = 24
 USERS_FILE = Path(os.getenv("FUXI_DATA_DIR", "data")) / "users.json"
 
@@ -25,21 +30,49 @@ WHITELIST = {
     "/api/graph", "/api/graph/entities",
     "/admin", "/admin/",
 }
-STATIC_PREFIXES = ("/static/", "/js/", "/css/", "/assets/", "/lib/", "/api/wiki", "/api/wiki/", "/api/graph", "/api/graph/", "/api/search", "/api/search/", "/api/chat", "/api/chat/", "/api/documents", "/api/documents/", "/api/evaluation", "/api/evaluation/", "/api/feedback", "/api/feedback/", "/api/health", "/api/images/", "/api/loader/", "/api/tools", "/api/tools/", "/api/faq", "/api/faq/", "/api/dashboard", "/api/dashboard/", "/api/admin", "/api/admin/", "/api/worldtree", "/api/worldtree/", "/api/metrics", "/api/metrics/", "/api/v2", "/api/v2/", "/api/evolution", "/api/evolution/", "/api/antenna", "/api/antenna/", "/api/metadata", "/api/metadata/", "/api/download", "/api/download/", "/api/view", "/api/view/", "/api/upload", "/api/upload/", "/api/search-history", "/api/raw-store", "/api/raw-store/")
+STATIC_PREFIXES = (
+    "/static/", "/js/", "/css/", "/assets/", "/lib/",
+    "/api/wiki", "/api/wiki/",
+    "/api/graph", "/api/graph/",
+    "/api/search", "/api/search/",
+    "/api/chat", "/api/chat/",
+    "/api/documents", "/api/documents/",
+    "/api/feedback", "/api/feedback/",
+    "/api/health",
+    "/api/images/",
+    "/api/loader/",
+    "/api/tools", "/api/tools/",
+    "/api/faq", "/api/faq/",
+    "/api/dashboard", "/api/dashboard/",
+    "/api/worldtree", "/api/worldtree/",
+    "/api/metrics", "/api/metrics/",
+    "/api/v2", "/api/v2/",
+    "/api/antenna", "/api/antenna/",
+    "/api/metadata", "/api/metadata/",
+    "/api/download", "/api/download/",
+    "/api/view", "/api/view/",
+    "/api/upload", "/api/upload/",
+    "/api/search-history",
+    "/api/raw-store", "/api/raw-store/",
+)
 
 
-def _hash_password(password: str, salt: str = "") -> str:
-    if not salt:
-        salt = secrets.token_hex(16)
+def _hash_password(password: str) -> str:
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
+
+
+def _hash_password_sha256(password: str, salt: str) -> str:
     h = hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
     return f"{salt}${h}"
 
 
 def _verify_password(password: str, stored: str) -> bool:
-    if "$" not in stored:
-        return False
-    salt, h = stored.split("$", 1)
-    return _hash_password(password, salt) == stored
+    if stored.startswith("$2b$") or stored.startswith("$2a$"):
+        return bcrypt.checkpw(password.encode(), stored.encode())
+    if "$" in stored:
+        salt, _ = stored.split("$", 1)
+        return _hash_password_sha256(password, salt) == stored
+    return False
 
 
 def _load_users() -> Dict:
@@ -100,6 +133,10 @@ def authenticate_user(username: str, password: str) -> Optional[Dict]:
     user = users.get(username)
     if not user or not _verify_password(password, user["password"]):
         return None
+    if not user["password"].startswith("$2b$"):
+        user["password"] = _hash_password(password)
+        _save_users(users)
+        logger.info(f"[Auth] 用户 {username} 密码已从 SHA-256 迁移到 bcrypt")
     return {"username": username, "role": user.get("role", "user"), "display_name": user.get("display_name", username)}
 
 

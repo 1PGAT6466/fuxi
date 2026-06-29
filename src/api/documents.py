@@ -18,7 +18,7 @@ from src.config import (
     DATA_DIR, UPLOAD_DIR, MAX_FILE_MB, ALLOWED_EXTENSIONS,
     SENSITIVE_PATTERNS, ADMIN_TOKEN, STATIC_DIR, LOADER_URL
 )
-from src.db.data_store import load_chunks, log_search
+from src.db.data_store import load_chunks, log_search, invalidate_chunk_cache
 from src.services.ingest import _sanitize_filename, _classify_text, _audit_text, _clean_text, _generate_summary, _smart_chunk, _extract_text, _compute_file_hash
 from src.category_registry import match_category, normalize_category
 from src.db.memory_store import get_store
@@ -200,6 +200,7 @@ async def download_file(file_hash: str):
 async def delete_document(file_hash: str):
     """删除文档"""
     count = get_store().delete_by_hash(file_hash)
+    invalidate_chunk_cache()
     return {"deleted": True, "removed_chunks": count}
 
 
@@ -410,6 +411,7 @@ async def ingest_batch(body: IngestBatchRequest):
     if not new_chunks:
         return {"status": "blocked", "file": body.file_name, "reason": "all chunks filtered", "chunks": 0}
     get_store().insert_many(new_chunks)
+    invalidate_chunk_cache()
 
     # 自动向量化 → 放入后台队列，不阻塞响应
     try:
@@ -545,8 +547,7 @@ async def reindex(request: Request):
     for fp in files:
         if fp.is_dir():
             continue
-        safe_name = parts[1] if len(parts) == 2 else raw_name
-        safe_name = raw_name
+        safe_name = fp.name
         ext = os.path.splitext(safe_name)[1].lower()
         if not ext:
             continue
@@ -587,6 +588,7 @@ async def reindex(request: Request):
         except Exception as e:
             logger.warning(f"[reindex] skip {fp.name}: {e}")
     store.insert_many(all_chunks)
+    invalidate_chunk_cache()
     return {"status": "ok", "message": f"重建完成 (跳过 {skipped_dupes} 个重复文件)", "reindexed": total_files, "total_chunks": len(all_chunks), "skipped_dupes": skipped_dupes}
 
 
@@ -601,5 +603,6 @@ async def reset(request: Request):
     # Phase 0: use SQL DELETE instead of clearing in-memory lists
     store._db_conn.execute("DELETE FROM chunks")
     store._db_conn.commit()
+    invalidate_chunk_cache()
     # store._save() removed — MemoryStore does not support persist
     return {"message": f"已清空 {n} 条数据", "deleted": n}

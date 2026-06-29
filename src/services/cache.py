@@ -72,7 +72,7 @@ async def get_cache(query: str, category: str = "", top_k: int = 15) -> Optional
                                         if now - t < MAX_CACHE_AGE_SECONDS]
             except Exception as e:
 
-                logger.warning(f"[{module}] suppressed exception", exc_info=True)
+                logger.warning(f"[cache] suppressed exception", exc_info=True)
     _cache_misses += 1
     return None
 
@@ -104,7 +104,8 @@ async def set_cache(query: str, results: list, category: str = "", top_k: int = 
                     _l2_cache.pop(0)
         except Exception as e:
 
-            logger.warning(f"[{module}] suppressed exception", exc_info=True)
+            logger.warning(f"[cache] suppressed exception", exc_info=True)
+
 def _cosine_similarity(a: list, b: list) -> float:
     """余弦相似度"""
     if not a or not b or len(a) != len(b):

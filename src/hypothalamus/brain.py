@@ -99,11 +99,15 @@ class Instinct:
                 if "compare" not in intents:
                     intents["compare"] = 0.4
         
-        # 特殊消歧：只有材料名没有意图词 → 默认 material_selector + definition
-        material_pattern = r"\b(pa\d{1,2}|pom|pc|abs|pps|pbt|pei|peek|ptfe|pmma|lcp)\b"
-        if re.search(material_pattern, query) and len(intents) <= 1 and primary == "general_search":
-            intents["definition"] = 0.5
-            intents["numeric_lookup"] = 0.3
+        # 材料名检测：含材料名时自动标记 material_selector
+        material_pattern = r"(pa\d{1,2}|pom|pc|abs|pps|pbt|pei|peek|ptfe|pmma|lcp)"
+        if re.search(material_pattern, query):
+            if "material_selector" not in intents:
+                intents["material_selector"] = 0.5
+            # 只有材料名没有意图词 → 默认 definition + numeric_lookup
+            if len(intents) <= 1 and primary == "general_search":
+                intents["definition"] = 0.5
+                intents["numeric_lookup"] = 0.3
         
         return {
             "intent": primary,

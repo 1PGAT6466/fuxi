@@ -89,8 +89,10 @@ async def health():
         "uptime": f"{d}d {h}h {m}m",
         "uptime_seconds": round(uptime_seconds),
         "chunks": chunk_count,
+        "total_chunks": chunk_count,
         "vectors": vector_count,
         "files": file_count,
+        "total_files": file_count,
         "ratio_info": ratio_info,
         "warnings": warnings if warnings else None,
         "check_duration_ms": check_duration_ms,
@@ -135,11 +137,21 @@ async def admin_stats():
     except:
         chunk_count = unique_sources = total_size = 0
 
+    categories = {}
+    try:
+        for c in chunks:
+            cat = c.get("category", "未分类")
+            categories[cat] = categories.get(cat, 0) + 1
+    except:
+        pass
+
     return {
         "ok": True,
         "chunks": chunk_count,
         "unique_sources": unique_sources,
         "total_size_kb": round(total_size / 1024, 1),
+        "categories": categories,
+        "category_distribution": categories,
         "distill": state,
     }
 
@@ -149,9 +161,25 @@ async def server_status():
     """服务器状态"""
     from src.config import START_TIME
     uptime = time.time() - START_TIME
-    return {
+    result = {
         "ok": True,
         "uptime_seconds": round(uptime),
         "uptime_hours": round(uptime / 3600, 1),
         "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+    try:
+        import psutil
+        result["cpu_percent"] = psutil.cpu_percent(interval=0.1)
+        mem = psutil.virtual_memory()
+        result["memory_percent"] = round(mem.percent, 1)
+        disk = psutil.disk_usage("/")
+        result["disk_percent"] = round(disk.percent, 1)
+    except ImportError:
+        result["cpu_percent"] = 0
+        result["memory_percent"] = 0
+        result["disk_percent"] = 0
+    except Exception:
+        result["cpu_percent"] = 0
+        result["memory_percent"] = 0
+        result["disk_percent"] = 0
+    return result

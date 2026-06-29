@@ -146,85 +146,24 @@ def _smart_chunk(text: str, size: int = 1200, overlap: int = 100) -> list:
         
         chunk = text[start:end].strip()
         if chunk and len(chunk) > 20:
-            chunks.append(chunk)
             # v4.0 表格结构化提取
+            structured = None
             try:
                 from src.services.table_parser import extract_tables_from_markdown
-                if chunk.get("text") and "|" in chunk["text"]:
-                    tables = extract_tables_from_markdown(chunk["text"])
+                if "|" in chunk:
+                    tables = extract_tables_from_markdown(chunk)
                     if tables:
-                        chunk["structured_table"] = tables[0]
+                        structured = tables[0]
             except Exception:
                 pass
+            if structured:
+                chunks.append({"text": chunk, "structured_table": structured})
+            else:
+                chunks.append(chunk)
         
         start = end - overlap if end < text_len else text_len
     
     return chunks
-
-def _smart_chunk_legacy(text: str, size: int = 1200, overlap: int = 100) -> list:
-    lines = text.split("\n")
-    chunks = []
-    current_title = ""
-    current_lines = []
-    current_len = 0
-
-    def _flush():
-        nonlocal current_lines, current_len
-        if not current_lines:
-            return
-        body = "\n".join(current_lines).strip()
-        if not body:
-            current_lines = []
-            current_len = 0
-            return
-        prefix = (current_title + "\n") if current_title else ""
-        chunks.append(prefix + body)
-        if overlap > 0 and len(current_lines) > 3:
-            tail_lines = []
-            tail_len = 0
-            picked = 0
-            for ol in reversed(current_lines):
-                if not ol or ol.startswith("#"):
-                    continue
-                if picked >= 2 or tail_len + len(ol) > overlap:
-                    break
-                tail_lines.insert(0, ol)
-                tail_len += len(ol) + 1
-                picked += 1
-            current_lines = tail_lines
-            current_len = tail_len
-        else:
-            current_lines = []
-            current_len = 0
-
-    for line in lines:
-        stripped = line.strip()
-        if stripped.startswith("#"):
-            _flush()
-            level = len(stripped) - len(stripped.lstrip("#"))
-            title_text = stripped.lstrip("#").strip()
-            if level <= 2:
-                current_title = title_text
-            else:
-                current_title = (current_title + " > " + title_text) if current_title else title_text
-            current_lines.append(stripped)
-            current_len += len(stripped) + 1
-            continue
-        if not stripped:
-            if current_len > size:
-                _flush()
-            elif current_lines:
-                current_lines.append("")
-                current_len += 1
-            continue
-        current_lines.append(stripped)
-        current_len += len(stripped) + 1
-        if current_len > size:
-            _flush()
-
-    _flush()
-    return chunks if chunks else [text[:1500]]
-
 
 def _extract_pdf_dual(file_path: str) -> str:
     """
@@ -577,17 +516,9 @@ def _extract_text(file_path: str, ext: str) -> str:
                 except ImportError:
                     continue
             if not installed:
-                try:
-                    _sp.run([sys.executable, "-m", "pip", "install", candidates[0], "-q"],
-                            check=False, timeout=30, stdout=_dn, stderr=_dn)
-                    _il.import_module(candidates[0].replace("-", "_"))
-                    installed = candidates[0]
-                except Exception:
-                    logger.warning(f"[ingest] suppressed exception", exc_info=True)
-                    pass
+                logger.warning(f"[ingest] 缺少解析依赖 {candidates[0]} (ext={ext})，请手动安装: pip install {candidates[0]}")
             if installed:
                 return _extract_text(path, ext)
-    return ""
     return ""
 
 
@@ -618,52 +549,6 @@ logger = logging.getLogger(__name__)
 # ============================================================
 
 
-
-def smart_chunk_adaptive(text: str, doc_type: str = "text", file_ext: str = "") -> list:
-    """自适应分块：根据文档类型和结构调整 chunk size
-    
-    规则：
-    - 技术文档/操作手册：大 chunk (1500字) + 大 overlap (200字) — 保留上下文
-    - 办公文档/通知：小 chunk (500字) + 小 overlap (50字) — 独立性强
-    - 表格数据：按行分块，不切段
-    - 默认：800字 + 100字 overlap
-    """
-    if not text or len(text) < 50:
-        return [text] if text.strip() else []
-    
-    # 根据文档类型选择参数
-    chunk_configs = {
-        "操作手册_泛微OA": (1500, 200),
-        "技术文档": (1200, 150),
-        "标准件": (800, 100),
-        "品质测量": (800, 100),
-        "办公文档": (500, 50),
-        "通用办公": (600, 80),
-    }
-    
-    chunk_size, overlap = chunk_configs.get(doc_type, (800, 100))
-    
-    # 按段落分割
-    paragraphs = [p.strip() for p in text.split("\n\n") if p.strip()]
-    
-    chunks = []
-    current = ""
-    
-    for para in paragraphs:
-        if len(current) + len(para) > chunk_size and current:
-            chunks.append(current.strip())
-            # 保留 overlap
-            if overlap > 0 and len(current) > overlap:
-                current = current[-overlap:] + "\n\n" + para
-            else:
-                current = para
-        else:
-            current = current + "\n\n" + para if current else para
-    
-    if current.strip():
-        chunks.append(current.strip())
-    
-    return chunks if chunks else [text[:chunk_size]]
 
 def smart_chunk_semantic(text: str, chunk_size: int = 1500, overlap: int = 200) -> List[str]:
     """语义分块：按段落边界切割，保持语义完整性"""
