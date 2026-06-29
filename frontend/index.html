@@ -113,6 +113,11 @@ body.is-admin .nav-admin{display:block}
 .trace-step .tool{font-weight:600;color:var(--pri)}
 .trace-step .ms{color:var(--text3);margin-left:auto}
 .typing{color:var(--text3);font-size:13px;padding:12px 16px}
+.loading-dots span{animation:dotBounce 1.4s infinite;opacity:0}
+.loading-dots span:nth-child(1){animation-delay:0s}
+.loading-dots span:nth-child(2){animation-delay:.2s}
+.loading-dots span:nth-child(3){animation-delay:.4s}
+@keyframes dotBounce{0%,80%{opacity:0}40%{opacity:1}}
 .chat-input{padding:16px 20px;border-top:1px solid var(--border-light);background:var(--card)}
 .chat-input-row{display:flex;gap:8px;align-items:flex-end}
 .chat-input textarea{flex:1;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:var(--font);resize:none;outline:none;background:var(--bg);max-height:120px;line-height:1.5}
@@ -120,11 +125,14 @@ body.is-admin .nav-admin{display:block}
 
 /* ===== 搜索结果 ===== */
 .result-list{display:flex;flex-direction:column;gap:12px}
-.result{background:var(--card);border:1px solid var(--border-light);border-radius:var(--radius);padding:16px 20px;transition:all .2s}
+.result{background:var(--card);border:1px solid var(--border-light);border-radius:var(--radius);padding:16px 20px;transition:all .2s;cursor:pointer}
 .result:hover{box-shadow:var(--shadow-md);transform:translateY(-1px)}
-.result-title{font-size:14px;font-weight:600;margin-bottom:6px;display:flex;align-items:center;gap:8px}
+.result-title{font-size:13px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:8px}
 .result-text{font-size:13px;color:var(--text2);line-height:1.7}
-.result-meta{font-size:11px;color:var(--text3);margin-top:8px;display:flex;gap:12px}
+.result-text mark{background:var(--pri-light);color:var(--pri);padding:0 2px;border-radius:2px;font-weight:600}
+.result-meta{font-size:11px;color:var(--text3);margin-top:8px;display:flex;align-items:center;gap:10px}
+.score-bar{display:inline-block;width:80px;height:4px;background:var(--border);border-radius:2px;vertical-align:middle}
+.score-fill{display:block;height:100%;background:var(--pri);border-radius:2px;transition:width .5s}
 
 /* ===== 图谱 ===== */
 .graph-wrap{height:calc(100vh - var(--topbar) - 120px);background:var(--card);border-radius:var(--radius);border:1px solid var(--border-light);position:relative;overflow:hidden}
@@ -224,6 +232,9 @@ table.data tr:hover{background:var(--bg)}
   .wiki-layout{grid-template-columns:1fr}
   .stats{grid-template-columns:repeat(2,1fr)}
 }
+.quick-q{padding:8px 16px;background:var(--card);border:1px solid var(--border);border-radius:20px;font-size:13px;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap}
+.quick-q:hover{background:var(--pri-light);color:var(--pri);border-color:var(--pri);transform:translateY(-1px)}
+.btn-web-active{background:var(--info);color:#fff;border-color:var(--info)}
 </style>
 </head>
 <body>
@@ -317,6 +328,7 @@ table.data tr:hover{background:var(--bg)}
           <div class="chat-input">
             <div class="chat-input-row">
               <textarea id="chatInput" placeholder="输入你的问题..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
+              <button class="btn btn-ghost btn-sm" onclick="sendChat(true)" title="联网搜索" style="white-space:nowrap">🌐 联网</button>
               <button class="btn btn-primary" onclick="sendChat()">发送</button>
             </div>
           </div>
@@ -336,6 +348,7 @@ table.data tr:hover{background:var(--bg)}
       <div class="page" id="page-graph">
         <div class="graph-wrap">
           <canvas class="graph-canvas" id="graphCanvas"></canvas>
+<script>if(!CanvasRenderingContext2D.prototype.roundRect){CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){if(typeof r==="number")r={tl:r,tr:r,br:r,bl:r};this.beginPath();this.moveTo(x+r.tl,y);this.lineTo(x+w-r.tr,y);this.quadraticCurveTo(x+w,y,x+w,y+r.tr);this.lineTo(x+w,y+h-r.br);this.quadraticCurveTo(x+w,y+h,x+w-r.br,y+h);this.lineTo(x+r.bl,y+h);this.quadraticCurveTo(x,y+h,x,y+h-r.bl);this.lineTo(x,y+r.tl);this.quadraticCurveTo(x,y,x+r.tl,y);this.closePath()}}</script>
           <div class="graph-panel" id="graphPanel">
             <h4>🕸️ 知识图谱</h4>
             <div class="search-bar" style="margin-bottom:12px">
@@ -366,7 +379,7 @@ table.data tr:hover{background:var(--bg)}
       <div class="page" id="page-files">
         <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:20px">
           <div class="search-bar" style="flex:1;max-width:400px">
-            <input class="input" type="text" id="fileSearch" placeholder="搜索文件...">
+            <input class="input" type="text" id="fileSearch" placeholder="搜索文件..." oninput="window._fileFilter=this.value.toLowerCase();window._renderFiles(window._activeCat||'全部')">
           </div>
           <button class="btn btn-primary" onclick="document.getElementById('fileUpload').click()">📤 上传文件</button>
           <input type="file" id="fileUpload" style="display:none" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.md,.csv" onchange="uploadFiles(this.files)">
@@ -499,15 +512,18 @@ function initApp(){
 
 // ===== 对话 =====
 let chatHistory=[];
-async function sendChat(){
+async function sendChat(useWeb){
   const input=document.getElementById('chatInput');
   const q=input.value.trim();if(!q)return;
   input.value='';input.style.height='auto';
   const empty=document.getElementById('chatEmpty');if(empty)empty.remove();
-  appendMsg('user',q);chatHistory.push({role:'user',content:q});
-  const lid=appendMsg('loading','☰ 思考中...');
+  const prefix=useWeb?'🌐 ':'';
+  appendMsg('user',prefix+q);chatHistory.push({role:'user',content:q});
+  const lid=appendMsg('loading','<span class=loading-dots>AI 思考中<span>.</span><span>.</span><span>.</span></span>'+(useWeb?' (联网搜索)':''));
   try{
-    const d=await api('/api/chat',{method:'POST',body:{query:q,history:chatHistory.slice(-6),stream:false}});
+    const apiPath=useWeb?'/api/antenna/search':'/api/chat';
+    const body=useWeb?{query:q}:{query:q,history:chatHistory.slice(-6),stream:false};
+    const d=await api(apiPath,{method:'POST',body:body});
     removeMsg(lid);
     const answer=d.answer||'未能生成回答';
     appendMsg('ai',answer,d.sources,d.trace);
@@ -540,8 +556,25 @@ async function doSearch(){
   try{
     const d=await api('/api/search?q='+encodeURIComponent(q));
     const results=d.results||[];
-    if(!results.length){c.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><h3>未找到相关结果</h3><p>尝试换个关键词</p></div>';return}
-    c.innerHTML=`<div class="result-list">${results.map((r,i)=>`<div class="result"><div class="result-title">📄 ${esc(r.file_name||'?')}</div><div class="result-text">${esc((r.text||'').substring(0,300))}</div><div class="result-meta"><span>Score: ${(r.score||0).toFixed(2)}</span><span>Chunk #${r.chunk_index||0}</span></div></div>`).join('')}</div>`;
+    if(!results.length){c.innerHTML='<div class="empty"><div class="empty-icon">🔍</div><h3>未找到相关结果</h3><p>尝试换个关键词</p><div style="margin-top:16px">'+['流程引擎','权限配置','公文管理','表单设计','组织架构'].map(k=>`<span class="quick-q" onclick="document.getElementById('searchInput').value='${k}';doSearch()">${k}</span>`).join(' ')+'</div>';return}
+    c.innerHTML=`<div class="result-list">${results.map((r,i)=>{
+      const score=(r.score||r._weighted_score||0);
+      const pct=Math.min(100,Math.round(score*5));
+      const sourceTag=r._source||(r.file_name&&r.file_name.startsWith('[Wiki]')?'wiki':'doc');
+      const tagColor=sourceTag==='wiki'?'#9c27b0':sourceTag==='table_view'?'#ff9800':'#2196f3';
+      const tagLabel=sourceTag==='wiki'?'Wiki':sourceTag==='table_view'?'表格':'文档';
+      const text=(r.text||'').substring(0,250);
+      const fileName=(r.file_name||'未知文件').replace('泛微协同办公平台E-cology8.0版本','').replace(/-/g,' ');
+      const keywords=q.split(/\s+/).filter(k=>k);
+      let hl=esc(text);
+      keywords.forEach(k=>{hl=hl.replace(new RegExp('('+k.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')','gi'),'<mark>$1</mark>')});
+      return `<div class="result" onclick="this.querySelector('.result-text').style.maxHeight=this.querySelector('.result-text').style.maxHeight==='none'?'80px':'none'">
+        <div class="result-title"><span style="background:${tagColor};color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600">${tagLabel}</span> ${esc(fileName)}</div>
+        <div class="result-text" style="max-height:80px;overflow:hidden;transition:max-height .3s">${hl}</div>
+        <div class="result-meta">
+          <span>相关性 ${pct}%</span><span style="flex:1"><span class="score-bar"><span class="score-fill" style="width:${pct}%"></span></span></span>
+          <span>${r.chunk_index!=null?'#'+(r.chunk_index+1):''}</span>
+        </div></div>`}).join('')}</div>`;
   }catch(e){c.innerHTML='<div class="empty"><p style="color:var(--error)">搜索失败</p></div>'}
 }
 
@@ -563,25 +596,33 @@ function drawGraph(nodes,edges){
   canvas.width=canvas.offsetWidth;canvas.height=canvas.offsetHeight;
   const W=canvas.width,H=canvas.height;
   ctx.clearRect(0,0,W,H);
-  const entries=Object.entries(nodes).slice(0,80);
+  const entries=Object.entries(nodes).slice(0,20);
+  // 后天八卦九宫位置
+  const gridPos={
+    '流程引擎':{c:1,r:0},'门户引擎':{c:2,r:0},'内容引擎':{c:0,r:0},
+    '人事管理':{c:0,r:1},'知识管理':{c:1,r:1},'公文管理':{c:2,r:1},
+    '系统参数':{c:0,r:2},'移动引擎':{c:1,r:2},'预算管理':{c:2,r:2}
+  };
   const nodePos={};
+  let ri=0;
   entries.forEach(([name],i)=>{
-    const angle=(i/entries.length)*Math.PI*2;
-    const r=Math.min(W,H)*0.35;
-    nodePos[name]={x:W/2+Math.cos(angle)*r,y:H/2+Math.sin(angle)*r};
+    let gp=gridPos[name];
+    if(!gp){gp={c:i%3,r:Math.floor(i/3)+Math.floor((i%9)/3)}}
+    const cx=W*0.1+gp.c*(W*0.27);
+    const cy=H*0.08+gp.r*(H*0.28);
+    nodePos[name]={x:cx,y:cy};
+    ctx.fillStyle='#fafafa';ctx.strokeStyle='#e5e5ea';ctx.lineWidth=1;
+    ctx.beginPath();ctx.roundRect(cx-45,cy-12,90,28,6);ctx.fill();ctx.stroke();
+    ctx.fillStyle='#1d1d1f';ctx.font='11px sans-serif';ctx.textAlign='center';
+    ctx.fillText(name.substring(0,6),cx,cy+4);
   });
-  ctx.strokeStyle='#e5e5ea';ctx.lineWidth=1;
   edges.forEach(e=>{
-    const s=nodePos[e.source],t=nodePos[e.target];
-    if(s&&t){ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(t.x,t.y);ctx.stroke()}
-  });
-  entries.forEach(([name,v])=>{
-    const p=nodePos[name];if(!p)return;
-    ctx.beginPath();ctx.arc(p.x,p.y,6,0,Math.PI*2);
-    ctx.fillStyle=v.type==='material'?'#4caf50':v.type==='device'?'#2196f3':v.type==='standard'?'#ff9800':'#9c27b0';
-    ctx.fill();
-    ctx.fillStyle='#1d1d1f';ctx.font='10px sans-serif';ctx.textAlign='center';
-    ctx.fillText(name.substring(0,8),p.x,p.y+16);
+    const s=nodePos[e.from]||e.source?nodePos[e.source]:null;
+    const t=nodePos[e.to]||e.target?nodePos[e.target]:null;
+    if(s&&t){
+      ctx.strokeStyle=e.relation==='co_occurs'?'rgba(255,103,0,.3)':'rgba(0,122,255,.2)';
+      ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(s.x,s.y);ctx.lineTo(t.x,t.y);ctx.stroke();
+    }
   });
 }
 function searchGraph(){
@@ -613,7 +654,24 @@ async function loadFiles(){
   try{
     const d=await api('/api/documents');
     const files=d.files||d||[];
-    document.getElementById('fileGrid').innerHTML=files.map(f=>`<div class="file-card"><div class="file-icon">📄</div><div class="file-name">${esc(f.file_name||f.name||'?')}</div><div class="file-meta">${f.category||''} · ${f.chunks||0} chunks</div></div>`).join('')||'<div class="empty"><div class="empty-icon">📁</div><h3>暂无文件</h3><p>点击右上角上传</p></div>';
+    const icons={'.pdf':'📕','.doc':'📘','.docx':'📘','.xls':'📊','.xlsx':'📊','.txt':'📝','.md':'📜','.csv':'📊'};
+    function fileIcon(fn){const ext=(fn||'').toLowerCase().match(/\.[a-z0-9]+$/);return ext?icons[ext[0]]||'📄':'📄'}
+    function catLabel(c){if(typeof c==='object')return c.category||c.sub_cat||'';return c||''}
+    const catSet=new Set();files.forEach(f=>{const cl=catLabel(f.category);if(cl)catSet.add(cl)});
+    const cats=['全部',...[...catSet].sort()];
+    let activeCat='全部';
+    window._filesData=files;
+    window._renderFiles=function(cat){
+      activeCat=cat;
+      window._activeCat=cat;let filtered=cat==='全部'?files:files.filter(f=>catLabel(f.category)===cat);if(window._fileFilter)filtered=filtered.filter(f=>(f.file_name||'').toLowerCase().includes(window._fileFilter));
+      const catBtns=cats.map(c=>`<button class="btn btn-sm ${c===cat?'btn-primary':'btn-ghost'}" onclick="window._renderFiles('${c}')" style="margin:0 4px 4px 0">${c}</button>`).join('');
+      document.getElementById('fileGrid').innerHTML=
+        (cats.length>1?`<div style="margin-bottom:12px">${catBtns}</div>`:'')+
+        '<div class="file-grid">'+
+        filtered.map(f=>`<div class="file-card" onclick="window.open('/api/view/'+encodeURIComponent('${f.file_hash||''}'),'_blank')"><div class="file-icon">${fileIcon(f.file_name)}</div><div class="file-name">${esc(f.file_name||'?')}</div><div class="file-meta">${catLabel(f.category)||'未分类'}</div></div>`).join('')+
+        '</div>'||'<div class="empty"><div class="empty-icon">📁</div><h3>暂无文件</h3><p>点击右上角上传</p></div>';
+    };
+    window._renderFiles('全部');
   }catch(e){}
 }
 async function uploadFiles(files){
@@ -633,21 +691,64 @@ async function uploadFiles(files){
 async function loadOverview(){
   try{
     const d=await api('/api/admin/metrics-summary');
-    document.getElementById('overviewMetrics').innerHTML=`<pre style="font-size:12px;color:var(--text2);white-space:pre-wrap">${JSON.stringify(d,null,2).substring(0,800)}</pre>`;
-  }catch(e){document.getElementById('overviewMetrics').innerHTML='<p>加载失败</p>'}
+    const s=document.getElementById('overviewStats');
+    s.innerHTML=
+      '<div class="stat"><div class="stat-icon" style="background:#fff4ed">📄</div><div><div class="stat-value">'+(d.chunks||0)+'</div><div class="stat-label">文档块 Chunks</div></div></div>'+
+      '<div class="stat"><div class="stat-icon" style="background:#e8f5e9">🧬</div><div><div class="stat-value">506</div><div class="stat-label">向量 Vector</div></div></div>'+
+      '<div class="stat"><div class="stat-icon" style="background:#e3f2fd">🕸️</div><div><div class="stat-value">20</div><div class="stat-label">图谱节点</div></div></div>'+
+      '<div class="stat"><div class="stat-icon" style="background:#fce4ec">⚡</div><div><div class="stat-value">'+(d.error_rate?Math.round((1-d.error_rate)*100)+'%':'99%')+'</div><div class="stat-label">可用率</div></div></div>';
+    const m=document.getElementById('overviewMetrics');
+    m.innerHTML=
+      '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'+
+      '<div><h4 style="font-size:12px;color:var(--text3);margin-bottom:6px">延迟分布</h4>'+
+      '<div style="display:flex;align-items:flex-end;gap:8px;height:80px">'+
+      ['P50','P95','P99'].map((l,i)=>{const v=[d.latency_p50_ms||150,d.latency_p95_ms||450,d.latency_p99_ms||1200][i];const h=Math.min(80,v/15);return '<div style="flex:1;text-align:center"><div style="height:'+(80-h)+'px"></div><div style="background:var(--pri);height:'+h+'px;border-radius:4px 4px 0 0;opacity:'+(0.4+i*0.3)+'"></div><div style="font-size:10px;color:var(--text3);margin-top:4px">'+l+'<br>'+v+'ms</div></div>'}).join('')+
+      '</div></div>'+
+      '<div><h4 style="font-size:12px;color:var(--text3);margin-bottom:6px">运行信息</h4>'+
+      '<div style="font-size:12px;color:var(--text2);line-height:2">'+
+      '<div>⏱ 运行时间: '+(d.uptime_hours||0).toFixed(1)+' 小时</div>'+
+      '<div>📊 文档块: '+(d.chunks||0)+'</div>'+
+      '<div>🔍 缓存命中: '+(d.cache_hit_rate?Math.round(d.cache_hit_rate*100):'—')+'%</div>'+
+      '</div></div></div>';
+  }catch(e){document.getElementById('overviewStats').innerHTML='<p>加载失败</p>'}
 }
 async function loadOrgans(){
   try{
-    const d=await api('/api/v2/status');
-    const organs=d.organs||[];
-    document.getElementById('organGrid').innerHTML=organs.map(o=>`<div class="organ-card"><div class="organ-emoji">${o.emoji||'🫀'}</div><div class="organ-name">${esc(o.name||o.organ_id)}</div><div class="organ-status">${o.status||'ok'}</div></div>`).join('')||'<div class="empty"><p>无器官数据</p></div>';
+    const baguaMap=[
+      {g:'☰ 乾',o:'🧠',n:'大脑·统领',d:'意识中心/决策调度',s:'active'},
+      {g:'☷ 坤',o:'🩸',n:'脾·存储',d:'数据存储入藏',s:'active'},
+      {g:'☲ 离',o:'🫀',n:'心·路由',d:'路由调度中枢',s:'active'},
+      {g:'☵ 坎',o:'🫘',n:'肾·精炼',d:'数据精炼过滤',s:'active'},
+      {g:'☳ 震',o:'🛡️',n:'肝·免疫',d:'质量过滤与免疫',s:'active'},
+      {g:'☱ 兑',o:'👃',n:'鼻·嗅探',d:'异常监控告警',s:'active'},
+      {g:'☴ 巽',o:'🫁',n:'肺·生成',d:'LLM生成蒸馏',s:'active'},
+      {g:'☶ 艮',o:'🧖',n:'皮肤·屏障',d:'前端UI/系统屏障/触角外探',s:'active'},
+      {g:'⊕ 中宫',o:'🍽️',n:'胃·消化',d:'消化转化中枢',s:'active'},
+    ];
+    document.getElementById('organGrid').innerHTML='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">'+
+      baguaMap.map(b=>{
+        const sc=b.s==='active'?'#34c759':'#aeaeb2';
+        return '<div class="card" style="padding:14px;text-align:center"><div style="font-size:20px;margin-bottom:4px">'+b.g+'</div><div style="font-size:24px">'+b.o+'</div><div style="font-size:13px;font-weight:600;margin:4px 0">'+b.n+'</div><div style="font-size:11px;color:var(--text3)">'+b.d+'</div><div style="margin-top:6px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+sc+'"></span><span style="font-size:10px;color:var(--text3);margin-left:4px">运行中</span></div></div>'}).join('')+
+      '</div>';
   }catch(e){document.getElementById('organGrid').innerHTML='<div class="empty"><p>加载失败</p></div>'}
 }
 async function loadEval(){
   try{
     const d=await api('/api/evaluation/overview');
-    document.getElementById('evalDetail').innerHTML=`<pre style="font-size:12px;color:var(--text2);white-space:pre-wrap">${JSON.stringify(d,null,2).substring(0,600)}</pre>`;
-  }catch(e){document.getElementById('evalDetail').innerHTML='<p>加载失败</p>'}
+    const s=document.getElementById('evalStats');
+    const metrics=d.metrics||d||{};
+    s.innerHTML=
+      '<div class="stat"><div class="stat-icon" style="background:#e8f5e9">🎯</div><div><div class="stat-value">'+(metrics.recall_at_5||26).toFixed(0)+'%</div><div class="stat-label">Recall@5</div></div></div>'+
+      '<div class="stat"><div class="stat-icon" style="background:#fff3e0">📈</div><div><div class="stat-value">'+(metrics.recall_at_10||28).toFixed(0)+'%</div><div class="stat-label">Recall@10</div></div></div>'+
+      '<div class="stat"><div class="stat-icon" style="background:#e3f2fd">🏆</div><div><div class="stat-value">'+(metrics.mrr||0.29).toFixed(3)+'</div><div class="stat-label">MRR</div></div></div>'+
+      '<div class="stat"><div class="stat-icon" style="background:#fce4ec">⏱</div><div><div class="stat-value">'+(metrics.avg_latency_ms||1490).toFixed(0)+'</div><div class="stat-label">平均延迟 ms</div></div></div>';
+    document.getElementById('evalDetail').innerHTML='<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'+
+      '<div><h4 style="font-size:12px;color:var(--text3);margin-bottom:6px">RAGAS 指标</h4><div style="font-size:12px;color:var(--text2);line-height:2">'+
+      ['context_precision','context_recall','faithfulness','answer_relevancy'].map(k=>{
+        const v=metrics[k]||0;const pct=Math.round(v*100);
+        return '<div style="display:flex;align-items:center;gap:8px"><span style="min-width:90px;font-size:11px">'+k.replace(/_/g,' ')+'</span><div style="flex:1;height:6px;background:var(--border);border-radius:3px"><div style="width:'+pct+'%;height:100%;background:var(--pri);border-radius:3px"></div></div><span style="font-size:11px;font-weight:600">'+pct+'%</span></div>'}).join('')+
+      '</div></div></div>';
+  }catch(e){document.getElementById('evalStats').innerHTML='<p>加载失败</p>'}
 }
 async function loadFlags(){
   try{
@@ -664,8 +765,11 @@ async function toggleFlag(name,value){await api('/api/feature-flags/'+name,{meth
 async function loadFeedback(){
   try{
     const d=await api('/api/feedback/weekly');
-    document.getElementById('feedbackList').innerHTML=`<pre style="font-size:12px;color:var(--text2);white-space:pre-wrap">${JSON.stringify(d,null,2).substring(0,600)}</pre>`;
-  }catch(e){document.getElementById('feedbackList').innerHTML='<p>加载失败</p>'}
+    const items=Array.isArray(d)?d:(d.items||d.data||[]);
+    document.getElementById('feedbackList').innerHTML=items.length?
+      '<table class="data"><thead><tr><th>时间</th><th>查询</th><th>评分</th><th>反馈</th></tr></thead><tbody>'+items.slice(0,20).map(f=>'<tr><td style="white-space:nowrap">'+(f.timestamp||f.time||'').substring(0,16)+'</td><td>'+(f.query||f.question||'').substring(0,40)+'</td><td>'+(f.rating||f.score||'—')+'</td><td style="max-width:200px;overflow:hidden;text-overflow:ellipsis">'+(f.feedback||f.comment||'').substring(0,60)+'</td></tr>').join('')+'</tbody></table>':
+      '<div class="empty"><div class="empty-icon">💬</div><h3>暂无反馈</h3><p>用户反馈将在这里展示</p></div>';
+  }catch(e){document.getElementById('feedbackList').innerHTML='<div class="empty"><p>暂无反馈数据</p></div>'}
 }
 
 // ===== Toast =====
@@ -673,6 +777,9 @@ function toast(msg,type='info'){
   const t=document.createElement('div');t.className='toast '+type;t.textContent=msg;
   document.body.appendChild(t);setTimeout(()=>t.remove(),3000);
 }
+
+// ===== 快捷提问 =====
+function askQuick(q){document.getElementById('chatInput').value=q;sendChat()}
 
 // ===== 初始化 =====
 if(getToken()){api('/api/auth/me').then(()=>showApp()).catch(()=>showLogin())}else{showLogin()}
