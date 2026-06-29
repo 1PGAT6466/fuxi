@@ -10,6 +10,7 @@ services/error_handler.py — 统一异常体系
 import logging
 from fastapi import Request
 from fastapi.responses import JSONResponse
+from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
@@ -109,6 +110,12 @@ def setup_error_handlers(app):
     @app.exception_handler(Exception)
     async def catch_all_handler(request: Request, exc: Exception):
         """兜底：未知异常统一格式"""
+        # FastAPI HTTPException 保持原始状态码
+        if isinstance(exc, HTTPException):
+            return JSONResponse(
+                status_code=exc.status_code,
+                content={"error": exc.detail if isinstance(exc.detail, dict) else {"message": str(exc.detail)}},
+            )
         logger.error(f"[UNHANDLED] {type(exc).__name__}: {exc}", exc_info=True)
         return JSONResponse(
             status_code=500,
