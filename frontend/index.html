@@ -1,13 +1,13 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
 <link rel="icon" type="image/x-icon" href="/static/favicon.ico">
 <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>伏羲 · 企业知识认知系统</title>
+<title>浼忕静 路 浼佷笟鐭ヨ瘑璁ょ煡绯荤粺</title>
 <style>
-/* ===== 小米设计语言 ===== */
+/* ===== 灏忕背璁捐璇█ ===== */
 :root {
   --mi-orange:#FF6700;--mi-orange-light:#FF8533;--mi-orange-dark:#E55D00;
   --pri:#FF6700;--pri-light:#fff4ed;--pri-dark:#E55D00;
@@ -31,7 +31,7 @@ input,textarea{font-family:inherit;outline:none}
 ::-webkit-scrollbar-thumb{background:#D0D0D0;border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:#B0B0B0}
 
-/* ===== 布局 ===== */
+/* ===== 甯冨眬 ===== */
 .app{display:none;height:100vh;overflow:hidden}
 .app.active{display:flex}
 .sidebar{width:var(--sidebar);background:var(--card);border-right:1px solid var(--border);display:flex;flex-direction:column;flex-shrink:0}
@@ -69,14 +69,14 @@ input,textarea{font-family:inherit;outline:none}
 .page.active{display:block}
 @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
-/* ===== 卡片 ===== */
+/* ===== 鍗＄墖 ===== */
 .card{background:var(--card);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow);transition:var(--transition)}
 .card:hover{box-shadow:var(--shadow-md)}
 .card-header{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .card-header h3{font-size:15px;font-weight:600}
 .card-body{padding:20px}
 
-/* ===== 统计卡片 ===== */
+/* ===== 缁熻鍗＄墖 ===== */
 .stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:16px;margin-bottom:24px}
 .stat{background:var(--card);border-radius:var(--radius);padding:20px;border:1px solid var(--border);box-shadow:var(--shadow);display:flex;align-items:center;gap:14px;transition:var(--transition)}
 .stat:hover{transform:translateY(-2px);box-shadow:var(--shadow-md)}
@@ -84,7 +84,7 @@ input,textarea{font-family:inherit;outline:none}
 .stat-value{font-size:22px;font-weight:700;line-height:1}
 .stat-label{font-size:12px;color:var(--text3);margin-top:2px}
 
-/* ===== 按钮 ===== */
+/* ===== 鎸夐挳 ===== */
 .btn{display:inline-flex;align-items:center;gap:6px;padding:8px 16px;border-radius:var(--radius-sm);font-size:13px;font-weight:500;cursor:pointer;transition:var(--transition);border:none;font-family:var(--font)}
 .btn-orange{background:var(--mi-orange);color:white}
 .btn-orange:hover{background:var(--mi-orange-dark)}
@@ -96,14 +96,14 @@ input,textarea{font-family:inherit;outline:none}
 .btn-icon{width:32px;height:32px;padding:0;display:flex;align-items:center;justify-content:center;border-radius:8px;background:transparent;border:none;cursor:pointer;color:var(--text2)}
 .btn-icon:hover{background:var(--bg)}
 
-/* ===== 输入框 ===== */
+/* ===== 杈撳叆妗?===== */
 .input{width:100%;padding:10px 14px;border:1px solid var(--border);border-radius:var(--radius-sm);font-size:14px;font-family:var(--font);background:var(--card);transition:all .15s;outline:none}
 .input:focus{border-color:var(--pri);box-shadow:0 0 0 3px rgba(255,103,0,.1)}
 .input::placeholder{color:var(--text4)}
 .search-bar{display:flex;gap:8px}
 .search-bar .input{flex:1}
 
-/* ===== 对话 ===== */
+/* ===== 瀵硅瘽 ===== */
 .chat-page{display:flex;flex-direction:column;height:100%}
 .chat-msgs{flex:1;overflow-y:auto;padding:24px;display:flex;flex-direction:column;gap:20px}
 .chat-welcome{display:flex;flex-direction:column;align-items:center;justify-content:center;flex:1;text-align:center;padding:40px}
@@ -149,7 +149,7 @@ input,textarea{font-family:inherit;outline:none}
 .send-btn:hover{transform:scale(1.05);box-shadow:0 4px 12px rgba(255,103,0,0.3)}
 .send-btn svg{width:18px;height:18px}
 
-/* ===== 搜索 ===== */
+/* ===== 鎼滅储 ===== */
 .search-box{display:flex;align-items:center;gap:10px;background:var(--card);border:1.5px solid var(--border);border-radius:var(--radius);padding:12px 16px;margin-bottom:24px;box-shadow:var(--shadow);transition:var(--transition)}
 .search-box:focus-within{border-color:var(--mi-orange);box-shadow:0 0 0 3px rgba(255,103,0,0.08),var(--shadow)}
 .search-box svg{width:20px;height:20px;color:var(--text3);flex-shrink:0}
@@ -167,7 +167,7 @@ input,textarea{font-family:inherit;outline:none}
 .score-bar{display:inline-block;width:80px;height:4px;background:var(--border);border-radius:2px;vertical-align:middle}
 .score-fill{display:block;height:100%;background:var(--mi-orange);border-radius:2px;transition:width .5s}
 
-/* ===== 图谱 ===== */
+/* ===== 鍥捐氨 ===== */
 .graph-wrap{height:calc(100vh - var(--topbar) - 48px);background:var(--card);border-radius:var(--radius);border:1px solid var(--border);position:relative;overflow:hidden}
 .graph-canvas{width:100%;height:100%}
 .graph-panel{position:absolute;top:16px;left:16px;width:260px;background:rgba(255,255,255,.95);backdrop-filter:blur(12px);border-radius:var(--radius);border:1px solid var(--border);box-shadow:var(--shadow-lg);padding:16px;max-height:calc(100% - 32px);overflow-y:auto}
@@ -202,7 +202,7 @@ input,textarea{font-family:inherit;outline:none}
 .wiki-content td{padding:10px 14px;border-bottom:1px solid var(--border)}
 .wiki-content blockquote{border-left:3px solid var(--mi-orange);padding:8px 16px;margin:12px 0;background:rgba(255,103,0,0.04);border-radius:0 var(--radius-sm) var(--radius-sm) 0}
 
-/* ===== 文件管理 ===== */
+/* ===== 鏂囦欢绠＄悊 ===== */
 .upload-zone{border:2px dashed var(--border);border-radius:var(--radius);padding:40px;text-align:center;transition:var(--transition);cursor:pointer;margin-bottom:20px}
 .upload-zone:hover,.upload-zone.dragover{border-color:var(--mi-orange);background:rgba(255,103,0,0.02)}
 .upload-zone svg{color:var(--text3);margin-bottom:12px}
@@ -223,7 +223,7 @@ input,textarea{font-family:inherit;outline:none}
 .file-name{font-size:13px;font-weight:600;margin-bottom:4px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .file-meta{font-size:11px;color:var(--text3)}
 
-/* ===== 表格 ===== */
+/* ===== 琛ㄦ牸 ===== */
 .table-wrap{overflow-x:auto}
 table.data{width:100%;border-collapse:collapse;font-size:13px}
 table.data th{text-align:left;padding:12px 16px;font-size:12px;font-weight:600;color:var(--text3);text-transform:uppercase;letter-spacing:0.5px;border-bottom:1px solid var(--border)}
@@ -231,7 +231,7 @@ table.data td{padding:14px 16px;font-size:14px;border-bottom:1px solid var(--bor
 table.data tr:last-child td{border-bottom:none}
 table.data tr:hover td{background:rgba(0,0,0,0.01)}
 
-/* ===== 开关 ===== */
+/* ===== 寮€鍏?===== */
 .toggle{position:relative;width:44px;height:24px;cursor:pointer;display:inline-block}
 .toggle input{display:none}
 .toggle .slider{position:absolute;inset:0;background:#E0E0E0;border-radius:12px;transition:var(--transition)}
@@ -239,7 +239,7 @@ table.data tr:hover td{background:rgba(0,0,0,0.01)}
 .toggle input:checked+.slider{background:var(--mi-orange)}
 .toggle input:checked+.slider::before{left:22px}
 
-/* ===== 登录页 ===== */
+/* ===== 鐧诲綍椤?===== */
 .login-page{display:flex;align-items:center;justify-content:center;height:100vh;background:linear-gradient(135deg,#FFF5EE 0%,#FFF0E6 50%,#FFE8D6 100%);position:relative;overflow:hidden}
 .login-page::before{content:'';position:absolute;width:600px;height:600px;background:radial-gradient(circle,rgba(255,103,0,0.08) 0%,transparent 70%);top:-200px;right:-200px;border-radius:50%}
 .login-card{background:var(--card);border-radius:var(--radius-lg);box-shadow:0 8px 40px rgba(0,0,0,0.08);padding:48px 40px;width:420px;position:relative;z-index:1}
@@ -262,7 +262,7 @@ table.data tr:hover td{background:rgba(0,0,0,0.01)}
 .login-error{color:var(--error);font-size:12px;text-align:center;margin-top:10px;min-height:18px}
 .login-hint{text-align:center;margin-top:20px;font-size:13px;color:var(--text3)}
 
-/* ===== 管理面板 ===== */
+/* ===== 绠＄悊闈㈡澘 ===== */
 .flag-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}
 .flag-row:last-child{border:none}
 .flag-name{font-size:14px;font-weight:500;min-width:180px}
@@ -274,7 +274,7 @@ table.data tr:hover td{background:rgba(0,0,0,0.01)}
 .organ-name{font-size:13px;font-weight:600}
 .organ-status{font-size:11px;color:var(--text3);margin-top:4px}
 
-/* ===== 空状态 ===== */
+/* ===== 绌虹姸鎬?===== */
 .empty{text-align:center;padding:60px 20px;color:var(--text3)}
 .empty-icon{font-size:40px;margin-bottom:12px;opacity:.4}
 .empty h3{font-size:15px;font-weight:600;color:var(--text2);margin-bottom:6px}
@@ -282,7 +282,7 @@ table.data tr:hover td{background:rgba(0,0,0,0.01)}
 .empty-btn{margin-top:12px;padding:8px 16px;background:var(--pri);color:#fff;border:none;border-radius:var(--radius-sm);font-size:13px;font-weight:600;cursor:pointer;font-family:var(--font);transition:.2s}
 .empty-btn:hover{background:var(--pri-dark)}
 
-/* ===== 骨架屏 ===== */
+/* ===== 楠ㄦ灦灞?===== */
 .skeleton-item{padding:16px 0;border-bottom:1px solid var(--border-light)}
 .skeleton-line{height:14px;background:linear-gradient(90deg,var(--border-light) 25%,var(--bg) 50%,var(--border-light) 75%);background-size:200% 100%;border-radius:4px;animation:shimmer 1.5s infinite;margin-bottom:8px}
 .skeleton-line.short{width:60%}
@@ -295,7 +295,7 @@ table.data tr:hover td{background:rgba(0,0,0,0.01)}
 .toast.info{background:var(--info)}
 @keyframes slideIn{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
 
-/* ===== 响应式 ===== */
+/* ===== 鍝嶅簲寮?===== */
 @media(max-width:768px){
   .sidebar{transform:translateX(-100%)}
   .sidebar.open{transform:none}
@@ -310,83 +310,83 @@ table.data tr:hover td{background:rgba(0,0,0,0.01)}
 </head>
 <body>
 
-<!-- ===== 登录页 ===== -->
+<!-- ===== 鐧诲綍椤?===== -->
 <div class="login-page" id="loginPage">
   <div class="login-card">
     <div class="login-logo">
       <div class="login-icon">
         <svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2"/><path d="M12 6v6l4 2"/></svg>
       </div>
-      <h1>伏羲</h1>
-      <p>企业知识认知系统</p>
+      <h1>浼忕静</h1>
+      <p>浼佷笟鐭ヨ瘑璁ょ煡绯荤粺</p>
     </div>
     <div class="login-tabs">
-      <button class="login-tab active" id="tabUser" onclick="switchLoginTab('user')">用户登录</button>
-      <button class="login-tab" id="tabAdmin" onclick="switchLoginTab('admin')">管理员登录</button>
+      <button class="login-tab active" id="tabUser" onclick="switchLoginTab('user')">鐢ㄦ埛鐧诲綍</button>
+      <button class="login-tab" id="tabAdmin" onclick="switchLoginTab('admin')">绠＄悊鍛樼櫥褰?/button>
     </div>
     <form id="loginForm" onsubmit="handleLogin(event)">
       <div class="form-group">
-        <label>用户名</label>
-        <input type="text" class="form-input" id="loginUser" placeholder="请输入用户名" autocomplete="username" required>
+        <label>鐢ㄦ埛鍚?/label>
+        <input type="text" class="form-input" id="loginUser" placeholder="璇疯緭鍏ョ敤鎴峰悕" autocomplete="username" required>
       </div>
       <div class="form-group">
-        <label>密码</label>
-        <input type="password" class="form-input" id="loginPass" placeholder="请输入密码" autocomplete="current-password" required>
+        <label>瀵嗙爜</label>
+        <input type="password" class="form-input" id="loginPass" placeholder="璇疯緭鍏ュ瘑鐮? autocomplete="current-password" required>
       </div>
-      <button type="submit" class="btn-login" id="loginBtn">登 录</button>
+      <button type="submit" class="btn-login" id="loginBtn">鐧?褰?/button>
       <div class="login-error" id="loginError"></div>
     </form>
-    <p class="login-hint">伏羲 RAG 4.0 · 企业知识认知系统</p>
+    <p class="login-hint">浼忕静 RAG 4.0 路 浼佷笟鐭ヨ瘑璁ょ煡绯荤粺</p>
   </div>
 </div>
 
-<!-- ===== 主应用 ===== -->
+<!-- ===== 涓诲簲鐢?===== -->
 <div class="app" id="mainApp" style="display:none">
-  <!-- 侧边栏 -->
+  <!-- 渚ц竟鏍?-->
   <aside class="sidebar" id="sidebar">
     <div class="sidebar-header">
       <div class="sidebar-brand">
         <div class="logo"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2"/><path d="M12 6v6l4 2"/></svg></div>
-        <span>伏羲</span>
+        <span>浼忕静</span>
       </div>
     </div>
     <nav class="sidebar-nav">
       <div class="nav-section">
-        <div class="nav-section-title">知识服务</div>
+        <div class="nav-section-title">鐭ヨ瘑鏈嶅姟</div>
         <div class="nav-item active" data-page="chat">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          智能对话
+          鏅鸿兘瀵硅瘽
         </div>
         <div class="nav-item" data-page="search">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          知识搜索
+          鐭ヨ瘑鎼滅储
         </div>
         <div class="nav-item" data-page="graph">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><circle cx="19" cy="5" r="2"/><circle cx="5" cy="5" r="2"/><circle cx="19" cy="19" r="2"/><circle cx="5" cy="19" r="2"/><line x1="12" y1="10" x2="19" y2="7"/><line x1="12" y1="10" x2="5" y2="7"/><line x1="12" y1="14" x2="19" y2="17"/><line x1="12" y1="14" x2="5" y2="17"/></svg>
-          知识图谱
+          鐭ヨ瘑鍥捐氨
         </div>
         <div class="nav-item" data-page="wiki">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-          Wiki 知识
+          Wiki 鐭ヨ瘑
         </div>
         <div class="nav-item" data-page="files">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
-          文件管理
+          鏂囦欢绠＄悊
         </div>
       </div>
       <div class="nav-section nav-admin">
-        <div class="nav-section-title">系统管理</div>
+        <div class="nav-section-title">绯荤粺绠＄悊</div>
         <div class="nav-item" data-page="admin-overview">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
-          系统概览
+          绯荤粺姒傝
         </div>
         <div class="nav-item" data-page="admin-organs">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-          器官状态
+          鍣ㄥ畼鐘舵€?
         </div>
         <div class="nav-item" data-page="admin-eval">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          评测报告
+          璇勬祴鎶ュ憡
         </div>
         <div class="nav-item" data-page="admin-flags">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
@@ -394,7 +394,7 @@ table.data tr:hover td{background:rgba(0,0,0,0.01)}
         </div>
         <div class="nav-item" data-page="admin-feedback">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
-          用户反馈
+          鐢ㄦ埛鍙嶉
         </div>
       </div>
     </nav>
@@ -402,7 +402,7 @@ table.data tr:hover td{background:rgba(0,0,0,0.01)}
       <div class="user-info" onclick="logout()">
         <div class="user-avatar" id="userAvatar">A</div>
         <div class="user-meta">
-          <div class="name" id="userName">用户</div>
+          <div class="name" id="userName">鐢ㄦ埛</div>
           <div class="role" id="userRole">user</div>
         </div>
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
@@ -410,17 +410,17 @@ table.data tr:hover td{background:rgba(0,0,0,0.01)}
     </div>
   </aside>
 
-  <!-- 主区域 -->
+  <!-- 涓诲尯鍩?-->
   <div class="main">
     <div class="topbar">
-      <div class="topbar-title" id="pageTitle">智能对话</div>
+      <div class="topbar-title" id="pageTitle">鏅鸿兘瀵硅瘽</div>
       <div class="topbar-right">
-        <div class="topbar-status"><span class="status-dot"></span> 系统正常</div>
+        <div class="topbar-status"><span class="status-dot"></span> 绯荤粺姝ｅ父</div>
       </div>
     </div>
     <div class="content">
 
-      <!-- ===== 对话页 ===== -->
+      <!-- ===== 瀵硅瘽椤?===== -->
       <div class="page active" id="page-chat" style="padding:0;display:flex;flex-direction:column;">
         <div class="chat-page">
           <div class="chat-msgs" id="chatMsgs">
@@ -428,19 +428,19 @@ table.data tr:hover td{background:rgba(0,0,0,0.01)}
               <div class="welcome-icon">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2"/><path d="M12 6v6l4 2"/></svg>
               </div>
-              <h2>你好，有什么可以帮你？</h2>
-              <p>基于企业知识库的智能问答系统，为你提供精准、有据可查的答案</p>
+              <h2>浣犲ソ锛屾湁浠€涔堝彲浠ュ府浣狅紵</h2>
+              <p>鍩轰簬浼佷笟鐭ヨ瘑搴撶殑鏅鸿兘闂瓟绯荤粺锛屼负浣犳彁渚涚簿鍑嗐€佹湁鎹彲鏌ョ殑绛旀</p>
               <div class="quick-actions">
-                <button class="quick-action" onclick="quickChat('知识库中有哪些文档？')">📚 知识库概览</button>
-                <button class="quick-action" onclick="quickChat('帮我总结最近上传的文档')">📝 文档总结</button>
-                <button class="quick-action" onclick="quickChat('如何提高检索准确率？')">🎯 使用技巧</button>
+                <button class="quick-action" onclick="quickChat('鐭ヨ瘑搴撲腑鏈夊摢浜涙枃妗ｏ紵')">馃摎 鐭ヨ瘑搴撴瑙?/button>
+                <button class="quick-action" onclick="quickChat('甯垜鎬荤粨鏈€杩戜笂浼犵殑鏂囨。')">馃摑 鏂囨。鎬荤粨</button>
+                <button class="quick-action" onclick="quickChat('濡備綍鎻愰珮妫€绱㈠噯纭巼锛?)">馃幆 浣跨敤鎶€宸?/button>
               </div>
             </div>
           </div>
           <div class="chat-input-area">
             <div class="chat-input-box">
-              <textarea id="chatInput" placeholder="输入你的问题..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}" oninput="autoResizeChat(this)"></textarea>
-              <button class="btn-web" id="btnWebSearch" onclick="toggleWebSearch()" title="联网搜索">
+              <textarea id="chatInput" placeholder="杈撳叆浣犵殑闂..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}" oninput="autoResizeChat(this)"></textarea>
+              <button class="btn-web" id="btnWebSearch" onclick="toggleWebSearch()" title="鑱旂綉鎼滅储">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
               </button>
               <button class="send-btn" onclick="sendChat()">
@@ -451,70 +451,70 @@ table.data tr:hover td{background:rgba(0,0,0,0.01)}
         </div>
       </div>
 
-      <!-- ===== 搜索页 ===== -->
+      <!-- ===== 鎼滅储椤?===== -->
       <div class="page" id="page-search">
         <div class="search-box">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <input type="text" id="searchInput" placeholder="输入关键词搜索知识库..." onkeydown="if(event.key==='Enter')doSearch()">
-          <button class="search-btn" onclick="doSearch()">搜索</button>
+          <input type="text" id="searchInput" placeholder="杈撳叆鍏抽敭璇嶆悳绱㈢煡璇嗗簱..." onkeydown="if(event.key==='Enter')doSearch()">
+          <button class="search-btn" onclick="doSearch()">鎼滅储</button>
         </div>
         <div id="searchResults"></div>
       </div>
 
-      <!-- ===== 图谱页 ===== -->
+      <!-- ===== 鍥捐氨椤?===== -->
       <div class="page" id="page-graph">
         <div class="graph-wrap">
           <canvas class="graph-canvas" id="graphCanvas"></canvas>
 <script>if(!CanvasRenderingContext2D.prototype.roundRect){CanvasRenderingContext2D.prototype.roundRect=function(x,y,w,h,r){if(typeof r==="number")r={tl:r,tr:r,br:r,bl:r};this.beginPath();this.moveTo(x+r.tl,y);this.lineTo(x+w-r.tr,y);this.quadraticCurveTo(x+w,y,x+w,y+r.tr);this.lineTo(x+w,y+h-r.br);this.quadraticCurveTo(x+w,y+h,x+w-r.br,y+h);this.lineTo(x+r.bl,y+h);this.quadraticCurveTo(x,y+h,x,y+h-r.bl);this.lineTo(x,y+r.tl);this.quadraticCurveTo(x,y,x+r.tl,y);this.closePath()}}</script>
           <div class="graph-panel" id="graphPanel">
-            <h4>知识图谱</h4>
+            <h4>鐭ヨ瘑鍥捐氨</h4>
             <div class="graph-search">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-              <input type="text" id="graphSearch" placeholder="搜索实体..." onkeydown="if(event.key==='Enter')searchGraph()">
+              <input type="text" id="graphSearch" placeholder="鎼滅储瀹炰綋..." onkeydown="if(event.key==='Enter')searchGraph()">
             </div>
             <div id="graphEntities"></div>
           </div>
         </div>
       </div>
 
-      <!-- ===== Wiki 页 ===== -->
+      <!-- ===== Wiki 椤?===== -->
       <div class="page" id="page-wiki">
         <div class="wiki-layout">
           <div class="wiki-tree" id="wikiTree">
             <div class="wiki-tree-header">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="16" height="16"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
-              <span>目录</span>
+              <span>鐩綍</span>
             </div>
           </div>
           <div class="wiki-content" id="wikiContent">
             <div class="empty">
-              <div class="empty-icon">📚</div>
-              <h3>选择一个 Wiki 页面</h3>
-              <p>从左侧目录中选择要查看的知识页面</p>
+              <div class="empty-icon">馃摎</div>
+              <h3>閫夋嫨涓€涓?Wiki 椤甸潰</h3>
+              <p>浠庡乏渚х洰褰曚腑閫夋嫨瑕佹煡鐪嬬殑鐭ヨ瘑椤甸潰</p>
             </div>
           </div>
         </div>
       </div>
 
-      <!-- ===== 文件管理页 ===== -->
+      <!-- ===== 鏂囦欢绠＄悊椤?===== -->
       <div class="page" id="page-files">
         <div class="upload-zone" id="uploadZone" onclick="document.getElementById('fileUpload').click()">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="40" height="40"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
-          <p>点击或拖拽文件到此处上传</p>
-          <span class="upload-hint">支持 PDF、DOCX、XLSX、TXT、MD、CSV 格式，单文件最大 200MB</span>
+          <p>鐐瑰嚮鎴栨嫋鎷芥枃浠跺埌姝ゅ涓婁紶</p>
+          <span class="upload-hint">鏀寔 PDF銆丏OCX銆乆LSX銆乀XT銆丮D銆丆SV 鏍煎紡锛屽崟鏂囦欢鏈€澶?200MB</span>
           <input type="file" id="fileUpload" style="display:none" multiple accept=".pdf,.doc,.docx,.xls,.xlsx,.txt,.md,.csv" onchange="uploadFiles(this.files)">
         </div>
         <div class="section-card">
           <div class="section-header">
-            <span class="section-title">文档列表</span>
+            <span class="section-title">鏂囨。鍒楄〃</span>
             <div style="display:flex;gap:8px;align-items:center">
               <div class="file-search-box">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-                <input type="text" placeholder="搜索文档..." id="fileSearch" oninput="window._fileFilter=this.value.toLowerCase();window._renderFiles(window._activeCat||'全部')">
+                <input type="text" placeholder="鎼滅储鏂囨。..." id="fileSearch" oninput="window._fileFilter=this.value.toLowerCase();window._renderFiles(window._activeCat||'鍏ㄩ儴')">
               </div>
               <button class="btn btn-orange btn-sm" onclick="document.getElementById('fileUpload').click()">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-                上传文档
+                涓婁紶鏂囨。
               </button>
             </div>
           </div>
@@ -522,45 +522,45 @@ table.data tr:hover td{background:rgba(0,0,0,0.01)}
         </div>
       </div>
 
-      <!-- ===== 管理面板：系统概览 ===== -->
+      <!-- ===== 绠＄悊闈㈡澘锛氱郴缁熸瑙?===== -->
       <div class="page" id="page-admin-overview">
         <div class="stats" id="overviewStats"></div>
         <div class="section-card">
-          <div class="section-header"><span class="section-title">系统指标</span></div>
-          <div class="section-body" id="overviewMetrics">加载中...</div>
+          <div class="section-header"><span class="section-title">绯荤粺鎸囨爣</span></div>
+          <div class="section-body" id="overviewMetrics">鍔犺浇涓?..</div>
         </div>
       </div>
 
-      <!-- ===== 管理面板：器官状态 ===== -->
+      <!-- ===== 绠＄悊闈㈡澘锛氬櫒瀹樼姸鎬?===== -->
       <div class="page" id="page-admin-organs">
         <div class="section-card">
-          <div class="section-header"><span class="section-title">器官状态</span><span style="font-size:12px;color:var(--text3)">伏羲生命体 · 八卦九宫</span></div>
+          <div class="section-header"><span class="section-title">鍣ㄥ畼鐘舵€?/span><span style="font-size:12px;color:var(--text3)">浼忕静鐢熷懡浣?路 鍏崷涔濆</span></div>
           <div class="section-body" id="organGrid"></div>
         </div>
       </div>
 
-      <!-- ===== 管理面板：评测报告 ===== -->
+      <!-- ===== 绠＄悊闈㈡澘锛氳瘎娴嬫姤鍛?===== -->
       <div class="page" id="page-admin-eval">
         <div class="stats" id="evalStats"></div>
         <div class="section-card">
-          <div class="section-header"><span class="section-title">评测详情</span></div>
-          <div class="section-body" id="evalDetail">加载中...</div>
+          <div class="section-header"><span class="section-title">璇勬祴璇︽儏</span></div>
+          <div class="section-body" id="evalDetail">鍔犺浇涓?..</div>
         </div>
       </div>
 
-      <!-- ===== 管理面板：Feature Flags ===== -->
+      <!-- ===== 绠＄悊闈㈡澘锛欶eature Flags ===== -->
       <div class="page" id="page-admin-flags">
         <div class="section-card">
-          <div class="section-header"><span class="section-title">Feature Flags</span><span style="font-size:12px;color:var(--text3)">修改后立即生效</span></div>
+          <div class="section-header"><span class="section-title">Feature Flags</span><span style="font-size:12px;color:var(--text3)">淇敼鍚庣珛鍗崇敓鏁?/span></div>
           <div class="section-body" id="flagsList"></div>
         </div>
       </div>
 
-      <!-- ===== 管理面板：用户反馈 ===== -->
+      <!-- ===== 绠＄悊闈㈡澘锛氱敤鎴峰弽棣?===== -->
       <div class="page" id="page-admin-feedback">
         <div class="section-card">
-          <div class="section-header"><span class="section-title">用户反馈</span></div>
-          <div class="section-body" id="feedbackList">加载中...</div>
+          <div class="section-header"><span class="section-title">鐢ㄦ埛鍙嶉</span></div>
+          <div class="section-body" id="feedbackList">鍔犺浇涓?..</div>
         </div>
       </div>
 
@@ -568,17 +568,18 @@ table.data tr:hover td{background:rgba(0,0,0,0.01)}
   </div>
 </div>
 
-<script src="/static/js/toast.js?v=1"></script>
-<script src="/static/js/utils.js?v=1"></script>
-<script src="/static/js/api-client.js?v=1"></script>
-<script src="/static/js/error-boundary.js?v=1"></script>
-<script src="/static/js/auth.js?v=1"></script>
+<script src="/static/js/toast.js?v=2"></script>
+<script src="/static/js/utils.js?v=2"></script>
+<script src="/static/js/api-client.js?v=2"></script>
+<script src="/static/js/error-boundary.js?v=2"></script>
+<script src="/static/js/auth.js?v=2"></script>
 <script src="/static/js/init-app.js?v=3"></script>
-<script src="/static/js/chat.js?v=1"></script>
-<script src="/static/js/search.js?v=1"></script>
-<script src="/static/js/graph.js?v=1"></script>
-<script src="/static/js/wiki.js?v=1"></script>
-<script src="/static/js/files.js?v=1"></script>
-<script src="/static/js/admin.js?v=1"></script>
+<script src="/static/js/chat.js?v=2"></script>
+<script src="/static/js/search.js?v=2"></script>
+<script src="/static/js/graph.js?v=2"></script>
+<script src="/static/js/wiki.js?v=2"></script>
+<script src="/static/js/files.js?v=2"></script>
+<script src="/static/js/admin.js?v=2"></script>
 </body>
 </html>
+
