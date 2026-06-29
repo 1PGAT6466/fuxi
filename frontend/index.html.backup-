@@ -430,9 +430,6 @@ table.data tr:hover{background:var(--bg)}
   </div>
 </div>
 
-<script src="/static/js/toast.js"></script>
-<script src="/static/js/types.js"></script>
-
 <script>
 // ===== 认证 =====
 const TK='***',UK='***';
