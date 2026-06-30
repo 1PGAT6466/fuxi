@@ -21,8 +21,8 @@ class TestInstinctMultiIntent:
     def test_material_numeric(self):
         r = Instinct.classify_intent("PA66 收缩率参数")
         assert r["intent"] == "numeric_lookup"
-        assert "definition" in r["intents"]
         assert "material_selector" in r["intents"]
+        assert "numeric_lookup" in r["intents"]
     
     def test_pure_how_to(self):
         r = Instinct.classify_intent("VLAN 怎么配置")

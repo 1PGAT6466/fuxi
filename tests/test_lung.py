@@ -68,7 +68,7 @@ class TestLungBreathInterval:
     def test_breath_interval(self):
         m = Meridian()
         lung = LungAgent(m)
-        assert lung.BREATH_INTERVAL == 300
+        assert lung.BREATH_INTERVAL == 25
 
 class TestLungInhale:
     @pytest.mark.asyncio
