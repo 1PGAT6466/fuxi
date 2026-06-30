@@ -1,4 +1,4 @@
-// ===== Wiki — 分类树形目录 =====
+// ===== Wiki — 分类树形目录 + 美观内容展示 =====
 var _wikiPages = [];
 var _wikiCategories = {
   "模具设计": ["模具","连接器","端子","注塑","成型","型腔","分模","滑块"],
@@ -23,6 +23,9 @@ function _classifyWikiPage(title, content) {
   return '其他';
 }
 
+var _catIcons = {'模具设计':'🔧','机械设计':'⚙️','电气自动化':'⚡','自动化产线':'🏭','网络建设':'🌐','工程技术规范':'📋','公司制度':'📜','IT系统':'💻','AI':'🧠','其他':'📁'};
+var _catColors = {'模具设计':'#e74c3c','机械设计':'#3498db','电气自动化':'#f39c12','自动化产线':'#27ae60','网络建设':'#9b59b6','工程技术规范':'#1abc9c','公司制度':'#e67e22','IT系统':'#2980b9','AI':'#8e44ad','其他':'#95a5a6'};
+
 async function loadWikiTree() {
   var tree = document.getElementById('wikiTree');
   tree.innerHTML = '<div style="text-align:center;padding:20px"><div class="loading-dots">加载中<span>.</span><span>.</span><span>.</span></div></div>';
@@ -44,7 +47,6 @@ function _renderWikiTree(filter) {
   var tree = document.getElementById('wikiTree');
   var filtered = filter ? _wikiPages.filter(function(p) { return (p.title||'').toLowerCase().indexOf(filter.toLowerCase()) >= 0; }) : _wikiPages;
 
-  // 分类
   var groups = {};
   filtered.forEach(function(p) {
     var cat = _classifyWikiPage(p.title, p.content);
@@ -53,7 +55,6 @@ function _renderWikiTree(filter) {
   });
 
   var catOrder = ['模具设计','机械设计','电气自动化','自动化产线','网络建设','工程技术规范','公司制度','IT系统','AI','其他'];
-  var catIcons = {'模具设计':'🔧','机械设计':'⚙️','电气自动化':'⚡','自动化产线':'🏭','网络建设':'🌐','工程技术规范':'📋','公司制度':'📜','IT系统':'💻','AI':'🧠','其他':'📁'};
   var html = '<div style="padding:0 4px">';
   html += '<div style="font-size:13px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px">📚 目录 <span style="font-size:11px;color:var(--text3);font-weight:400">('+_wikiPages.length+')</span></div>';
   html += '<div style="display:flex;align-items:center;gap:6px;background:var(--bg);border-radius:8px;padding:6px 10px;margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="color:var(--text3);flex-shrink:0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" placeholder="搜索页面..." value="'+esc(filter)+'" oninput="_renderWikiTree(this.value)" style="flex:1;border:none;background:transparent;font-size:12px;outline:none;font-family:var(--font)"></div>';
@@ -61,7 +62,8 @@ function _renderWikiTree(filter) {
   catOrder.forEach(function(cat) {
     var pages = groups[cat];
     if (!pages || !pages.length) return;
-    var icon = catIcons[cat] || '📁';
+    var icon = _catIcons[cat] || '📁';
+    var color = _catColors[cat] || '#999';
     html += '<div class="wiki-cat" style="margin-bottom:8px">';
     html += '<div onclick="this.parentElement.querySelector(\'.wiki-cat-items\').classList.toggle(\'hidden\')" style="display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;border-radius:6px;font-size:12px;font-weight:600;color:var(--text2);transition:all .15s" onmouseenter="this.style.background=\'var(--bg)\'" onmouseleave="this.style.background=\'transparent\'">';
     html += '<span style="font-size:14px">'+icon+'</span>';
@@ -79,19 +81,111 @@ function _renderWikiTree(filter) {
   tree.innerHTML = html;
 }
 
+// 提取 markdown 中的标题作为目录
+function _extractToc(content) {
+  if (!content) return [];
+  var toc = [];
+  var lines = content.split('\n');
+  for (var i = 0; i < lines.length; i++) {
+    var m = lines[i].match(/^(#{1,3})\s+(.+)/);
+    if (m) {
+      var level = m[1].length;
+      var text = m[2].replace(/\*\*/g, '').replace(/\*/g, '').trim();
+      var id = 'heading-' + i;
+      toc.push({ level: level, text: text, id: id });
+    }
+  }
+  return toc;
+}
+
+// 给渲染后的 HTML 中的标题加 id（用于目录跳转）
+function _addHeadingIds(html, content) {
+  if (!content) return html;
+  var lines = content.split('\n');
+  var headingIdx = 0;
+  for (var i = 0; i < lines.length; i++) {
+    var m = lines[i].match(/^(#{1,3})\s+(.+)/);
+    if (m) {
+      var level = m[1].length;
+      var tag = 'h' + level;
+      var id = 'heading-' + i;
+      // 替换第一个匹配的 <hN> 为 <hN id="...">
+      var re = new RegExp('<' + tag + '>([\\s\\S]*?)</' + tag + '>');
+      var replaced = false;
+      html = html.replace(re, function(match) {
+        if (replaced) return match;
+        replaced = true;
+        return '<' + tag + ' id="' + id + '">' + match.slice(tag.length + 2, -(tag.length + 3)) + '</' + tag + '>';
+      });
+    }
+  }
+  return html;
+}
+
 async function loadWikiPage(id) {
   try {
     var c = document.getElementById('wikiContent');
-    c.innerHTML = '<div style="text-align:center;padding:40px"><div class="loading-dots">加载中<span>.</span><span>.</span><span>.</span></div></div>';
+    c.innerHTML = '<div style="text-align:center;padding:60px"><div class="loading-dots">加载中<span>.</span><span>.</span><span>.</span></div></div>';
     var d = await api('/api/wiki/page/' + id);
-    var rendered = typeof marked !== 'undefined' ? marked.parse(d.content || '') : esc(d.content || '');
+    var content = d.content || '';
+    var rendered = typeof marked !== 'undefined' ? marked.parse(content) : esc(content);
     if (typeof DOMPurify !== 'undefined') rendered = DOMPurify.sanitize(rendered);
 
-    // 面包屑
-    var cat = _classifyWikiPage(d.title, d.content);
-    var breadcrumb = '<div style="font-size:12px;color:var(--text3);margin-bottom:16px;display:flex;align-items:center;gap:6px"><span style="cursor:pointer;color:var(--mi-orange)" onclick="loadWikiTree()">📚 目录</span> <span>›</span> <span>'+esc(cat)+'</span> <span>›</span> <span style="color:var(--text);font-weight:500">'+esc(d.title||'')+'</span></div>';
+    // 给标题加 id
+    rendered = _addHeadingIds(rendered, content);
 
-    c.innerHTML = breadcrumb + '<h1>' + esc(d.title || '') + '</h1><div>' + rendered + '</div>';
+    // 分类
+    var cat = _classifyWikiPage(d.title, content);
+    var catIcon = _catIcons[cat] || '📁';
+    var catColor = _catColors[cat] || '#999';
+
+    // 提取目录
+    var toc = _extractToc(content);
+
+    // 面包屑
+    var breadcrumb = '<div style="font-size:12px;color:var(--text3);margin-bottom:20px;display:flex;align-items:center;gap:6px">';
+    breadcrumb += '<span style="cursor:pointer;color:var(--mi-orange)" onclick="loadWikiTree()">📚 目录</span>';
+    breadcrumb += '<span style="opacity:0.4">›</span>';
+    breadcrumb += '<span style="background:'+catColor+'15;color:'+catColor+';padding:2px 8px;border-radius:4px;font-size:11px">'+catIcon+' '+esc(cat)+'</span>';
+    breadcrumb += '<span style="opacity:0.4">›</span>';
+    breadcrumb += '<span style="color:var(--text);font-weight:500">'+esc(d.title||'')+'</span>';
+    breadcrumb += '</div>';
+
+    // 标题卡片
+    var titleCard = '<div style="background:linear-gradient(135deg,'+catColor+'08,'+catColor+'04);border:1px solid '+catColor+'15;border-radius:12px;padding:20px 24px;margin-bottom:20px">';
+    titleCard += '<div style="display:flex;align-items:center;gap:12px;margin-bottom:8px">';
+    titleCard += '<span style="font-size:28px">'+catIcon+'</span>';
+    titleCard += '<div>';
+    titleCard += '<h1 style="font-size:22px;font-weight:700;margin:0;line-height:1.3">'+esc(d.title||'')+'</h1>';
+    titleCard += '<div style="font-size:12px;color:var(--text3);margin-top:4px">'+esc(cat)+' · Wiki 知识页面</div>';
+    titleCard += '</div></div>';
+    if (d.summary) {
+      titleCard += '<div style="font-size:13px;color:var(--text2);line-height:1.6;margin-top:8px;padding-top:12px;border-top:1px solid '+catColor+'10">'+esc(d.summary)+'</div>';
+    }
+    titleCard += '</div>';
+
+    // 目录侧栏
+    var tocHtml = '';
+    if (toc.length > 2) {
+      tocHtml = '<div style="background:var(--bg);border-radius:10px;padding:16px;margin-bottom:20px">';
+      tocHtml += '<div style="font-size:12px;font-weight:600;color:var(--text3);margin-bottom:10px;text-transform:uppercase;letter-spacing:1px">📑 目录</div>';
+      toc.forEach(function(t) {
+        var indent = (t.level - 1) * 12;
+        tocHtml += '<div style="padding:4px 0;padding-left:'+indent+'px">';
+        tocHtml += '<a href="#'+t.id+'" style="font-size:12px;color:var(--text2);text-decoration:none;transition:color .15s" onmouseenter="this.style.color=\'var(--mi-orange)\'" onmouseleave="this.style.color=\'var(--text2)\'">';
+        tocHtml += (t.level > 1 ? '<span style="opacity:0.3;margin-right:4px">└</span>' : '') + esc(t.text);
+        tocHtml += '</a></div>';
+      });
+      tocHtml += '</div>';
+    }
+
+    // 内容区域
+    var contentCard = '<div class="wiki-rendered" style="font-size:14px;line-height:1.9;color:var(--text)">'+rendered+'</div>';
+
+    // 组装
+    c.innerHTML = breadcrumb + titleCard + tocHtml + contentCard;
+
+    // 高亮当前目录项
     document.querySelectorAll('.wiki-tree-item').forEach(function(t) {
       t.classList.toggle('active', t.dataset.id === id);
     });
