@@ -62,7 +62,9 @@ def clean_text(text: str) -> str:
 def get_db(path: str):
     """获取 sqlite3 连接 (调用方负责 close)"""
     import sqlite3
-    conn = sqlite3.connect(path)
+    conn = sqlite3.connect(path, timeout=10)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     conn.row_factory = sqlite3.Row
     return conn
 

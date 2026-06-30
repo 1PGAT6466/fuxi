@@ -26,7 +26,9 @@ CATEGORY_MAP = {
 def _get_wt_db():
     """Get worldtree.db connection — uses core/db context manager pattern."""
     from src.core.db import connect, get_db_path
-    conn = sqlite3.connect(str(get_db_path("worldtree")))
+    conn = sqlite3.connect(str(get_db_path("worldtree")), timeout=10)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     conn.row_factory = sqlite3.Row
     return conn
 

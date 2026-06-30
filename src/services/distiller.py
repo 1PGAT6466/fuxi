@@ -189,7 +189,9 @@ def _qgate(content: str) -> tuple:
 
 def _init_db():
     DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = sqlite3.connect(str(DB_PATH), timeout=10)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     conn.executescript("""
         CREATE TABLE IF NOT EXISTS wiki_pages (id TEXT PRIMARY KEY, title TEXT NOT NULL, summary TEXT DEFAULT '', content TEXT NOT NULL, category_path TEXT DEFAULT '', version INTEGER DEFAULT 1, quality_score REAL DEFAULT 0.7, created_at TEXT DEFAULT '', updated_at TEXT DEFAULT '');
         CREATE TABLE IF NOT EXISTS entities (id TEXT PRIMARY KEY, name TEXT NOT NULL UNIQUE, type TEXT DEFAULT 'unknown', aliases TEXT DEFAULT '[]', category_path TEXT DEFAULT '', mentions INTEGER DEFAULT 1, created_at TEXT DEFAULT '');
@@ -276,7 +278,9 @@ async def distill_batch_async(
 
 def save_batch(results: List[Tuple[str, dict]]) -> dict:
     """批量写入蒸馏结果到 SQLite"""
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = sqlite3.connect(str(DB_PATH), timeout=10)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     now = now_iso()
     stats = {"wiki":0,"ent":0,"term":0,"rel":0}
     emap, tmap = {}, {}
@@ -370,7 +374,9 @@ async def run_full_async(incremental: bool = True) -> dict:
         return {"ok": True, "msg": "no chunks"}
     
     # 1. 读取 chunk
-    conn = sqlite3.connect(str(CHUNKS_DB))
+    conn = sqlite3.connect(str(CHUNKS_DB), timeout=10)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     all_chunks = []
     for rid, doc_json, fname, raw_cat in conn.execute(
         "SELECT id, doc, file_name, category FROM chunks WHERE status='active' AND chunk_index>=0 ORDER BY id"

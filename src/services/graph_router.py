@@ -325,7 +325,9 @@ def route_entity_with_neighbors(query: str, max_entities: int = 5) -> dict:
     try:
         import sqlite3
         from src.config import WORLDTREE_DB_PATH
-        conn = sqlite3.connect(str(WORLDTREE_DB_PATH))
+        conn = sqlite3.connect(str(WORLDTREE_DB_PATH), timeout=10)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
         for e in top:
             entity_name = e["entity"]
             cur = conn.execute(

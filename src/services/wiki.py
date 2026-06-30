@@ -108,7 +108,9 @@ class WikiEngine:
     def _init_db(self):
         """初始化 SQLite 表"""
         DATA_DIR.mkdir(parents=True, exist_ok=True)
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
         conn.execute("""
             CREATE TABLE IF NOT EXISTS wiki_pages (
                 id TEXT PRIMARY KEY,
@@ -144,7 +146,9 @@ class WikiEngine:
         if not summary:
             summary = self._generate_summary(content)
         
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
         conn.execute(
             """INSERT OR REPLACE INTO wiki_pages 
                (id, title, category, tags, summary, content, sources, version, quality_score, created_at, updated_at)
@@ -160,7 +164,9 @@ class WikiEngine:
     def update_page(self, page_id: str, content: str = None, summary: str = None,
                     quality_score: float = None) -> bool:
         """更新 Wiki 页面"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
         cur = conn.execute("SELECT * FROM wiki_pages WHERE id = ?", (page_id,))
         row = cur.fetchone()
         if not row:
@@ -196,7 +202,9 @@ class WikiEngine:
     
     def get_page(self, page_id: str) -> Optional[Dict]:
         """获取单个 Wiki 页面"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
         cur = conn.execute("SELECT * FROM wiki_pages WHERE id = ?", (page_id,))
         row = cur.fetchone()
         conn.close()
@@ -206,7 +214,9 @@ class WikiEngine:
     
     def delete_page(self, page_id: str) -> bool:
         """删除 Wiki 页面"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
         cur = conn.execute("DELETE FROM wiki_pages WHERE id = ?", (page_id,))
         conn.commit()
         deleted = cur.rowcount > 0
@@ -215,7 +225,9 @@ class WikiEngine:
 
     def search_by_title(self, query: str, limit: int = 5) -> list:
         """按标题关键词搜索"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
         keywords = query.split()
         if not keywords:
             conn.close()
@@ -232,7 +244,9 @@ class WikiEngine:
 
     def search_content(self, query: str, limit: int = 5) -> list:
         """全文搜索 Wiki 内容（标题 + 正文 + 标签）"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
         keywords = [kw.strip() for kw in query.split() if len(kw.strip()) >= 1][:5]
         if not keywords:
             conn.close()
@@ -251,7 +265,9 @@ class WikiEngine:
 
     def search_by_tag(self, tag: str, limit: int = 10) -> list:
         """按标签搜索"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
         cur = conn.execute(
             "SELECT * FROM wiki_pages WHERE tags LIKE ? ORDER BY quality_score DESC LIMIT ?",
             (f"%{tag}%", limit)
@@ -262,7 +278,9 @@ class WikiEngine:
     
     def list_pages(self, category: str = "", limit: int = 50) -> list:
         """列出页面"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
         if category:
             cur = conn.execute(
                 "SELECT * FROM wiki_pages WHERE category = ? ORDER BY updated_at DESC LIMIT ?",
@@ -279,7 +297,9 @@ class WikiEngine:
     
     def get_summaries_for_indexing(self) -> list:
         """获取所有页面的摘要（用于向量索引）"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
         cur = conn.execute("SELECT id, title, summary, category, tags FROM wiki_pages")
         rows = cur.fetchall()
         conn.close()
@@ -290,7 +310,9 @@ class WikiEngine:
         """获取页面完整内容（用于注入 LLM）"""
         if not page_ids:
             return []
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
         placeholders = ",".join(["?" for _ in page_ids])
         cur = conn.execute(
             f"SELECT id, title, content, category, sources FROM wiki_pages WHERE id IN ({placeholders})",
@@ -306,7 +328,9 @@ class WikiEngine:
     
     def add_cross_link(self, from_id: str, to_id: str, link_type: str = "related"):
         """添加页面间交叉引用"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
         conn.execute(
             "INSERT OR REPLACE INTO wiki_cross_links VALUES (?, ?, ?)",
             (from_id, to_id, link_type)
@@ -316,7 +340,9 @@ class WikiEngine:
     
     def get_linked_pages(self, page_id: str) -> list:
         """获取关联页面"""
-        conn = sqlite3.connect(self.db_path)
+        conn = sqlite3.connect(self.db_path, timeout=10)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
         cur = conn.execute(
             "SELECT to_id, link_type FROM wiki_cross_links WHERE from_id = ?",
             (page_id,)

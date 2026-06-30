@@ -26,7 +26,9 @@ def get_db_path(name: str) -> Path:
 @contextmanager
 def connect(name: str):
     """上下文管理器，自动关闭"""
-    conn = sqlite3.connect(str(get_db_path(name)))
+    conn = sqlite3.connect(str(get_db_path(name)), timeout=10)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     conn.row_factory = sqlite3.Row
     try:
         yield conn

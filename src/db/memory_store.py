@@ -63,7 +63,7 @@ class MemoryStore:
 
     def _ensure_db(self):
         """确保数据库和表存在"""
-        self._db_conn = sqlite3.connect(self._db_path, check_same_thread=False)
+        self._db_conn = sqlite3.connect(self._db_path, check_same_thread=False, timeout=10)
         self._db_conn.execute("PRAGMA journal_mode=WAL")
         self._db_conn.execute("PRAGMA synchronous=NORMAL")
         self._db_conn.execute("PRAGMA cache_size=-64000")  # 64MB SQLite cache

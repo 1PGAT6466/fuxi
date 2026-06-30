@@ -163,7 +163,9 @@ async def hybrid_search(query: str, chunks: list = None, category: str = "",
                     # Fallback: keyword search in worldtree.db wiki_pages
                     import sqlite3
                     from src.config import WORLDTREE_DB_PATH
-                    wt_db = sqlite3.connect(str(WORLDTREE_DB_PATH))
+                    wt_db = sqlite3.connect(str(WORLDTREE_DB_PATH), timeout=10)
+                    wt_db.execute("PRAGMA journal_mode=WAL")
+                    wt_db.execute("PRAGMA busy_timeout=5000")
                     wt_db.row_factory = sqlite3.Row
                     rows = wt_db.execute(
                         "SELECT id, title, summary, category_path FROM wiki_pages WHERE title LIKE ? OR summary LIKE ? LIMIT 5",

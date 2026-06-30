@@ -20,7 +20,9 @@ async def extract_relations_cooccurrence(chunks: list) -> list:
     """基于共现: 在同一 chunk 中出现的 entities → 建立关系"""
     try:
         from src.config import WORLDTREE_DB_PATH
-        db = sqlite3.connect(str(WORLDTREE_DB_PATH))
+        db = sqlite3.connect(str(WORLDTREE_DB_PATH), timeout=10)
+        db.execute("PRAGMA journal_mode=WAL")
+        db.execute("PRAGMA busy_timeout=5000")
         entities = db.execute("SELECT id, name, type FROM entities").fetchall()
         entity_names = {r[1]: (r[0], r[2]) for r in entities}
         db.close()
@@ -104,7 +106,9 @@ async def build_relations_from_chunks(chunks: list, batch_size: int = 50) -> dic
     if relations:
         try:
             from src.config import WORLDTREE_DB_PATH
-            db = sqlite3.connect(str(WORLDTREE_DB_PATH))
+            db = sqlite3.connect(str(WORLDTREE_DB_PATH), timeout=10)
+            db.execute("PRAGMA journal_mode=WAL")
+            db.execute("PRAGMA busy_timeout=5000")
             
             for r in relations:
                 try:
@@ -128,7 +132,9 @@ async def build_relations_from_chunks(chunks: list, batch_size: int = 50) -> dic
 def get_relation_stats() -> dict:
     try:
         from src.config import WORLDTREE_DB_PATH
-        db = sqlite3.connect(str(WORLDTREE_DB_PATH))
+        db = sqlite3.connect(str(WORLDTREE_DB_PATH), timeout=10)
+        db.execute("PRAGMA journal_mode=WAL")
+        db.execute("PRAGMA busy_timeout=5000")
         total = db.execute("SELECT COUNT(1) FROM entity_relations").fetchone()[0]
         entities = db.execute("SELECT COUNT(1) FROM entities").fetchone()[0]
         db.close()

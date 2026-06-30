@@ -13,7 +13,9 @@ DB_PATH = Path(os.path.join(os.path.dirname(__file__), "../../data/chunks.db"))
 
 
 def _get_conn():
-    conn = sqlite3.connect(str(DB_PATH))
+    conn = sqlite3.connect(str(DB_PATH), timeout=10)
+    conn.execute("PRAGMA journal_mode=WAL")
+    conn.execute("PRAGMA busy_timeout=5000")
     conn.execute("""
         CREATE TABLE IF NOT EXISTS graph_adjacency (
             entity_id   TEXT NOT NULL,
