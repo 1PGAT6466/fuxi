@@ -30,7 +30,7 @@ async function sendChat(forceWeb) {
   var prefix = useWeb ? '🌐 ' : '';
   appendMsg('user', prefix + q);
   chatHistory.push({ role: 'user', content: q });
-  var lid = appendMsg('loading', '<span class=loading-dots>AI 思考中<span>.</span><span>.</span><span>.</span></span>' + (useWeb ? ' (联网搜索)' : ''));
+  var lid = appendMsg('loading', '');
   try {
     var apiPath = useWeb ? '/api/antenna/search' : '/api/chat';
     var body = useWeb ? { query: q } : { query: q, history: chatHistory.slice(-6), stream: false };
@@ -54,7 +54,7 @@ function appendMsg(role, content, sources, trace) {
   if (role === 'user') {
     div.innerHTML = '<div class="msg-avatar">U</div><div class="msg-bubble">' + esc(content) + '</div>';
   } else if (role === 'loading') {
-    div.innerHTML = '<div class="msg-avatar">AI</div><div class="typing">' + content + '</div>';
+    div.innerHTML = '<div class="msg-avatar">AI</div><div class="msg-bubble"><div class="typing-indicator"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div></div>';
   } else if (role === 'error') {
     div.innerHTML = '<div class="msg-avatar">!</div><div class="msg-bubble" style="color:var(--error)">' + esc(content) + '</div>';
   } else {
