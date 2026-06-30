@@ -88,6 +88,7 @@ class LimbsAgent(OrganBase):
                 # 简单 BM25 降级
                 return self._fallback_search(query, chunks, top_k)
             except Exception:
+                logger.debug("[suppressed] return self._fallback_search(q")
                 pass
 
             return []

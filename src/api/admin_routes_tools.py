@@ -18,6 +18,7 @@ async def tools():
         if hasattr(TOOLS_DATA, 'is_file') and TOOLS_DATA.is_file():
             return {"ok": True, "data": json.loads(TOOLS_DATA.read_text(encoding="utf-8"))}
     except Exception:
+        logger.debug("[suppressed] return {")
         pass
     return {"ok": True, "data": []}
 

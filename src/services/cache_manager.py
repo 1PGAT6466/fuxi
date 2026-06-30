@@ -79,6 +79,7 @@ class CacheManager:
                 self._hits["L2"] += 1
                 return best_result
         except Exception:
+            logger.debug("[suppressed] return best_result")
             pass
         return None
 

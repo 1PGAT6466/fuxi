@@ -4,6 +4,7 @@ routers/documents.py — 文档管理路由（v10.0）
       /api/view, /api/reset, 文档上传/删除/查看
 """
 import logging; logger = logging.getLogger(__name__)
+from src.core.http_client import fetch, post
 import os
 import hashlib as hl_dl, json, hashlib, time, asyncio, urllib.request
 from datetime import datetime, timezone
@@ -29,6 +30,7 @@ from pydantic import BaseModel
 import asyncio
 from collections import deque
 import logging
+from src.core.http_client import fetch, post
 _logger = logging.getLogger(__name__)
 
 _vector_queue = deque()
@@ -168,11 +170,9 @@ async def download_file(file_hash: str):
         # Try direct loader proxy
         try:
             loader_url = LOADER_URL + "/api/download?path=" + urllib.parse.quote(file_name)
-            req = urllib.request.Request(loader_url)
-            with urllib.request.urlopen(req, timeout=15) as resp:
-                data = resp.read()
-                if data and len(data) > 50:
-                    return Response(content=data, media_type="application/octet-stream")
+            data = await fetch(loader_url, timeout=15)
+            if data and len(data) > 50:
+                return Response(content=data, media_type="application/octet-stream")
         except Exception as e:
             logger.warning(f"Loader direct failed: {e}")
         
@@ -186,11 +186,9 @@ async def download_file(file_hash: str):
                     lp = f.get("path", "").replace("\\", "/")
                     if lp:
                         loader_url = LOADER_URL + "/api/download?path=" + urllib.parse.quote(lp)
-                        req = urllib.request.Request(loader_url)
-                        with urllib.request.urlopen(req, timeout=30) as resp:
-                            data = resp.read()
-                            if data and len(data) > 50:
-                                return Response(content=data, media_type="application/octet-stream")
+                        data = await fetch(loader_url, timeout=30)
+                        if data and len(data) > 50:
+                            return Response(content=data, media_type="application/octet-stream")
         except Exception as e:
             logger.warning(f"Loader fallback failed: {e}")
     
@@ -241,20 +239,18 @@ async def view_file(file_hash: str):
         try:
             import urllib.request
             proxy_url = LOADER_URL + "/api/download?path=" + urllib.parse.quote(file_name.replace("\\", "/"))
-            req = urllib.request.Request(proxy_url)
-            with urllib.request.urlopen(req, timeout=10) as resp:
-                raw_bytes = resp.read()
-                if raw_bytes and len(raw_bytes) > 100:
-                    ext_map = {
-                        ".pdf": "application/pdf",
-                        ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-                        ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                        ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
-                        ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
-                        ".gif": "image/gif", ".bmp": "image/bmp", ".webp": "image/webp",
-                    }
-                    mt = ext_map.get(file_ext, "application/octet-stream")
-                    return Response(content=raw_bytes, media_type=mt)
+            raw_bytes = await fetch(proxy_url, timeout=10)
+            if raw_bytes and len(raw_bytes) > 100:
+                ext_map = {
+                    ".pdf": "application/pdf",
+                    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                    ".pptx": "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+                    ".png": "image/png", ".jpg": "image/jpeg", ".jpeg": "image/jpeg",
+                    ".gif": "image/gif", ".bmp": "image/bmp", ".webp": "image/webp",
+                }
+                mt = ext_map.get(file_ext, "application/octet-stream")
+                return Response(content=raw_bytes, media_type=mt)
         except Exception:
             pass  # 不可达，回退文本
 
@@ -301,13 +297,9 @@ async def raw_store_proxy(request: Request):
     body = await request.body()
     content_type = request.headers.get("content-type", "")
     try:
-        req = urllib.request.Request(
-            os.getenv("KB_RAW_STORE_URL", LOADER_URL.replace(":8090", ":8090") + "/api/raw-store"),
-            data=body,
-            headers={"Content-Type": content_type}
-        )
-        with urllib.request.urlopen(req, timeout=120) as resp:
-            return Response(content=resp.read(), status_code=resp.status, media_type="application/json")
+        raw_store_url = os.getenv("KB_RAW_STORE_URL", LOADER_URL.replace(":8090", ":8090") + "/api/raw-store")
+        status, resp_body = await post(raw_store_url, data=body, timeout=120, headers={"Content-Type": content_type})
+        return Response(content=resp_body, status_code=status, media_type="application/json")
     except Exception as e:
         raise HTTPException(status_code=502, detail=f"上传代理失败: {str(e)}")
 

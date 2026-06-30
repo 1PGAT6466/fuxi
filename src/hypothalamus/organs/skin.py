@@ -160,6 +160,7 @@ class SkinAgent(OrganBase):
                         text = _re.sub(r'\s+', ' ', text)
                         return text.strip()[:2000]
         except Exception:
+            logger.debug("[suppressed] return text.strip()[:2000]")
             pass
         return ""
 

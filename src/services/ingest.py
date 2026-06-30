@@ -155,6 +155,7 @@ def _smart_chunk(text: str, size: int = 1200, overlap: int = 100) -> list:
                     if tables:
                         structured = tables[0]
             except Exception:
+                logger.debug("[suppressed] structured = tables[0]")
                 pass
             if structured:
                 chunks.append({"text": chunk, "structured_table": structured})
@@ -678,6 +679,7 @@ async def ingest_document(
             if _cat:
                 category = _cat
         except Exception:
+            logger.debug("[suppressed] category = _cat")
             pass
     
     # 防御性校验：category 不能是 Python repr() 格式

@@ -49,6 +49,7 @@ class MemoryStore:
                         dst.close()
                         os.replace(new_path, self._db_path)
                     except Exception:
+                        logger.debug("[suppressed] os.replace(new_path, self._db_")
                         pass
         self._db_conn = None
         self._ensure_db()

@@ -129,6 +129,7 @@ def inc_counter(name: str, value: int = 1):
         if name in _counter_map and _counter_map[name]:
             _counter_map[name].inc(value)
     except Exception:
+        logger.debug("[suppressed] _counter_map[name].inc(value)")
         pass
 
 def observe_histogram(name: str, value: float):
@@ -137,6 +138,7 @@ def observe_histogram(name: str, value: float):
         if name == "kb_search_latency_seconds":
             search_duration_seconds.observe(value)
     except Exception:
+        logger.debug("[suppressed] search_duration_seconds.observ")
         pass
 
 

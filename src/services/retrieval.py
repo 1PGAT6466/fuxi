@@ -105,6 +105,7 @@ async def hybrid_search(query: str, chunks: list = None, category: str = "",
                     skip_cache = True  # QA匹配命中时跳过缓存直接走全文检索
                     logger.info(f"[Retrieval] QA pair match: {len(qa_chunk_ids)} source chunks for '{query[:30]}...'")
     except Exception:
+        logger.debug("[suppressed] logger.info(f")
         pass
 
     # L0: 语义缓存（精确+相似查询命中直接返回）

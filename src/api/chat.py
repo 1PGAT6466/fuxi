@@ -382,15 +382,14 @@ async def chat(body: ChatRequest, request: Request):
             try:
                 brave_key = os.getenv("BRAVE_API_KEY", "")
                 if brave_key:
-                    import urllib.request as _ur, urllib.parse as _up
+                    import urllib.parse as _up
                     _search_url = "https://api.search.brave.com/res/v1/web/search?q=" + _up.quote(q) + "&count=3"
-                    _search_req = _ur.Request(_search_url, headers={
+                    _search_resp = await fetch(_search_url, timeout=8, headers={
                         "Accept": "application/json",
                         "Accept-Encoding": "gzip",
                         "X-Subscription-Token": brave_key
                     })
-                    _search_resp = _ur.urlopen(_search_req, timeout=8)
-                    _web_data = json.loads(_search_resp.read())
+                    _web_data = json.loads(_search_resp)
                     _web_items = []
                     for _wr in (_web_data.get("web", {}).get("results", []) or [])[:3]:
                         _web_items.append("🌐 **{}**\n{}".format(_wr.get("title",""), _wr.get("description","")[:250]))
@@ -399,6 +398,7 @@ async def chat(body: ChatRequest, request: Request):
                         _record_chat_memory(q, len(results), "ai_skin_external")
                         return {"answer": llm_answer, "sources": results, "mode": "ai_antenna"}
             except Exception:
+                logger.debug("[suppressed] exception in antenna search")
                 pass
         return {"answer": llm_answer, "sources": results, "mode": "deepseek_chat", "retrieval_mode": "hybrid"}
 

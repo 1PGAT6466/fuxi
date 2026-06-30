@@ -136,6 +136,7 @@ class SpleenAgent(OrganBase):
             if result:
                 return result
         except Exception:
+            logger.debug("[suppressed] return result")
             pass
         t = text.lower()
         if any(kw in t for kw in ["api", "接口", "部署", "运维"]):
@@ -178,6 +179,7 @@ class SpleenAgent(OrganBase):
                         emb = r.json()["vectors"][0]
                         return we.vector_search_wiki(emb, top_k=top_k)
                 except Exception:
+                    logger.debug("[suppressed] return we.vector_search_wiki(e")
                     pass
 
             # Fallback: 关键词搜索
