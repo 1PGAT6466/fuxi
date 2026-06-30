@@ -122,6 +122,67 @@ function _addHeadingIds(html, content) {
   return html;
 }
 
+
+// 智能结构化：将【xxx】：描述 和 **key**：value 模式转为卡片/表格
+function _structureContent(html) {
+  // 模式1: 【操作名】：描述 — 转为操作卡片表格
+  var actionPattern = /(<p>【[^】]+】[：:][^<]*<\/p>\s*){2,}/g;
+  html = html.replace(actionPattern, function(match) {
+    var items = [];
+    var re = /<p>【([^】]+)】[：:]\s*([^<]*)<\/p>/g;
+    var m;
+    while ((m = re.exec(match)) !== null) {
+      items.push({ action: m[1], desc: m[2].trim() });
+    }
+    if (items.length < 2) return match;
+    var table = '<div style="margin:16px 0"><table style="width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:13px"><thead><tr><th style="background:var(--bg);padding:10px 14px;text-align:left;font-weight:600;color:var(--text3);font-size:12px;width:120px">操作</th><th style="background:var(--bg);padding:10px 14px;text-align:left;font-weight:600;color:var(--text3);font-size:12px">说明</th></tr></thead><tbody>';
+    items.forEach(function(it, i) {
+      var bg = i % 2 === 0 ? '' : ' style="background:rgba(0,0,0,0.01)"';
+      table += '<tr' + bg + '><td style="padding:10px 14px;border-bottom:1px solid var(--border);font-weight:600;color:var(--mi-orange)">【' + esc(it.action) + '】</td><td style="padding:10px 14px;border-bottom:1px solid var(--border);color:var(--text2)">' + esc(it.desc) + '</td></tr>';
+    });
+    table += '</tbody></table></div>';
+    return table;
+  });
+
+  // 模式2: li 中 **key**：value — 转为定义卡片
+  // 匹配 <li><strong>key</strong>：value</li> 或 <li><strong>key</strong>：<br>
+  html = html.replace(/<li>\s*<strong>([^<]+)<\/strong>[：:]\s*([^<]*(?:<br>\s*<\/li>|<\/li>))/g, function(match, key, value) {
+    return '<li style="list-style:none;padding:0;margin-bottom:12px"><div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px"><div style="font-weight:600;color:var(--mi-orange);font-size:13px;margin-bottom:4px">' + key.trim() + '</div><div style="color:var(--text2);font-size:13px;line-height:1.7">' + (value.trim() || '') + '</div></div></li>';
+  });
+
+  // 模式3: <li>后紧跟 <ul> 的 **key**：嵌套子列表 — 提取为卡片
+  // 匹配 <li><strong>key</strong>：<ul>子项</ul></li>
+  html = html.replace(/<li>\s*<strong>([^<]+)<\/strong>[：:]\s*<ul>([\s\S]*?)<\/ul>\s*<\/li>/g, function(match, key, subList) {
+    // 提取子项
+    var subItems = [];
+    var re2 = /<li>([^<]*(?:<strong>[^<]*<\/strong>[^<]*)?)<\/li>/g;
+    var m2;
+    while ((m2 = re2.exec(subList)) !== null) {
+      subItems.push(m2[1].trim());
+    }
+    var card = '<li style="list-style:none;padding:0;margin-bottom:12px"><div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px"><div style="font-weight:600;color:var(--mi-orange);font-size:13px;margin-bottom:8px">' + key.trim() + '</div>';
+    if (subItems.length) {
+      card += '<ul style="margin:0;padding-left:16px;font-size:13px;color:var(--text2);line-height:1.8">';
+      subItems.forEach(function(si) {
+        card += '<li style="margin-bottom:4px">' + si + '</li>';
+      });
+      card += '</ul>';
+    }
+    card += '</div></li>';
+    return card;
+  });
+
+  // 模式4: 连续的 <li><strong>key</strong>：value</li> (无嵌套) — 已被模式2处理
+  // 但如果模式2没匹配到（因为 value 在下一行），再试一次
+  html = html.replace(/<li>\s*<strong>([^<]+)<\/strong>[：:]\s*<\/li>/g, function(match, key) {
+    return '<li style="list-style:none;padding:0;margin-bottom:8px"><div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px"><span style="font-weight:600;color:var(--mi-orange);font-size:13px">' + key.trim() + '</span></div></li>';
+  });
+
+  return html;
+}
+
+
+
 async function loadWikiPage(id) {
   try {
     var c = document.getElementById('wikiContent');
@@ -133,6 +194,7 @@ async function loadWikiPage(id) {
 
     // 给标题加 id
     rendered = _addHeadingIds(rendered, content);
+    rendered = _structureContent(rendered);
 
     // 分类
     var cat = _classifyWikiPage(d.title, content);
