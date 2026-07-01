@@ -217,6 +217,7 @@ class Brain:
         self.ollama_call = ollama_call  # Ollama 降级入口
         self._recent_thoughts: List[Thought] = []
         self._conversation_context: List[str] = []  # v1.42: 对话记忆
+        self._conversation_history: List[Dict] = []  # v1.43: 完整对话历史(query+answer+intent)
         self._stats = {"thoughts": 0, "complex_success": 0, "retries": 0, "fallbacks": 0}
         
         self.meridian.register_organ("brain", "乾·大脑", "🧠", "伏羲唯一意识中心——多意图本能+三级降级+记忆")
@@ -292,10 +293,18 @@ class Brain:
         self._recent_thoughts.append(thought)
         if len(self._recent_thoughts) > 50:
             self._recent_thoughts = self._recent_thoughts[-50:]
-        # 上下文记忆（最近 5 轮）
-        self._conversation_context.append(query)
-        if len(self._conversation_context) > 5:
-            self._conversation_context = self._conversation_context[-5:]
+        # 上下文记忆（最近 10 轮，保留 query+answer）
+        self._conversation_history.append({
+            "query": query,
+            "answer": (thought.answer or "")[:200],
+            "intent": intent.get("intent", "general_search"),
+        })
+        if len(self._conversation_history) > 10:
+            self._conversation_history = self._conversation_history[-10:]
+        # 兼容旧接口：同步到 _conversation_context
+        self._conversation_context = [
+            f"Q: {t['query']} A: {t['answer'][:80]}" for t in self._conversation_history
+        ]
         
         return {
             "answer": thought.answer,

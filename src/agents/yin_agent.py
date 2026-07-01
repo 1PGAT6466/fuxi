@@ -99,12 +99,15 @@ class YinAgent(BaseAgent):
             issues.append("有来源但未在答案中引用")
             score -= 15
 
-        # 3. 数字一致性检查
+        # 3. 数字一致性检查（过滤材料名中的数字：PA66、POM、PC+ABS 等）
         numbers_in_answer = set(re.findall(r'\d+\.?\d*', answer))
         if numbers_in_answer and sources:
             source_text = " ".join(s.get("text", "") for s in sources[:5])
             numbers_in_source = set(re.findall(r'\d+\.?\d*', source_text))
-            phantom_numbers = numbers_in_answer - numbers_in_source
+            material_numbers = set()
+            for match in re.findall(r'[A-Za-z]{2,}\d+', answer):
+                material_numbers.update(re.findall(r'\d+\.?\d*', match))
+            phantom_numbers = numbers_in_answer - numbers_in_source - material_numbers
             if len(phantom_numbers) > 3:
                 issues.append(f"答案包含 {len(phantom_numbers)} 个来源中未出现的数字")
                 score -= 25

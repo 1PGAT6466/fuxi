@@ -235,7 +235,7 @@ class Meridian:
             "organs_registered": len(self._organs),
             "queue_size": self._queue.qsize() if self._queue else 0,
             "pending_replies": len(self._replies),
-            "total_signals_sent": self._signal_count if hasattr(self, '_signal_count') else 0,
+            "total_signals_sent": sum(o.signals_sent for o in self._organs.values()),
         }
 
     def broadcast(self, source: str, signal_type: str, payload: Any,
