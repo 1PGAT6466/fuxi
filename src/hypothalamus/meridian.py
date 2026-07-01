@@ -102,6 +102,8 @@ class Meridian:
         self._running = False
         self._task: Optional[asyncio.Task] = None
         self._services: Dict[str, Callable] = {}
+        # 四象注册表（四象归位）
+        self._symbols: Dict[str, Dict] = {}
     
     # ========== 器官注册 ==========
     
@@ -117,6 +119,33 @@ class Meridian:
         self._organs[organ_id] = info
         logger.info(f"[Meridian] Organ registered: {emoji} {name} ({organ_id})")
         return info
+
+    # ========== 象注册（四象归位） ==========
+    
+    def register_symbol(self, symbol_id: str, name: str, handler) -> None:
+        """注册一个象到经络"""
+        self._symbols[symbol_id] = {
+            "name": name,
+            "handler": handler,
+            "registered_at": time.time(),
+        }
+        logger.info(f"[Meridian] Symbol registered: {name} ({symbol_id})")
+
+    async def call_symbol(self, symbol_id: str, method: str, params: dict = None, timeout: float = 5.0):
+        """调用另一个象的方法"""
+        symbol = self._symbols.get(symbol_id)
+        if not symbol:
+            raise ValueError(f"Unknown symbol: {symbol_id}")
+        handler = symbol["handler"]
+        fn = getattr(handler, method)
+        return await asyncio.wait_for(fn(**(params or {})), timeout=timeout)
+
+    def last_heartbeat_ago(self, organ_id: str) -> float:
+        """返回最后一次心跳距今的秒数"""
+        info = self._organs.get(organ_id)
+        if not info:
+            return 0
+        return time.time() - info.last_heartbeat
 
     # ========== 1.40 P3: Service Bridge (decouple organ direct calls) ==========
 
