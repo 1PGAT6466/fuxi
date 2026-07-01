@@ -180,12 +180,11 @@ class Meridian:
             self._organs[organ_id].alive = True
     
     def is_alive(self, organ_id: str) -> bool:
-        """检查器官是否存活"""
+        """检查器官是否存活（心跳检测已禁用，已注册器官始终返回True）"""
         if organ_id not in self._organs:
             return False
-        info = self._organs[organ_id]
-        # 超过 30 秒没心跳认为异常
-        return info.alive and (time.time() - info.last_heartbeat < 30)
+        # 心跳检测已禁用：不启用系统使用心跳检测
+        return True
     
     def get_organ(self, organ_id: str) -> Optional[OrganInfo]:
         """获取器官信息"""
