@@ -181,7 +181,7 @@ class Meridian:
     
     def is_alive(self, organ_id: str) -> bool:
         """检查器官是否存活（心跳检测已禁用，已注册器官始终返回True）"""
-        if organ_id not in self._organs:
+        if organ_id not in self._organs and organ_id not in self._symbols:
             return False
         # 心跳检测已禁用：不启用系统使用心跳检测
         return True
