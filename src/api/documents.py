@@ -631,3 +631,53 @@ async def pipeline_process(request: Request):
         raise HTTPException(500, f"管线错误 [{e.code}]: {e.message}")
     except Exception as e:
         raise HTTPException(500, f"处理失败: {str(e)}")
+
+
+@router.post("/api/pipeline/upload")
+async def pipeline_upload(file: UploadFile = File(...)):
+    """统一管线上传文件 — 周天大阵 Phase 2"""
+    from src.pipeline.unified import get_pipeline
+    from src.pipeline.errors import PipelineError
+
+    # 安全检查
+    if not file.filename:
+        raise HTTPException(400, "文件名为空")
+
+    ext = os.path.splitext(file.filename)[1].lower()
+    if ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(400, f"不支持的文件类型: {ext}")
+
+    # 保存到临时目录
+    tmp_dir = UPLOAD_DIR / "pipeline_tmp"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    tmp_path = tmp_dir / file.filename
+
+    try:
+        content = await file.read()
+        if len(content) > MAX_FILE_MB * 1024 * 1024:
+            raise HTTPException(400, f"文件过大，最大 {MAX_FILE_MB}MB")
+
+        tmp_path.write_bytes(content)
+
+        # 通过统一管线处理
+        pipeline = get_pipeline()
+        result = await pipeline.process(str(tmp_path), source="upload")
+
+        return {
+            "status": "ok",
+            "file_name": file.filename,
+            "chunks": len(result.chunks),
+            "events": len(result.events),
+            "entities": len(result.entities),
+            "duration_ms": round(result.duration_ms, 1),
+            "errors": result.errors,
+        }
+    except PipelineError as e:
+        raise HTTPException(500, f"管线错误 [{e.code}]: {e.message}")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(500, f"处理失败: {str(e)}")
+    finally:
+        if tmp_path.exists():
+            tmp_path.unlink(missing_ok=True)
