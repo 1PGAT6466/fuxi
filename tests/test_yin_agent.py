@@ -3,7 +3,7 @@ tests/test_yin_agent.py — 太极·阴 Agent 单元测试
 覆盖：规则校验、数字一致性、幻觉检测、答非所问检测
 """
 import pytest
-from src.agents.yin_agent import YinAgent
+from src.shaoyin.validator import YinAgent
 
 
 @pytest.fixture

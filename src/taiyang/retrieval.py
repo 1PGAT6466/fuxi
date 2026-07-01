@@ -65,7 +65,7 @@ class TaiyangRetrieval(SymbolBase):
     def _expand_query(self, query: str) -> str:
         """查询扩展"""
         try:
-            from src.services.query_expansion import expand_query
+            from src.taiyang.query_expansion import expand_query
             return expand_query(query)
         except Exception:
             return query
@@ -114,7 +114,7 @@ class TaiyangRetrieval(SymbolBase):
     def _fuse(self, bm25_results: List[Dict], vector_results: List[Dict]) -> List[Dict]:
         """RRF 融合"""
         try:
-            from src.services.fusion import rrf_fusion
+            from src.taiyang.fusion import rrf_fusion
             return rrf_fusion(bm25_results, vector_results)
         except Exception:
             return bm25_results + vector_results
@@ -122,7 +122,7 @@ class TaiyangRetrieval(SymbolBase):
     async def _rerank(self, query: str, results: List[Dict]) -> List[Dict]:
         """精排"""
         try:
-            from src.services.rerank import rerank_with_deepseek
+            from src.taiyang.rerank import rerank_with_deepseek
             reranked = await rerank_with_deepseek(query, results, top_k=len(results))
             if reranked:
                 return reranked
@@ -133,7 +133,7 @@ class TaiyangRetrieval(SymbolBase):
     def _expand_context(self, results: List[Dict]) -> List[Dict]:
         """上下文扩展"""
         try:
-            from src.services.results_postprocess import expand_context
+            from src.taiyang.results_postprocess import expand_context
             return expand_context(results)
         except Exception:
             return results

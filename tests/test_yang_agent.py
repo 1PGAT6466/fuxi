@@ -3,7 +3,7 @@ tests/test_yang_agent.py — 太极·阳 Agent 单元测试
 覆盖：初始化、工具定义、token 预算
 """
 import pytest
-from src.agents.yang_agent import YangAgent, YANG_SYSTEM_PROMPT, YANG_TOOLS, MAX_STEPS, TOKEN_BUDGET
+from src.shaoyin.tools import YangAgent, YANG_SYSTEM_PROMPT, YANG_TOOLS, MAX_STEPS, TOKEN_BUDGET
 
 
 @pytest.fixture

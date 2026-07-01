@@ -4,7 +4,7 @@ tests/test_retrieval.py — 混合检索管线单元测试
 """
 import pytest
 from unittest.mock import patch, MagicMock, AsyncMock
-from src.services.retrieval import hybrid_search, vector_recall, _merge_vector_results
+from src.taiyang.retrieval import hybrid_search, vector_recall, _merge_vector_results
 
 
 class TestMergeVectorResults:

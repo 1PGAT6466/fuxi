@@ -101,7 +101,7 @@ class ShaoyinBrain(SymbolBase):
     async def _compose(self, query: str, results: List[Dict], history: List[Dict] = None) -> str:
         """LLM 合成"""
         try:
-            from src.services.llm import call_deepseek
+            from src.infra.llm import call_deepseek
             context = "\n".join([r.get("text", "")[:200] for r in results[:5]])
             prompt = f"基于以下信息回答问题：\n{context}\n\n问题：{query}"
             answer = await call_deepseek(prompt)
@@ -127,7 +127,7 @@ class ShaoyinBrain(SymbolBase):
         """重试"""
         self._retry_count += 1
         try:
-            from src.services.llm import call_deepseek
+            from src.infra.llm import call_deepseek
             context = "\n".join([r.get("text", "")[:300] for r in results[:8]])
             prompt = f"请更准确地回答以下问题，参考文档：\n{context}\n\n问题：{query}"
             answer = await call_deepseek(prompt)
