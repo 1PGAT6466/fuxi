@@ -9,6 +9,7 @@ ChromaDB 封装：增删查 + 故障自愈 + 批量嵌入代理
 - 自动重连：_collection 失效时惰性重建
 """
 import os
+import asyncio
 import logging
 from typing import Optional, List, Dict, Any
 
@@ -20,6 +21,11 @@ logger = logging.getLogger(__name__)
 
 # ============ 配置 ============
 from src.config import EMBEDDER_URL
+
+# Embedder 健康检查缓存
+_embedder_available = None
+_embedder_last_check = 0
+_EMBEDDER_CHECK_INTERVAL = 30  # 30秒检查一次
 CHROMA_DIR = os.getenv("KB_CHROMA_DIR", "data/chromadb")
 COLLECTION_NAME = "kb_chunks"
 
@@ -258,16 +264,26 @@ async def embed_texts(texts: List[str]) -> Optional[List[List[float]]]:
     Returns:
         向量列表（成功）或 None（服务不可用）
     """
+    global _embedder_available, _embedder_last_check
+
     if not texts:
         return None
+
+    # 健康检查缓存：如果 embedder 不可用，跳过连接尝试
+    import time
+    now = time.time()
+    if _embedder_available is False and (now - _embedder_last_check) < _EMBEDDER_CHECK_INTERVAL:
+        return None
+
     try:
         async with aiohttp.ClientSession() as sess:
             async with sess.post(
                 f"{EMBEDDER_URL}/embed",
                 json={"texts": texts},
-                timeout=aiohttp.ClientTimeout(total=30),
+                timeout=aiohttp.ClientTimeout(total=5, connect=2),
             ) as resp:
                 if resp.status == 200:
+                    _embedder_available = True
                     data = await resp.json()
                     vectors = data.get("vectors")
                     if vectors:
@@ -276,8 +292,12 @@ async def embed_texts(texts: List[str]) -> Optional[List[List[float]]]:
                     logger.warning("embed_texts: no vectors in response")
                     return None
                 logger.warning(f"embed_texts: HTTP {resp.status}")
+                _embedder_available = False
+                _embedder_last_check = now
                 return None
-    except aiohttp.ClientError as e:
+    except (aiohttp.ClientError, asyncio.TimeoutError) as e:
+        _embedder_available = False
+        _embedder_last_check = now
         logger.warning(f"embed_texts: embedder unreachable — {e}")
         return None
     except Exception:
