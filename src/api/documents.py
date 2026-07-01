@@ -598,3 +598,36 @@ async def reset(request: Request):
     invalidate_chunk_cache()
     # store._save() removed — MemoryStore does not support persist
     return {"message": f"已清空 {n} 条数据", "deleted": n}
+
+
+# ============ 周天大阵: 统一管线 API ============
+
+@router.post("/api/pipeline/process")
+async def pipeline_process(request: Request):
+    """统一管线处理文件 — 周天大阵 Phase 2"""
+    from src.pipeline.unified import get_pipeline
+    from src.pipeline.errors import PipelineError
+
+    body = await request.json()
+    file_path = body.get("file_path", "")
+    source = body.get("source", "api")
+
+    if not file_path or not os.path.exists(file_path):
+        raise HTTPException(400, f"文件不存在: {file_path}")
+
+    try:
+        pipeline = get_pipeline()
+        result = await pipeline.process(file_path, source=source)
+        return {
+            "status": "ok",
+            "chunks": len(result.chunks),
+            "events": len(result.events),
+            "entities": len(result.entities),
+            "duration_ms": round(result.duration_ms, 1),
+            "errors": result.errors,
+            "skipped": result.skipped,
+        }
+    except PipelineError as e:
+        raise HTTPException(500, f"管线错误 [{e.code}]: {e.message}")
+    except Exception as e:
+        raise HTTPException(500, f"处理失败: {str(e)}")
