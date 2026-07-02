@@ -194,6 +194,55 @@ from src.api.evolution import router as evolution_router
 app.include_router(evaluation_router)
 app.include_router(evolution_router)
 
+# ============ MCP 工具 API ============
+from src.taiyin.mcp_tools import sag_search, sag_ingest, sag_explain, sag_status, MCP_TOOLS
+
+@app.get("/api/mcp/tools")
+async def mcp_list_tools():
+    """列出所有 MCP 工具"""
+    return {"tools": MCP_TOOLS}
+
+@app.post("/api/mcp/sag_search")
+async def mcp_sag_search(request: Request):
+    """MCP: 搜索知识库"""
+    body = await request.json()
+    query = body.get("query", "")
+    top_k = body.get("top_k", 10)
+    return await sag_search(query, top_k)
+
+@app.post("/api/mcp/sag_ingest")
+async def mcp_sag_ingest(request: Request):
+    """MCP: 入库文档"""
+    body = await request.json()
+    file_path = body.get("file_path", "")
+    category = body.get("category", "")
+    return await sag_ingest(file_path, category)
+
+@app.post("/api/mcp/sag_explain")
+async def mcp_sag_explain(request: Request):
+    """MCP: 解释查询"""
+    body = await request.json()
+    query = body.get("query", "")
+    return await sag_explain(query)
+
+@app.get("/api/mcp/sag_status")
+async def mcp_sag_status():
+    """MCP: 系统状态"""
+    return await sag_status()
+
+# ============ 四象状态 + 成长 API ============
+from src.taiyin.growth_api import get_growth_overview, get_symbols_status
+
+@app.get("/api/symbols/status")
+async def symbols_status():
+    """四象状态"""
+    return get_symbols_status()
+
+@app.get("/api/growth/overview")
+async def growth_overview():
+    """成长概览"""
+    return get_growth_overview()
+
 # ============ Feature Flag API ============
 from src.services.feature_flags import load_flags, set_flag, DEFAULT_FLAGS
 
