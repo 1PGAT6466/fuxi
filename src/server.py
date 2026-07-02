@@ -295,6 +295,46 @@ async def growth_overview():
     """成长概览"""
     return get_growth_overview()
 
+# ============ 健康检查 + 系统监控 API ============
+@app.get("/api/health")
+async def health_check():
+    """健康检查"""
+    try:
+        from src.infra.health_check import get_health_checker
+        checker = get_health_checker()
+        import asyncio
+        result = asyncio.get_event_loop().run_until_complete(checker.check_all())
+        return result
+    except Exception as e:
+        return {"status": "error", "error": str(e)}
+
+@app.get("/api/system/stats")
+async def system_stats():
+    """系统统计"""
+    try:
+        from src.infra.system_monitor import get_system_monitor
+        return get_system_monitor().get_system_stats()
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/api/cache/stats")
+async def cache_stats():
+    """缓存统计"""
+    try:
+        from src.infra.cache_stats import get_cache_stats
+        return get_cache_stats().get_stats()
+    except Exception as e:
+        return {"error": str(e)}
+
+@app.get("/api/errors/stats")
+async def error_stats():
+    """错误统计"""
+    try:
+        from src.infra.error_tracker import get_error_tracker
+        return get_error_tracker().get_error_stats()
+    except Exception as e:
+        return {"error": str(e)}
+
 # ============ Feature Flag API ============
 from src.services.feature_flags import load_flags, set_flag, DEFAULT_FLAGS
 
