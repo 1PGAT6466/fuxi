@@ -109,6 +109,17 @@ class TaiyinServer(SymbolBase):
 
             duration = (time.time() - start_time) * 1000
 
+            # 记录成长数据
+            try:
+                from src.growth.growth_recorder import GrowthRecordPoints
+                recorder = GrowthRecordPoints()
+                await recorder.record_taiyin_request(
+                    trace_id=trace_id, endpoint="/api/search",
+                    method="GET", status_code=200, duration_ms=duration,
+                )
+            except Exception:
+                pass
+
             return {
                 "results": results,
                 "count": len(results),
@@ -119,6 +130,19 @@ class TaiyinServer(SymbolBase):
         except Exception as e:
             self._error_count += 1
             logger.error(f"[{trace_id}] [太阴] 搜索失败: {e}")
+
+            # 记录错误
+            try:
+                from src.growth.growth_recorder import GrowthRecordPoints
+                recorder = GrowthRecordPoints()
+                duration = (time.time() - start_time) * 1000
+                await recorder.record_taiyin_request(
+                    trace_id=trace_id or "", endpoint="/api/search",
+                    method="GET", status_code=500, duration_ms=duration,
+                )
+            except Exception:
+                pass
+
             return {"results": [], "count": 0, "error": str(e), "trace_id": trace_id}
 
     async def handle_ingest(self, file_path: str, source: str = "upload", trace_id: str = None) -> Dict:
