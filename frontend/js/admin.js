@@ -180,8 +180,32 @@ async function loadGrowth(){
       return '<div class="stat"><div class="stat-icon" style="background:#fff4ed">' + (SYMBOLS[s.id]||{}).emoji + '</div><div><div class="stat-value">' + (s.metrics.success_rate != null ? Math.round(s.metrics.success_rate * 100) + '%' : '—') + '</div><div class="stat-label">' + s.name + '</div></div></div>';
     }).join('');
 
-    // 趋势占位
-    trends.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:32px;margin-bottom:8px">📈</div><p>成长趋势数据将在系统运行后自动积累</p></div>';
+    // 趋势图（使用Chart.js）
+    if (overview.trend && overview.trend.length > 0) {
+      trends.innerHTML = '<canvas id="growthChart" height="200"></canvas>';
+      var ctx = document.getElementById('growthChart');
+      if (ctx && typeof Chart !== 'undefined') {
+        new Chart(ctx, {
+          type: 'line',
+          data: {
+            labels: overview.trend.map(function(t) { return t.date; }),
+            datasets: [{
+              label: '查询次数',
+              data: overview.trend.map(function(t) { return t.query_count; }),
+              borderColor: '#FF6700',
+              tension: 0.4
+            }]
+          },
+          options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true } }
+          }
+        });
+      }
+    } else {
+      trends.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:32px;margin-bottom:8px">📈</div><p>成长趋势数据将在系统运行后自动积累</p></div>';
+    }
 
   } catch(e) { _adminError('growthStats', e.message); }
 }

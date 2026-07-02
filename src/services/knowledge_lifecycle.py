@@ -1,84 +1,135 @@
 """
-knowledge_lifecycle.py — Phase 8.7: 知识生命周期管理
-知识入库 → 活跃 → 衰退 → 反刍/淘汰
+knowledge_lifecycle.py — 知识生命周期管理
+实体未找到/同义词未关联/图谱缺失关系
 """
-import json, os, time, logging
-from typing import List, Dict
-from datetime import datetime, timedelta
+import json
+import logging
+import time
+from typing import Dict, List, Optional
+from pathlib import Path
 
-logger = logging.getLogger("knowledge_lifecycle")
-LIFECYCLE_FILE = os.path.join(os.path.dirname(__file__), "../../data/knowledge_lifecycle.json")
+logger = logging.getLogger("services.knowledge_lifecycle")
 
-STAGES = ["incubating", "active", "stable", "declining", "archived", "reborn"]
+LIFECYCLE_DIR = Path("data/knowledge_lifecycle")
 
-def load_lifecycle() -> dict:
-    if os.path.exists(LIFECYCLE_FILE):
-        with open(LIFECYCLE_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
-    return {"entries": []}
 
-def save_lifecycle(data: dict):
-    os.makedirs(os.path.dirname(LIFECYCLE_FILE), exist_ok=True)
-    with open(LIFECYCLE_FILE, 'w', encoding='utf-8') as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+class KnowledgeLifecycle:
+    """知识生命周期管理"""
 
-def register_knowledge(entity_id: str, source: str, confidence: float = 0.5) -> Dict:
-    """注册新知识"""
-    lc = load_lifecycle()
-    entry = {
-        "entity_id": entity_id,
-        "source": source,
-        "confidence": confidence,
-        "stage": "incubating",
-        "created_at": datetime.now().isoformat(),
-        "last_accessed": datetime.now().isoformat(),
-        "access_count": 0,
-        "utility_score": 0.5,
+    TRIGGER_CONDITIONS = {
+        "entity_not_found": {"threshold": 10, "period_days": 7},
+        "synonym_variant": {"threshold": 5, "period_days": 7},
+        "missing_relation": {"threshold": 3, "period_days": 7},
+        "empty_result": {"threshold": 20, "period_days": 7},
+        "user_doubt": {"threshold": 5, "period_days": 7},
     }
-    lc["entries"].append(entry)
-    save_lifecycle(lc)
-    logger.info(f"[Lifecycle] 新知识入库: {entity_id}")
-    return entry
 
-def access_knowledge(entity_id: str) -> Dict:
-    """记录知识被访问"""
-    lc = load_lifecycle()
-    for e in lc["entries"]:
-        if e["entity_id"] == entity_id:
-            e["access_count"] += 1
-            e["last_accessed"] = datetime.now().isoformat()
-            # 活跃度提升
-            if e["stage"] == "incubating" and e["access_count"] >= 3:
-                e["stage"] = "active"
-            elif e["stage"] == "declining":
-                e["stage"] = "reborn"
-            save_lifecycle(lc)
-            return e
-    return register_knowledge(entity_id, "auto", 0.3)
+    CONFIDENCE_LEVELS = {
+        "high": {"min": 0.9, "action": "auto_add"},
+        "medium": {"min": 0.7, "action": "pending_queue"},
+        "low": {"min": 0.0, "action": "ignore"},
+    }
 
-def decay_check() -> List[Dict]:
-    """检查衰退知识（30 天未访问）"""
-    lc = load_lifecycle()
-    threshold = datetime.now() - timedelta(days=30)
-    decaying = []
-    
-    for e in lc["entries"]:
-        if e["stage"] in ("active", "stable"):
-            last = datetime.fromisoformat(e["last_accessed"])
-            if last < threshold:
-                e["stage"] = "declining"
-                decaying.append(e)
-                logger.info(f"[Lifecycle] 知识衰退: {e['entity_id']}")
-    
-    if decaying:
-        save_lifecycle(lc)
-    return decaying
+    def __init__(self):
+        LIFECYCLE_DIR.mkdir(parents=True, exist_ok=True)
+        self._events: List[Dict] = []
 
-def get_lifecycle_stats() -> Dict:
-    """生命周期统计"""
-    lc = load_lifecycle()
-    stats = {s: 0 for s in STAGES}
-    for e in lc["entries"]:
-        stats[e["stage"]] = stats.get(e["stage"], 0) + 1
-    stats["total"] = len(lc["entries"])
-    return stats
+    async def record_event(self, event_type: str, data: Dict):
+        """记录知识生命周期事件"""
+        event = {
+            "timestamp": time.time(),
+            "event_type": event_type,
+            "data": data,
+        }
+
+        self._events.append(event)
+
+        # 写入日志
+        try:
+            log_file = LIFECYCLE_DIR / f"{event_type}.jsonl"
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(event, ensure_ascii=False) + "\n")
+        except Exception as e:
+            logger.warning(f"[Lifecycle] 写入失败: {e}")
+
+    async def check_triggers(self) -> List[Dict]:
+        """检查触发条件"""
+        triggers = []
+
+        for event_type, config in self.TRIGGER_CONDITIONS.items():
+            count = await self._count_events(event_type, config["period_days"])
+            if count >= config["threshold"]:
+                triggers.append({
+                    "event_type": event_type,
+                    "count": count,
+                    "threshold": config["threshold"],
+                    "period_days": config["period_days"],
+                })
+
+        return triggers
+
+    async def get_candidates(self, event_type: str) -> List[Dict]:
+        """获取候选知识"""
+        log_file = LIFECYCLE_DIR / f"{event_type}.jsonl"
+
+        if not log_file.exists():
+            return []
+
+        candidates = []
+        try:
+            with open(log_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        event = json.loads(line.strip())
+                        candidates.append(event.get("data", {}))
+                    except:
+                        pass
+        except Exception:
+            pass
+
+        return candidates
+
+    async def _count_events(self, event_type: str, period_days: int) -> int:
+        """统计事件数量"""
+        log_file = LIFECYCLE_DIR / f"{event_type}.jsonl"
+
+        if not log_file.exists():
+            return 0
+
+        count = 0
+        cutoff = time.time() - period_days * 86400
+
+        try:
+            with open(log_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        event = json.loads(line.strip())
+                        if event.get("timestamp", 0) > cutoff:
+                            count += 1
+                    except:
+                        pass
+        except Exception:
+            pass
+
+        return count
+
+    def classify_confidence(self, confidence: float) -> str:
+        """分类置信度"""
+        if confidence >= self.CONFIDENCE_LEVELS["high"]["min"]:
+            return "high"
+        elif confidence >= self.CONFIDENCE_LEVELS["medium"]["min"]:
+            return "medium"
+        else:
+            return "low"
+
+
+# 全局实例
+_lifecycle: Optional[KnowledgeLifecycle] = None
+
+
+def get_knowledge_lifecycle() -> KnowledgeLifecycle:
+    """获取全局知识生命周期实例"""
+    global _lifecycle
+    if _lifecycle is None:
+        _lifecycle = KnowledgeLifecycle()
+    return _lifecycle

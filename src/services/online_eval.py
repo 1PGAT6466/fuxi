@@ -1,66 +1,151 @@
 """
-online_eval.py — 在线评估 (v1.43)
-从用户行为自动构建评测信号，写入审计日志
+online_eval.py — 在线评测
+实时监控检索质量
 """
-import time, logging
-from typing import Dict, Optional
-from src.services.audit import log_audit
+import json
+import logging
+import time
+from typing import Dict, List, Optional
+from pathlib import Path
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("services.online_eval")
 
-
-def record_search_quality(query: str, result_count: int, duration_ms: int, user_feedback: str = ""):
-    """记录搜索质量信号"""
-    quality = "good" if result_count > 0 else "empty"
-    if duration_ms > 10000:
-        quality = "slow"
-    
-    log_audit(
-        action="search_quality",
-        query=query,
-        result_summary=f"results={result_count}, duration={duration_ms}ms",
-        duration_ms=duration_ms,
-        status=quality,
-        metadata={"result_count": result_count, "user_feedback": user_feedback},
-    )
+ONLINE_EVAL_DIR = Path("data/online_eval")
 
 
-def record_answer_quality(query: str, answer: str, judge_score: int, fact_check_score: float):
-    """记录答案质量信号"""
-    quality = "good" if judge_score >= 3 else "poor"
-    
-    log_audit(
-        action="answer_quality",
-        query=query,
-        result_summary=f"judge={judge_score}, fact_check={fact_check_score}",
-        status=quality,
-        metadata={"judge_score": judge_score, "fact_check_score": fact_check_score},
-    )
+class OnlineEvaluator:
+    """在线评测器"""
+
+    def __init__(self):
+        ONLINE_EVAL_DIR.mkdir(parents=True, exist_ok=True)
+        self._metrics_buffer: List[Dict] = []
+        self._flush_interval = 100  # 每100条刷新一次
+
+    async def record_search_metric(self, query: str, results: List[Dict],
+                                     latency_ms: float, trace_id: str = ""):
+        """记录检索指标"""
+        metric = {
+            "timestamp": time.time(),
+            "type": "search",
+            "query": query[:100],
+            "result_count": len(results),
+            "max_score": max([r.get("score", 0) for r in results], default=0),
+            "avg_score": sum([r.get("score", 0) for r in results]) / max(len(results), 1),
+            "latency_ms": latency_ms,
+            "trace_id": trace_id,
+        }
+
+        self._metrics_buffer.append(metric)
+
+        if len(self._metrics_buffer) >= self._flush_interval:
+            await self._flush_metrics()
+
+    async def record_feedback(self, query: str, result_id: str,
+                                feedback: str, rating: int = 0):
+        """记录用户反馈"""
+        metric = {
+            "timestamp": time.time(),
+            "type": "feedback",
+            "query": query[:100],
+            "result_id": result_id,
+            "feedback": feedback,
+            "rating": rating,
+        }
+
+        self._metrics_buffer.append(metric)
+
+        if len(self._metrics_buffer) >= self._flush_interval:
+            await self._flush_metrics()
+
+    async def _flush_metrics(self):
+        """刷新指标到文件"""
+        if not self._metrics_buffer:
+            return
+
+        try:
+            metrics_file = ONLINE_EVAL_DIR / "metrics.jsonl"
+            with open(metrics_file, "a", encoding="utf-8") as f:
+                for metric in self._metrics_buffer:
+                    f.write(json.dumps(metric, ensure_ascii=False) + "\n")
+
+            self._metrics_buffer.clear()
+        except Exception as e:
+            logger.warning(f"[OnlineEval] 刷新指标失败: {e}")
+
+    async def get_stats(self, hours: int = 24) -> Dict:
+        """获取统计信息"""
+        metrics_file = ONLINE_EVAL_DIR / "metrics.jsonl"
+
+        if not metrics_file.exists():
+            return {"total_queries": 0, "avg_latency_ms": 0}
+
+        metrics = []
+        cutoff = time.time() - hours * 3600
+
+        try:
+            with open(metrics_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        metric = json.loads(line.strip())
+                        if metric.get("timestamp", 0) > cutoff:
+                            metrics.append(metric)
+                    except:
+                        pass
+        except Exception:
+            pass
+
+        if not metrics:
+            return {"total_queries": 0, "avg_latency_ms": 0}
+
+        search_metrics = [m for m in metrics if m.get("type") == "search"]
+        feedback_metrics = [m for m in metrics if m.get("type") == "feedback"]
+
+        stats = {
+            "total_queries": len(search_metrics),
+            "avg_latency_ms": sum([m.get("latency_ms", 0) for m in search_metrics]) / max(len(search_metrics), 1),
+            "avg_result_count": sum([m.get("result_count", 0) for m in search_metrics]) / max(len(search_metrics), 1),
+            "avg_max_score": sum([m.get("max_score", 0) for m in search_metrics]) / max(len(search_metrics), 1),
+            "feedback_count": len(feedback_metrics),
+            "avg_rating": sum([m.get("rating", 0) for m in feedback_metrics]) / max(len(feedback_metrics), 1),
+        }
+
+        return stats
+
+    async def get_slow_queries(self, threshold_ms: float = 3000,
+                                 limit: int = 10) -> List[Dict]:
+        """获取慢查询"""
+        metrics_file = ONLINE_EVAL_DIR / "metrics.jsonl"
+
+        if not metrics_file.exists():
+            return []
+
+        slow_queries = []
+        try:
+            with open(metrics_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        metric = json.loads(line.strip())
+                        if (metric.get("type") == "search" and
+                            metric.get("latency_ms", 0) > threshold_ms):
+                            slow_queries.append(metric)
+                    except:
+                        pass
+        except Exception:
+            pass
+
+        # 按延迟排序
+        slow_queries.sort(key=lambda x: x.get("latency_ms", 0), reverse=True)
+
+        return slow_queries[:limit]
 
 
-def record_feedback(user_id: str, query: str, action: str, answer_preview: str = ""):
-    """记录用户反馈"""
-    log_audit(
-        action=f"feedback_{action}",
-        query=query,
-        user_id=user_id,
-        result_summary=answer_preview[:200],
-        status="feedback",
-    )
+# 全局实例
+_online_eval: Optional[OnlineEvaluator] = None
 
 
-def get_quality_trend(hours: int = 24) -> Dict:
-    """获取质量趋势"""
-    from src.services.audit import get_audit_stats
-    stats = get_audit_stats(hours)
-    
-    search_stats = stats.get("search_quality", {"count": 0, "avg_ms": 0})
-    answer_stats = stats.get("answer_quality", {"count": 0})
-    feedback_stats = {k: v for k, v in stats.items() if k.startswith("feedback_")}
-    
-    return {
-        "search": search_stats,
-        "answer": answer_stats,
-        "feedback": feedback_stats,
-        "total_queries": sum(v.get("count", 0) for v in stats.values()),
-    }
+def get_online_evaluator() -> OnlineEvaluator:
+    """获取全局在线评测器实例"""
+    global _online_eval
+    if _online_eval is None:
+        _online_eval = OnlineEvaluator()
+    return _online_eval
