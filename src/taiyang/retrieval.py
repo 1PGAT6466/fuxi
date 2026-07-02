@@ -99,6 +99,13 @@ class TaiyangRetrieval(SymbolBase):
             except Exception:
                 pass
 
+            # 记录缓存统计
+            try:
+                from src.infra.cache_stats import get_cache_stats
+                get_cache_stats().record_miss(duration)
+            except Exception:
+                pass
+
             # 记录成长数据
             try:
                 from src.growth.growth_recorder import GrowthRecordPoints
