@@ -32,7 +32,7 @@ class ShaoyinBrain(SymbolBase):
         """延迟加载Self-RAG"""
         if self._self_rag is None:
             try:
-                from src.shaoyin.self_rag import SmartSelfRAG
+                from src.shaoyin.smart_self_rag import SmartSelfRAG
                 self._self_rag = SmartSelfRAG()
             except Exception:
                 pass
@@ -42,8 +42,8 @@ class ShaoyinBrain(SymbolBase):
         """延迟加载CRAG"""
         if self._crag is None:
             try:
-                from src.shaoyin.crag import CorrectiveRAG
-                self._crag = CorrectiveRAG()
+                from src.shaoyin.crag_corrector import CRAGCorrector
+                self._crag = CRAGCorrector()
             except Exception:
                 pass
         return self._crag
@@ -87,11 +87,13 @@ class ShaoyinBrain(SymbolBase):
             if not reflection_pass:
                 crag = self._get_crag()
                 if crag:
-                    crag_result = await crag.evaluate_and_correct(query, results)
-                    crag_status = crag_result.status
-                    if crag_result.new_results:
-                        results = crag_result.new_results
-                        logger.info(f"[{trace_id}] [少阴] CRAG纠正: {crag_result.reason}")
+                    new_results = await crag.correct_and_retry(query, results)
+                    if new_results and len(new_results) > 0:
+                        results = new_results
+                        crag_status = "NEED_REWRITE"
+                        logger.info(f"[{trace_id}] [少阴] CRAG纠正完成: {len(new_results)} results")
+                    else:
+                        crag_status = "OFF_TOPIC"
 
             # Step 6: 合成
             answer = await self._compose(query, results, history)

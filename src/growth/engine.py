@@ -1,12 +1,13 @@
 """
 engine.py — 成长引擎
 运行在四象之上的元层，监控四象的"进步"
+三阶段：Phase 1只记录不调整 → Phase 2参数自动调整 → Phase 3策略和知识成长
 """
 import json
 import logging
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, field
 
 logger = logging.getLogger("growth.engine")
@@ -32,7 +33,9 @@ class AdjustmentRecord:
     new_value: float
     reason: str
     rollback_value: float
+    rollback_condition: str = ""
     next_adjust_allowed_at: float = 0
+    timestamp: float = field(default_factory=time.time)
 
 
 class GrowthEngine:
@@ -42,29 +45,71 @@ class GrowthEngine:
         GROWTH_DIR.mkdir(parents=True, exist_ok=True)
         self._events: Dict[str, list] = {}
         self._baselines: Dict[str, float] = {}
-        self._adjustments: list = []
+        self._adjustments: List[AdjustmentRecord] = []
 
     async def record_event(self, symbol: str, metric: str, value: float, context: Dict = None):
         """记录成长事件"""
-        event = GrowthEvent(
-            symbol=symbol,
-            metric=metric,
-            value=value,
-            context=context or {},
-        )
+        context = context or {}
 
         # 写入日志文件
         log_file = GROWTH_DIR / f"{symbol}_quality.jsonl"
-        with open(log_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps({
-                "symbol": symbol,
-                "metric": metric,
-                "value": value,
-                "context": context or {},
-                "timestamp": time.time(),
-            }, ensure_ascii=False) + "\n")
+        record = {
+            "symbol": symbol,
+            "metric": metric,
+            "value": value,
+            "context": context,
+            "timestamp": time.time(),
+        }
 
-        logger.info(f"[Growth] {symbol}.{metric} = {value}")
+        try:
+            with open(log_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+        except Exception as e:
+            logger.warning(f"[Growth] 写入失败: {e}")
+
+        # 内存缓存
+        if symbol not in self._events:
+            self._events[symbol] = []
+        self._events[symbol].append(record)
+
+        logger.debug(f"[Growth] {symbol}.{metric} = {value}")
+
+    async def record_search(self, query: str, results_count: int, duration_ms: float,
+                           confidence: float = 0, trace_id: str = ""):
+        """记录搜索事件"""
+        await self.record_event("taiyang", "search_result_count", results_count, {
+            "query": query[:100],
+            "duration_ms": duration_ms,
+            "confidence": confidence,
+            "trace_id": trace_id,
+        })
+
+    async def record_decision(self, query: str, confidence: float, duration_ms: float,
+                            strategy: str = "", trace_id: str = ""):
+        """记录决策事件"""
+        await self.record_event("shaoyin", "decision_confidence", confidence, {
+            "query": query[:100],
+            "duration_ms": duration_ms,
+            "strategy": strategy,
+            "trace_id": trace_id,
+        })
+
+    async def record_extraction(self, file_name: str, chunks: int, events: int,
+                              entities: int, duration_ms: float):
+        """记录提取事件"""
+        await self.record_event("shaoyang", "extraction_chunks", chunks, {
+            "file_name": file_name,
+            "events": events,
+            "entities": entities,
+            "duration_ms": duration_ms,
+        })
+
+    async def record_request(self, endpoint: str, status_code: int, duration_ms: float):
+        """记录请求事件"""
+        await self.record_event("taiyin", "request_duration", duration_ms, {
+            "endpoint": endpoint,
+            "status_code": status_code,
+        })
 
     async def evaluate(self, symbol: str) -> Dict:
         """评估成长状态"""
@@ -73,32 +118,49 @@ class GrowthEngine:
             return {"symbol": symbol, "metrics": {}, "has_improvement": False}
 
         events = []
-        with open(log_file, "r", encoding="utf-8") as f:
-            for line in f:
-                try:
-                    events.append(json.loads(line.strip()))
-                except:
-                    pass
+        try:
+            with open(log_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        events.append(json.loads(line.strip()))
+                    except:
+                        pass
+        except Exception:
+            pass
 
-        # 计算各指标的平均值
+        # 计算各指标的统计
         metrics = {}
         for event in events:
             metric = event.get("metric", "")
             value = event.get("value", 0)
             if metric not in metrics:
-                metrics[metric] = []
-            metrics[metric].append(value)
+                metrics[metric] = {"values": [], "count": 0}
+            metrics[metric]["values"].append(value)
+            metrics[metric]["count"] += 1
 
         avg_metrics = {}
-        for metric, values in metrics.items():
-            avg_metrics[metric] = sum(values) / len(values) if values else 0
+        for metric, data in metrics.items():
+            values = data["values"]
+            avg_metrics[metric] = {
+                "avg": sum(values) / len(values) if values else 0,
+                "min": min(values) if values else 0,
+                "max": max(values) if values else 0,
+                "count": data["count"],
+            }
 
         return {
             "symbol": symbol,
             "metrics": avg_metrics,
             "event_count": len(events),
-            "has_improvement": False,  # 需要基线对比
+            "has_improvement": False,  # Phase 2实现基线对比
         }
+
+    async def evaluate_all(self) -> Dict:
+        """评估所有象的成长状态"""
+        results = {}
+        for symbol in ["shaoyang", "taiyang", "shaoyin", "taiyin"]:
+            results[symbol] = await self.evaluate(symbol)
+        return results
 
     def get_stats(self) -> Dict:
         """获取成长统计"""
@@ -112,3 +174,12 @@ class GrowthEngine:
             except:
                 stats[symbol] = {"events": 0}
         return stats
+
+    def get_overview(self) -> Dict:
+        """获取成长概览"""
+        stats = self.get_stats()
+        return {
+            "symbols": stats,
+            "total_events": sum(s.get("events", 0) for s in stats.values()),
+            "phase": "Phase 1 (只记录，不调整)",
+        }
