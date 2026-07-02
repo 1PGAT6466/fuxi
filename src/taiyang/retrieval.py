@@ -26,18 +26,38 @@ class TaiyangRetrieval(SymbolBase):
         self._search_count = 0
         self._cache_hits = 0
 
-    async def refine(self, query: str, strategy: str = "auto", top_k: int = 15) -> List[Dict]:
+    async def refine(self, query: str, strategy: str = "auto", top_k: int = 15, trace_id: str = None) -> List[Dict]:
         """精炼检索入口"""
         self._set_status("processing")
         start_time = time.time()
 
+        if not trace_id:
+            from src.infra.logging import get_trace_id
+            trace_id = get_trace_id()
+
         try:
+            logger.info(f"[{trace_id}] [太阳] 开始检索: {query[:30]}..., strategy={strategy}")
+
             # L1: 查询扩展
             expanded_q = self._expand_query(query)
 
             # L2: 多路召回
             bm25_results = await self._bm25_recall(expanded_q, top_k)
+            logger.info(f"[{trace_id}] [太阳] BM25召回: {len(bm25_results)} results")
+
             vector_results = await self._vector_recall(expanded_q, top_k)
+            logger.info(f"[{trace_id}] [太阳] 向量召回: {len(vector_results)} results")
+
+            # L2.5: 多跳检索（如果启用）
+            multi_hop_results = []
+            try:
+                from src.taiyin.flags import is_enabled
+                if is_enabled("taiyang_multi_hop"):
+                    from src.taiyang.multi_hop import multi_hop_search
+                    multi_hop_results = await multi_hop_search(query, top_k=top_k)
+                    logger.info(f"[{trace_id}] [太阳] 多跳检索: {len(multi_hop_results)} results")
+            except Exception as e:
+                logger.debug(f"[{trace_id}] [太阳] 多跳检索跳过: {e}")
 
             # L3: 融合
             fused = self._fuse(bm25_results, vector_results)
@@ -48,16 +68,20 @@ class TaiyangRetrieval(SymbolBase):
             # L5: 扩展
             expanded = self._expand_context(reranked)
 
-            # L6: 缓存
+            # L6: 合并多跳结果
+            if multi_hop_results:
+                from src.taiyang.results_postprocess import merge_search_results
+                expanded = merge_search_results(expanded, [], multi_hop_results)
+
             self._search_count += 1
             duration = (time.time() - start_time) * 1000
 
-            logger.info(f"[太阳] 检索完成: {query[:30]}... → {len(expanded)} results, {duration:.0f}ms")
+            logger.info(f"[{trace_id}] [太阳] 检索完成: {query[:30]}... → {len(expanded)} results, {duration:.0f}ms")
 
             return expanded
 
         except Exception as e:
-            logger.error(f"[太阳] 检索失败: {e}")
+            logger.error(f"[{trace_id}] [太阳] 检索失败: {e}")
             return []
         finally:
             self._set_status("idle")

@@ -1,6 +1,6 @@
 """
 brain.py — 少阴·炼化 决策合成中枢
-合并大脑(决策)+心(路由)的能力
+合并大脑(决策)+心(路由)+Self-RAG+CRAG
 """
 import asyncio
 import logging
@@ -25,36 +25,88 @@ class ShaoyinBrain(SymbolBase):
         )
         self._thought_count = 0
         self._retry_count = 0
+        self._self_rag = None
+        self._crag = None
 
-    async def think(self, query: str, history: List[Dict] = None) -> Dict:
+    def _get_self_rag(self):
+        """延迟加载Self-RAG"""
+        if self._self_rag is None:
+            try:
+                from src.shaoyin.self_rag import SmartSelfRAG
+                self._self_rag = SmartSelfRAG()
+            except Exception:
+                pass
+        return self._self_rag
+
+    def _get_crag(self):
+        """延迟加载CRAG"""
+        if self._crag is None:
+            try:
+                from src.shaoyin.crag import CorrectiveRAG
+                self._crag = CorrectiveRAG()
+            except Exception:
+                pass
+        return self._crag
+
+    async def think(self, query: str, history: List[Dict] = None, trace_id: str = None) -> Dict:
         """决策合成入口"""
         self._set_status("processing")
         start_time = time.time()
 
+        if not trace_id:
+            from src.infra.logging import get_trace_id
+            trace_id = get_trace_id()
+
         try:
             # Step 1: 意图识别
             intent = self._classify_intent(query)
+            logger.info(f"[{trace_id}] [少阴] 意图识别: {intent.get('intent', 'unknown')}")
 
             # Step 2: 策略选择
             strategy = self._select_strategy(intent)
+            logger.info(f"[{trace_id}] [少阴] 策略选择: {strategy}")
 
             # Step 3: 检索（调用太阳）
             results = await self._retrieve(query, strategy)
 
-            # Step 4: 合成
+            # Step 4: Self-RAG反思（条件触发）
+            self_rag = self._get_self_rag()
+            reflection_pass = True
+            if self_rag:
+                max_score = max((r.get("score", 0) for r in results), default=0)
+                reflection = await self_rag.reflect_if_needed(query, results, {
+                    "max_score": max_score,
+                    "query_type": intent.get("intent", "general"),
+                })
+                reflection_pass = reflection.action == "pass"
+                if not reflection_pass:
+                    logger.info(f"[{trace_id}] [少阴] Self-RAG未通过: {reflection.reason}")
+
+            # Step 5: CRAG纠正（如果Self-RAG未通过）
+            crag_status = "GOOD"
+            if not reflection_pass:
+                crag = self._get_crag()
+                if crag:
+                    crag_result = await crag.evaluate_and_correct(query, results)
+                    crag_status = crag_result.status
+                    if crag_result.new_results:
+                        results = crag_result.new_results
+                        logger.info(f"[{trace_id}] [少阴] CRAG纠正: {crag_result.reason}")
+
+            # Step 6: 合成
             answer = await self._compose(query, results, history)
 
-            # Step 5: 校验
+            # Step 7: 校验
             confidence = self._validate(answer, results)
 
-            # Step 6: 纠错
+            # Step 8: 纠错
             if confidence < 0.5:
                 answer = await self._retry(query, results, history, confidence)
 
             duration = (time.time() - start_time) * 1000
             self._thought_count += 1
 
-            logger.info(f"[少阴] 决策完成: {query[:30]}... → confidence={confidence:.2f}, {duration:.0f}ms")
+            logger.info(f"[{trace_id}] [少阴] 决策完成: {query[:30]}... → confidence={confidence:.2f}, {duration:.0f}ms")
 
             return {
                 "answer": answer,
@@ -63,11 +115,14 @@ class ShaoyinBrain(SymbolBase):
                 "strategy": strategy,
                 "sources": self._extract_sources(results),
                 "duration_ms": duration,
+                "trace_id": trace_id,
+                "reflection_pass": reflection_pass,
+                "crag_status": crag_status,
             }
 
         except Exception as e:
-            logger.error(f"[少阴] 决策失败: {e}")
-            return {"answer": "抱歉，处理您的问题时出现错误。", "confidence": 0, "error": str(e)}
+            logger.error(f"[{trace_id}] [少阴] 决策失败: {e}")
+            return {"answer": "抱歉，处理您的问题时出现错误。", "confidence": 0, "error": str(e), "trace_id": trace_id}
         finally:
             self._set_status("idle")
 
