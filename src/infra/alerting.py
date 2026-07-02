@@ -29,13 +29,17 @@ class AlertManager:
         "critical": {
             "taiyin_error_rate": 0.05,
             "taiyang_latency_p99": 2000,
+            "shaoyin_retry_rate": 0.3,
         },
         "warning": {
             "taiyang_latency_p95": 1000,
             "shaoyin_confidence_avg": 0.3,
+            "shaoyang_extraction_failure_rate": 0.2,
+            "taiyang_cache_hit_rate": 0.1,
         },
         "info": {
             "taiyang_cache_hit_rate": 0.2,
+            "shaoyin_confidence_avg": 0.5,
         },
     }
 
