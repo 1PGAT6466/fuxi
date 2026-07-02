@@ -41,10 +41,19 @@ class DegradationChain:
         },
         "L4_AGENT": {
             "conditions": [
-                {"metric": "agent_loops", "operator": ">", "value": 3, "target": "RETURN_EMPTY"},
-                {"metric": "total_tokens", "operator": ">", "value": 4000, "target": "RETURN_EMPTY"},
+                {"metric": "agent_loops", "operator": ">", "value": 3, "target": "L5_CRAG"},
+                {"metric": "total_tokens", "operator": ">", "value": 4000, "target": "L5_CRAG"},
+                {"metric": "agent_confidence", "operator": "<", "value": 0.3, "target": "L5_CRAG"},
+                {"metric": "agent_timeout", "operator": "==", "value": True, "target": "L5_CRAG"},
             ],
             "timeout_ms": 10000,
+        },
+        "L5_CRAG": {
+            "conditions": [
+                {"metric": "crag_success", "operator": "==", "value": False, "target": "RETURN_EMPTY"},
+                {"metric": "confidence", "operator": "<", "value": 0.2, "target": "RETURN_EMPTY"},
+            ],
+            "timeout_ms": 5000,
         },
     }
     
@@ -119,6 +128,8 @@ class DegradationChain:
             return await self._execute_l3(query, trace_id)
         elif level == "L4_AGENT":
             return await self._execute_l4(query, trace_id)
+        elif level == "L5_CRAG":
+            return await self._execute_l5(query, trace_id)
         else:
             raise ValueError(f"Unknown level: {level}")
     
@@ -213,6 +224,26 @@ class DegradationChain:
             "level": "L4_AGENT",
         }
     
+    async def _execute_l5(self, query: str, trace_id: str) -> Dict:
+        """L5 CRAG 模式：纠正检索"""
+        logger.info(f"[降级链] trace_id={trace_id}, 触发 L5 CRAG 模式")
+        
+        from src.taiyang.l5_crag import L5CRAGExecutor
+        
+        executor = L5CRAGExecutor()
+        # 获取之前的结果作为部分结果
+        partial_results = []
+        result = await executor.execute(query, partial_results, trace_id)
+        
+        return {
+            "results": result.get("results", []),
+            "result_count": len(result.get("results", [])),
+            "max_score": max([r.get("score", 0) for r in result.get("results", [])], default=0),
+            "crag_success": result.get("mode") == "l5_crag",
+            "confidence": max([r.get("score", 0) for r in result.get("results", [])], default=0),
+            "level": "L5_CRAG",
+        }
+    
     def _check_degradation(self, level: str, result: Dict) -> Optional[Dict]:
         """检查是否需要降级"""
         config = self.DEGRADATION_CONFIG.get(level)
@@ -248,7 +279,7 @@ class DegradationChain:
     
     def _get_next_level(self, current_level: str) -> str:
         """获取下一层级"""
-        level_order = ["L1_FAST", "L2_STANDARD", "L3_DEEP", "L4_AGENT", "RETURN_EMPTY"]
+        level_order = ["L1_FAST", "L2_STANDARD", "L3_DEEP", "L4_AGENT", "L5_CRAG", "RETURN_EMPTY"]
         try:
             current_index = level_order.index(current_level)
             return level_order[min(current_index + 1, len(level_order) - 1)]
