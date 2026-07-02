@@ -49,6 +49,17 @@ class TaiyinServer(SymbolBase):
             result["trace_id"] = trace_id
             result["duration_ms"] = duration
 
+            # 记录成长数据
+            try:
+                from src.growth.growth_recorder import GrowthRecordPoints
+                recorder = GrowthRecordPoints()
+                await recorder.record_taiyin_request(
+                    trace_id=trace_id, endpoint="/api/chat",
+                    method="POST", status_code=200, duration_ms=duration,
+                )
+            except Exception:
+                pass
+
             logger.info(f"[{trace_id}] [太阴] 查询完成: {duration:.0f}ms, confidence={result.get('confidence', 0):.2f}")
 
             return result
@@ -56,6 +67,19 @@ class TaiyinServer(SymbolBase):
         except Exception as e:
             self._error_count += 1
             logger.error(f"[{trace_id}] [太阴] 查询失败: {e}")
+
+            # 记录错误
+            try:
+                from src.growth.growth_recorder import GrowthRecordPoints
+                recorder = GrowthRecordPoints()
+                duration = (time.time() - start_time) * 1000
+                await recorder.record_taiyin_request(
+                    trace_id=trace_id or "", endpoint="/api/chat",
+                    method="POST", status_code=500, duration_ms=duration,
+                )
+            except Exception:
+                pass
+
             return {
                 "answer": "抱歉，处理您的问题时出现错误。",
                 "confidence": 0,

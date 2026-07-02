@@ -164,44 +164,64 @@ async function loadGrowth(){
     var overview = {};
     try { overview = await api('/api/growth/overview'); } catch(e) {}
 
-    // 四象成长指标
-    var symbols = [
-      { id: 'shaoyang', name: '少阳·提取', metrics: overview.shaoyang || {} },
-      { id: 'taiyang', name: '太阳·检索', metrics: overview.taiyang || {} },
-      { id: 'shaoyin', name: '少阴·决策', metrics: overview.shaoyin || {} },
-      { id: 'taiyin', name: '太阴·体验', metrics: overview.taiyin || {} }
+    // 四象成长指标卡片
+    var symbolConfigs = [
+      { id: 'shaoyang', name: '少阳·提取', color: '#4caf50', metrics: ['extraction_success_rate', 'entity_coverage', 'extraction_latency_p95'] },
+      { id: 'taiyang', name: '太阳·检索', color: '#ff9800', metrics: ['recall_at_10', 'cache_hit_rate', 'search_latency_p95'] },
+      { id: 'shaoyin', name: '少阴·决策', color: '#9c27b0', metrics: ['confidence_avg', 'retry_rate', 'hallucination_rate'] },
+      { id: 'taiyin', name: '太阴·体验', color: '#2196f3', metrics: ['request_count', 'error_rate', 'p95_latency'] }
     ];
 
-    stats.innerHTML = symbols.map(function(s) {
-      var metricHtml = Object.entries(s.metrics).slice(0, 3).map(function([k, v]) {
-        var display = typeof v === 'number' ? (v < 1 ? Math.round(v * 100) + '%' : v.toFixed(1)) : String(v);
-        return '<div style="text-align:center;padding:8px;background:var(--bg);border-radius:8px"><div style="font-size:18px;font-weight:600;color:var(--pri)">' + display + '</div><div style="font-size:10px;color:var(--text3);margin-top:4px">' + esc(k) + '</div></div>';
-      }).join('');
-      return '<div class="stat"><div class="stat-icon" style="background:#fff4ed">' + (SYMBOLS[s.id]||{}).emoji + '</div><div><div class="stat-value">' + (s.metrics.success_rate != null ? Math.round(s.metrics.success_rate * 100) + '%' : '—') + '</div><div class="stat-label">' + s.name + '</div></div></div>';
-    }).join('');
+    var symbolData = overview.symbols || {};
 
-    // 趋势图（使用Chart.js）
+    stats.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">' +
+      symbolConfigs.map(function(config) {
+        var data = symbolData[config.id] || {};
+        var metrics = data.metrics || {};
+        var eventCount = data.event_count || 0;
+
+        var metricHtml = config.metrics.map(function(key) {
+          var val = metrics[key];
+          var display = val != null ? (typeof val === 'number' ? (val < 1 ? Math.round(val * 100) + '%' : val.toFixed(1)) : String(val)) : '—';
+          var label = {extraction_success_rate:'提取成功率',entity_coverage:'实体覆盖率',extraction_latency_p95:'提取延迟P95',recall_at_10:'Recall@10',cache_hit_rate:'缓存命中率',search_latency_p95:'检索延迟P95',confidence_avg:'平均置信度',retry_rate:'重试率',hallucination_rate:'幻觉拦截率',request_count:'请求次数',error_rate:'错误率',p95_latency:'P95延迟'}[key] || key;
+          return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;color:var(--text3)">' + label + '</span><span style="font-size:13px;font-weight:600;color:var(--pri)">' + display + '</span></div>';
+        }).join('');
+
+        return '<div class="card" style="padding:16px;border-top:3px solid ' + config.color + '">' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">' +
+          '<span style="font-size:24px">' + (SYMBOLS[config.id]||{}).emoji + '</span>' +
+          '<div><div style="font-size:15px;font-weight:600">' + config.name + '</div>' +
+          '<div style="font-size:11px;color:var(--text3)">事件数: ' + eventCount + '</div></div></div>' +
+          metricHtml + '</div>';
+      }).join('') + '</div>';
+
+    // 趋势图
     if (overview.trend && overview.trend.length > 0) {
-      trends.innerHTML = '<canvas id="growthChart" height="200"></canvas>';
-      var ctx = document.getElementById('growthChart');
-      if (ctx && typeof Chart !== 'undefined') {
-        new Chart(ctx, {
-          type: 'line',
-          data: {
-            labels: overview.trend.map(function(t) { return t.date; }),
-            datasets: [{
-              label: '查询次数',
-              data: overview.trend.map(function(t) { return t.query_count; }),
-              borderColor: '#FF6700',
-              tension: 0.4
-            }]
-          },
-          options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true } }
-          }
-        });
+      trends.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px"><canvas id="growthChartQuery" height="180"></canvas><canvas id="growthChartLatency" height="180"></canvas></div>';
+
+      if (typeof Chart !== 'undefined') {
+        var ctxQ = document.getElementById('growthChartQuery');
+        if (ctxQ) {
+          new Chart(ctxQ, {
+            type: 'line',
+            data: {
+              labels: overview.trend.map(function(t) { return t.date; }),
+              datasets: [{ label: '查询次数', data: overview.trend.map(function(t) { return t.query_count; }), borderColor: '#FF6700', tension: 0.4, fill: true, backgroundColor: 'rgba(255,103,0,0.1)' }]
+            },
+            options: { responsive: true, plugins: { title: { display: true, text: '查询趋势' } }, scales: { y: { beginAtZero: true } } }
+          });
+        }
+        var ctxL = document.getElementById('growthChartLatency');
+        if (ctxL) {
+          new Chart(ctxL, {
+            type: 'line',
+            data: {
+              labels: overview.trend.map(function(t) { return t.date; }),
+              datasets: [{ label: '平均延迟(ms)', data: overview.trend.map(function(t) { return t.avg_latency_ms || 0; }), borderColor: '#2196f3', tension: 0.4, fill: true, backgroundColor: 'rgba(33,150,243,0.1)' }]
+            },
+            options: { responsive: true, plugins: { title: { display: true, text: '延迟趋势' } }, scales: { y: { beginAtZero: true } } }
+          });
+        }
       }
     } else {
       trends.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:32px;margin-bottom:8px">📈</div><p>成长趋势数据将在系统运行后自动积累</p></div>';
