@@ -111,3 +111,77 @@ async function loadFeedback(){
       '</tbody></table>';
   }catch(e){_adminError('feedbackList',e.message)}
 }
+
+// ===== 四象状态 =====
+var SYMBOLS = {
+  shaoyang: { name: '少阳·消化', emoji: '🌱', color: '#4caf50', organs: ['胃', '脾', '肺', '小肠'] },
+  taiyang:  { name: '太阳·筑基', emoji: '☀️', color: '#ff9800', organs: ['肾', '肝', '鼻', '胆', '四肢', '骨骼'] },
+  shaoyin:  { name: '少阴·炼化', emoji: '🌙', color: '#9c27b0', organs: ['大脑'] },
+  taiyin:   { name: '太阴·显化', emoji: '🌑', color: '#2196f3', organs: ['皮肤', '三焦'] }
+};
+
+async function loadSymbols(){
+  var grid = document.getElementById('symbolGrid');
+  var stats = document.getElementById('symbolStats');
+  grid.innerHTML = '<div style="text-align:center;padding:40px"><div class="loading-dots">加载中<span>.</span><span>.</span><span>.</span></div></div>';
+
+  try {
+    var symbols = {};
+    try { symbols = (await api('/api/v2/status')).symbols || {}; } catch(e) {}
+
+    // 四象卡片
+    grid.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">' +
+      Object.entries(SYMBOLS).map(function([id, config]) {
+        var s = symbols[id] || {};
+        var alive = s.alive !== false;
+        var status = s.status || 'idle';
+        return '<div class="card" style="padding:20px;border-left:4px solid ' + config.color + '">' +
+          '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">' +
+          '<span style="font-size:28px">' + config.emoji + '</span>' +
+          '<div><div style="font-size:16px;font-weight:600">' + config.name + '</div>' +
+          '<div style="font-size:11px;color:var(--text3)">' + config.organs.join('·') + '</div></div></div>' +
+          '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">' +
+          '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + (alive ? '#34c759' : '#ff3b30') + '"></span>' +
+          '<span style="font-size:12px;color:var(--text3)">' + (alive ? (status === 'processing' ? '处理中' : '运行中') : '离线') + '</span></div>' +
+          '</div>';
+      }).join('') + '</div>';
+
+    // 统计卡片
+    stats.innerHTML =
+      '<div class="stat"><div class="stat-icon" style="background:#e8f5e9">🌱</div><div><div class="stat-value">' + Object.keys(SYMBOLS).length + '</div><div class="stat-label">四象模块</div></div></div>' +
+      '<div class="stat"><div class="stat-icon" style="background:#e3f2fd">🔗</div><div><div class="stat-value">' + Object.values(symbols).filter(function(s){return s.alive!==false}).length + '</div><div class="stat-label">运行中</div></div></div>';
+
+  } catch(e) { _adminError('symbolGrid', e.message); }
+}
+
+// ===== 成长面板 =====
+async function loadGrowth(){
+  var stats = document.getElementById('growthStats');
+  var trends = document.getElementById('growthTrends');
+  stats.innerHTML = '<div style="text-align:center;padding:20px"><div class="loading-dots">加载中<span>.</span><span>.</span><span>.</span></div></div>';
+
+  try {
+    var overview = {};
+    try { overview = await api('/api/growth/overview'); } catch(e) {}
+
+    // 四象成长指标
+    var symbols = [
+      { id: 'shaoyang', name: '少阳·提取', metrics: overview.shaoyang || {} },
+      { id: 'taiyang', name: '太阳·检索', metrics: overview.taiyang || {} },
+      { id: 'shaoyin', name: '少阴·决策', metrics: overview.shaoyin || {} },
+      { id: 'taiyin', name: '太阴·体验', metrics: overview.taiyin || {} }
+    ];
+
+    stats.innerHTML = symbols.map(function(s) {
+      var metricHtml = Object.entries(s.metrics).slice(0, 3).map(function([k, v]) {
+        var display = typeof v === 'number' ? (v < 1 ? Math.round(v * 100) + '%' : v.toFixed(1)) : String(v);
+        return '<div style="text-align:center;padding:8px;background:var(--bg);border-radius:8px"><div style="font-size:18px;font-weight:600;color:var(--pri)">' + display + '</div><div style="font-size:10px;color:var(--text3);margin-top:4px">' + esc(k) + '</div></div>';
+      }).join('');
+      return '<div class="stat"><div class="stat-icon" style="background:#fff4ed">' + (SYMBOLS[s.id]||{}).emoji + '</div><div><div class="stat-value">' + (s.metrics.success_rate != null ? Math.round(s.metrics.success_rate * 100) + '%' : '—') + '</div><div class="stat-label">' + s.name + '</div></div></div>';
+    }).join('');
+
+    // 趋势占位
+    trends.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:32px;margin-bottom:8px">📈</div><p>成长趋势数据将在系统运行后自动积累</p></div>';
+
+  } catch(e) { _adminError('growthStats', e.message); }
+}

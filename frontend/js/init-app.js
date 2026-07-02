@@ -6,6 +6,7 @@
 const TITLES = {
   chat: '智能对话', search: '知识搜索', graph: '知识图谱', wiki: 'Wiki 知识',
   files: '文件管理', 'admin-overview': '系统概览', 'admin-organs': '器官状态',
+  'admin-symbols': '四象状态', 'admin-growth': '成长面板',
   'admin-eval': '评测报告', 'admin-flags': 'Feature Flags', 'admin-feedback': '用户反馈'
 };
 
@@ -23,6 +24,8 @@ function switchPage(name) {
   if (name === 'files') { if (typeof loadFiles === 'function') loadFiles(); }
   if (name === 'admin-overview') loadOverview();
   if (name === 'admin-organs') loadOrgans();
+  if (name === 'admin-symbols') loadSymbols();
+  if (name === 'admin-growth') loadGrowth();
   if (name === 'admin-eval') loadEval();
   if (name === 'admin-flags') loadFlags();
   if (name === 'admin-feedback') loadFeedback();
