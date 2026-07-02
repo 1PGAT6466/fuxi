@@ -103,6 +103,9 @@ class SAGExtractor:
             # 6. 实体去重归一化
             result = self._deduplicate_entities(result)
 
+            # 7. 写入数据库表
+            await self._save_to_db(result, chunk_meta)
+
             self._extract_count += 1
             if result.events or result.entities:
                 self._success_count += 1
@@ -112,6 +115,39 @@ class SAGExtractor:
         except Exception as e:
             logger.warning(f"[SAG] 提取失败: {e}")
             return ExtractionResult()
+
+    async def _save_to_db(self, result: ExtractionResult, chunk_meta: Dict = None):
+        """将提取结果写入数据库表"""
+        try:
+            from src.db.memory_store import get_store
+            store = get_store()
+            meta = chunk_meta or {}
+
+            # 写入events表
+            for event in result.events:
+                event_id = f"evt_{int(time.time()*1000)}_{id(event)}"
+                store._db_conn.execute(
+                    "INSERT OR REPLACE INTO events (event_id, title, summary, content, category, keywords, priority, level, chunk_ids, entity_names, file_hash, file_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (event_id, event.get("title", ""), event.get("summary", ""), event.get("content", ""),
+                     meta.get("category", ""), json.dumps(event.get("keywords", []), ensure_ascii=False),
+                     event.get("priority", "UNKNOWN"), event.get("level", 1),
+                     json.dumps([meta.get("chunk_id", "")], ensure_ascii=False),
+                     json.dumps(event.get("entities", []) + event.get("participants", []), ensure_ascii=False),
+                     meta.get("file_hash", ""), meta.get("file_name", ""))
+                )
+
+            # 写入entities表
+            for entity in result.entities:
+                entity_id = f"ent_{int(time.time()*1000)}_{id(entity)}"
+                store._db_conn.execute(
+                    "INSERT OR REPLACE INTO entities (entity_id, name, entity_type, description, file_hash, file_name) VALUES (?, ?, ?, ?, ?, ?)",
+                    (entity_id, entity.get("name", ""), entity.get("type", ""),
+                     entity.get("description", ""), meta.get("file_hash", ""), meta.get("file_name", ""))
+                )
+
+            store._db_conn.commit()
+        except Exception as e:
+            logger.warning(f"[SAG] 写入数据库失败: {e}")
 
     def _build_entity_types_text(self) -> str:
         """从 ontology.py 动态读取实体类型"""
