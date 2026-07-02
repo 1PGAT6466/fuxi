@@ -59,6 +59,20 @@ class TaiyangRetrieval(SymbolBase):
             except Exception as e:
                 logger.debug(f"[{trace_id}] [太阳] 多跳检索跳过: {e}")
 
+            # L2.6: 知识图谱查询
+            graph_results = []
+            try:
+                from src.services.graph_traversal import find_paths
+                graph_paths = find_paths(query)
+                if graph_paths:
+                    from src.taiyang.graph import GraphRouter
+                    router = GraphRouter()
+                    entity_context = router.get_entity_context(query)
+                    if entity_context.get("found"):
+                        logger.info(f"[{trace_id}] [太阳] 图谱查询: {entity_context.get('count', 0)} 实体")
+            except Exception as e:
+                logger.debug(f"[{trace_id}] [太阳] 图谱查询跳过: {e}")
+
             # L3: 融合
             fused = self._fuse(bm25_results, vector_results)
 
@@ -75,6 +89,26 @@ class TaiyangRetrieval(SymbolBase):
 
             self._search_count += 1
             duration = (time.time() - start_time) * 1000
+
+            # 记录在线评测指标
+            try:
+                from src.services.online_eval import get_online_evaluator
+                evaluator = get_online_evaluator()
+                await evaluator.record_search_metric(query, expanded, duration, trace_id)
+            except Exception:
+                pass
+
+            # 记录成长数据
+            try:
+                from src.growth.growth_recorder import GrowthRecordPoints
+                recorder = GrowthRecordPoints()
+                max_score = max([r.get("score", 0) for r in expanded], default=0)
+                await recorder.record_taiyang_search(
+                    query=query, trace_id=trace_id or "", search_mode=strategy,
+                    result_count=len(expanded), max_score=max_score, duration_ms=duration,
+                )
+            except Exception:
+                pass
 
             logger.info(f"[{trace_id}] [太阳] 检索完成: {query[:30]}... → {len(expanded)} results, {duration:.0f}ms")
 
