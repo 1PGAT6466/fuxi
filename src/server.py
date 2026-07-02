@@ -95,8 +95,8 @@ async def shutdown():
     await _stop_fuxi()
 
 # 注册统一异常处理器
-from src.services.error_handler import setup_error_handlers
-setup_error_handlers(app)
+# from src.services.error_handler import setup_error_handlers
+# setup_error_handlers(app)
 # ============ 中间件 ============
 # ── API 认证中间件 ──
 from src.api.auth import AuthMiddleware, InputLimitMiddleware
@@ -140,8 +140,8 @@ app.include_router(auth_router)
 from src.api.documents import router as documents_router
 
 # v10.1: MinerU + Unstructured dual engine
-from src.services.mineru import apply_patches
-apply_patches()
+# from src.services.mineru import apply_patches
+# apply_patches()
 app.include_router(documents_router)
 
 # 知识图谱路由 — /api/graph, /api/graph/path, /api/graph/build, /api/graph/nodes
