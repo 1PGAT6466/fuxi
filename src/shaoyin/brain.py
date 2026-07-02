@@ -108,6 +108,19 @@ class ShaoyinBrain(SymbolBase):
             duration = (time.time() - start_time) * 1000
             self._thought_count += 1
 
+            # 记录成长数据
+            try:
+                from src.growth.growth_recorder import GrowthRecordPoints
+                recorder = GrowthRecordPoints()
+                await recorder.record_shaoyin_decision(
+                    query=query, trace_id=trace_id or "",
+                    intent=intent.get("intent", "unknown"), strategy=strategy,
+                    confidence=confidence, retry_count=1 if confidence < 0.5 else 0,
+                    duration_ms=duration,
+                )
+            except Exception:
+                pass
+
             logger.info(f"[{trace_id}] [少阴] 决策完成: {query[:30]}... → confidence={confidence:.2f}, {duration:.0f}ms")
 
             return {
