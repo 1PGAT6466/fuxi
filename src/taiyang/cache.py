@@ -34,6 +34,8 @@ def _make_key(query: str, category: str, top_k: int) -> str:
 async def get_cache(query: str, category: str = "", top_k: int = 15) -> Optional[list]:
     """查询缓存 — L1 精确 → L2 语义"""
     global _cache_hits, _cache_misses
+    import time as _time
+    _start = _time.time()
     
     async with _cache_lock:
         # L1: 精确匹配
@@ -43,6 +45,12 @@ async def get_cache(query: str, category: str = "", top_k: int = 15) -> Optional
             if time.time() - entry["ts"] < MAX_CACHE_AGE_SECONDS:
                 _l1_cache.move_to_end(key)
                 _cache_hits += 1
+                latency_ms = (_time.time() - _start) * 1000
+                try:
+                    from src.infra.cache_stats import get_cache_stats
+                    get_cache_stats().record_hit(latency_ms)
+                except Exception:
+                    pass
                 logger.info(f"[Cache] L1 hit: '{query[:40]}...'")
                 return entry["results"]
             else:
@@ -64,6 +72,12 @@ async def get_cache(query: str, category: str = "", top_k: int = 15) -> Optional
                         sim = _cosine_similarity(q_vec, emb)
                         if sim >= SIMILARITY_THRESHOLD:
                             _cache_hits += 1
+                            latency_ms = (_time.time() - _start) * 1000
+                            try:
+                                from src.infra.cache_stats import get_cache_stats
+                                get_cache_stats().record_hit(latency_ms)
+                            except Exception:
+                                pass
                             logger.info(f"[Cache] L2 hit (sim={sim:.3f}): '{query[:40]}...'")
                             return results
                     # 如果大量过期，触发清理
@@ -71,9 +85,14 @@ async def get_cache(query: str, category: str = "", top_k: int = 15) -> Optional
                         _l2_cache[:] = [(e, r, t) for e, r, t in _l2_cache
                                         if now - t < MAX_CACHE_AGE_SECONDS]
             except Exception as e:
-
                 logger.warning(f"[cache] suppressed exception", exc_info=True)
     _cache_misses += 1
+    latency_ms = (_time.time() - _start) * 1000
+    try:
+        from src.infra.cache_stats import get_cache_stats
+        get_cache_stats().record_miss(latency_ms)
+    except Exception:
+        pass
     return None
 
 
