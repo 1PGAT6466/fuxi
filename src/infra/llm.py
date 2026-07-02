@@ -247,6 +247,47 @@ async def call_deepseek_stream(
         yield chunk
 
 
+# ============ 任务→模型映射（方案要求） ============
+
+TASK_MODEL_MAP = {
+    # JSON 输出任务 → 非 pro 版
+    "extraction": "mimo-v2.5",
+    "classification": "mimo-v2.5",
+    "parsing": "mimo-v2.5",
+    "validation": "mimo-v2.5",
+    "distillation": "mimo-v2.5",
+
+    # 推理任务 → pro 版
+    "synthesis": "mimo-v2.5-pro",
+    "reflection": "mimo-v2.5-pro",
+    "reasoning": "mimo-v2.5-pro",
+    "planning": "mimo-v2.5-pro",
+
+    # 轻量任务 → turbo 版
+    "fast_classify": "mimo-v2.5-turbo",
+    "fast_extract": "mimo-v2.5-turbo",
+}
+
+TASK_MAX_TOKENS = {
+    "extraction": 4096,
+    "synthesis": 8192,
+    "rewrite": 1024,
+    "reflection": 4096,
+    "validation": 2048,
+    "distillation": 2048,
+}
+
+
+async def call_llm_by_task(task: str, prompt: str, **kwargs) -> str:
+    """根据任务类型选择模型"""
+    model = TASK_MODEL_MAP.get(task, "mimo-v2.5")
+    max_tokens = TASK_MAX_TOKENS.get(task, 4096)
+
+    kwargs["max_tokens"] = max_tokens
+
+    return await call_llm(prompt, model=model, **kwargs)
+
+
 async def call_ollama(prompt_text: str, model: str = None, max_tokens: int = 300) -> Optional[str]:
     """已弃用：重定向到 MiMo API"""
     return await call_llm(prompt_text, max_tokens=max_tokens)
