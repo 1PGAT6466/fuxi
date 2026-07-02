@@ -194,41 +194,69 @@ from src.api.evolution import router as evolution_router
 app.include_router(evaluation_router)
 app.include_router(evolution_router)
 
-# ============ MCP 工具 API ============
-from src.taiyin.mcp_tools import sag_search, sag_ingest, sag_explain, sag_status, MCP_TOOLS
+# ============ MCP 协议 API ============
+from src.taiyin.mcp_protocol import get_mcp_server
+
+@app.post("/api/mcp")
+async def mcp_handler(request: Request):
+    """MCP协议入口 — 标准JSON-RPC 2.0"""
+    body = await request.json()
+    server = get_mcp_server()
+    return await server.handle_request(body)
 
 @app.get("/api/mcp/tools")
 async def mcp_list_tools():
-    """列出所有 MCP 工具"""
-    return {"tools": MCP_TOOLS}
+    """列出所有MCP工具"""
+    server = get_mcp_server()
+    return {"tools": [{"name": t.name, "description": t.description} for t in server.tools.values()]}
 
 @app.post("/api/mcp/sag_search")
 async def mcp_sag_search(request: Request):
     """MCP: 搜索知识库"""
+    from src.taiyin.mcp_tools import sag_search
     body = await request.json()
-    query = body.get("query", "")
-    top_k = body.get("top_k", 10)
-    return await sag_search(query, top_k)
+    return await sag_search(body.get("query", ""), body.get("top_k", 10))
 
 @app.post("/api/mcp/sag_ingest")
 async def mcp_sag_ingest(request: Request):
     """MCP: 入库文档"""
+    from src.taiyin.mcp_tools import sag_ingest
     body = await request.json()
-    file_path = body.get("file_path", "")
-    category = body.get("category", "")
-    return await sag_ingest(file_path, category)
+    return await sag_ingest(body.get("file_path", ""), body.get("category", ""))
 
 @app.post("/api/mcp/sag_explain")
 async def mcp_sag_explain(request: Request):
     """MCP: 解释查询"""
+    from src.taiyin.mcp_tools import sag_explain
     body = await request.json()
-    query = body.get("query", "")
-    return await sag_explain(query)
+    return await sag_explain(body.get("query", ""))
 
 @app.get("/api/mcp/sag_status")
 async def mcp_sag_status():
     """MCP: 系统状态"""
+    from src.taiyin.mcp_tools import sag_status
     return await sag_status()
+
+# ============ 评测自动化 API ============
+from src.services.eval_automation import get_eval_automation
+
+@app.post("/api/eval/run")
+async def eval_run():
+    """运行每日评测"""
+    automation = get_eval_automation()
+    return await automation.run_daily_eval()
+
+@app.get("/api/eval/report")
+async def eval_report():
+    """获取最新评测报告"""
+    automation = get_eval_automation()
+    return await automation.get_latest_report() or {"message": "暂无评测报告"}
+
+@app.get("/api/eval/history")
+async def eval_history():
+    """获取评测历史"""
+    automation = get_eval_automation()
+    return {"history": await automation.get_eval_history()}
 
 # ============ 四象状态 + 成长 API ============
 from src.taiyin.growth_api import get_growth_overview, get_symbols_status

@@ -154,7 +154,7 @@ async function loadSymbols(){
   } catch(e) { _adminError('symbolGrid', e.message); }
 }
 
-// ===== 成长面板 =====
+// ===== 成长面板（完整版）=====
 async function loadGrowth(){
   var stats = document.getElementById('growthStats');
   var trends = document.getElementById('growthTrends');
@@ -166,15 +166,25 @@ async function loadGrowth(){
 
     // 四象成长指标卡片
     var symbolConfigs = [
-      { id: 'shaoyang', name: '少阳·提取', color: '#4caf50', metrics: ['extraction_success_rate', 'entity_coverage', 'extraction_latency_p95'] },
-      { id: 'taiyang', name: '太阳·检索', color: '#ff9800', metrics: ['recall_at_10', 'cache_hit_rate', 'search_latency_p95'] },
-      { id: 'shaoyin', name: '少阴·决策', color: '#9c27b0', metrics: ['confidence_avg', 'retry_rate', 'hallucination_rate'] },
-      { id: 'taiyin', name: '太阴·体验', color: '#2196f3', metrics: ['request_count', 'error_rate', 'p95_latency'] }
+      { id: 'shaoyang', name: '少阳·提取', color: '#4caf50', metrics: ['extraction_success_rate', 'entity_coverage', 'extraction_latency_p95'], desc: '文档→碎片+事件+实体' },
+      { id: 'taiyang', name: '太阳·检索', color: '#ff9800', metrics: ['recall_at_10', 'cache_hit_rate', 'search_latency_p95'], desc: '查询→精排结果' },
+      { id: 'shaoyin', name: '少阴·决策', color: '#9c27b0', metrics: ['confidence_avg', 'retry_rate', 'hallucination_rate'], desc: '问题→答案' },
+      { id: 'taiyin', name: '太阴·体验', color: '#2196f3', metrics: ['request_count', 'error_rate', 'p95_latency'], desc: '一个入口，一个出口' }
     ];
 
     var symbolData = overview.symbols || {};
+    var totalEvents = overview.total_events || 0;
+    var phase = overview.phase || 'Phase 1';
 
-    stats.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">' +
+    // 总览卡片
+    var summaryHtml = '<div class="card" style="padding:16px;margin-bottom:16px;background:linear-gradient(135deg,#FF6700 0%,#ff9800 100%);color:#fff">' +
+      '<div style="display:flex;justify-content:space-between;align-items:center">' +
+      '<div><div style="font-size:14px;opacity:0.9">成长引擎</div><div style="font-size:24px;font-weight:700">' + phase + '</div></div>' +
+      '<div style="text-align:right"><div style="font-size:14px;opacity:0.9">总事件数</div><div style="font-size:24px;font-weight:700">' + totalEvents + '</div></div>' +
+      '</div></div>';
+
+    // 四象卡片
+    var cardsHtml = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px">' +
       symbolConfigs.map(function(config) {
         var data = symbolData[config.id] || {};
         var metrics = data.metrics || {};
@@ -184,47 +194,55 @@ async function loadGrowth(){
           var val = metrics[key];
           var display = val != null ? (typeof val === 'number' ? (val < 1 ? Math.round(val * 100) + '%' : val.toFixed(1)) : String(val)) : '—';
           var label = {extraction_success_rate:'提取成功率',entity_coverage:'实体覆盖率',extraction_latency_p95:'提取延迟P95',recall_at_10:'Recall@10',cache_hit_rate:'缓存命中率',search_latency_p95:'检索延迟P95',confidence_avg:'平均置信度',retry_rate:'重试率',hallucination_rate:'幻觉拦截率',request_count:'请求次数',error_rate:'错误率',p95_latency:'P95延迟'}[key] || key;
-          return '<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border)"><span style="font-size:12px;color:var(--text3)">' + label + '</span><span style="font-size:13px;font-weight:600;color:var(--pri)">' + display + '</span></div>';
+          var color = val != null ? (val < 0.3 ? '#ff3b30' : val < 0.7 ? '#ff9500' : '#34c759') : 'var(--text3)';
+          return '<div style="display:flex;justify-content:space-between;padding:8px 0;border-bottom:1px solid var(--border)">' +
+            '<span style="font-size:12px;color:var(--text3)">' + label + '</span>' +
+            '<span style="font-size:14px;font-weight:600;color:' + color + '">' + display + '</span></div>';
         }).join('');
+
+        // sparkline 占位
+        var sparkline = '<div style="height:40px;margin-top:8px;background:var(--bg);border-radius:4px;display:flex;align-items:center;justify-content:center;font-size:10px;color:var(--text3)">╱╲╱╲ 趋势</div>';
 
         return '<div class="card" style="padding:16px;border-top:3px solid ' + config.color + '">' +
           '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">' +
-          '<span style="font-size:24px">' + (SYMBOLS[config.id]||{}).emoji + '</span>' +
-          '<div><div style="font-size:15px;font-weight:600">' + config.name + '</div>' +
-          '<div style="font-size:11px;color:var(--text3)">事件数: ' + eventCount + '</div></div></div>' +
-          metricHtml + '</div>';
+          '<span style="font-size:28px">' + (SYMBOLS[config.id]||{}).emoji + '</span>' +
+          '<div><div style="font-size:16px;font-weight:600">' + config.name + '</div>' +
+          '<div style="font-size:11px;color:var(--text3)">' + config.desc + '</div></div>' +
+          '<div style="margin-left:auto;text-align:right"><div style="font-size:20px;font-weight:700;color:' + config.color + '">' + eventCount + '</div><div style="font-size:10px;color:var(--text3)">事件</div></div></div>' +
+          metricHtml + sparkline + '</div>';
       }).join('') + '</div>';
+
+    stats.innerHTML = summaryHtml + cardsHtml;
 
     // 趋势图
     if (overview.trend && overview.trend.length > 0) {
-      trends.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px"><canvas id="growthChartQuery" height="180"></canvas><canvas id="growthChartLatency" height="180"></canvas></div>';
+      trends.innerHTML = '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">' +
+        '<canvas id="growthChartQuery" height="200"></canvas>' +
+        '<canvas id="growthChartLatency" height="200"></canvas>' +
+        '<canvas id="growthChartConfidence" height="200"></canvas>' +
+        '<canvas id="growthChartEvents" height="200"></canvas></div>';
 
       if (typeof Chart !== 'undefined') {
+        var labels = overview.trend.map(function(t) { return t.date; });
+
+        // 查询趋势
         var ctxQ = document.getElementById('growthChartQuery');
-        if (ctxQ) {
-          new Chart(ctxQ, {
-            type: 'line',
-            data: {
-              labels: overview.trend.map(function(t) { return t.date; }),
-              datasets: [{ label: '查询次数', data: overview.trend.map(function(t) { return t.query_count; }), borderColor: '#FF6700', tension: 0.4, fill: true, backgroundColor: 'rgba(255,103,0,0.1)' }]
-            },
-            options: { responsive: true, plugins: { title: { display: true, text: '查询趋势' } }, scales: { y: { beginAtZero: true } } }
-          });
-        }
+        if (ctxQ) new Chart(ctxQ, { type: 'line', data: { labels: labels, datasets: [{ label: '查询次数', data: overview.trend.map(function(t) { return t.query_count; }), borderColor: '#FF6700', tension: 0.4, fill: true, backgroundColor: 'rgba(255,103,0,0.1)' }] }, options: { responsive: true, plugins: { title: { display: true, text: '查询趋势' } }, scales: { y: { beginAtZero: true } } } });
+
+        // 延迟趋势
         var ctxL = document.getElementById('growthChartLatency');
-        if (ctxL) {
-          new Chart(ctxL, {
-            type: 'line',
-            data: {
-              labels: overview.trend.map(function(t) { return t.date; }),
-              datasets: [{ label: '平均延迟(ms)', data: overview.trend.map(function(t) { return t.avg_latency_ms || 0; }), borderColor: '#2196f3', tension: 0.4, fill: true, backgroundColor: 'rgba(33,150,243,0.1)' }]
-            },
-            options: { responsive: true, plugins: { title: { display: true, text: '延迟趋势' } }, scales: { y: { beginAtZero: true } } }
-          });
-        }
+        if (ctxL) new Chart(ctxL, { type: 'line', data: { labels: labels, datasets: [{ label: '平均延迟(ms)', data: overview.trend.map(function(t) { return t.avg_latency_ms || 0; }), borderColor: '#2196f3', tension: 0.4, fill: true, backgroundColor: 'rgba(33,150,243,0.1)' }] }, options: { responsive: true, plugins: { title: { display: true, text: '延迟趋势' } }, scales: { y: { beginAtZero: true } } } });
+
+        // 置信度趋势
+        var ctxC = document.getElementById('growthChartConfidence');
+        if (ctxC) new Chart(ctxC, { type: 'line', data: { labels: labels, datasets: [{ label: '平均置信度', data: overview.trend.map(function(t) { return t.avg_confidence || 0; }), borderColor: '#4caf50', tension: 0.4, fill: true, backgroundColor: 'rgba(76,175,80,0.1)' }] }, options: { responsive: true, plugins: { title: { display: true, text: '置信度趋势' } }, scales: { y: { beginAtZero: true, max: 1 } } } });
+
+        // 事件趋势
+        var ctxE = document.getElementById('growthChartEvents');
+        if (ctxE) new Chart(ctxE, { type: 'bar', data: { labels: labels, datasets: [{ label: '事件数', data: overview.trend.map(function(t) { return t.event_count || 0; }), backgroundColor: 'rgba(255,103,0,0.6)' }] }, options: { responsive: true, plugins: { title: { display: true, text: '事件趋势' } }, scales: { y: { beginAtZero: true } } } });
       }
     } else {
-      trends.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:32px;margin-bottom:8px">📈</div><p>成长趋势数据将在系统运行后自动积累</p></div>';
+      trends.innerHTML = '<div style="text-align:center;padding:40px;color:var(--text3)"><div style="font-size:32px;margin-bottom:8px">📈</div><p>成长趋势数据将在系统运行后自动积累</p><p style="font-size:12px;margin-top:8px">系统运行后，每100次查询自动记录一次成长指标</p></div>';
     }
 
   } catch(e) { _adminError('growthStats', e.message); }
