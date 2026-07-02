@@ -123,6 +123,30 @@ try:
 except ImportError:
     limiter = None
 
+# ============ 请求指标中间件 ============
+@app.middleware("http")
+async def metrics_middleware(request: Request, call_next):
+    """记录请求指标"""
+    import time
+    start = time.time()
+    try:
+        response = await call_next(request)
+        duration_ms = (time.time() - start) * 1000
+        try:
+            from src.infra.request_metrics import get_request_metrics
+            get_request_metrics().record_request(duration_ms, response.status_code < 500)
+        except Exception:
+            pass
+        return response
+    except Exception as e:
+        duration_ms = (time.time() - start) * 1000
+        try:
+            from src.infra.request_metrics import get_request_metrics
+            get_request_metrics().record_request(duration_ms, False)
+        except Exception:
+            pass
+        raise
+
 # ============ 注册路由 ============
 
 # 搜索路由 — /api/search, /api/search-history, /api/images/*

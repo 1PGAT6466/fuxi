@@ -117,6 +117,12 @@ class TaiyangRetrieval(SymbolBase):
 
         except Exception as e:
             logger.error(f"[{trace_id}] [太阳] 检索失败: {e}")
+            # 记录错误
+            try:
+                from src.infra.error_tracker import get_error_tracker
+                get_error_tracker().record_error("retrieval_failed", str(e), {"query": query[:100], "trace_id": trace_id})
+            except Exception:
+                pass
             return []
         finally:
             self._set_status("idle")
