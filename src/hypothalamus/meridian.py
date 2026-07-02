@@ -194,6 +194,45 @@ class Meridian:
         """列出所有器官"""
         return list(self._organs.values())
     
+    # ========== 四象查询（四象归位） ==========
+    
+    def get_symbol(self, symbol_id: str):
+        """获取象的处理器"""
+        symbol = self._symbols.get(symbol_id)
+        if symbol:
+            return symbol.get("handler")
+        return None
+    
+    def get_symbol_status(self, symbol_id: str) -> dict:
+        """获取象的状态"""
+        symbol = self._symbols.get(symbol_id)
+        if not symbol:
+            return {"symbol": symbol_id, "alive": False, "status": "not_registered"}
+        
+        handler = symbol.get("handler")
+        if handler and hasattr(handler, "get_status"):
+            return handler.get_status()
+        
+        return {
+            "symbol": symbol_id,
+            "alive": True,
+            "status": "unknown",
+            "name": symbol.get("name", ""),
+        }
+    
+    def list_symbols(self) -> list:
+        """列出所有象"""
+        result = []
+        for symbol_id, info in self._symbols.items():
+            handler = info.get("handler")
+            status = handler.get_status() if handler and hasattr(handler, "get_status") else {}
+            result.append({
+                "symbol_id": symbol_id,
+                "name": info.get("name", ""),
+                "status": status,
+            })
+        return result
+    
     # ========== 订阅 ==========
     
     def subscribe(self, organ_id: str, signal_type: str, 

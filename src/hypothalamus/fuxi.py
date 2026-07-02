@@ -11,10 +11,18 @@ from typing import Dict, Optional
 
 from src.hypothalamus.meridian import Meridian, Signal, SignalPriority
 from src.hypothalamus.brain import Brain
+
+# 四象模块
+from src.shaoyang.pipeline import ShaoyangPipeline
+from src.taiyang.retrieval import TaiyangRetrieval
+from src.shaoyin.brain import ShaoyinBrain
+from src.taiyin.server import TaiyinServer
+
+# 保留旧器官（兼容层）
 try:
     from src.hypothalamus.organs.stomach import StomachAgent
 except ImportError:
-    StomachAgent = None  # stomach 已迁至装载机
+    StomachAgent = None
 from src.hypothalamus.organs.spleen import SpleenAgent
 from src.hypothalamus.organs.lung import LungAgent
 from src.hypothalamus.organs.liver import LiverAgent
@@ -52,8 +60,14 @@ class Fuxi:
         # 大脑——唯一意识
         self.brain: Optional[Brain] = None
         
-        # 器官
-        self.stomach = None  # stomach 已迁至装载机
+        # 四象模块
+        self.shaoyang: Optional[ShaoyangPipeline] = None
+        self.taiyang: Optional[TaiyangRetrieval] = None
+        self.shaoyin: Optional[ShaoyinBrain] = None
+        self.taiyin: Optional[TaiyinServer] = None
+        
+        # 器官（保留兼容）
+        self.stomach = None
         self.spleen: Optional[SpleenAgent] = None
         self.lung: Optional[LungAgent] = None
         self.liver: Optional[LiverAgent] = None
@@ -68,14 +82,27 @@ class Fuxi:
     async def born(self) -> None:
         """伏羲诞生——创建所有器官，启动生命"""
         logger.info("=" * 50)
-        logger.info("  伏羲 Fuxi 1.42 — 生命体启动")
+        logger.info("  伏羲 Fuxi 1.44 — 生命体启动")
         logger.info("=" * 50)
         
         # 1. 启动经络
         await self.meridian.start()
         logger.info("🔗 经络已激活")
         
-        # 2. 创建器官（顺序反映它们在活体中的重要性）
+        # 2. 创建四象模块
+        self.shaoyang = ShaoyangPipeline(self.meridian)
+        logger.info("🌱 少阳·消化 已就绪")
+        
+        self.taiyang = TaiyangRetrieval(self.meridian)
+        logger.info("☀️ 太阳·筑基 已就绪")
+        
+        self.shaoyin = ShaoyinBrain(self.meridian)
+        logger.info("🌙 少阴·炼化 已就绪")
+        
+        self.taiyin = TaiyinServer(self.meridian)
+        logger.info("🌑 太阴·显化 已就绪")
+        
+        # 3. 创建器官（保留兼容）
         self.heart = HeartAgent(self.meridian)
         logger.info("🫀 心脏已启动")
         
@@ -101,7 +128,6 @@ class Fuxi:
         self.limbs = LimbsAgent(self.meridian)
         logger.info("💪 四肢已就绪")
         
-        # v1.42: 头发外探能力已融入皮肤，不再独立注册
         logger.info("🧖 皮肤触角已就绪（含头发外探能力）")
         
         self.kidney = KidneyAgent(self.meridian)
@@ -116,7 +142,7 @@ class Fuxi:
         self.sanjiao = SanJiaoAgent(self.meridian)
         logger.info("🧖 皮肤·屏障已就绪")
         
-        # 2.5 启动平衡监控
+        # 4. 启动平衡监控
         self.five_elements = FiveElementsBalance(self)
         self.stem_scheduler = StemScheduler(self)
         self.rhythm = MeridianRhythm(self.meridian)
@@ -125,7 +151,7 @@ class Fuxi:
         await self.rhythm.start()
         logger.info("⚖️ 五行平衡 + 天干调度 + 经络流注已启动")
 
-        # 3. 启动自主节律
+        # 5. 启动自主节律
         await self.heart.start_beating()
         await self.lung.start_breathing()
         await self.kidney.start_filtering()
@@ -139,13 +165,12 @@ class Fuxi:
         await self.small_intestine.start_working()
         await self.gallbladder.start_working()
         await self.sanjiao.start_working()
-        # v1.43 fix: skeleton 无 start_working，已在 132 行 start_scanning
         await self.skin.start_guarding()
         
         self._born = True
         
         logger.info("=" * 50)
-        logger.info("  伏羲 Fuxi 1.42 — 已苏醒")
+        logger.info("  伏羲 Fuxi 1.44 — 已苏醒")
         logger.info("=" * 50)
     
     async def think(self, query: str, 
@@ -154,6 +179,11 @@ class Fuxi:
         if not self._born:
             raise RuntimeError("伏羲尚未诞生，请先调用 born()")
         
+        # 优先使用少阴·炼化
+        if self.shaoyin:
+            return await self.shaoyin.think(query)
+        
+        # 降级到旧大脑
         return await self.brain.think(query, enable_external=enable_external)
     
     async def digest_file(self, file_path: str) -> Dict:
@@ -170,20 +200,33 @@ class Fuxi:
     
     def health_report(self) -> Dict:
         """全身健康报告"""
-        return {
-            "organs": {
-                info.organ_id: {
-                    "name": info.name,
-                    "emoji": info.emoji,
-                    "alive": self.meridian.is_alive(info.organ_id),
-                    "stats": getattr(self, info.organ_id, None).stats() 
-                    if hasattr(getattr(self, info.organ_id, None), "stats") 
-                    else {}
-                }
-                for info in self.meridian.list_organs()
-            },
+        report = {
+            "symbols": {},
+            "organs": {},
             "meridian": self.meridian.stats(),
         }
+        
+        # 四象状态
+        if self.shaoyang:
+            report["symbols"]["shaoyang"] = self.shaoyang.get_status()
+        if self.taiyang:
+            report["symbols"]["taiyang"] = self.taiyang.get_status()
+        if self.shaoyin:
+            report["symbols"]["shaoyin"] = self.shaoyin.get_status()
+        if self.taiyin:
+            report["symbols"]["taiyin"] = self.taiyin.get_status()
+        
+        # 器官状态
+        for info in self.meridian.list_organs():
+            organ = getattr(self, info.organ_id, None)
+            report["organs"][info.organ_id] = {
+                "name": info.name,
+                "emoji": info.emoji,
+                "alive": self.meridian.is_alive(info.organ_id),
+                "stats": organ.stats() if hasattr(organ, "stats") else {}
+            }
+        
+        return report
     
     async def sleep(self) -> None:
         """伏羲休眠"""
