@@ -41,11 +41,12 @@ class TaiyangRetrieval(SymbolBase):
             # L1: 查询扩展
             expanded_q = self._expand_query(query)
 
-            # L2: 多路召回
-            bm25_results = await self._bm25_recall(expanded_q, top_k)
+            # L2: 多路召回（并行执行）
+            import asyncio
+            bm25_task = self._bm25_recall(expanded_q, top_k)
+            vector_task = self._vector_recall(expanded_q, top_k)
+            bm25_results, vector_results = await asyncio.gather(bm25_task, vector_task)
             logger.info(f"[{trace_id}] [太阳] BM25召回: {len(bm25_results)} results")
-
-            vector_results = await self._vector_recall(expanded_q, top_k)
             logger.info(f"[{trace_id}] [太阳] 向量召回: {len(vector_results)} results")
 
             # L2.5: 多跳检索（如果启用）
