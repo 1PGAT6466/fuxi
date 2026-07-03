@@ -10,8 +10,8 @@ class LoginRequest(BaseModel):
 
 @router.post("/login")
 def login(body: LoginRequest):
-    from src.api.auth import JWT_SECRET
-    import hashlib, time, json
+    from src.api.auth import create_jwt_token
+    import hashlib, json
     from pathlib import Path
     
     users_file = Path("data/users.json")
@@ -31,13 +31,8 @@ def login(body: LoginRequest):
         if hashlib.sha256(f"{salt}:{body.password}".encode()).hexdigest() != h:
             raise HTTPException(401, "用户名或密码错误")
     
-    # 生成token
-    import base64
-    header = base64.urlsafe_b64encode(json.dumps({"alg": "HS256", "typ": "JWT"}).encode()).decode().rstrip("=")
-    payload_data = {"sub": body.username, "role": user.get("role", "user"), "exp": int(time.time()) + 86400}
-    payload = base64.urlsafe_b64encode(json.dumps(payload_data).encode()).decode().rstrip("=")
-    sig = hashlib.sha256(f"{header}.{payload}.{JWT_SECRET}".encode()).hexdigest()[:32]
-    token = f"{header}.{payload}.{sig}"
+    # 生成标准JWT token
+    token = create_jwt_token(body.username, user.get("role", "user"))
     
     return {"token": token, "username": body.username, "role": user.get("role", "user"), "display_name": user.get("display_name", body.username)}
 

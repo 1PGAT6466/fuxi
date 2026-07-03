@@ -10,9 +10,10 @@ BASE_URL = "http://localhost:8080"
 TOKEN = "fuxi-v1.50-token"
 HEADERS = {"Authorization": f"Bearer {TOKEN}"}
 
-# 跳过所有冒烟测试（需要运行中的服务器）
-pytestmark = pytest.mark.skip(reason="Smoke tests require running server")
+# 需要运行中服务器的测试标记
+requires_server = pytest.mark.skip(reason="Smoke tests require running server")
 
+@requires_server
 def test_health():
     """0.6.1: /api/health 返回 200"""
     import urllib.request
@@ -23,6 +24,7 @@ def test_health():
     assert "status" in data, "Missing 'status' in response"
     print(f"✅ /api/health: {data['status']}")
 
+@requires_server
 def test_search():
     """0.6.2: /api/search 返回结果"""
     import urllib.request, urllib.parse
@@ -33,6 +35,7 @@ def test_search():
     assert resp.status == 200, f"Expected 200, got {resp.status}"
     print(f"✅ /api/search: returned {len(data.get('results', []))} results")
 
+@requires_server
 def test_documents():
     """0.6.3: /api/documents 返回文件列表"""
     import urllib.request
@@ -42,6 +45,7 @@ def test_documents():
     assert resp.status == 200, f"Expected 200, got {resp.status}"
     print(f"✅ /api/documents: {data.get('total', 0)} files")
 
+@requires_server
 def test_chat():
     """0.6.4: /api/chat 返回回答"""
     import urllib.request
@@ -59,6 +63,7 @@ def test_chat():
     answer = data.get("answer", "")
     print(f"✅ /api/chat: {len(answer)} chars, mode={data.get('mode', '?')}")
 
+@requires_server
 def test_v2_status():
     """0.6.5: /api/v2/status 返回系统状态"""
     import urllib.request
@@ -68,8 +73,37 @@ def test_v2_status():
     assert resp.status == 200, f"Expected 200, got {resp.status}"
     print(f"✅ /api/v2/status: health_score={data.get('health_score', '?')}")
 
+def test_jwt_create_and_verify():
+    """JWT标准实现: 创建和验证token"""
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from src.api.auth import create_jwt_token, verify_jwt_token
+    
+    token = create_jwt_token("testuser", "user")
+    assert isinstance(token, str), "Token should be a string"
+    assert token.count(".") == 2, "JWT should have 3 parts separated by dots"
+    
+    payload = verify_jwt_token(token)
+    assert payload["sub"] == "testuser", f"Expected sub=testuser, got {payload['sub']}"
+    assert payload["role"] == "user", f"Expected role=user, got {payload['role']}"
+    assert "exp" in payload, "Missing exp claim"
+    assert "iat" in payload, "Missing iat claim"
+
+
+def test_jwt_verify_invalid_token():
+    """JWT标准实现: 无效token应抛出异常"""
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from src.api.auth import verify_jwt_token
+    from fastapi import HTTPException
+    
+    try:
+        verify_jwt_token("invalid.token.here")
+        assert False, "Should have raised HTTPException"
+    except HTTPException as e:
+        assert e.status_code == 401, f"Expected 401, got {e.status_code}"
+
+
 if __name__ == "__main__":
-    tests = [test_health, test_search, test_documents, test_chat, test_v2_status]
+    tests = [test_health, test_search, test_documents, test_chat, test_v2_status, test_jwt_create_and_verify, test_jwt_verify_invalid_token]
     passed = 0
     failed = 0
     for t in tests:
