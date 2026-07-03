@@ -103,5 +103,70 @@ class TestMemoryStore:
         assert len(result) == 1
 
 
+class TestIndexes:
+    def test_ensure_indexes_creates_expected_indexes(self, tmp_path):
+        import sqlite3
+        from src.db.data_store import _ensure_indexes
+
+        db_path = str(tmp_path / "test_idx.db")
+        conn = sqlite3.connect(db_path)
+        conn.execute("""
+            CREATE TABLE chunks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                doc TEXT NOT NULL,
+                file_hash TEXT,
+                file_name TEXT,
+                category TEXT,
+                chunk_index INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'active',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                loader_path TEXT
+            )
+        """)
+        conn.commit()
+
+        _ensure_indexes(conn)
+
+        rows = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='chunks'"
+        ).fetchall()
+        index_names = {r[0] for r in rows}
+        assert "idx_chunks_file" in index_names
+        assert "idx_chunks_category" in index_names
+        assert "idx_chunks_created" in index_names
+        conn.close()
+
+    def test_ensure_indexes_idempotent(self, tmp_path):
+        import sqlite3
+        from src.db.data_store import _ensure_indexes
+
+        db_path = str(tmp_path / "test_idx2.db")
+        conn = sqlite3.connect(db_path)
+        conn.execute("""
+            CREATE TABLE chunks (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                doc TEXT NOT NULL,
+                file_hash TEXT,
+                file_name TEXT,
+                category TEXT,
+                chunk_index INTEGER DEFAULT 0,
+                status TEXT DEFAULT 'active',
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                loader_path TEXT
+            )
+        """)
+        conn.commit()
+
+        _ensure_indexes(conn)
+        _ensure_indexes(conn)
+
+        rows = conn.execute(
+            "SELECT name FROM sqlite_master WHERE type='index' AND tbl_name='chunks'"
+        ).fetchall()
+        index_names = [r[0] for r in rows]
+        assert index_names.count("idx_chunks_file") == 1
+        conn.close()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

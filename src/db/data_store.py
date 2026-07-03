@@ -14,6 +14,21 @@ from src.config import (
     GRAPH_PATH, FEEDBACK_DIR, TOOLS_DATA, FAQ_DATA
 )
 
+# ============ 索引初始化 ============
+
+def _ensure_indexes(conn):
+    """确保常用查询有索引"""
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_chunks_file ON chunks(file_name)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_chunks_category ON chunks(category)")
+    conn.execute("CREATE INDEX IF NOT EXISTS idx_chunks_created ON chunks(created_at)")
+    conn.commit()
+
+
+def init_db():
+    """初始化数据库索引（幂等，可重复调用）"""
+    store = get_store()
+    _ensure_indexes(store._db_conn)
+
 # ============ Chunks ============
 
 _CHUNK_CACHE = {"data": None, "ts": 0}
