@@ -168,5 +168,42 @@ class TestIndexes:
         conn.close()
 
 
+class TestDynamicTTL:
+    def test_calculate_dynamic_ttl_low_access(self):
+        from src.db.data_store import _calculate_dynamic_ttl
+        import time
+        assert _calculate_dynamic_ttl(5, time.time()) == 30
+
+    def test_calculate_dynamic_ttl_medium_access(self):
+        from src.db.data_store import _calculate_dynamic_ttl
+        import time
+        assert _calculate_dynamic_ttl(11, time.time()) == 60
+
+    def test_calculate_dynamic_ttl_high_access(self):
+        from src.db.data_store import _calculate_dynamic_ttl
+        import time
+        assert _calculate_dynamic_ttl(101, time.time()) == 120
+
+    def test_calculate_dynamic_ttl_boundary_10(self):
+        from src.db.data_store import _calculate_dynamic_ttl
+        import time
+        assert _calculate_dynamic_ttl(10, time.time()) == 30
+
+    def test_calculate_dynamic_ttl_boundary_11(self):
+        from src.db.data_store import _calculate_dynamic_ttl
+        import time
+        assert _calculate_dynamic_ttl(11, time.time()) == 60
+
+    def test_calculate_dynamic_ttl_boundary_100(self):
+        from src.db.data_store import _calculate_dynamic_ttl
+        import time
+        assert _calculate_dynamic_ttl(100, time.time()) == 60
+
+    def test_calculate_dynamic_ttl_boundary_101(self):
+        from src.db.data_store import _calculate_dynamic_ttl
+        import time
+        assert _calculate_dynamic_ttl(101, time.time()) == 120
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

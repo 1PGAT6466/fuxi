@@ -31,14 +31,26 @@ def init_db():
 
 # ============ Chunks ============
 
-_CHUNK_CACHE = {"data": None, "ts": 0}
-_CHUNK_CACHE_TTL = 30  # seconds
+_CHUNK_CACHE = {"data": None, "ts": 0, "access_count": 0, "last_access": 0}
+
+
+def _calculate_dynamic_ttl(access_count: int, last_access: float) -> int:
+    """根据访问频率动态计算TTL"""
+    if access_count > 100:
+        return 120
+    elif access_count > 10:
+        return 60
+    else:
+        return 30
 
 def load_chunks(filter_junk: bool = True, limit: int = None, offset: int = 0) -> list:
-    """从 SQLite 分页加载 chunk（带 30s TTL 缓存）"""
+    """从 SQLite 分页加载 chunk（带动态 TTL 缓存）"""
     now = time.time()
     if filter_junk and limit is None and offset == 0 and _CHUNK_CACHE["data"] is not None:
-        if now - _CHUNK_CACHE["ts"] < _CHUNK_CACHE_TTL:
+        ttl = _calculate_dynamic_ttl(_CHUNK_CACHE["access_count"], _CHUNK_CACHE["last_access"])
+        if now - _CHUNK_CACHE["ts"] < ttl:
+            _CHUNK_CACHE["access_count"] += 1
+            _CHUNK_CACHE["last_access"] = now
             return _CHUNK_CACHE["data"]
 
     store = get_store()
@@ -61,6 +73,8 @@ def load_chunks(filter_junk: bool = True, limit: int = None, offset: int = 0) ->
     if limit is None and offset == 0:
         _CHUNK_CACHE["data"] = result
         _CHUNK_CACHE["ts"] = now
+        _CHUNK_CACHE["access_count"] = 1
+        _CHUNK_CACHE["last_access"] = now
 
     return result
 
@@ -69,6 +83,8 @@ def invalidate_chunk_cache():
     """在数据写入/删除后调用，清除缓存"""
     _CHUNK_CACHE["data"] = None
     _CHUNK_CACHE["ts"] = 0
+    _CHUNK_CACHE["access_count"] = 0
+    _CHUNK_CACHE["last_access"] = 0
 
 
 def save_chunks(chunks: list):
