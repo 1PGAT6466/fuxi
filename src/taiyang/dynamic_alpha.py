@@ -1,5 +1,5 @@
 """
-dynamic_alpha.py — 动态融合权重 (v1.43)
+dynamic_alpha.py — 动态融合权重 (v1.50)
 根据 query 类型动态调整 RRF alpha
 """
 from typing import Tuple

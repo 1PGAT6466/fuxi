@@ -1,5 +1,5 @@
 """
-feedback_store.py — 反馈闭环服务（v1.43 新增）
+feedback_store.py — 反馈闭环服务（v1.50 新增）
 负责：
   1. 用户反馈去重（基于 MD5 签名）
   2. 批量学习触发（buffer 满时自动调用 learner）

@@ -1,4 +1,4 @@
-'''services/context_compressor.py - v1.42
+'''services/context_compressor.py - v1.50
 
 RAG Context Compression: 在检索结果送入 LLM 之前，提炼冗余内容。
 不暴力截断，用轻量 LLM 调用提取关键信息。

@@ -1,5 +1,5 @@
 """
-llm.py — LLM 调用服务（v1.43 MiMo 2.5 Pro + Fallback 链）
+llm.py — LLM 调用服务（v1.50 MiMo 2.5 Pro + Fallback 链）
 调用链：MiMo 2.5 Pro → DeepSeek → 本地（逐级降级）
 """
 import os, json, logging, asyncio

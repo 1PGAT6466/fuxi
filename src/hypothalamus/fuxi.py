@@ -82,7 +82,7 @@ class Fuxi:
     async def born(self) -> None:
         """伏羲诞生——创建所有器官，启动生命"""
         logger.info("=" * 50)
-        logger.info("  伏羲 Fuxi 1.44 — 生命体启动")
+        logger.info("  伏羲 Fuxi 1.50 — 生命体启动")
         logger.info("=" * 50)
         
         # 1. 启动经络
@@ -170,7 +170,7 @@ class Fuxi:
         self._born = True
         
         logger.info("=" * 50)
-        logger.info("  伏羲 Fuxi 1.44 — 已苏醒")
+        logger.info("  伏羲 Fuxi 1.50 — 已苏醒")
         logger.info("=" * 50)
     
     async def think(self, query: str, 

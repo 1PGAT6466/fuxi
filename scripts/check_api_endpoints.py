@@ -7,7 +7,7 @@ import json, sys, os
 import urllib.request
 
 BASE_URL = os.getenv("KB_BASE_URL", "http://localhost:8080")
-TOKEN = os.getenv("FUXI_API_TOKEN", "fuxi-v1.43-token")
+TOKEN = os.getenv("FUXI_API_TOKEN", "fuxi-v1.50-token")
 HEADERS = {"Authorization": f"Bearer {TOKEN}"}
 
 ENDPOINTS = [

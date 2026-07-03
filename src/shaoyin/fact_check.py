@@ -1,5 +1,5 @@
 """
-fact_check.py — 事实性校验 (v1.43)
+fact_check.py — 事实性校验 (v1.50)
 生成答案后再检索验证关键断言是否有出处
 """
 import logging, asyncio, json

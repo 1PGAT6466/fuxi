@@ -1,5 +1,5 @@
 """
-metrics.py — Prometheus 指标暴露 (v1.43)
+metrics.py — Prometheus 指标暴露 (v1.50)
 提供 /api/metrics 端点，输出：
   - 请求计数、延迟分布、错误率
   - 缓存命中率、搜索延迟

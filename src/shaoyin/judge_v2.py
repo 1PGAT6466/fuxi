@@ -1,5 +1,5 @@
 """
-judge_v2.py — LLM-as-Judge 答案质量评分 (v1.43)
+judge_v2.py — LLM-as-Judge 答案质量评分 (v1.50)
 用 MiMo 2.5 Pro 自动评估答案质量
 """
 import json, logging

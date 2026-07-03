@@ -1,5 +1,5 @@
 """
-hypothalamus/meridian.py — 伏羲经络系统（全身信号总线）v1.40
+hypothalamus/meridian.py — 伏羲经络系统（全身信号总线）v1.50
 
 经络 = 伏羲体内唯一的通信网络。
 所有器官通过经络收发信号，大脑通过经络指挥全身。

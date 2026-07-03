@@ -7,7 +7,7 @@ import pytest
 sys.path.insert(0, os.path.expanduser("~/kb-server"))
 
 BASE_URL = "http://localhost:8080"
-TOKEN = "fuxi-v1.43-token"
+TOKEN = "fuxi-v1.50-token"
 HEADERS = {"Authorization": f"Bearer {TOKEN}"}
 
 # 跳过所有冒烟测试（需要运行中的服务器）

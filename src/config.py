@@ -67,7 +67,7 @@ MIMO_TIMEOUT = int(os.getenv("MIMO_TIMEOUT", "60"))
 # ============ 模型 ============
 
 # ============ 版本 ============
-VERSION = "1.43"
+VERSION = "1.50"
 START_TIME = __import__("time").time()
 
 # ============ 工具与 FAQ 默认数据 ============
