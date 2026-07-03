@@ -302,8 +302,7 @@ async def health_check():
     try:
         from src.infra.health_check import get_health_checker
         checker = get_health_checker()
-        import asyncio
-        result = asyncio.get_event_loop().run_until_complete(checker.check_all())
+        result = await checker.check_all()
         return result
     except Exception as e:
         return {"status": "error", "error": str(e)}
