@@ -22,9 +22,9 @@ except ImportError:
 
 from src.db.memory_store import get_store
 from src.db.vector_store import get_vector_store, embed_texts
-from src.services.graph_router import route_to_categories, expand_query_with_synonyms, get_entity_context
+from src.taiyang.graph_router import route_to_categories, expand_query_with_synonyms, get_entity_context
 from src.config import EMBEDDER_URL
-from src.services.synonym_loader import load_synonyms
+from src.taiyang.synonym_loader import load_synonyms
 # 兼容别名
 _SYNONYM_MAP = load_synonyms()
 

@@ -176,9 +176,9 @@ class TestIntegrationChain:
 
     def test_knowledge_graph(self):
         """知识图谱：graph_traversal/kg_extractor/relation_builder"""
-        from src.services.graph_traversal import find_paths, build_adjacency
-        from src.services.kg_extractor import EntityResolver, extract_entities_llm
-        from src.services.relation_builder import build_relations_from_chunks
+        from src.taiyang.graph_traversal import find_paths, build_adjacency
+        from src.shaoyang.kg_extractor import EntityResolver, extract_entities_llm
+        from src.shaoyang.relation_builder import build_relations_from_chunks
 
         # 验证函数可调用
         assert callable(find_paths)
