@@ -73,6 +73,41 @@ def test_v2_status():
     assert resp.status == 200, f"Expected 200, got {resp.status}"
     print(f"✅ /api/v2/status: health_score={data.get('health_score', '?')}")
 
+def test_bcrypt_hash_and_verify():
+    """bcrypt密码哈希: 新密码应使用bcrypt格式"""
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from src.api.auth_routes import _hash_password, _verify_password
+    
+    hashed = _hash_password("testpassword")
+    assert hashed.startswith("$2b$"), f"bcrypt hash should start with $2b$, got: {hashed[:10]}"
+    assert _verify_password("testpassword", hashed), "Valid password should verify"
+    assert not _verify_password("wrongpassword", hashed), "Wrong password should fail"
+
+
+def test_bcrypt_lazy_migration():
+    """bcrypt懒迁移: 旧SHA256格式应可验证"""
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from src.api.auth_routes import _verify_password
+    import hashlib, secrets
+    
+    salt = secrets.token_hex(16)
+    password = "oldpassword"
+    h = hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
+    old_format = f"{salt}${h}"
+    
+    assert _verify_password(password, old_format), "Old SHA256 format should still verify"
+    assert not _verify_password("wrongpassword", old_format), "Wrong password should fail for old format"
+
+
+def test_bcrypt_empty_stored():
+    """bcrypt验证: 空密码存储应返回False"""
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from src.api.auth_routes import _verify_password
+    
+    assert not _verify_password("anything", ""), "Empty stored should fail"
+    assert not _verify_password("anything", "no-dollars"), "Non-hashed should fail"
+
+
 def test_jwt_create_and_verify():
     """JWT标准实现: 创建和验证token"""
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
