@@ -57,15 +57,15 @@ MIGRATION_MAP = {
     "services_old/embedder.py": "infra/embedder.py",
     "services_old/memory.py": "infra/memory.py",
 
-    # 保留（跨象）
-    "services_old/feedback_store.py": "services_old/feedback_store.py",
-    "services_old/learner.py": "services_old/learner.py",
-    "services_old/evolver.py": "services_old/evolver.py",
-    "services_old/evaluator.py": "services_old/evaluator.py",
-    "services_old/eval_dataset.py": "services_old/eval_dataset.py",
-    "services_old/eval_updater.py": "services_old/eval_updater.py",
-    "services_old/online_eval.py": "services_old/online_eval.py",
-    "services_old/knowledge_lifecycle.py": "services_old/knowledge_lifecycle.py",
+    # 跨象模块 → services/
+    "services_old/feedback_store.py": "services/feedback_store.py",
+    "services_old/learner.py": "services/learner.py",
+    "services_old/evolver.py": "services/evolver.py",
+    "services_old/evaluator.py": "services/evaluator.py",
+    "services_old/eval_dataset.py": "services/eval_dataset.py",
+    "services_old/eval_updater.py": "services/eval_updater.py",
+    "services_old/online_eval.py": "services/online_eval.py",
+    "services_old/knowledge_lifecycle.py": "services/knowledge_lifecycle.py",
 }
 
 print("=== 迁移映射表 ===")
