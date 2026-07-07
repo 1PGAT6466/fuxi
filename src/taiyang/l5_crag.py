@@ -73,6 +73,7 @@ class L5CRAGExecutor:
             "reason": "L5 CRAG 纠正检索失败",
             "trace_id": trace_id,
         }
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def _rewrite_query(self, original_query: str,
                              partial_results: List[Dict]) -> str:

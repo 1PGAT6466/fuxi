@@ -258,8 +258,15 @@ def get_vector_store() -> Optional[VectorStore]:
 
 # ============ 批量嵌入代理 ============
 
+# 嵌入结果缓存（FIX-E3）
+_embedding_cache: Dict[str, tuple] = {}  # text → (vector, timestamp)
+_EMBEDDING_CACHE_TTL = 600  # 10 分钟
+_EMBEDDING_CACHE_MAX = 200
+
 async def embed_texts(texts: List[str]) -> Optional[List[List[float]]]:
     """调用外部 embedder 服务做批量文本嵌入
+
+    FIX-E3: 嵌入结果缓存，避免同一 text 重复调用 embedder
 
     Returns:
         向量列表（成功）或 None（服务不可用）
@@ -269,17 +276,36 @@ async def embed_texts(texts: List[str]) -> Optional[List[List[float]]]:
     if not texts:
         return None
 
-    # 健康检查缓存：如果 embedder 不可用，跳过连接尝试
     import time
     now = time.time()
+
+    # 健康检查缓存
     if _embedder_available is False and (now - _embedder_last_check) < _EMBEDDER_CHECK_INTERVAL:
         return None
 
+    # 嵌入缓存检查
+    results = [None] * len(texts)
+    uncached_texts = []
+    uncached_indices = []
+
+    for i, text in enumerate(texts):
+        cache_entry = _embedding_cache.get(text)
+        if cache_entry and (now - cache_entry[1]) < _EMBEDDING_CACHE_TTL:
+            results[i] = cache_entry[0]
+        else:
+            uncached_texts.append(text)
+            uncached_indices.append(i)
+
+    # 如果全部缓存命中，直接返回
+    if not uncached_texts:
+        return results
+
+    # 调用 embedder 获取未缓存的向量
     try:
         async with aiohttp.ClientSession() as sess:
             async with sess.post(
                 f"{EMBEDDER_URL}/embed",
-                json={"texts": texts},
+                json={"texts": uncached_texts},
                 timeout=aiohttp.ClientTimeout(total=5, connect=2),
             ) as resp:
                 if resp.status == 200:
@@ -287,9 +313,19 @@ async def embed_texts(texts: List[str]) -> Optional[List[List[float]]]:
                     data = await resp.json()
                     vectors = data.get("vectors")
                     if vectors:
-                        logger.debug(f"embed_texts: got {len(vectors)} vectors")
-                        return vectors
-                    logger.warning("embed_texts: no vectors in response")
+                        # 回填结果 + 写入缓存
+                        for j, idx in enumerate(uncached_indices):
+                            vec = vectors[j]
+                            results[idx] = vec
+                            # 缓存管理
+                            if len(_embedding_cache) >= _EMBEDDING_CACHE_MAX:
+                                oldest = next(iter(_embedding_cache))
+                                del _embedding_cache[oldest]
+                            _embedding_cache[uncached_texts[j]] = (vec, now)
+
+                        if logger.isEnabledFor(logging.DEBUG):
+                            logger.debug(f"embed_texts: got {len(vectors)} vectors ({len(texts) - len(uncached_texts)} from cache)")
+                        return results
                     return None
                 logger.warning(f"embed_texts: HTTP {resp.status}")
                 _embedder_available = False

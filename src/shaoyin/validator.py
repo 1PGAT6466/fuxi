@@ -15,6 +15,7 @@ class YinAgent:
     def __init__(self):
         pass
 
+    # DEPRECATED: 未使用，v1.50 标记待删除
     def _rule_check(self, answer: str, sources: List[Dict], query: str) -> Dict:
         """规则校验（零成本）"""
         issues = []

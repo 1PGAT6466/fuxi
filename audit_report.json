@@ -1,0 +1,142 @@
+{
+  "timestamp": "2026-07-05T19:56:08.295179",
+  "api_tests": {
+    "/api/health": {
+      "status_code": 200,
+      "success": true,
+      "response_time_ms": 11.044,
+      "content_type": "application/json",
+      "error": null
+    },
+    "/api/system/stats": {
+      "status_code": 500,
+      "success": false,
+      "response_time_ms": 2.885,
+      "content_type": "text/plain; charset=utf-8",
+      "error": "Internal Server Error"
+    },
+    "/api/cache/stats": {
+      "status_code": 500,
+      "success": false,
+      "response_time_ms": 10.727,
+      "content_type": "text/plain; charset=utf-8",
+      "error": "Internal Server Error"
+    },
+    "/api/errors/stats": {
+      "status_code": 500,
+      "success": false,
+      "response_time_ms": 6.355,
+      "content_type": "text/plain; charset=utf-8",
+      "error": "Internal Server Error"
+    },
+    "/api/search?q=test": {
+      "status_code": 500,
+      "success": false,
+      "response_time_ms": 19.611,
+      "content_type": "text/plain; charset=utf-8",
+      "error": "Internal Server Error"
+    },
+    "/api/feature-flags": {
+      "status_code": 500,
+      "success": false,
+      "response_time_ms": 64.126,
+      "content_type": "text/plain; charset=utf-8",
+      "error": "Internal Server Error"
+    },
+    "/api/auth/me": {
+      "status_code": 500,
+      "success": false,
+      "response_time_ms": 46.919000000000004,
+      "content_type": "text/plain; charset=utf-8",
+      "error": "Internal Server Error"
+    },
+    "/api/metrics": {
+      "status_code": 500,
+      "success": false,
+      "response_time_ms": 2.625,
+      "content_type": "text/plain; charset=utf-8",
+      "error": "Internal Server Error"
+    }
+  },
+  "database_status": {
+    "chunks.db": {
+      "exists": true,
+      "size_bytes": 98304,
+      "tables": [
+        "chunks",
+        "sqlite_sequence",
+        "events",
+        "entities",
+        "relations",
+        "chunks_fts",
+        "chunks_fts_data",
+        "chunks_fts_idx",
+        "chunks_fts_docsize",
+        "chunks_fts_config"
+      ],
+      "table_counts": {
+        "chunks": 0,
+        "sqlite_sequence": 0,
+        "events": 0,
+        "entities": 0,
+        "relations": 0,
+        "chunks_fts": "error",
+        "chunks_fts_data": 2,
+        "chunks_fts_idx": 0,
+        "chunks_fts_docsize": 0,
+        "chunks_fts_config": 1
+      },
+      "error": null
+    },
+    "worldtree.db": {
+      "exists": true,
+      "size_bytes": 20480,
+      "tables": [
+        "wiki_pages",
+        "wiki_cross_links"
+      ],
+      "table_counts": {
+        "wiki_pages": 0,
+        "wiki_cross_links": 0
+      },
+      "error": null
+    },
+    "audit.db": {
+      "exists": true,
+      "size_bytes": 20480,
+      "tables": [
+        "audit_log",
+        "sqlite_sequence"
+      ],
+      "table_counts": {
+        "audit_log": 22,
+        "sqlite_sequence": 1
+      },
+      "error": null
+    }
+  },
+  "security_audit": {
+    "issues": [
+      "JWT 密钥未设置"
+    ],
+    "jwt_secret_set": false,
+    "jwt_secret_length": 0,
+    "bcrypt_passwords": true,
+    "rate_limiting": true,
+    "input_validation": true
+  },
+  "performance_metrics": {},
+  "configuration_issues": [
+    "环境变量 MIMO_API_KEY 未设置",
+    "环境变量 DEEPSEEK_API_KEY 未设置",
+    "环境变量 KB_ADMIN_TOKEN 未设置",
+    "环境变量 KB_EMBEDDER_URL 未设置",
+    "环境变量 LOADER_URL 未设置",
+    ".env 文件中缺少 MIMO_API_KEY"
+  ],
+  "recommendations": [
+    "设置强 JWT 密钥",
+    "配置缺失的环境变量",
+    "修复失败的 API 端点: /api/system/stats, /api/cache/stats, /api/errors/stats, /api/search?q=test, /api/feature-flags, /api/auth/me, /api/metrics"
+  ]
+}

@@ -43,6 +43,9 @@ node_modules/
 *.trunk_bak
 *.leaf_bak
 *.wt_backup
+*.backup
+*.v2
+*.v42-bak
 
 # Frontend deploy target (source is frontend/, symlinked/copied to static/)
 frontend/static/

@@ -78,22 +78,18 @@ async def vector_recall(query: str, n_results: int = 30, category: str = "") -> 
                     "_source": "vector",
                     "_similarity": round(sim, 4),
                 })
-    except Exception:
-        logger.warning(f"[retrieval] suppressed exception", exc_info=True)
-        pass
+    except Exception as e:
+        logger.warning("vector_recall 操作失败: %s", e, exc_info=True)
     return results
 
 
-async def hybrid_search(query: str, chunks: list = None, category: str = "",
-                        file_type: str = "", date_from: str = "", date_to: str = "",
-                        top_k: int = 15, skip_cache: bool = False) -> list:
-    """
-    完整混合检索管线 (RAG 3.0):
-    L0: 语义缓存 → L1: Query 扩展(分词+同义词+LLM改写) → L1.5: HyDE → L2: BM25+向量双路 → 
-    L3: RRF 融合 + 动态 alpha → L4: 精排(精确/分类/个性化/MMR) → 
-    L5: Rerank → L6: Parent-Child + Sentence Window 上下文扩展
-    """
-    # L-1: QA对匹配（v1.42）— 口语化问题桥接，命中时跳过缓存
+# ============================================================
+# v11.0: hybrid_search 管道模式重构 — 每个检索阶段独立子函数
+# ============================================================
+
+
+async def _l_minus_1_qa_match(query: str) -> bool:
+    """L-1: QA对匹配 — 口语化问题桥接，命中时跳过缓存"""
     try:
         from src.db.memory_store import get_store
         store_inst = get_store()
@@ -102,98 +98,52 @@ async def hybrid_search(query: str, chunks: list = None, category: str = "",
             if qa_results:
                 qa_chunk_ids = [r.get("source_chunk_id") for r in qa_results if r.get("source_chunk_id")]
                 if qa_chunk_ids:
-                    skip_cache = True  # QA匹配命中时跳过缓存直接走全文检索
-                    logger.info(f"[Retrieval] QA pair match: {len(qa_chunk_ids)} source chunks for '{query[:30]}...'")
-    except Exception:
-        logger.debug("[suppressed] logger.info(f")
-        pass
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.info(f"[Retrieval] QA pair match: {len(qa_chunk_ids)} source chunks for '{query[:30]}...'")
+                    else:
+                        logger.info(f"[Retrieval] QA pair match: {len(qa_chunk_ids)} source chunks, query_len={len(query)}")
+                    return True
+    except Exception as e:
+        logger.warning("QA对匹配失败: %s", e, exc_info=True)
+    return False
 
-    # L0: 语义缓存（精确+相似查询命中直接返回）
-    if not skip_cache:
-        cached = await _check_cache(query, category, top_k)
-        if cached is not None:
-            return cached
-    
-    if chunks is None:
-        from src.db.data_store import load_chunks
-        chunks = load_chunks()
 
-    # L0: 图谱驱动路由 — 识别实体 → 锁定分类范围
+async def _l0_cache_check(query: str, category: str, top_k: int, skip_cache: bool) -> list | None:
+    """L0: 语义缓存检查 — 精确+相似查询命中直接返回"""
+    if skip_cache:
+        return None
+    return await _check_cache(query, category, top_k)
+
+
+async def _l0_graph_routing(query: str, category: str) -> str:
+    """L0: 图谱驱动路由 — 识别实体 → 锁定分类范围"""
     graph_categories = route_to_categories(query)
     if graph_categories and not category:
-        # 图谱命中了分类 → 优先在相关分类中检索
-        category = graph_categories[0]  # 主分类
+        category = graph_categories[0]
         logger.info(f"[graph-router] Query '{query}' → categories: {graph_categories}, main: {category}")
-    
-    # L1: Query 扩展（+ 同义词 + LLM 改写）
-    expanded_q = expand_query_with_synonyms(query)
-    rewritten = expand_query(expanded_q)
-    # L1-P2: LLM 驱动查询改写（与 HyDE 并行）
+    return category
+
+
+async def _l1_2_bm25_search(query: str, rewritten: str, top_k: int,
+                              category: str = "", llm_rewritten: str = None,
+                              file_type: str = "", date_from: str = "", date_to: str = "") -> list:
+    """L1+L2: BM25 检索 — 支持 LLM 改写双路检索"""
     llm_rewrite_task = asyncio.create_task(llm_rewrite_query(query))
 
-    # L1.5 + L2: HyDE + BM25 + 向量三路并行 (v10.1)
-    async def _bm25_search():
+    async def _bm25_inner():
         store = get_store()
         r = store.hierarchical_search(rewritten, summary_top_k=5, chunk_top_k=top_k * 3)
         if not r:
             r = store.keyword_search(rewritten, top_k)
         return r
-    
-    async def _hyde_and_vector():
-        hyde_t = await hyde_expand_query(query)
-        sq = hyde_t if hyde_t else query
-        vec_r = await vector_recall(sq, top_k * 2)
-        if hyde_t:
-            hyde_vec_r = await vector_recall(query, top_k)
-            vec_r = _merge_vector_results(vec_r, hyde_vec_r)
-        return vec_r
-    
-    hyde_task = asyncio.create_task(_hyde_and_vector())
-    
-    # L1.75: Wiki summary vector recall (with worldtree fallback)
-    async def _wiki_recall():
-        wiki_hits = []
-        try:
-            q_emb = await embed_texts([query])
-            if q_emb and q_emb[0]:
-                try:
-                    from src.services.wiki import get_wiki_engine
-                    we = get_wiki_engine()
-                    wiki_hits = we.vector_search_wiki(q_emb[0], top_k=3)
-                except ModuleNotFoundError:
-                    # Fallback: keyword search in worldtree.db wiki_pages
-                    import sqlite3
-                    from src.config import WORLDTREE_DB_PATH
-                    wt_db = sqlite3.connect(str(WORLDTREE_DB_PATH), timeout=10)
-                    wt_db.execute("PRAGMA journal_mode=WAL")
-                    wt_db.execute("PRAGMA busy_timeout=5000")
-                    wt_db.row_factory = sqlite3.Row
-                    rows = wt_db.execute(
-                        "SELECT id, title, summary, category_path FROM wiki_pages WHERE title LIKE ? OR summary LIKE ? LIMIT 5",
-                        (f"%{query}%", f"%{query}%")
-                    ).fetchall()
-                    wt_db.close()
-                    for r in rows:
-                        d = dict(r)
-                        wiki_hits.append({
-                            "wiki_id": d["id"],
-                            "title": d["title"],
-                            "category": d.get("category_path", "") or "",
-                            "similarity": 0.7
-                        })
-        except Exception as e:
-            logger.warning(f"[Wiki recall] {e}")
-        return wiki_hits
-    
-    wiki_task = asyncio.create_task(_wiki_recall())
-    
-    # L1-P2: 等待 LLM Rewrite 结果，若有改写则双路检索
+
     try:
-        llm_rewritten = await asyncio.wait_for(llm_rewrite_task, timeout=10.0)
+        llm_rewritten_result = await asyncio.wait_for(llm_rewrite_task, timeout=10.0)
     except (asyncio.TimeoutError, Exception):
-        llm_rewritten = None
-    if llm_rewritten and llm_rewritten != query:
-        _rewritten_for_bm25 = expand_query(expand_query_with_synonyms(llm_rewritten))
+        llm_rewritten_result = None
+
+    if llm_rewritten_result and llm_rewritten_result != query:
+        _rewritten_for_bm25 = expand_query(expand_query_with_synonyms(llm_rewritten_result))
         async def _retrieve_with_rewrite():
             store = get_store()
             r = store.hierarchical_search(_rewritten_for_bm25, category, file_type, date_from, date_to,
@@ -203,11 +153,26 @@ async def hybrid_search(query: str, chunks: list = None, category: str = "",
             return r
         results = await _retrieve_with_rewrite()
     else:
-        results = await _bm25_search()
+        results = await _bm25_inner()
+
     for i, r in enumerate(results):
         r["_bm25_rank"] = i + 1
         r["_source"] = "bm25"
-    
+    return results
+
+
+async def _l15_l2_hyde_vector(query: str, top_k: int) -> list:
+    """L1.5+L2: HyDE 扩展 + 向量语义召回"""
+    async def _hyde_and_vector():
+        hyde_t = await hyde_expand_query(query)
+        sq = hyde_t if hyde_t else query
+        vec_r = await vector_recall(sq, top_k * 2)
+        if hyde_t:
+            hyde_vec_r = await vector_recall(query, top_k)
+            vec_r = _merge_vector_results(vec_r, hyde_vec_r)
+        return vec_r
+
+    hyde_task = asyncio.create_task(_hyde_and_vector())
     try:
         vector_results = await asyncio.wait_for(hyde_task, timeout=15.0)
     except asyncio.TimeoutError:
@@ -216,15 +181,53 @@ async def hybrid_search(query: str, chunks: list = None, category: str = "",
     for i, r in enumerate(vector_results):
         r["_vector_rank"] = i + 1
         r["_source"] = "vector"
+    return vector_results
 
+
+async def _l175_wiki_recall(query: str) -> list:
+    """L1.75: Wiki summary 向量召回（含 worldtree fallback）"""
+    wiki_hits = []
+    try:
+        q_emb = await embed_texts([query])
+        if q_emb and q_emb[0]:
+            try:
+                from src.services.wiki import get_wiki_engine
+                we = get_wiki_engine()
+                wiki_hits = we.vector_search_wiki(q_emb[0], top_k=3)
+            except ModuleNotFoundError:
+                # Fallback: keyword search in worldtree.db wiki_pages
+                import sqlite3
+                from src.config import WORLDTREE_DB_PATH
+                wt_db = sqlite3.connect(str(WORLDTREE_DB_PATH), timeout=10)
+                wt_db.execute("PRAGMA journal_mode=WAL")
+                wt_db.execute("PRAGMA busy_timeout=5000")
+                wt_db.row_factory = sqlite3.Row
+                rows = wt_db.execute(
+                    "SELECT id, title, summary, category_path FROM wiki_pages WHERE title LIKE ? OR summary LIKE ? LIMIT 5",
+                    (f"%{query}%", f"%{query}%")
+                ).fetchall()
+                wt_db.close()
+                for r in rows:
+                    d = dict(r)
+                    wiki_hits.append({
+                        "wiki_id": d["id"],
+                        "title": d["title"],
+                        "category": d.get("category_path", "") or "",
+                        "similarity": 0.7
+                    })
+    except Exception as e:
+        logger.warning(f"[Wiki recall] {e}")
+    return wiki_hits
+
+
+def _l3_fusion_and_boost(bm25_results: list, vector_results: list,
+                          query: str, wiki_hits: list, table_results: list,
+                          top_k: int) -> list:
+    """L3+L4: RRF 融合 + Wiki/Table 注入 + 排序 + 精排"""
     # L3: RRF 融合
-    merged = rrf_fusion(results, vector_results, k=60)
-
-    # RAG 3.0: Multi-View 表格视图 (第四路召回)
-    table_task = asyncio.create_task(_table_recall(query, chunks, top_k))
+    merged = rrf_fusion(bm25_results, vector_results, k=60)
 
     # Wiki results injection
-    wiki_hits = await wiki_task
     if wiki_hits:
         for wh in wiki_hits:
             merged.append({
@@ -238,49 +241,47 @@ async def hybrid_search(query: str, chunks: list = None, category: str = "",
                 "_wiki_id": wh["wiki_id"],
                 "_wiki_title": wh["title"],
             })
-    
-    # RAG 3.0: Table view results injection
-    table_results = await table_task
+
+    # Table view results injection
     if table_results:
         for tr in table_results:
             merged.append({**tr, "_source": "table_view"})
         logger.info(f"[TableView] injected {len(table_results)} table results")
-    
+
     merged.sort(key=lambda x: float(x.get("score", 0)), reverse=True)
-    merged = weighted_fusion_adjust(query, merged, results, vector_results)
+    merged = weighted_fusion_adjust(query, merged, bm25_results, vector_results)
     if not merged:
-        merged = results[:top_k * 3]
+        merged = bm25_results[:top_k * 3]
 
     # L4: 三阶段精排
     merged = exact_match_boost(query, merged)
     merged = dynamic_category_weight(query, merged)
     merged = personalized_boost(query, merged)
     merged = mmr_dedup(merged, diversity_weight=0.25, top_k=top_k * 2)
+    return merged
 
-    # L5: Rerank（同步优先 + 异步回退）
-    # 先尝试同步获取精排结果；超时/失败则异步后台完成
+
+async def _l5_l6_postprocess(query: str, merged: list, chunks: list, top_k: int) -> list:
+    """L5+L6: Rerank + 上下文扩展 + Parent-Child 展开"""
     for r in merged:
         r["_query"] = query
     merged = expand_context(merged, None, 2, 2, 3000)
-    
-    # P1-3: Parent-Child expansion — when a parent chunk is hit, attach its child chunks
     merged = _expand_parent_child(merged, chunks)
-    
+
     rerank_result = await _rerank_layer(query, list(merged), top_k * 2)
     if rerank_result:
         merged = rerank_result
-    # 注意：rerank_layer 内部已有完整的降级链，不再需要额外的异步重试
-    # 如果 rerank 失败，merged 保持 RRF+精排的结果直接返回
+    return merged
 
-    result = merged[:top_k]
-    
-    # P1.1.1: 统一返回格式 — 添加 context 和 meta 字段
+
+def _format_results(result: list, query: str, merged: list) -> list:
+    """P1.1.1: 统一返回格式 — 添加 context 和 meta 字段"""
     context_parts = []
     for r in result:
         text = r.get("text", "") or r.get("chunk_text", "")
         if text:
             context_parts.append(text[:500])
-    
+
     meta = {
         "query": query,
         "total_candidates": len(merged),
@@ -288,19 +289,95 @@ async def hybrid_search(query: str, chunks: list = None, category: str = "",
         "sources": list(set(r.get("_source", "unknown") for r in result)),
         "pipeline": "hybrid_v3",
     }
-    
-    # 在每个结果中注入统一字段
+
     for r in result:
         r["context"] = context_parts
         r["meta"] = meta
-    
-    # RAG 3.0: 写入语义缓存
+    return result
+
+
+async def hybrid_search(query: str, chunks: list = None, category: str = "",
+                        file_type: str = "", date_from: str = "", date_to: str = "",
+                        top_k: int = 15, skip_cache: bool = False) -> list:
+    """
+    完整混合检索管线 (RAG 3.0) — v11.0 管道模式重构。
+
+    管线阶段:
+      L-1: QA对匹配 → L0: 缓存+图谱路由 → L1/L2: BM25+HyDE向量并行 →
+      L1.75: Wiki召回 → L3/L4: RRF融合+精排+去重 → L5/L6: Rerank+上下文扩展
+
+    Args:
+        query: 用户查询字符串
+        chunks: 预加载的文档块列表（可选）
+        category: 分类过滤
+        file_type: 文件类型过滤
+        date_from: 起始日期
+        date_to: 截止日期
+        top_k: 返回结果数
+        skip_cache: 是否跳过缓存
+
+    Returns:
+        检索结果列表，每个结果含 context 和 meta 字段
+    """
+    # L-1: QA对匹配
+    if not skip_cache:
+        skip_cache = await _l_minus_1_qa_match(query)
+
+    # L0: 语义缓存
+    cached = await _l0_cache_check(query, category, top_k, skip_cache)
+    if cached is not None:
+        return cached
+
+    if chunks is None:
+        from src.db.data_store import load_chunks
+        chunks = load_chunks()
+
+    # L0: 图谱路由
+    category = await _l0_graph_routing(query, category)
+
+    # L1: Query 扩展
+    expanded_q = expand_query_with_synonyms(query)
+    rewritten = expand_query(expanded_q)
+
+    # L1+L2: BM25 检索（含 LLM 改写双路）
+    bm25_task = asyncio.create_task(
+        _l1_2_bm25_search(query, rewritten, top_k, category, None, file_type, date_from, date_to)
+    )
+
+    # L1.5+L2: HyDE 向量检索
+    vector_task = asyncio.create_task(_l15_l2_hyde_vector(query, top_k))
+
+    # L1.75: Wiki 召回
+    wiki_task = asyncio.create_task(_l175_wiki_recall(query))
+
+    # RAG 3.0: Multi-View 表格视图
+    table_task = asyncio.create_task(_table_recall(query, chunks, top_k))
+
+    # 等待 BM25 和向量结果
+    results = await bm25_task
+    vector_results = await vector_task
+
+    # 等待 Wiki 和 Table 结果
+    wiki_hits = await wiki_task
+    table_results = await table_task
+
+    # L3+L4: RRF 融合 + 精排
+    merged = _l3_fusion_and_boost(results, vector_results, query, wiki_hits, table_results, top_k)
+
+    # L5+L6: Rerank + 上下文扩展
+    merged = await _l5_l6_postprocess(query, merged, chunks, top_k)
+
+    result = merged[:top_k]
+
+    # 统一返回格式
+    result = _format_results(result, query, merged)
+
+    # 写入语义缓存
     try:
         from src.services.cache import set_cache as _set_cache_sync
         await _set_cache_sync(query, result, category, top_k)
     except Exception as e:
-
-        logger.warning("suppressed exception", exc_info=True)
+        logger.warning("缓存写入失败: %s", e, exc_info=True)
     return result
 
 
@@ -327,7 +404,7 @@ async def _rerank_layer(query: str, candidates: list, top_k: int = 30) -> list:
             logger.debug(f'intermediate-rerank top score: {rr_score:.4f}, source: {first.get("_source", "?")}')
             return ranked
     except Exception as e:
-        logger.warning(f'intermediate-rerank fallback: {e}')
+        logger.warning("intermediate-rerank 降级: %s", e, exc_info=True)
     # 最终兜底：返回原始排序
     return candidates[:top_k]
 
@@ -338,7 +415,8 @@ async def _check_cache(query: str, category: str, top_k: int):
     try:
         from src.services.cache import get_cache
         return await get_cache(query, category, top_k)
-    except Exception:
+    except Exception as e:
+        logger.warning("Exception 失败: %s", e, exc_info=True)
         return None
 
 async def _set_cache(query: str, results: list, category: str, top_k: int):
@@ -346,14 +424,14 @@ async def _set_cache(query: str, results: list, category: str, top_k: int):
         from src.services.cache import set_cache
         await set_cache(query, results, category, top_k)
     except Exception as e:
-
-        logger.warning("suppressed exception", exc_info=True)
+        logger.warning("_set_cache 操作失败: %s", e, exc_info=True)
 # RAG 3.0: Multi-View 表格视图
 async def _table_recall(query: str, chunks: list, top_k: int) -> list:
     try:
         from src.services.table_view import table_view_recall
         return await table_view_recall(query, chunks, top_k)
-    except Exception:
+    except Exception as e:
+        logger.warning("Exception 失败: %s", e, exc_info=True)
         return []
 
 

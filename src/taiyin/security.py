@@ -82,6 +82,7 @@ def sanitize_user_input(query: str) -> Optional[str]:
     """检测并拦截 Prompt 注入，返回 None 表示拦截"""
     for pat in INJECTION_PATTERNS:
         if re.search(pat, query, re.IGNORECASE):
-            logger.warning(f"[Security] Prompt injection detected: {query[:100]}")
+            pat_name = pat[:40].replace('\n', ' ')
+            logger.warning(f"[Security] Prompt injection detected: pattern={pat_name}, query_len={len(query)}")
             return None
     return query.strip()

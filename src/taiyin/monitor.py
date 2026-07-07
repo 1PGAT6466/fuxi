@@ -15,6 +15,7 @@ def setup_error_handlers(app):
         from fastapi.responses import JSONResponse
 
         @app.exception_handler(Exception)
+        # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
         async def global_exception_handler(request: Request, exc: Exception):
             logger.error(f"[Monitor] 未处理异常: {exc}")
             return JSONResponse(
@@ -23,6 +24,7 @@ def setup_error_handlers(app):
             )
 
         @app.exception_handler(404)
+        # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
         async def not_found_handler(request: Request, exc):
             return JSONResponse(
                 status_code=404,

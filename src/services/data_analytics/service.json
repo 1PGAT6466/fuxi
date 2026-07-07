@@ -1,0 +1,11 @@
+{
+  "id": "data-analytics",
+  "name": "数据分析服务",
+  "version": "1.0.0",
+  "description": "知识库数据分析、统计报表、趋势图生成",
+  "service_type": "data",
+  "api_prefix": "/api/analytics",
+  "health_endpoint": "/health",
+  "capabilities": ["stats", "report", "trend", "export", "dashboard"],
+  "config": {}
+}

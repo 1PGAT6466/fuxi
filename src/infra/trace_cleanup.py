@@ -10,7 +10,8 @@ from typing import List
 
 logger = logging.getLogger("infra.trace_cleanup")
 
-TRACE_DIR = Path("data/traces")
+from src.config import DATA_DIR as CONFIG_DATA_DIR
+TRACE_DIR = Path(CONFIG_DATA_DIR) / "traces"
 RETENTION_DAYS = 7
 
 
@@ -20,6 +21,7 @@ class TraceCleanup:
     def __init__(self, trace_dir: Path = TRACE_DIR, retention_days: int = RETENTION_DAYS):
         self.trace_dir = trace_dir
         self.retention_days = retention_days
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def cleanup(self) -> Dict:
         """清理过期的trace文件"""
@@ -59,8 +61,8 @@ class TraceCleanup:
                     "modified": stat.st_mtime,
                     "age_days": (time.time() - stat.st_mtime) / 86400,
                 })
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Exception 失败: %s", e, exc_info=True)
 
         return sorted(files, key=lambda x: x["modified"], reverse=True)
 

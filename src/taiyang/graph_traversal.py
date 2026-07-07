@@ -93,7 +93,8 @@ def _get_neighbors_from_db(entity_id: str) -> List[tuple]:
         ).fetchall()
         conn.close()
         return rows
-    except Exception:
+    except Exception as e:
+        logger.warning("Exception 失败: %s", e, exc_info=True)
         return []
 
 

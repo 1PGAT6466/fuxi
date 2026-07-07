@@ -13,6 +13,7 @@ except ImportError:
     jieba = None
 
 
+# DEPRECATED: 未使用，v1.50 标记待删除
 def _sanitize_filename(fn: str) -> str:
     # 去除非法字符 + 截断到 180 字符（留 buffer 给 file_hash 前缀）
     safe = re.sub(r'[<>:"/\\|?*]', '_', fn).replace("..", "_").strip()
@@ -25,6 +26,7 @@ def _sanitize_filename(fn: str) -> str:
         safe = f"{name}.{ext}"
     return safe
 
+# DEPRECATED: 未使用，v1.50 标记待删除
 
 def _classify_text(text: str, file_type: str = "") -> str:
     """统一分类：基于文件名+扩展名+内容的加权打分（C1-C4 内联版本）"""
@@ -57,6 +59,7 @@ def _classify_text(text: str, file_type: str = "") -> str:
     if any(k in t for k in ["财务","预算","税务","审计","发票"]):
         return "财务文档"
     return "通用办公"
+# DEPRECATED: 未使用，v1.50 标记待删除
 
 
 def _audit_text(text: str, sensitive_patterns: list = None) -> tuple:
@@ -68,6 +71,7 @@ def _audit_text(text: str, sensitive_patterns: list = None) -> tuple:
         if pat.search(safe):
             flags.append("检测到敏感信息")
             safe = pat.sub("[已脱敏]", safe)
+    # DEPRECATED: 未使用，v1.50 标记待删除
     return safe, flags
 
 
@@ -95,6 +99,7 @@ def _clean_text(raw: str) -> str:
     # 乱码字符（连续 3+ 个非中英数字符）
     raw = re.sub(r'[^\w\s\u4e00-\u9fff\u3000-\u303f，。！？；：“”‘’（）【】《》、…—·\-\+\.\/]{3,}', ' ', raw)
     
+    # DEPRECATED: 未使用，v1.50 标记待删除
     raw = re.sub(r'\n{4,}', '\n\n\n', raw)
     return raw.strip()
 
@@ -119,6 +124,7 @@ def _generate_summary(text: str, max_len: int = 200) -> str:
     kw_str = "、".join(keywords[:5]) if keywords else ""
     summary = f"[文档摘要] {first_para}"
     if kw_str:
+        # DEPRECATED: 未使用，v1.50 标记待删除
         summary += f"\n[关键词] {kw_str}"
     return summary
 
@@ -241,6 +247,7 @@ def _extract_pdf_dual(file_path: str) -> str:
             except Exception:
                 lines.append(f"[Page {i+1}/{total}] skipped")
         return "\n".join(lines)
+    # DEPRECATED: 未使用，v1.50 标记待删除
     except Exception as e:
         return f"[PDF 解析失败: {e}]"
     
@@ -259,267 +266,372 @@ def _compute_file_hash(file_path: str) -> str:
     return sha.hexdigest()
 
 
-def _extract_text(file_path: str, ext: str) -> str:
-    path = Path(file_path)
+# ============================================================
+# v16.0: _extract_text 策略模式重构 — 每个文件类型独立处理函数
+# ============================================================
+
+# 纯文本扩展名集合（UTF-8 直接读取）
+_PLAINTEXT_EXTS = frozenset([
+    ".txt", ".md", ".csv", ".cfg", ".log", ".ini", ".conf", ".json", ".xml", ".html", ".htm",
+    ".py", ".js", ".ts", ".java", ".c", ".cpp", ".h", ".sh", ".bat", ".ps1", ".yaml", ".yml",
+])
+
+# 二进制/不可读格式集合（仅记录文件名）
+_BINARY_EXTS = frozenset([
+    ".deb", ".dwg", ".dxf", ".stp", ".step", ".igs", ".iges",
+    ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg",
+    ".exe", ".msi", ".apk", ".dmg", ".pkg", ".rpm", ".7z", ".rar", ".tar.gz", ".gz",
+    ".bin", ".iso", ".img", ".dll", ".so", ".o", ".a", ".lib",
+    ".mp3", ".mp4", ".avi", ".mkv", ".wav", ".flac", ".mov", ".wmv",
+])
+
+# ZIP 内支持递归解析的文件扩展名
+_ZIP_SUPPORTED_EXTS = frozenset([
+    '.txt', '.md', '.csv', '.log', '.json', '.xml', '.html', '.htm',
+    '.cfg', '.ini', '.conf', '.docx', '.doc', '.xlsx', '.xls', '.pdf', '.pptx', '.ppt',
+])
+
+# 自愈层：扩展名 → pip 安装候选（按优先级排列）
+_SELF_HEAL_MAP = {
+    "msg": ["extract-msg", "msg-parser"],
+    "eml": ["mail-parser"],
+    "wps": ["python-docx"],
+    "rtf": ["striprtf", "pyth"],
+    "ods": ["odfpy", "ezodf"],
+    "odt": ["odfpy", "python-docx"],
+    "epub": ["ebooklib", "epub2txt"],
+    "djvu": ["djvulibre-python"],
+    "ps": ["ghostscript"],
+    "ai": ["pdf2image"],
+    "cdr": ["pdf2image"],
+    "one": ["python-docx"],
+    "vsd": ["python-docx"],
+    "vsdx": ["python-docx"],
+    "mpp": ["python-docx"],
+    "pub": ["python-docx"],
+}
+
+
+def _extract_plaintext(path: Path) -> str:
+    """提取纯文本文件内容（UTF-8 编码）"""
+    return path.read_text(encoding="utf-8", errors="ignore")
+
+
+def _extract_docx(path: Path) -> str:
+    """提取 .docx 文件内容"""
+    from docx import Document
+    return "\n".join(p.text for p in Document(str(path)).paragraphs if p.text.strip())
+
+
+def _extract_doc(path: Path) -> str:
+    """提取 .doc 文件内容（antiword → python-docx 回退）"""
+    import subprocess
+    # 路1: antiword 命令行工具
     try:
-        if ext in [".txt",".md",".csv",".cfg",".log",".ini",".conf",".json",".xml",".html",".htm",
-                  ".py",".js",".ts",".java",".c",".cpp",".h",".sh",".bat",".ps1",".yaml",".yml"]:
-            return path.read_text(encoding="utf-8", errors="ignore")
-        elif ext == ".docx":
-            from docx import Document
-            return "\n".join(p.text for p in Document(str(path)).paragraphs if p.text.strip())
-        elif ext == ".doc":
-            # 老式 .doc 二进制格式 → antiword 转换
-            import subprocess
-            try:
-                result = subprocess.run(
-                    ["antiword", "-m", "UTF-8.txt", str(path)],
-                    capture_output=True, text=True, timeout=30
-                )
-                if result.returncode == 0 and result.stdout.strip():
-                    return result.stdout.strip()
-            except Exception:
-                logger.warning(f"[ingest] suppressed exception", exc_info=True)
-                pass
-            # 回退: .doc 也可能是 docx 格式，尝试用 python-docx 打开
-            try:
-                from docx import Document
-                return "\n".join(p.text for p in Document(str(path)).paragraphs if p.text.strip())
-            except Exception:
-                return ""
-        elif ext == ".wps":
-            # WPS 格式尝试用 python-docx（新版 WPS 可能是 docx 格式）
-            try:
-                from docx import Document
-                return "\n".join(p.text for p in Document(str(path)).paragraphs if p.text.strip())
-            except Exception:
-                return ""
-        elif ext == ".xlsx":
-            import openpyxl
-            wb = openpyxl.load_workbook(str(path), read_only=True, data_only=True)
-            lines = []
-            for sn in wb.sheetnames:
-                ws = wb[sn]
-                rows = list(ws.iter_rows(values_only=True))
-                if not rows:
-                    continue
-                lines.append(f"[Sheet: {sn}] 行数={len(rows)}")
-                headers = [str(c) if c is not None else "" for c in rows[0]]
-                lines.append(f"[列名] {' | '.join(headers)}")
-                for row in rows[1:]:
-                    vals = []
-                    for j, c in enumerate(row):
-                        if c is None:
-                            continue
-                        col_name = headers[j] if j < len(headers) else f"Col{j}"
-                        vals.append(f"{col_name}={c}")
-                    if vals:
-                        lines.append(" | ".join(vals))
-            wb.close()
-            return "\n".join(lines)
-        elif ext == ".xls":
-            import xlrd
-            wb = xlrd.open_workbook(str(path))
-            lines = []
-            for sn in wb.sheet_names():
-                ws = wb.sheet_by_name(sn)
-                if ws.nrows == 0:
-                    continue
-                lines.append(f"[Sheet: {sn}] 行数={ws.nrows}")
-                headers = [str(ws.cell_value(0, j)) for j in range(ws.ncols)]
-                lines.append(f"[列名] {' | '.join(headers)}")
-                for r in range(1, ws.nrows):
-                    vals = []
-                    for j in range(ws.ncols):
-                        v = ws.cell_value(r, j)
-                        if v == "" or v is None:
-                            continue
-                        col_name = headers[j] if j < len(headers) else f"Col{j}"
-                        vals.append(f"{col_name}={v}")
-                    if vals:
-                        lines.append(" | ".join(vals))
-            return "\n".join(lines)
-        elif ext == ".pdf":
-            # v10.0: 双轨 PDF 解析 — pdfplumber 主力 + PyPDF2 回退
-            return _extract_pdf_dual(str(path))
-        elif ext in [".pptx",".ppt"]:
-            # python-pptx for .pptx, olefile fallback for .ppt
-            try:
-                from pptx import Presentation
-                slides = []
-                for i, sl in enumerate(Presentation(str(path)).slides):
-                    t = [f"[Slide {i+1}]"]
-                    for sh in sl.shapes:
-                        if sh.has_text_frame:
-                            t.append(sh.text_frame.text)
-                    if sl.has_notes_slide and sl.notes_slide.notes_text_frame:
-                        notes = sl.notes_slide.notes_text_frame.text.strip()
-                        if notes:
-                            t.append("[Notes] " + notes)
-                    slides.append("\n".join(t))
-                result = "\n\n".join(slides)
-                if len(result.strip()) > 50:
-                    return result
-            except Exception:
-                logger.warning(f"[ingest] suppressed exception", exc_info=True)
-                pass
-            # olefile fallback for legacy .ppt
-            try:
-                import olefile, re
-                ole = olefile.OleFileIO(str(path))
-                texts = []
-                for stream in ole.listdir():
-                    try:
-                        raw = ole.openstream(stream).read()
-                        try:
-                            t = raw.decode("utf-16-le", errors="ignore")
-                        except Exception:
-                            continue
-                        t = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", t)
-                        t = t.strip()
-                        if len(t) > 20:
-                            texts.append(t)
-                    except Exception:
-                        logger.warning(f"[ingest] suppressed exception", exc_info=True)
-                        pass
-                ole.close()
-                result = "\n\n".join(texts)
-                if len(result.strip()) > 100:
-                    return result
-            except Exception:
-                logger.warning(f"[ingest] suppressed exception", exc_info=True)
-                pass
-            return ""
-        elif ext == ".zip":
-            import zipfile, tempfile, shutil
-            lines = []
-            try:
-                with zipfile.ZipFile(str(path), 'r') as zf:
-                    for name in zf.namelist():
-                        if name.endswith('/'):
-                            continue
-                        inner_ext = os.path.splitext(name)[1].lower()
-                        # 只处理可读文件格式
-                        supported = ['.txt','.md','.csv','.log','.json','.xml','.html','.htm','.cfg','.ini','.conf','.docx','.doc','.xlsx','.xls','.pdf','.pptx','.ppt']
-                        if inner_ext not in supported:
-                            continue
-                        try:
-                            with zf.open(name) as inner_f:
-                                content = inner_f.read()
-                            # 写入临时文件用 _extract_text 递归解析
-                            tmp_dir = tempfile.mkdtemp()
-                            tmp_path = os.path.join(tmp_dir, os.path.basename(name))
-                            with open(tmp_path, 'wb') as tmp_f:
-                                tmp_f.write(content)
-                            inner_text = _extract_text(tmp_path, inner_ext)
-                            shutil.rmtree(tmp_dir, ignore_errors=True)
-                            if inner_text.strip():
-                                lines.append(f"[ZIP内: {name}]\n{inner_text[:2000]}")
-                        except Exception:
-                            lines.append(f"[ZIP内: {name}] 提取失败")
-                return "\n\n---\n\n".join(lines[:20])  # 最多 20 个文件
-            except Exception as e:
-                return f"[ZIP提取失败: {e}]"
-        elif ext in [".deb",".dwg",".dxf",".stp",".step",".igs",".iges",
-                    ".jpg",".jpeg",".png",".gif",".bmp",".svg",
-                    ".exe",".msi",".apk",".dmg",".pkg",".rpm",".7z",".rar",".tar.gz",".gz",
-                    ".bin",".iso",".img",".dll",".so",".o",".a",".lib",
-                    ".mp3",".mp4",".avi",".mkv",".wav",".flac",".mov",".wmv"]:
-            # 二进制/图纸/图片/安装包格式 — 仅记录文件名，无文本
-            return f"[文件: {path.name}] (二进制格式，无文本提取)"
-        else:
-            # 未知格式：尝试作为 UTF-8 文本读取
-            try:
-                return path.read_text(encoding="utf-8", errors="replace")
-            except Exception:
-                return f"[文件: {path.name}] (未知格式)"
+        result = subprocess.run(
+            ["antiword", "-m", "UTF-8.txt", str(path)],
+            capture_output=True, text=True, timeout=30
+        )
+        if result.returncode == 0 and result.stdout.strip():
+            return result.stdout.strip()
+    except Exception:
+        logger.warning(f"[ingest] suppressed exception", exc_info=True)
+    # 路2: 回退到 python-docx
+    try:
+        return _extract_docx(path)
     except Exception as e:
-        return f"[提取失败: {e}]"
-    # === 通用降级解析器：尝试 raw text + 二进制扫描 ===
+        logger.warning("Exception 失败: %s", e, exc_info=True)
+        return ""
+
+
+def _extract_wps(path: Path) -> str:
+    """提取 .wps 文件内容（新版 WPS 可能是 docx 格式）"""
+    try:
+        return _extract_docx(path)
+    except Exception as e:
+        logger.warning("Exception 失败: %s", e, exc_info=True)
+        return ""
+
+
+def _extract_xlsx(path: Path) -> str:
+    """提取 .xlsx 文件内容为结构化文本"""
+    import openpyxl
+    wb = openpyxl.load_workbook(str(path), read_only=True, data_only=True)
+    lines = []
+    for sn in wb.sheetnames:
+        ws = wb[sn]
+        rows = list(ws.iter_rows(values_only=True))
+        if not rows:
+            continue
+        lines.append(f"[Sheet: {sn}] 行数={len(rows)}")
+        headers = [str(c) if c is not None else "" for c in rows[0]]
+        lines.append(f"[列名] {' | '.join(headers)}")
+        for row in rows[1:]:
+            vals = []
+            for j, c in enumerate(row):
+                if c is None:
+                    continue
+                col_name = headers[j] if j < len(headers) else f"Col{j}"
+                vals.append(f"{col_name}={c}")
+            if vals:
+                lines.append(" | ".join(vals))
+    wb.close()
+    return "\n".join(lines)
+
+
+def _extract_xls(path: Path) -> str:
+    """提取 .xls 文件内容为结构化文本"""
+    import xlrd
+    wb = xlrd.open_workbook(str(path))
+    lines = []
+    for sn in wb.sheet_names():
+        ws = wb.sheet_by_name(sn)
+        if ws.nrows == 0:
+            continue
+        lines.append(f"[Sheet: {sn}] 行数={ws.nrows}")
+        headers = [str(ws.cell_value(0, j)) for j in range(ws.ncols)]
+        lines.append(f"[列名] {' | '.join(headers)}")
+        for r in range(1, ws.nrows):
+            vals = []
+            for j in range(ws.ncols):
+                v = ws.cell_value(r, j)
+                if v == "" or v is None:
+                    continue
+                col_name = headers[j] if j < len(headers) else f"Col{j}"
+                vals.append(f"{col_name}={v}")
+            if vals:
+                lines.append(" | ".join(vals))
+    return "\n".join(lines)
+
+
+def _extract_pptx_modern(path: Path) -> str:
+    """提取 .pptx 文件内容（python-pptx）"""
+    from pptx import Presentation
+    slides = []
+    for i, sl in enumerate(Presentation(str(path)).slides):
+        t = [f"[Slide {i+1}]"]
+        for sh in sl.shapes:
+            if sh.has_text_frame:
+                t.append(sh.text_frame.text)
+        if sl.has_notes_slide and sl.notes_slide.notes_text_frame:
+            notes = sl.notes_slide.notes_text_frame.text.strip()
+            if notes:
+                t.append("[Notes] " + notes)
+        slides.append("\n".join(t))
+    result = "\n\n".join(slides)
+    if len(result.strip()) > 50:
+        return result
+    return ""
+
+
+def _extract_ppt_legacy(path: Path) -> str:
+    """提取旧版 .ppt 文件内容（olefile）"""
+    import olefile
+    ole = olefile.OleFileIO(str(path))
+    texts = []
+    for stream in ole.listdir():
+        try:
+            raw = ole.openstream(stream).read()
+            try:
+                t = raw.decode("utf-16-le", errors="ignore")
+            except Exception:
+                continue
+            t = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", t)
+            t = t.strip()
+            if len(t) > 20:
+                texts.append(t)
+        except Exception:
+            pass
+    ole.close()
+    result = "\n\n".join(texts)
+    if len(result.strip()) > 100:
+        return result
+    return ""
+
+
+def _extract_pptx(path: Path) -> str:
+    """提取 .pptx/.ppt 文件内容（pptx 优先，legacy ole 回退）"""
+    try:
+        result = _extract_pptx_modern(path)
+        if result:
+            return result
+    except Exception:
+        logger.warning(f"[ingest] suppressed exception", exc_info=True)
+    try:
+        return _extract_ppt_legacy(path)
+    except Exception:
+        logger.warning(f"[ingest] suppressed exception", exc_info=True)
+    return ""
+
+
+def _extract_zip(path: Path) -> str:
+    """提取 .zip 压缩包内可读文件的内容（递归解析，最多 20 个内部文件）"""
+    import zipfile, tempfile, shutil
+    lines = []
+    try:
+        with zipfile.ZipFile(str(path), 'r') as zf:
+            for name in zf.namelist():
+                if name.endswith('/'):
+                    continue
+                inner_ext = os.path.splitext(name)[1].lower()
+                if inner_ext not in _ZIP_SUPPORTED_EXTS:
+                    continue
+                try:
+                    with zf.open(name) as inner_f:
+                        content = inner_f.read()
+                    tmp_dir = tempfile.mkdtemp()
+                    tmp_path = os.path.join(tmp_dir, os.path.basename(name))
+                    with open(tmp_path, 'wb') as tmp_f:
+                        tmp_f.write(content)
+                    inner_text = _extract_text(tmp_path, inner_ext)
+                    shutil.rmtree(tmp_dir, ignore_errors=True)
+                    if inner_text.strip():
+                        lines.append(f"[ZIP内: {name}]\n{inner_text[:2000]}")
+                except Exception:
+                    lines.append(f"[ZIP内: {name}] 提取失败")
+        return "\n\n---\n\n".join(lines[:20])
+    except Exception as e:
+        return f"[ZIP提取失败: {e}]"
+
+
+def _extract_binary(path: Path) -> str:
+    """返回二进制/不可读格式的占位信息"""
+    return f"[文件: {path.name}] (二进制格式，无文本提取)"
+
+
+def _extract_generic_fallback(path: Path) -> str:
+    """通用降级解析器：尝试 raw bytes → UTF-8 → UTF-16 → latin-1"""
     try:
         with open(str(path), "rb") as f:
             raw = f.read()
-    except Exception:
+    except Exception as e:
+        logger.warning("Exception 失败: %s", e, exc_info=True)
         return ""
-    
-    # 1. 尝试 UTF-8 纯文本
+
+    # 尝试 UTF-8
     try:
         text = raw.decode("utf-8")
         if len(text.strip()) > 50:
             return text
     except Exception:
-        logger.warning(f"[ingest] suppressed exception", exc_info=True)
         pass
-    
-    # 2. 尝试 UTF-16 LE
+
+    # 尝试 UTF-16 LE
     try:
         text = raw.decode("utf-16-le")
-        import re
         text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text)
         if len(text.strip()) > 100:
             return text
     except Exception:
-        logger.warning(f"[ingest] suppressed exception", exc_info=True)
         pass
-    
-    # 3. 尝试 latin-1 + 提取可读行（二进制格式最后手段）
+
+    # 尝试 latin-1 + 可读行提取
     try:
         text = raw.decode("latin-1")
-        import re
-        lines = text.split("\n")
+        lines_list = text.split("\n")
         readable = []
-        for line in lines:
+        for line in lines_list:
             alpha_ratio = sum(1 for c in line if c.isalpha() or c.isspace()) / max(len(line), 1)
             if alpha_ratio > 0.6 and len(line.strip()) > 10:
                 readable.append(line.strip())
         if len(readable) > 3:
             return "\n".join(readable)
     except Exception:
-        logger.warning(f"[ingest] suppressed exception", exc_info=True)
         pass
-    
-    # === 智能自愈层：自动搜索并安装缺失的解析器 ===
-    ext_str = str(path).lower()
-    if "." in ext_str:
-        ext = ext_str.rsplit(".", 1)[-1]
-        import subprocess as _sp
+
+    return ""
+
+
+def _extract_self_heal(path: Path, ext: str) -> str:
+    """智能自愈层：检测缺失的解析依赖，提示用户安装并重试"""
+    candidates = _SELF_HEAL_MAP.get(ext, [])
+    if not candidates:
+        return ""
+    import importlib as _il
+    installed = None
+    for pkg in candidates:
         try:
-            _dn = _sp.DEVNULL if hasattr(_sp, 'DEVNULL') else open('/dev/null', 'w')
+            _il.import_module(pkg.replace("-", "_"))
+            installed = pkg
+            break
+        except ImportError:
+            continue
+    if not installed:
+        logger.warning(f"[ingest] 缺少解析依赖 {candidates[0]} (ext={ext})，请手动安装: pip install {candidates[0]}")
+        return ""
+    # 依赖已安装，递归调用 _extract_text 重新解析
+    return _extract_text(str(path), ext)
+
+
+# 扩展名 → 提取函数的调度字典（策略模式）
+_EXTRACTOR_DISPATCH = {
+    "docx": _extract_docx,
+    "doc": _extract_doc,
+    "wps": _extract_wps,
+    "xlsx": _extract_xlsx,
+    "xls": _extract_xls,
+    "pdf": lambda p: _extract_pdf_dual(str(p)),
+    "pptx": _extract_pptx,
+    "ppt": _extract_pptx,
+    "zip": _extract_zip,
+}
+
+
+def _extract_text(file_path: str, ext: str) -> str:
+    """
+    统一文档文本提取入口（v16.0 策略模式重构）。
+
+    根据文件扩展名分派到对应的提取函数：
+    - 纯文本扩展名 → UTF-8 直接读取
+    - 办公文档（docx/doc/wps/xlsx/xls/pdf/pptx/ppt/zip）→ 专用提取器
+    - 二进制格式（图片/音频/可执行文件等）→ 占位信息
+    - 其他 → 通用降级解析器 → 自愈层
+
+    Args:
+        file_path: 文件路径字符串
+        ext: 文件扩展名（含点号），如 ".pdf"、".docx"
+
+    Returns:
+        提取的文本内容字符串。失败时返回错误描述字符串。
+    """
+    path = Path(file_path)
+
+    # Phase 1: 已知格式 — 直接调度
+    try:
+        # 纯文本
+        if ext in _PLAINTEXT_EXTS:
+            return _extract_plaintext(path)
+
+        # 专用提取器（策略字典查找）
+        ext_key = ext.lstrip('.').lower()
+        extractor = _EXTRACTOR_DISPATCH.get(ext_key)
+        if extractor is not None:
+            return extractor(path)
+
+        # 二进制/不可读格式
+        if ext in _BINARY_EXTS:
+            return _extract_binary(path)
+
+        # 未知格式：尝试 UTF-8 文本读取
+        try:
+            return path.read_text(encoding="utf-8", errors="replace")
         except Exception:
-            _dn = None
-        known_map = {
-            "msg": ["extract-msg", "msg-parser"],
-            "eml": ["mail-parser"],
-            "wps": ["python-docx"],
-            "rtf": ["striprtf", "pyth"],
-            "ods": ["odfpy", "ezodf"],
-            "odt": ["odfpy", "python-docx"],
-            "epub": ["ebooklib", "epub2txt"],
-            "djvu": ["djvulibre-python"],
-            "ps": ["ghostscript"],
-            "ai": ["pdf2image"],
-            "cdr": ["pdf2image"],
-            "one": ["python-docx"],
-            "vsd": ["python-docx"],
-            "vsdx": ["python-docx"],
-            "mpp": ["python-docx"],
-            "pub": ["python-docx"],
-        }
-        candidates = known_map.get(ext, [])
-        if candidates:
-            import importlib as _il
-            installed = None
-            for pkg in candidates:
-                try:
-                    _il.import_module(pkg.replace("-", "_"))
-                    installed = pkg
-                    break
-                except ImportError:
-                    continue
-            if not installed:
-                logger.warning(f"[ingest] 缺少解析依赖 {candidates[0]} (ext={ext})，请手动安装: pip install {candidates[0]}")
-            if installed:
-                return _extract_text(path, ext)
+            return f"[文件: {path.name}] (未知格式)"
+
+    except Exception as e:
+        return f"[提取失败: {e}]"
+
+    # Phase 2: 通用降级（仅当 Phase 1 未 return 时到达）
+    result = _extract_generic_fallback(path)
+    if result:
+        return result
+
+    # Phase 3: 智能自愈
+    ext_key = ext.lstrip('.').lower() if '.' in ext else ext
+    healed = _extract_self_heal(path, ext_key)
+    if healed:
+        return healed
+
     return ""
 
 
@@ -638,39 +750,15 @@ def chunk_image(file_path: str, ocr_text: str = "") -> List[str]:
 # ============================================================
 # 入库引擎
 # ============================================================
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
-async def ingest_document(
-    parse_result: Dict,
-    file_name: str = "",
-    category: str = "",
-    embed_fn=None,
-    vector_store=None,
-    table_store=None,
-    memory_store=None
-) -> Dict:
-    """
-    统一入库一个文档
-    
-    参数:
-      parse_result: 解析器输出 {type, text, metadata, tables, images}
-      file_name: 原始文件名
-      category: 文档分类
-      embed_fn: 向量化函数
-      vector_store: ChromaDB kb_chunks 集合
-      table_store: ChromaDB kb_tables 集合
-      memory_store: BM25 全文索引
-    
-    返回: {chunks_added, tables_indexed, errors}
-    """
-    doc_type = parse_result.get('type', 'unknown')
-    text = parse_result.get('text', '')
-    metadata = parse_result.get('metadata', {})
-    tables = parse_result.get('tables', [])
-    images = parse_result.get('images', [])
-    
-    file_hash = hashlib.md5((file_name + str(metadata)).encode()).hexdigest()[:16]
-    
-    # 分类：如果没传入 category 或为"通用办公"，用 match_category 重新分类
+# ============================================================
+# v3.0: ingest_document 辅助函数 — 准备 / 存储 / 索引三阶段
+# ============================================================
+
+
+def _resolve_category(file_name: str, text: str, category: str) -> str:
+    """解析并校验文档分类，包含防御性纠错"""
     if not category or category == "通用办公":
         try:
             from src.category_registry import match_category as _match_cat
@@ -680,18 +768,21 @@ async def ingest_document(
                 category = _cat
         except Exception:
             logger.debug("[suppressed] category = _cat")
-            pass
-    
     # 防御性校验：category 不能是 Python repr() 格式
     if category and ("[{" in category or "': " in category):
-        import re
         m = re.search(r"'category':\s*'([^']+)'", category)
         category = m.group(1) if m else "通用办公"
-    
+    return category
+
+
+def _prepare_chunks(
+    text: str, tables: list, images: list,
+    file_hash: str, file_name: str, category: str, doc_type: str
+) -> list:
+    """Phase 1: 将解析结果切分为统一的 chunk 列表（文本/表格/图片）"""
     chunks = []
-    result = {"chunks_added": 0, "tables_indexed": 0, "errors": [], "file_hash": file_hash}
-    
-    # --- 处理文本 ---
+
+    # 文本分块
     if text and len(text) > 20:
         text_chunks = smart_chunk_semantic(text)
         for i, tc in enumerate(text_chunks):
@@ -705,8 +796,8 @@ async def ingest_document(
                 "doc_type": doc_type,
                 "_source": f"parser:{doc_type}",
             })
-    
-    # --- 处理表格 ---
+
+    # 表格分块
     for t in tables:
         table_chunks = chunk_table(t)
         for tc in table_chunks:
@@ -723,8 +814,8 @@ async def ingest_document(
                 "table_rows": t.get('rows', 0),
                 "table_cols": t.get('cols', 0),
             })
-    
-    # --- 处理图片 ---
+
+    # 图片分块
     for img_path in images:
         img_chunks = chunk_image(img_path, text)
         for ic in img_chunks:
@@ -738,60 +829,116 @@ async def ingest_document(
                 "doc_type": doc_type,
                 "_source": "parser:image",
             })
-    
+
+    return chunks
+
+
+async def _store_to_vector(chunks: list, file_hash: str, embed_fn, vector_store) -> int:
+    """Phase 2: 写入向量库 (ChromaDB)，返回成功写入的 chunk 数"""
+    if embed_fn and vector_store:
+        texts = [c['text'][:1000] for c in chunks]
+        embeddings = await embed_fn(texts)
+        if embeddings:
+            ids = [f"{file_hash}_{c['chunk_index']}" for c in chunks]
+            metadatas = [{k: str(v)[:512] for k, v in c.items() if k != 'text'} for c in chunks]
+            documents = [c['text'] for c in chunks]
+            vector_store.add(ids=ids, embeddings=embeddings, documents=documents, metadata=metadatas)
+            logger.info(f"[Ingest] Added {len(chunks)} chunks to vector store")
+            return len(chunks)
+    return 0
+
+
+def _store_to_memory(chunks: list, memory_store) -> None:
+    """Phase 2: 写入 BM25 全文索引"""
+    if memory_store:
+        for c in chunks:
+            memory_store.add_document(c)
+
+
+async def _index_tables(chunks: list, tables: list, table_store) -> int:
+    """Phase 2: 写入表格独立索引，并清理正文中的表格原文，返回索引入的表格数"""
+    if not (table_store and tables):
+        return 0
+    from src.services.table_view import index_tables_from_chunks
+    table_result = await index_tables_from_chunks(chunks, clear_first=False)
+    indexed = table_result.get("tables_indexed", 0)
+
+    # 1.5.3b: 从正文中移除表格原文（已被独立索引）
+    if indexed > 0:
+        table_pattern = re.compile(r'\|[^\n]+\|\n\|[\-\s|:]+\|\n(?:\|[^\n]+\|\n)+', re.MULTILINE)
+        for c in chunks:
+            text_content = c.get("text", "")
+            if text_content and "|" in text_content and "---" in text_content:
+                cleaned = table_pattern.sub("", text_content).strip()
+                if len(cleaned) > 50:
+                    c["text"] = cleaned
+    return indexed
+
+
+async def ingest_document(
+    parse_result: Dict,
+    file_name: str = "",
+    category: str = "",
+    embed_fn=None,
+    vector_store=None,
+    table_store=None,
+    memory_store=None
+) -> Dict:
+    """
+    统一入库一个文档 — v3.0 三阶段重构。
+
+    阶段:
+      1. 准备 (prepare): 分类解析 → 文本/表格/图片统一分块
+      2. 存储 (store): 写入向量库 + BM25 索引 + 表格独立索引
+      3. 汇总 (result): 返回统计信息
+
+    参数:
+      parse_result: 解析器输出 {type, text, metadata, tables, images}
+      file_name: 原始文件名
+      category: 文档分类
+      embed_fn: 向量化函数
+      vector_store: ChromaDB kb_chunks 集合
+      table_store: ChromaDB kb_tables 集合
+      memory_store: BM25 全文索引
+
+    返回: {chunks_added, tables_indexed, errors, file_hash}
+    """
+    doc_type = parse_result.get('type', 'unknown')
+    text = parse_result.get('text', '')
+    metadata = parse_result.get('metadata', {})
+    tables = parse_result.get('tables', [])
+    images = parse_result.get('images', [])
+
+    file_hash = hashlib.md5((file_name + str(metadata)).encode()).hexdigest()[:16]
+    category = _resolve_category(file_name, text, category)
+
+    result = {"chunks_added": 0, "tables_indexed": 0, "errors": [], "file_hash": file_hash}
+
+    # Phase 1: 准备 chunk 列表
+    chunks = _prepare_chunks(text, tables, images, file_hash, file_name, category, doc_type)
     if not chunks:
         logger.info(f"[Ingest] No content extracted from {file_name}")
         return result
-    
-    # --- 写入向量库 ---
+
+    # Phase 2: 写入向量库
     try:
-        if embed_fn and vector_store:
-            texts = [c['text'][:1000] for c in chunks]
-            embeddings = await embed_fn(texts)
-            
-            if embeddings:
-                ids = [f"{file_hash}_{c['chunk_index']}" for c in chunks]
-                metadatas = [{k: str(v)[:512] for k, v in c.items() if k != 'text'} for c in chunks]
-                documents = [c['text'] for c in chunks]
-                
-                vector_store.add(ids=ids, embeddings=embeddings, documents=documents, metadata=metadatas)
-                result["chunks_added"] = len(chunks)
-                logger.info(f"[Ingest] Added {len(chunks)} chunks to vector store")
+        result["chunks_added"] = await _store_to_vector(chunks, file_hash, embed_fn, vector_store)
     except Exception as e:
         result["errors"].append(f"vector_store: {str(e)}")
-        logger.error(f"[Ingest] vector_store error: {e}")
-    
-    # --- 写入 BM25 索引 ---
+
+    # Phase 2: 写入 BM25 索引
     try:
-        if memory_store:
-            for c in chunks:
-                memory_store.add_document(c)
+        _store_to_memory(chunks, memory_store)
     except Exception as e:
         result["errors"].append(f"memory_store: {str(e)}")
-    
-    # --- 写入表格独立索引 ---
+
+    # Phase 2: 写入表格独立索引
     try:
-        if table_store and tables:
-            from src.services.table_view import index_tables_from_chunks
-            table_result = await index_tables_from_chunks(chunks, clear_first=False)
-            result["tables_indexed"] = table_result.get("tables_indexed", 0)
-            
-            # 1.5.3b: 从正文中移除表格原文（已被独立索引）
-            if table_result.get("tables_indexed", 0) > 0:
-                import re
-                table_pattern = re.compile(r'\|[^\n]+\|\n\|[-\s|:]+\|\n(?:\|[^\n]+\|\n)+', re.MULTILINE)
-                for c in chunks:
-                    text = c.get("text", "")
-                    if text and "|" in text and "---" in text:
-                        cleaned = table_pattern.sub("", text).strip()
-                        if len(cleaned) > 50:  # 保留有意义的剩余内容
-                            c["text"] = cleaned
+        result["tables_indexed"] = await _index_tables(chunks, tables, table_store)
     except Exception as e:
         result["errors"].append(f"table_store: {str(e)}")
-    
+
     return result
-
-
 async def ingest_directory(
     dir_path: str,
     category: str = "",

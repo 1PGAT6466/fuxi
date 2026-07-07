@@ -200,6 +200,7 @@ class MCPServer:
             },
         }
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def _read_resource(self, uri: str) -> Dict:
         """读取资源内容"""
         if uri == "fuxi://symbols/status":

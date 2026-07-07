@@ -14,13 +14,11 @@ jobs:
         with:
           python-version: '3.10'
       - name: Install deps
-        run: pip install fastapi uvicorn chromadb requests pytest
+        run: pip install fastapi uvicorn chromadb requests pytest pytest-asyncio
       - name: Unit tests
         run: python -m pytest tests/ -x --tb=short -q
-        continue-on-error: true
       - name: Smoke test (API)
         run: python scripts/eval_smoke_lite.py
-        continue-on-error: true
       - name: Security check
         run: |
           echo "Checking for leaked keys..."

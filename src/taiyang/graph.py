@@ -20,7 +20,8 @@ class GraphRouter:
                 "SELECT DISTINCT category FROM chunks WHERE category IS NOT NULL LIMIT 10"
             ).fetchall()
             return [r[0] for r in rows if r[0]]
-        except Exception:
+        except Exception as e:
+            logger.warning("Exception 失败: %s", e, exc_info=True)
             return []
 
     def get_entity_context(self, entity_name: str) -> Dict:
@@ -34,6 +35,6 @@ class GraphRouter:
             ).fetchall()
             if rows:
                 return {"entity": entity_name, "found": True, "count": len(rows)}
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Exception 失败: %s", e, exc_info=True)
         return {"entity": entity_name, "found": False, "count": 0}

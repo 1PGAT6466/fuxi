@@ -3,7 +3,7 @@ data_store.py — 数据存储工具（v10.0）
 负责：chunks 加载/保存、配置加载/保存、搜索日志、图谱操作
 抽取自 server.py，供各 router 模块共享
 """
-import os, json, time
+import os, json, time, threading
 from datetime import datetime, timezone
 from pathlib import Path
 from collections import Counter
@@ -32,6 +32,7 @@ def init_db():
 # ============ Chunks ============
 
 _CHUNK_CACHE = {"data": None, "ts": 0, "access_count": 0, "last_access": 0}
+_chunk_cache_lock = threading.Lock()
 
 
 def _calculate_dynamic_ttl(access_count: int, last_access: float) -> int:
@@ -44,14 +45,15 @@ def _calculate_dynamic_ttl(access_count: int, last_access: float) -> int:
         return 30
 
 def load_chunks(filter_junk: bool = True, limit: int = None, offset: int = 0) -> list:
-    """从 SQLite 分页加载 chunk（带动态 TTL 缓存）"""
+    """从 SQLite 分页加载 chunk（带动态 TTL 缓存，threadsafe）"""
     now = time.time()
-    if filter_junk and limit is None and offset == 0 and _CHUNK_CACHE["data"] is not None:
-        ttl = _calculate_dynamic_ttl(_CHUNK_CACHE["access_count"], _CHUNK_CACHE["last_access"])
-        if now - _CHUNK_CACHE["ts"] < ttl:
-            _CHUNK_CACHE["access_count"] += 1
-            _CHUNK_CACHE["last_access"] = now
-            return _CHUNK_CACHE["data"]
+    with _chunk_cache_lock:
+        if filter_junk and limit is None and offset == 0 and _CHUNK_CACHE["data"] is not None:
+            ttl = _calculate_dynamic_ttl(_CHUNK_CACHE["access_count"], _CHUNK_CACHE["last_access"])
+            if now - _CHUNK_CACHE["ts"] < ttl:
+                _CHUNK_CACHE["access_count"] += 1
+                _CHUNK_CACHE["last_access"] = now
+                return _CHUNK_CACHE["data"]
 
     store = get_store()
     chunks = store.get_all(limit=limit, offset=offset)
@@ -71,18 +73,20 @@ def load_chunks(filter_junk: bool = True, limit: int = None, offset: int = 0) ->
     result = [c for c in chunks if not _is_junk(c.get('file_name', ''))]
 
     if limit is None and offset == 0:
-        _CHUNK_CACHE["data"] = result
-        _CHUNK_CACHE["ts"] = now
-        _CHUNK_CACHE["access_count"] = 1
-        _CHUNK_CACHE["last_access"] = now
+        with _chunk_cache_lock:
+            _CHUNK_CACHE["data"] = result
+            _CHUNK_CACHE["ts"] = now
+            _CHUNK_CACHE["access_count"] = 1
+            _CHUNK_CACHE["last_access"] = now
 
     return result
 
 
 def invalidate_chunk_cache():
     """在数据写入/删除后调用，清除缓存"""
-    _CHUNK_CACHE["data"] = None
-    _CHUNK_CACHE["ts"] = 0
+    with _chunk_cache_lock:
+        _CHUNK_CACHE["data"] = None
+        _CHUNK_CACHE["ts"] = 0
     _CHUNK_CACHE["access_count"] = 0
     _CHUNK_CACHE["last_access"] = 0
 

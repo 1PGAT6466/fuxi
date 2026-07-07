@@ -35,7 +35,10 @@ class TaiyinServer(SymbolBase):
         start_time = time.time()
 
         try:
-            logger.info(f"[{trace_id}] [太阴] 收到查询: {query[:50]}...")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"[{trace_id}] [太阴] 收到查询: {query[:50]}...")
+            else:
+                logger.info(f"[{trace_id}] [太阴] 收到查询 (len={len(query)})")
 
             # 调用少阴决策
             shaoyin = self.meridian.get_symbol("shaoyin")
@@ -57,8 +60,8 @@ class TaiyinServer(SymbolBase):
                     trace_id=trace_id, endpoint="/api/chat",
                     method="POST", status_code=200, duration_ms=duration,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Exception 失败: %s", e, exc_info=True)
 
             logger.info(f"[{trace_id}] [太阴] 查询完成: {duration:.0f}ms, confidence={result.get('confidence', 0):.2f}")
 
@@ -77,8 +80,8 @@ class TaiyinServer(SymbolBase):
                     trace_id=trace_id or "", endpoint="/api/chat",
                     method="POST", status_code=500, duration_ms=duration,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Exception 失败: %s", e, exc_info=True)
 
             return {
                 "answer": "抱歉，处理您的问题时出现错误。",
@@ -97,7 +100,10 @@ class TaiyinServer(SymbolBase):
         start_time = time.time()
 
         try:
-            logger.info(f"[{trace_id}] [太阴] 收到搜索: {query[:50]}...")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"[{trace_id}] [太阴] 收到搜索: {query[:50]}...")
+            else:
+                logger.info(f"[{trace_id}] [太阴] 收到搜索 (len={len(query)})")
 
             # 调用太阳检索
             taiyang = self.meridian.get_symbol("taiyang")
@@ -117,8 +123,8 @@ class TaiyinServer(SymbolBase):
                     trace_id=trace_id, endpoint="/api/search",
                     method="GET", status_code=200, duration_ms=duration,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Exception 失败: %s", e, exc_info=True)
 
             return {
                 "results": results,
@@ -140,8 +146,8 @@ class TaiyinServer(SymbolBase):
                     trace_id=trace_id or "", endpoint="/api/search",
                     method="GET", status_code=500, duration_ms=duration,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Exception 失败: %s", e, exc_info=True)
 
             return {"results": [], "count": 0, "error": str(e), "trace_id": trace_id}
 
@@ -202,6 +208,7 @@ class TaiyinServer(SymbolBase):
         except Exception as e:
             return {"answer": "抱歉，处理您的问题时出现错误。", "confidence": 0, "error": str(e)}
 
+    # DEPRECATED: 未使用，v1.50 标记待删除
     def _get_metrics(self) -> dict:
         """返回接口指标"""
         return {

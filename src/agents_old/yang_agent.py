@@ -279,6 +279,7 @@ class YangAgent(BaseAgent):
                 logger.warning(f"[Yang] graph search failed: {e}")
 
         return {"results": results[:top_k], "count": len(results)}
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def _read_document(self, file_hash: str, chunk_index: int = -1) -> Dict:
         """读取文档"""
@@ -293,6 +294,7 @@ class YangAgent(BaseAgent):
             return {"chunks": chunks[:10], "count": len(chunks)}
         except Exception as e:
             return {"error": str(e)}
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def _query_entity(self, entity_name: str, relation_type: str = "") -> Dict:
         """查询知识图谱实体"""

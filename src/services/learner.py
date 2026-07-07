@@ -68,7 +68,8 @@ def extract_new_terms(text: str, min_freq: int = 3) -> list:
         import jieba
         import jieba.posseg as pseg
         jieba.setLogLevel(20)
-    except ImportError:
+    except ImportError as e:
+        logger.warning("ImportError 失败: %s", e, exc_info=True)
         return []
     
     # 过滤：只保留名词/动词/英文
@@ -127,7 +128,8 @@ def get_feedback_stats(days: int = 7) -> dict:
                     stats["dislikes"] += 1
                 elif entry["action"] == "correct":
                     stats["corrections"] += 1
-            except Exception:
+            except Exception as e:
+                logger.warning("处理反馈条目失败: %s", e, exc_info=True)
                 continue
     
     return stats

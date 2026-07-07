@@ -1,5 +1,10 @@
+# 伏羲 v1.50 体系架构
 
-# 宝利根知识库 v10.0 系统架构
+## 术语定义
+
+- **伏羲 = 体系（System of Systems）**：由多个系统组成的完整知识认知体系
+- **四象 = 系统（System）**：少阳、太阳、少阴、太阴四大功能系统
+- **器官 = 组件（Component）**：系统内的具体功能模块（心、肝、脾、肺、肾...）
 
 ## 一、物理拓扑
 
@@ -17,91 +22,192 @@
       ├─ 清洗文件\
       ├─ 清洗程序\
       ├─ 知识图谱\
-      ├─ 后端\     (v10.0 代码备份)
-      └─ 前端\     (v10.0 代码备份)
+      ├─ 后端\     (v1.50 代码备份)
+      └─ 前端\     (v1.50 代码备份)
 
 172.25.30.200 (服务器/PGAT-storge · Ubuntu 22.04 VM)
   ├─ kb-server :8080      — FastAPI 主服务
   ├─ Ollama :11434        — qwen2.5:1.5b 本地推理
   ├─ embedder_server :8081 — BGE-base 文本向量化
-  ├─ ChromaDB             — 向量存储 (4,985 vectors)
-  ├─ MemoryStore          — BM25 全文索引 (9,937 chunks)
+  ├─ ChromaDB             — 向量存储
+  ├─ MemoryStore          — BM25 全文索引
   └─ 路径: /home/feng-shaoxuan/kb-server/
 ```
 
-## 二、数据流
+## 二、四象系统架构
+
+### 2.1 少阳·消化系统（知识消化中枢）
+
+负责文档的解析、清洗、分块和知识提取。
 
 ```
-上传:  用户 → 主平台 → local_receiver:8090
-         → kb_daemon 监听 → 清洗 → POST /api/ingest-batch
-         → 服务器 MemoryStore → 自动向量化 → 图谱进化
-
-检索:  用户 Query → /api/search
-         → query_router(意图路由) → graph_router(图谱分类锁定)
-         → BM25 + 向量双路 → RRF 融合 → 精排(匹配/分类/MMR)
-         → Rerank(装载机:8091→SiliconFlow) → Sentence Window
-         → Top-K 结果
-
-AI对话: /api/chat → 混合检索 → 图谱上下文注入
-         → Ollama 流式生成 → 答案 + 引用来源
-
-评估:   /api/admin/eval/run
-         → Hit@K/MRR/NDCG/ContextPrecision/Faithfulness
-
-反馈:   👍/👎 → feedback_log → 术语权重调整 → 周画像更新
+shaoyang/
+├── pipeline.py        # 统一处理管线
+├── extractor.py       # SAG式事件/实体提取
+├── semantic_chunker.py # 语义分块（替代原 chunker.py）
+├── cleaner.py         # 文本清洗
+├── parser.py          # 文档解析
+└── ingest.py          # 入库管理
 ```
 
-## 三、代码结构 (服务器)
+### 2.2 太阳·筑基系统（精炼排序中枢）
+
+负责检索和排序。通过多路召回、融合、精排，从海量知识中找到最相关内容。
 
 ```
-/home/feng-shaoxuan/kb-server/
-├── server.py              # 主入口 (81行)
-├── config.py              # 全局配置
-├── data_store.py          # 数据读写工具
-├── memory_store.py        # BM25 全文检索(FTS5)
-├── vector_store.py        # ChromaDB 向量存储
-├── ingest.py              # 文本提取/清洗/分块(pdfplumber+PyPDF2)
-├── classify.py            # 17类文档分类器
-├── query_router.py        # 意图路由
-├── feedback_learner.py    # 反馈学习闭环
-├── knowledge_evolver.py   # 图谱进化
-├── embedder_server.py     # 向量嵌入服务(独立进程)
-│
-├── routers/               # API 路由层
-│   ├── search.py          # /api/search
-│   ├── chat.py            # /api/chat
-│   ├── documents.py       # /api/documents + raw-store + ingest-batch
-│   ├── graph.py           # /api/graph
-│   ├── admin.py           # / /admin /api/health + 管理API
-│   └── feedback.py        # /api/feedback + 用户偏好
-│
-├── services/              # 业务逻辑层
-│   ├── retrieval.py       # 混合检索全链路
-│   ├── rerank.py          # Rerank 精排(代理 → SiliconFlow)
-│   ├── llm.py             # LLM 调用(Ollama/MIMO)
-│   ├── embed.py           # 向量嵌入
-│   ├── eval.py            # 四层评估指标
-│   └── graph_router.py    # 图谱驱动检索路由
-│
-└── static/                # 前端
-    ├── index.html         # 主平台(搜索+AI问答)
-    └── admin/
-        ├── index.html     # 管理面板(9个tab)
-        └── graph.html     # 知识图谱(知书阁)
+taiyang/
+├── retrieval.py       # 混合检索管线
+├── multi_hop.py       # SAG式多跳检索
+├── fusion.py          # RRF融合
+├── rerank.py          # 四级降级精排
+├── dynamic_alpha.py   # 动态融合权重 (v1.50新增)
+├── query_expansion.py # 查询扩展
+├── graph.py           # 图谱检索
+└── cache.py           # 语义缓存
 ```
 
-## 四、API 清单 (58 个端点)
+### 2.3 少阴·炼化系统（决策合成中枢）
 
-### 搜索
+负责答案生成和质量控制。通过LLM合成答案，并进行事实性校验和质量评估。
+
+```
+shaoyin/
+├── brain.py           # 决策合成引擎
+├── judge_v2.py        # LLM-as-Judge评分 (v1.50新增)
+├── fact_check.py      # 事实性校验 (v1.50新增)
+├── context_compressor.py # 上下文压缩 (v1.50新增)
+├── strategy.py        # 策略选择
+├── orchestrator.py    # 编排器
+└── resolver.py        # 解析器
+```
+
+### 2.4 太阴·显化系统（对外接口中枢）
+
+负责体系对外服务。提供API接口、监控指标、审计日志和安全管理。
+
+```
+taiyin/
+├── server.py          # 对外接口
+├── audit.py           # 审计日志 (v1.50新增)
+├── metrics.py         # Prometheus指标 (v1.50新增)
+├── security.py        # 安全模块 (v1.50新增)
+├── flags.py           # Feature Flag管理
+├── monitor.py         # 监控模块
+└── mcp_protocol.py    # MCP协议
+```
+
+## 三、经络系统
+
+### 3.1 信号总线
+
+经络系统是体系内唯一的通信网络，负责系统和器官间的异步通信和状态同步。
+
+```python
+# 信号类型
+class SignalType(Enum):
+    HEARTBEAT = "heartbeat"      # 心跳信号
+    ALERT = "alert"              # 告警信号
+    DATA = "data"                # 数据信号
+    COMMAND = "command"          # 命令信号
+
+# 信号优先级
+class Priority(Enum):
+    CRITICAL = 0                 # 紧急
+    HIGH = 1                     # 高
+    NORMAL = 2                   # 普通
+    LOW = 3                      # 低
+```
+
+### 3.2 系统和器官注册
+
+每个系统和器官在启动时注册到经络系统，并订阅感兴趣的信号类型。
+
+```python
+class Organ:
+    def __init__(self, name: str):
+        self.name = name
+        self.meridian = get_meridian()
+        self.meridian.register(self)
+    
+    def on_signal(self, signal: Signal):
+        """处理接收到的信号"""
+        pass
+    
+    def emit(self, signal_type: SignalType, payload: dict):
+        """发送信号到经络"""
+        self.meridian.emit(Signal(
+            signal_type=signal_type,
+            source=self.name,
+            payload=payload
+        ))
+```
+
+## 四、数据流
+
+### 4.1 文档入库流程
+
+```
+用户上传 → local_receiver:8090
+  → kb_daemon 监听
+  → 少阳·消化系统处理
+    → parser.py 解析
+    → cleaner.py 清洗
+    → semantic_chunker.py 分块
+    → extractor.py 提取
+  → MemoryStore 存储
+  → ChromaDB 向量化
+  → 知识图谱更新
+```
+
+### 4.2 检索流程
+
+```
+用户查询 → /api/search
+  → 大脑·brain 意图识别
+  → 少阴·炼化系统 查询规划
+  → 太阳·筑基系统 检索
+    → L-1: QA对匹配
+    → L0: 语义缓存+图谱路由
+    → L1: 同义词+LLM改写
+    → L1.5: HyDE
+    → L2: BM25+向量双路
+    → L3: RRF融合+动态alpha
+    → L4: 三阶段精排
+    → L5: Rerank四级降级
+    → L6: Parent-Child+Sentence Window
+  → Top-K 结果
+```
+
+### 4.3 对话流程
+
+```
+用户提问 → /api/chat
+  → 大脑·brain 意图识别
+  → 少阴·炼化系统 编排
+    → 检索相关知识
+    → 上下文压缩
+    → LLM生成答案
+    → 事实性校验
+    → 质量评分
+  → 太阴·显化系统 返回响应
+  → 审计日志记录
+```
+
+## 五、API清单 (60+ 端点)
+
+### 5.1 搜索
+
 - GET  /api/search            — 混合检索
 - GET  /api/search-history    — 搜索历史
 - GET  /api/images/{name}     — 图片服务
 
-### AI 对话
+### 5.2 AI 对话
+
 - POST /api/chat              — 智能问答(流式/非流式)
 - POST /api/chat/agent        — Agentic RAG
 
-### 文档管理
+### 5.3 文档管理
+
 - GET  /api/documents         — 文档列表(分页)
 - GET  /api/documents/{hash}  — 文档详情
 - DEL  /api/documents/{hash}  — 删除文档
@@ -111,13 +217,15 @@ AI对话: /api/chat → 混合检索 → 图谱上下文注入
 - POST /api/reindex           — 全量重建索引
 - POST /api/reset             — 清空数据
 
-### 知识图谱
+### 5.4 知识图谱
+
 - GET  /api/graph             — 实体查询/BFS路径
 - GET  /api/graph/path        — 最短路径
 - GET  /api/graph/nodes       — 节点列表
 - POST /api/graph/build       — 重建图谱
 
-### 管理面板
+### 5.5 管理面板
+
 - GET  /                       — 主平台首页
 - GET  /admin                  — 管理面板首页
 - GET  /api/health             — 健康检查
@@ -142,12 +250,14 @@ AI对话: /api/chat → 混合检索 → 图谱上下文注入
 - GET  /api/admin/export/documents — 导出文档CSV
 - GET  /api/admin/export/search-logs — 导出搜索日志
 
-### 评估 (v10.0新增)
+### 5.6 评测
+
 - GET  /api/admin/eval/run     — 运行评估
 - GET  /api/admin/eval/dataset — 评测集(GET/POST)
 - GET  /api/admin/eval/results — 历史结果
 
-### 反馈与用户
+### 5.7 反馈与用户
+
 - POST /api/feedback           — 用户反馈
 - POST /api/feedback/v2        — 增强反馈
 - POST /api/behavior           — 行为日志
@@ -157,25 +267,76 @@ AI对话: /api/chat → 混合检索 → 图谱上下文注入
 - GET  /api/tools/check        — 工具状态检查
 - GET  /api/faq                — FAQ列表
 
-## 五、数据库
+### 5.8 MCP协议 (v1.50增强)
+
+- GET  /api/mcp/tools          — MCP工具列表
+- POST /api/mcp                — MCP调用
+
+### 5.9 四象系统状态
+
+- GET  /api/symbols/status     — 四象系统状态
+- GET  /api/growth/overview    — 成长概览
+
+### 5.10 Feature Flags
+
+- GET  /api/feature-flags      — 获取Flags
+- PUT  /api/feature-flags/{name} — 更新Flag
+
+### 5.11 审计与监控 (v1.50新增)
+
+- GET  /api/audit/logs         — 审计日志
+- GET  /metrics                — Prometheus指标
+
+## 六、数据库
 
 | 存储 | 引擎 | 数据量 | 用途 |
 |------|------|--------|------|
-| MemoryStore | SQLite FTS5 + JSON | 9,937 chunks | BM25 全文检索 |
-| ChromaDB | SQLite + HNSW | 4,985 vectors | 语义向量检索 |
-| knowledge_graph.json | JSON | 249 entities, 2,932 edges | 知识图谱 |
-| chunks.json | JSON | 53MB | 原始 chunk 数据 |
+| chunks.db | SQLite FTS5 | — | BM25 全文检索 |
+| ChromaDB | SQLite + HNSW | — | 语义向量检索 |
+| knowledge_graph.json | JSON | — | 知识图谱 |
 | feedback_log.jsonl | JSONL | — | 反馈日志 |
 
-## 六、关键技术栈
+## 七、技术栈
 
 | 组件 | 选型 | 版本 |
 |------|------|------|
 | Web框架 | FastAPI | — |
+| LLM | MiMo 2.5 Pro | v1.50 |
 | 本地模型 | Ollama qwen2.5:1.5b | — |
 | Embedding | BGE-base-zh-v1.5 | :8081 |
 | 向量库 | ChromaDB | — |
 | 关键词检索 | jieba + BM25 | — |
 | Rerank | SiliconFlow Qwen3-Reranker-8B | 代理 via :8091 |
 | 文档解析 | pdfplumber + PyPDF2 | 双轨 |
+| 认证 | PyJWT | v1.50升级 |
 | 前端 | 原生 HTML/CSS/JS | 无框架依赖 |
+
+## 八、v1.50 新增模块
+
+### 8.1 审计日志 (taiyin/audit.py)
+
+记录所有关键操作，支持安全审计和问题追踪。
+
+### 8.2 Prometheus指标 (taiyin/metrics.py)
+
+暴露体系指标，支持Prometheus监控集成。
+
+### 8.3 安全模块 (taiyin/security.py)
+
+敏感信息脱敏、输入验证、安全防护。
+
+### 8.4 动态融合权重 (taiyang/dynamic_alpha.py)
+
+根据查询特征动态调整BM25和向量检索的权重。
+
+### 8.5 LLM-as-Judge (shaoyin/judge_v2.py)
+
+使用LLM进行答案质量评分。
+
+### 8.6 事实性校验 (shaoyin/fact_check.py)
+
+校验生成答案的事实准确性。
+
+### 8.7 上下文压缩 (shaoyin/context_compressor.py)
+
+压缩检索到的上下文，提高LLM处理效率。

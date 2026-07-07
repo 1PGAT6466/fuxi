@@ -10,7 +10,8 @@ from pathlib import Path
 
 logger = logging.getLogger("services.online_eval")
 
-ONLINE_EVAL_DIR = Path("data/online_eval")
+from src.config import DATA_DIR as CONFIG_DATA_DIR
+ONLINE_EVAL_DIR = Path(CONFIG_DATA_DIR) / "online_eval"
 
 
 class OnlineEvaluator:
@@ -57,6 +58,7 @@ class OnlineEvaluator:
         if len(self._metrics_buffer) >= self._flush_interval:
             await self._flush_metrics()
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def _flush_metrics(self):
         """刷新指标到文件"""
         if not self._metrics_buffer:
@@ -72,6 +74,7 @@ class OnlineEvaluator:
         except Exception as e:
             logger.warning(f"[OnlineEval] 刷新指标失败: {e}")
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def get_stats(self, hours: int = 24) -> Dict:
         """获取统计信息"""
         metrics_file = ONLINE_EVAL_DIR / "metrics.jsonl"
@@ -89,10 +92,10 @@ class OnlineEvaluator:
                         metric = json.loads(line.strip())
                         if metric.get("timestamp", 0) > cutoff:
                             metrics.append(metric)
-                    except:
-                        pass
-        except Exception:
-            pass
+                    except Exception as e:
+                        logger.warning("JSON解析线上评测指标失败: %s", e, exc_info=True)
+        except Exception as e:
+            logger.warning("获取线上评测指标失败: %s", e, exc_info=True)
 
         if not metrics:
             return {"total_queries": 0, "avg_latency_ms": 0}
@@ -111,6 +114,7 @@ class OnlineEvaluator:
 
         return stats
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def get_slow_queries(self, threshold_ms: float = 3000,
                                  limit: int = 10) -> List[Dict]:
         """获取慢查询"""
@@ -128,10 +132,10 @@ class OnlineEvaluator:
                         if (metric.get("type") == "search" and
                             metric.get("latency_ms", 0) > threshold_ms):
                             slow_queries.append(metric)
-                    except:
-                        pass
-        except Exception:
-            pass
+                    except Exception as e:
+                        logger.warning("JSON解析慢查询数据失败: %s", e, exc_info=True)
+        except Exception as e:
+            logger.warning("获取慢查询数据失败: %s", e, exc_info=True)
 
         # 按延迟排序
         slow_queries.sort(key=lambda x: x.get("latency_ms", 0), reverse=True)

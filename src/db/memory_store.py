@@ -61,10 +61,14 @@ class MemoryStore:
         # File metadata cache
         self._files_cache = None
         self._files_cache_time = 0
+        # JSON parse cache: chunk_id → parsed dict
+        self._json_cache: OrderedDict[str, tuple] = OrderedDict()
+        self._json_cache_max = 500
 
     def _ensure_db(self):
         """确保数据库和表存在"""
         self._db_conn = sqlite3.connect(self._db_path, check_same_thread=False, timeout=10)
+        self._db_conn.row_factory = sqlite3.Row  # L-11: 启用按名称访问
         self._db_conn.execute("PRAGMA journal_mode=WAL")
         self._db_conn.execute("PRAGMA synchronous=NORMAL")
         self._db_conn.execute("PRAGMA cache_size=-64000")  # 64MB SQLite cache
@@ -86,9 +90,120 @@ class MemoryStore:
         self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_chunks_status ON chunks(status)")
         self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_chunks_category ON chunks(category)")
         self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_chunks_index ON chunks(file_hash, chunk_index)")
+
+        # Phase A: 迁移旧 events/entities 表（若存在不兼容 schema 则重建）
+        self._migrate_events_entities()
+
+        # Phase A: events 表（SAG 事件索引）
+        self._db_conn.execute("""
+            CREATE TABLE IF NOT EXISTS events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_id TEXT UNIQUE NOT NULL,
+                chunk_id TEXT,
+                title TEXT,
+                summary TEXT,
+                content TEXT,
+                entities_json TEXT DEFAULT '[]',
+                event_type TEXT DEFAULT '',
+                keywords_json TEXT DEFAULT '[]',
+                priority TEXT DEFAULT 'UNKNOWN',
+                level INTEGER DEFAULT 1,
+                chunk_ids_json TEXT DEFAULT '[]',
+                entity_names_json TEXT DEFAULT '[]',
+                parent_event_id TEXT DEFAULT '',
+                file_hash TEXT DEFAULT '',
+                file_name TEXT DEFAULT '',
+                embedding BLOB,
+                status TEXT DEFAULT 'active',
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_events_event_id ON events(event_id)")
+        self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_events_chunk_id ON events(chunk_id)")
+        self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_events_status ON events(status)")
+        self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_events_file_hash ON events(file_hash)")
+        self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_events_entity_names ON events(entity_names_json)")
+        self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_events_title_search ON events(title)")
+
+        # Phase A: entities 表（SAG 实体索引）
+        self._db_conn.execute("""
+            CREATE TABLE IF NOT EXISTS entities (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                entity_id TEXT UNIQUE NOT NULL,
+                name TEXT NOT NULL,
+                entity_type TEXT DEFAULT '',
+                description TEXT DEFAULT '',
+                aliases_json TEXT DEFAULT '[]',
+                chunk_ids_json TEXT DEFAULT '[]',
+                event_ids_json TEXT DEFAULT '[]',
+                source TEXT DEFAULT 'sag_extractor',
+                file_hash TEXT DEFAULT '',
+                file_name TEXT DEFAULT '',
+                embedding BLOB,
+                mentions INTEGER DEFAULT 1,
+                status TEXT DEFAULT 'active',
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+            )
+        """)
+        self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_entities_entity_id ON entities(entity_id)")
+        self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name)")
+        self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(entity_type)")
+        self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_entities_status ON entities(status)")
+
         self._db_conn.commit()
         # Migrate from JSON if needed
         self._maybe_migrate_json()
+
+    def _migrate_events_entities(self):
+        """Phase A: 检测旧 events/entities 表 schema 并迁移
+
+        旧 schema 缺少 id, chunk_id, entity_type, status, embedding, timestamp 等列。
+        若列不匹配则 DROP 旧表并重建。
+        """
+        try:
+            existing = self._db_conn.execute(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name IN ('events', 'entities')"
+            ).fetchall()
+            existing_names = [r[0] for r in existing]
+            if not existing_names:
+                return  # 无旧表，无需迁移
+
+            # 安全修复 (CWE-89): 白名单验证表名（防止SQL注入）
+            ALLOWED_TABLES = {'events', 'entities'}
+            for table_name in existing_names:
+                if table_name not in ALLOWED_TABLES:
+                    logger.warning(f"[MemoryStore] 跳过未知表: {table_name}")
+                    continue
+                cols = self._db_conn.execute(f"PRAGMA table_info('{table_name}')").fetchall()
+                col_names = [c[1] for c in cols]
+
+                # 检查是否需要迁移（缺少新字段）
+                if table_name == 'events':
+                    needed = {'id', 'chunk_id', 'embedding', 'status', 'timestamp'}
+                    missing = needed - set(col_names)
+                    if missing:
+                        logger.info(f"[MemoryStore] 检测到旧 events 表 schema，缺少: {missing}，准备迁移...")
+                        self._db_conn.execute("DROP TABLE IF EXISTS events")
+                        # 也要删旧索引
+                        self._db_conn.execute("DROP INDEX IF EXISTS idx_events_event_id")
+                        self._db_conn.execute("DROP INDEX IF EXISTS idx_events_chunk_id")
+                        self._db_conn.execute("DROP INDEX IF EXISTS idx_events_status")
+                        self._db_conn.execute("DROP INDEX IF EXISTS idx_events_file_hash")
+
+                elif table_name == 'entities':
+                    needed = {'id', 'entity_type', 'aliases_json', 'chunk_ids_json', 'source', 'embedding', 'status', 'timestamp'}
+                    missing = needed - set(col_names)
+                    if missing:
+                        logger.info(f"[MemoryStore] 检测到旧 entities 表 schema，缺少: {missing}，准备迁移...")
+                        self._db_conn.execute("DROP TABLE IF EXISTS entities")
+                        self._db_conn.execute("DROP INDEX IF EXISTS idx_entities_entity_id")
+                        self._db_conn.execute("DROP INDEX IF EXISTS idx_entities_name")
+                        self._db_conn.execute("DROP INDEX IF EXISTS idx_entities_type")
+                        self._db_conn.execute("DROP INDEX IF EXISTS idx_entities_status")
+
+            self._db_conn.commit()
+        except Exception as e:
+            logger.warning(f"[MemoryStore] 迁移 events/entities 表失败: {e}")
 
     def _maybe_migrate_json(self):
         """从旧 JSON 文件迁移数据"""
@@ -357,6 +472,15 @@ class MemoryStore:
             )
         return len(rows)
 
+    # ===== v1.50 兼容别名 =====
+    def insert_many(self, chunks: list) -> int:
+        """兼容别名 → add_batch()"""
+        return self.add_batch(chunks)
+
+    def add_document(self, doc: dict) -> int:
+        """兼容别名 → add()"""
+        return self.add(doc)
+
     def get_files_summary(self) -> List[Dict]:
         """获取文件摘要（带缓存）"""
         if self._files_cache is not None:
@@ -383,8 +507,229 @@ class MemoryStore:
         self._files_cache = result
         return result
 
+    # ===== Phase A: Events & Entities CRUD =====
+
+    def add_event(self, event_data: dict) -> int:
+        """添加单个 event"""
+        import json as _json
+        # 将 embedding (List[float]) 序列化为 BLOB
+        embedding_blob = None
+        if event_data.get("embedding"):
+            import struct
+            emb = event_data["embedding"]
+            if isinstance(emb, list) and len(emb) > 0:
+                try:
+                    embedding_blob = struct.pack(f'{len(emb)}f', *emb)
+                except Exception:
+                    embedding_blob = _json.dumps(emb).encode('utf-8')
+
+        with self._db_conn:
+            cur = self._db_conn.execute(
+                """INSERT OR REPLACE INTO events
+                   (event_id, chunk_id, title, summary, content, entities_json, event_type,
+                    keywords_json, priority, level, chunk_ids_json, entity_names_json,
+                    parent_event_id, file_hash, file_name, embedding, status, timestamp)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
+                (
+                    event_data.get("event_id", f"evt_{int(__import__('time').time()*1000)}_{id(event_data)}"),
+                    event_data.get("chunk_id", ""),
+                    event_data.get("title", ""),
+                    event_data.get("summary", ""),
+                    event_data.get("content", ""),
+                    _json.dumps(event_data.get("entities", []), ensure_ascii=False),
+                    event_data.get("event_type", ""),
+                    _json.dumps(event_data.get("keywords", []), ensure_ascii=False),
+                    event_data.get("priority", "UNKNOWN"),
+                    event_data.get("level", 1),
+                    _json.dumps(event_data.get("chunk_ids", []), ensure_ascii=False),
+                    _json.dumps(event_data.get("entity_names", []), ensure_ascii=False),
+                    event_data.get("parent_event_id", ""),
+                    event_data.get("file_hash", ""),
+                    event_data.get("file_name", ""),
+                    embedding_blob,
+                    event_data.get("status", "active"),
+                )
+            )
+            return cur.lastrowid
+
+    def add_entity(self, entity_data: dict) -> int:
+        """添加单个 entity"""
+        import json as _json
+        with self._db_conn:
+            cur = self._db_conn.execute(
+                """INSERT OR REPLACE INTO entities
+                   (entity_id, name, entity_type, description, aliases_json, chunk_ids_json,
+                    event_ids_json, source, file_hash, file_name, embedding, mentions, status, timestamp)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
+                (
+                    entity_data.get("entity_id", f"ent_{int(__import__('time').time()*1000)}_{id(entity_data)}"),
+                    entity_data.get("name", ""),
+                    entity_data.get("entity_type", "") or entity_data.get("type", ""),
+                    entity_data.get("description", ""),
+                    _json.dumps(entity_data.get("aliases", []), ensure_ascii=False),
+                    _json.dumps(entity_data.get("chunk_ids", []), ensure_ascii=False),
+                    _json.dumps(entity_data.get("event_ids", []), ensure_ascii=False),
+                    entity_data.get("source", "sag_extractor"),
+                    entity_data.get("file_hash", ""),
+                    entity_data.get("file_name", ""),
+                    None,  # embedding placeholder for Phase A task 3
+                    entity_data.get("mentions", 1),
+                    entity_data.get("status", "active"),
+                )
+            )
+            return cur.lastrowid
+
+    def get_events_by_chunk_id(self, chunk_id: str) -> list:
+        """按 chunk_id 查询 events"""
+        try:
+            rows = self._db_conn.execute(
+                "SELECT * FROM events WHERE chunk_id=? AND status='active'",
+                (chunk_id,)
+            ).fetchall()
+            cols = [desc[0] for desc in self._db_conn.execute(
+                "SELECT * FROM events LIMIT 0"
+            ).description]
+            return [dict(zip(cols, row)) for row in rows]
+        except Exception as e:
+            logger.warning(f"[MemoryStore] get_events_by_chunk_id failed: {e}")
+            return []
+
+    def get_entities_by_name(self, name: str) -> list:
+        """按名称查询 entities"""
+        try:
+            rows = self._db_conn.execute(
+                "SELECT * FROM entities WHERE name=? AND status='active'",
+                (name,)
+            ).fetchall()
+            cols = [desc[0] for desc in self._db_conn.execute(
+                "SELECT * FROM entities LIMIT 0"
+            ).description]
+            return [dict(zip(cols, row)) for row in rows]
+        except Exception as e:
+            logger.warning(f"[MemoryStore] get_entities_by_name failed: {e}")
+            return []
+
+    def get_entity_count(self) -> int:
+        """返回活跃 entity 总数"""
+        try:
+            return self._db_conn.execute(
+                "SELECT COUNT(*) FROM entities WHERE status='active'"
+            ).fetchone()[0]
+        except Exception:
+            return 0
+
+    def get_event_count(self) -> int:
+        """返回活跃 event 总数"""
+        try:
+            return self._db_conn.execute(
+                "SELECT COUNT(*) FROM events WHERE status='active'"
+            ).fetchone()[0]
+        except Exception:
+            return 0
+
+    def get_chunks_batch(self, chunk_ids: List[str]) -> Dict[str, dict]:
+        """批量获取 chunk（避免 N+1 查询）
+
+        FIX-02, FIX-05: 一次 IN 查询 + JSON 解析缓存
+
+        Returns:
+            {chunk_id: parsed_chunk_dict, ...}
+        """
+        if not chunk_ids:
+            return {}
+
+        result = {}
+        missing_ids = []
+
+        # 先查 JSON 缓存
+        for cid in chunk_ids:
+            cached = self._json_cache.get(cid)
+            if cached is not None:
+                result[cid] = cached
+            else:
+                missing_ids.append(cid)
+
+        if not missing_ids:
+            return result
+
+        # 批量查询缺失的 chunk
+        try:
+            placeholders = ",".join("?" * len(missing_ids))
+            # 用 json_extract 匹配 chunk_id 和 id 字段
+            conditions = []
+            params = []
+            for cid in missing_ids:
+                conditions.append("(json_extract(doc, '$.chunk_id') = ? OR json_extract(doc, '$.id') = ?)")
+                params.extend([cid, cid])
+
+            sql = f"SELECT id, doc FROM chunks WHERE ({' OR '.join(conditions)}) AND status='active'"
+            rows = self._db_conn.execute(sql, params).fetchall()
+
+            for row_id, doc_json in rows:
+                c = json.loads(doc_json) if isinstance(doc_json, str) else doc_json
+                cid_from_doc = c.get("chunk_id") or c.get("id", "")
+                result[cid_from_doc] = c
+                # 也以传入的 cid 为 key 缓存
+                for orig_cid in missing_ids:
+                    if orig_cid and (orig_cid in str(cid_from_doc) or cid_from_doc in str(orig_cid)):
+                        self._json_cache_put(orig_cid, c)
+                        break
+                # 缓存
+                self._json_cache_put(str(cid_from_doc), c)
+        except Exception as e:
+            logger.debug(f"[MemoryStore] get_chunks_batch failed: {e}")
+
+        return result
+
+    def _json_cache_put(self, key: str, value: dict):
+        """写入 JSON 解析缓存"""
+        if len(self._json_cache) >= self._json_cache_max:
+            self._json_cache.popitem(last=False)
+        self._json_cache[key] = value
+        self._json_cache.move_to_end(key)
+
+    def get_all_events(self, limit: int = None, offset: int = 0) -> list:
+        """获取 event 列表"""
+        try:
+            cols = [desc[0] for desc in self._db_conn.execute(
+                "SELECT * FROM events LIMIT 0"
+            ).description]
+            if limit is not None:
+                rows = self._db_conn.execute(
+                    "SELECT * FROM events WHERE status='active' ORDER BY id LIMIT ? OFFSET ?",
+                    (limit, offset)
+                ).fetchall()
+            else:
+                rows = self._db_conn.execute(
+                    "SELECT * FROM events WHERE status='active' ORDER BY id"
+                ).fetchall()
+            return [dict(zip(cols, row)) for row in rows]
+        except Exception as e:
+            logger.warning(f"[MemoryStore] get_all_events failed: {e}")
+            return []
+
+    def get_all_entities(self, limit: int = None, offset: int = 0) -> list:
+        """获取 entity 列表"""
+        try:
+            cols = [desc[0] for desc in self._db_conn.execute(
+                "SELECT * FROM entities LIMIT 0"
+            ).description]
+            if limit is not None:
+                rows = self._db_conn.execute(
+                    "SELECT * FROM entities WHERE status='active' ORDER BY id LIMIT ? OFFSET ?",
+                    (limit, offset)
+                ).fetchall()
+            else:
+                rows = self._db_conn.execute(
+                    "SELECT * FROM entities WHERE status='active' ORDER BY id"
+                ).fetchall()
+            return [dict(zip(cols, row)) for row in rows]
+        except Exception as e:
+            logger.warning(f"[MemoryStore] get_all_entities failed: {e}")
+            return []
+
     # ===== QA Pairs (unchanged) =====
-    def add_qa_pair(self, question: str, source_chunk_id: str, qa_index: int = 0):
+    def add_qa_pair(self, question: str, source_chunk_id: str, qa_index: int = 0) -> None:
         """添加 QA 对"""
         try:
             self._db_conn.execute("""
@@ -412,7 +757,8 @@ class MemoryStore:
                 (f'%{query}%', top_k)
             ).fetchall()
             return [{"question": r[0], "source_chunk_id": r[1]} for r in rows]
-        except Exception:
+        except Exception as e:
+            logger.warning(f"[MemoryStore] search_qa_pairs failed: {e}")
             return []
 
     # ===== Compatibility aliases =====
@@ -445,10 +791,12 @@ class MemoryStore:
         return result
 
     @property
+    # DEPRECATED: 未使用，v1.50 标记待删除
     def _inverted(self):
         """Compatibility: return empty dict (inverted index not needed for compat)"""
         return {}
 
+    # DEPRECATED: 未使用，v1.50 标记待删除
     @property
     def _loaded(self):
         """Compatibility: always True (no loading phase needed)"""
@@ -464,9 +812,11 @@ class MemoryStore:
             "total_chunks": self.total_chunks,
             "total_files": self.total_files,
         }
+# DEPRECATED: 未使用，v1.50 标记待删除
 
     @property
     def _db_conn_public(self):
+        # DEPRECATED: 未使用，v1.50 标记待删除
         """Compatibility alias"""
         return self._db_conn
 

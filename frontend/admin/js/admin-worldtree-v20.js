@@ -822,7 +822,7 @@ async function loadDocuments() {
   var v = document.getElementById('view');
   v.innerHTML = '<div class="loading">⏳ 加载中…</div>';
   try {
-    var r = await fetch('/api/documents?page=1&page_size=500');
+    var r = await fetch('/api/documents?page=1&limit=500');
     var d = await r.json();
     _adminAllFiles = d.files || [];
 

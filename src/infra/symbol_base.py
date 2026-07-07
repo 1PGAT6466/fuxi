@@ -26,6 +26,7 @@ class SymbolBase:
         # 注册到经络
         meridian.register_symbol(symbol_id, name, self)
         logger.info(f"[{symbol_id}] {emoji} {name} 已注册")
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def heartbeat(self):
         """心跳上报"""
@@ -45,10 +46,13 @@ class SymbolBase:
         """子类实现，返回各自的指标"""
         return self._metrics
 
+    # DEPRECATED: 未使用，v1.50 标记待删除
     def _set_status(self, status: str):
         """设置状态（idle/processing/error）"""
         self._status = status
         self._last_activity = time.time()
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+# DEPRECATED: 未使用，v1.50 标记待删除
 
     async def _handle_growth_rollback(self, signal):
         """处理成长引擎的回滚信号"""

@@ -31,5 +31,6 @@ class QueryExpander:
                     for syn in syns:
                         result.append(query.replace(word, syn))
             return result[:5]
-        except Exception:
+        except Exception as e:
+            logger.warning("Exception 失败: %s", e, exc_info=True)
             return []

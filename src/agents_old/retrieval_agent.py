@@ -47,6 +47,7 @@ class RetrievalAgent(BaseAgent):
         from src.services.retrieval import hybrid_search
         from src.db.data_store import load_chunks
         return await hybrid_search(query, load_chunks(), top_k=top_k)
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def _wiki_search(self, query: str) -> List[Dict]:
         """Wiki 检索工具"""
@@ -54,8 +55,10 @@ class RetrievalAgent(BaseAgent):
             from src.services.wiki import get_wiki_engine
             we = get_wiki_engine()
             return we.search_content(query, limit=3)
-        except Exception:
+        except Exception as e:
+            logger.warning("Exception 失败: %s", e, exc_info=True)
             return []
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def _graph_search(self, query: str) -> Dict:
         """知识图谱检索工具"""
@@ -63,5 +66,6 @@ class RetrievalAgent(BaseAgent):
             from src.services.graph_router import get_entity_context
             ctx = get_entity_context(query)
             return {"context": ctx} if ctx else {}
-        except Exception:
+        except Exception as e:
+            logger.warning("Exception 失败: %s", e, exc_info=True)
             return {}

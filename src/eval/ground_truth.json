@@ -1,0 +1,47 @@
+{
+  "description": "伏羲 v1.50 评测种子数据集 — P0-E1",
+  "version": "1.0.0",
+  "created": "2026-07-05",
+  "test_cases": [
+    {
+      "id": "gt-001",
+      "query": "VLAN 的基本概念和作用是什么？",
+      "expected_answer": "VLAN（虚拟局域网）是一种将物理局域网逻辑划分的技术",
+      "relevant_chunk_ids": ["vlan_basic_01"],
+      "relevant_keywords": ["VLAN", "虚拟局域网", "广播域", "二层隔离"],
+      "category": "网络建设"
+    },
+    {
+      "id": "gt-002",
+      "query": "PLC 的工作原理是什么？",
+      "expected_answer": "PLC（可编程逻辑控制器）通过扫描输入、执行程序、更新输出来控制设备",
+      "relevant_chunk_ids": ["plc_basic_01"],
+      "relevant_keywords": ["PLC", "可编程逻辑控制器", "扫描周期", "梯形图", "输入输出"],
+      "category": "电气自动化"
+    },
+    {
+      "id": "gt-003",
+      "query": "齿轮的模数是什么意思？",
+      "expected_answer": "齿轮模数是齿轮尺寸的基本参数，等于齿距除以π",
+      "relevant_chunk_ids": ["gear_module_01"],
+      "relevant_keywords": ["模数", "齿轮", "齿距", "分度圆", "标准模数"],
+      "category": "机械设计"
+    },
+    {
+      "id": "gt-004",
+      "query": "注塑工艺的温度控制要点有哪些？",
+      "expected_answer": "注塑温度控制包括料筒温度、喷嘴温度、模具温度，需要根据材料特性设定",
+      "relevant_chunk_ids": ["injection_temp_01"],
+      "relevant_keywords": ["注塑", "料筒温度", "喷嘴温度", "模具温度", "熔体温度"],
+      "category": "工程技术规范"
+    },
+    {
+      "id": "gt-005",
+      "query": "CPK 与 PPK 有什么区别？",
+      "expected_answer": "CPK 衡量过程能力的短期稳定性，PPK 衡量长期性能表现",
+      "relevant_chunk_ids": ["cpk_ppk_01"],
+      "relevant_keywords": ["CPK", "PPK", "过程能力指数", "性能指数", "标准差", "规格限"],
+      "category": "品质管理"
+    }
+  ]
+}

@@ -1,0 +1,36 @@
+service:
+  id: dxf-viewer
+  name: DXF看图服务
+  version: 1.0.0
+  description: 专业DXF文件查看、测量、标注服务
+  type: extension
+  icon: 📐
+  dependencies:
+    python:
+      - ezdxf>=1.0.0
+  capabilities:
+    file_types: [".dxf", ".dwg"]
+    features: ["view", "measure", "annotate"]
+  api:
+    prefix: /api/dxf
+    endpoints:
+      - path: /view/{hash}
+        method: GET
+        auth: required
+      - path: /upload
+        method: POST
+        auth: required
+      - path: /files
+        method: GET
+        auth: required
+      - path: /health
+        method: GET
+        auth: none
+  health:
+    endpoint: /api/dxf/health
+    interval: 30s
+    timeout: 5s
+  resources:
+    max_file_size: 100MB
+    max_concurrent: 50
+    timeout: 30s

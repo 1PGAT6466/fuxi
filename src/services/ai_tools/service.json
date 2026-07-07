@@ -1,0 +1,11 @@
+{
+  "id": "ai-tools",
+  "name": "AI智能工具服务",
+  "version": "1.0.0",
+  "description": "文档摘要、智能翻译、关键词提取、实体识别等AI能力",
+  "service_type": "ai",
+  "api_prefix": "/api/ai",
+  "health_endpoint": "/health",
+  "capabilities": ["summarize", "translate", "keywords", "entities", "classify"],
+  "config": {}
+}

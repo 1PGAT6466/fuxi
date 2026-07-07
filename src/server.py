@@ -64,35 +64,210 @@ app = FastAPI(
 # ============ 伏羲 1.50 生命体启动 ============
 _fuxi_instance = None  # module-level fallback
 
+# ============ 八卦引擎模式 ============
+_DEFAULT_ENGINE: str = os.getenv("FUXI_ENGINE", "v2").lower()
+# FUXI_INTENT_MODE: rule_based | shadow | low_risk | medium_risk | full_llm
+_DEFAULT_INTENT_MODE: str = os.getenv("FUXI_INTENT_MODE", "rule_based").lower()
+
+
 async def _start_fuxi():
-    """启动伏羲生命体"""
+    """启动伏羲生命体 — v2.1 八卦体系
+
+    引擎路由：
+      - v2（默认）: 八卦 QianGua + IntentBus
+      - v1: 旧版 hypothalamus.fuxi.Fuxi（保留兼容）
+    """
     global _fuxi_instance
+    import time as _time
+    engine = os.getenv("FUXI_ENGINE", "v2").lower()
+    intent_mode = os.getenv("FUXI_INTENT_MODE", "rule_based").lower()
+
     try:
-        from src.hypothalamus.fuxi import Fuxi
-        _fuxi_instance = Fuxi()
-        app.state.fuxi = _fuxi_instance
-        app.state.meridian = _fuxi_instance.meridian
-        app.state.fuxi_version = _VERSION
-        app.state.fuxi_born_at = __import__('time').time()
-        await _fuxi_instance.born()
-        logging.getLogger("server").info(f"[Fuxi] 伏羲 {_VERSION} 生命体已苏醒")
+        # ---- v2: 八卦体系（默认） ----
+        if engine == "v2":
+            from src.bagua.qian import QianGua
+            from src.bagua.intent_bus import IntentBus, get_intent_bus
+
+            # 初始化 IntentBus
+            intent_bus = get_intent_bus()
+
+            # 初始化乾卦（意识中枢）
+            _fuxi_instance = QianGua(
+                intent_bus=intent_bus,
+                intent_mode=intent_mode,
+            )
+            _fuxi_instance.start()
+            _fuxi_instance.start_beating()
+
+            app.state.fuxi = _fuxi_instance
+            app.state.intent_bus = intent_bus
+            app.state.fuxi_version = _VERSION
+            app.state.fuxi_born_at = _time.time()
+            app.state.engine = "v2"
+            app.state.intent_mode = intent_mode
+
+            logging.getLogger("server").info(
+                f"[Fuxi] 引擎: v2 (Bagua) | intent_mode: {intent_mode}"
+            )
+            logging.getLogger("server").info(
+                f"[Fuxi] 伏羲 {_VERSION} 八卦体系已苏醒 ☰"
+            )
+
+            # 注册八卦卦到 IntentBus
+            _register_bagua_guas(app, intent_bus)
+
+        # ---- v1: 旧版 hypothalamus.fuxi.Fuxi（保留兼容） ----
+        elif engine == "v1":
+            from src.hypothalamus.fuxi import Fuxi
+            _fuxi_instance = Fuxi()
+            app.state.fuxi = _fuxi_instance
+            app.state.meridian = _fuxi_instance.meridian
+            app.state.fuxi_version = _VERSION
+            app.state.fuxi_born_at = _time.time()
+            app.state.engine = "v1"
+            app.state.intent_mode = intent_mode
+            await _fuxi_instance.born()
+            logging.getLogger("server").info(
+                f"[Fuxi] 引擎: v1 (Legacy) | intent_mode: {intent_mode}"
+            )
+            logging.getLogger("server").info(
+                f"[Fuxi] 伏羲 {_VERSION} 生命体已苏醒（旧版）"
+            )
+
+        else:
+            raise ValueError(f"未知引擎版本: {engine}，支持 v1/v2")
+
+        # ======== v2.1: 注册优雅关机 handler ========
+        _register_shutdown_handler()
+
+    except ImportError as e:
+        logging.getLogger("server").critical(
+            f"[Fuxi] 无法导入伏羲模块，服务无法启动: {e}", exc_info=True
+        )
+        raise
     except Exception as e:
-        logging.getLogger("server").error(f"[Fuxi] 启动失败: {e}")
+        logging.getLogger("server").error(
+            f"[Fuxi] 启动失败: {e}", exc_info=True
+        )
+        # 不阻止服务器启动，部分功能不可用
+
+
+def _register_bagua_guas(app: FastAPI, intent_bus: Any) -> None:
+    """注册八卦所有卦到 IntentBus
+
+    每个卦独立启动并注册到 IntentBus 让乾卦可以 dispatch 到它们。
+    失败不阻塞启动。
+    """
+    gua_registry = {
+        "坤": ("src.bagua.kun", "KunGua"),
+        "震(zhen)": ("src.bagua.zhen", "ZhenGua"),
+        "巽(xun)": ("src.bagua.xun", "XunGua"),
+        "坎(kan)": ("src.bagua.kan", "KanGua"),
+        "离(li)": ("src.bagua.li", "LiGua"),
+        "艮(gen)": ("src.bagua.gen", "GenGua"),
+        "兑(dui)": ("src.bagua.dui", "DuiGua"),
+    }
+
+    for register_name, (module_path, class_name) in gua_registry.items():
+        try:
+            mod = __import__(module_path, fromlist=[class_name])
+            cls = getattr(mod, class_name)
+            instance = cls(intent_bus=intent_bus)
+            instance.start()
+            # IntentBus 注册通过 GuaBase.start() → register_to_bus() 完成
+            # 但 GuaBase 注册时用的是 self.GUA_NAME（如 "kun"/"zhen"/...），
+            # 而乾卦 dispatch 用中文名（如 "坤"/"震"/...），需要额外注册
+            instance.register_to_bus(name=register_name)
+            logging.getLogger("server").info(
+                f"[Bagua] {register_name} 已注册到 IntentBus"
+            )
+        except Exception as e:
+            logging.getLogger("server").warning(
+                f"[Bagua] {register_name} 注册失败（服务继续启动）: {e}"
+            )
+
+
+def _register_shutdown_handler():
+    """v2.1: 注册三步清理法关机 handler"""
+    try:
+        from src.bagua.shutdown import register_shutdown_handler
+        register_shutdown_handler(
+            app=app,
+            fuxi_instance=_fuxi_instance,
+            grace_period=5.0,
+            cancel_timeout=10.0,
+            drain_timeout=5.0,
+        )
+        logging.getLogger("server").info(
+            "[Shutdown] 优雅关机 handler 已注册 (STOP→CANCEL→DRAIN)"
+        )
+    except ImportError:
+        logging.getLogger("server").warning(
+            "[Shutdown] bagua.shutdown 模块未找到，跳过优雅关机注册"
+        )
+    except Exception as e:
+        logging.getLogger("server").warning(
+            "[Shutdown] 关机 handler 注册失败: %s", e
+        )
 
 async def _stop_fuxi():
-    """休眠伏羲"""
+    """休眠伏羲 — v2.1"""
     global _fuxi_instance
+    engine = getattr(app.state, "engine", "v2")
     if _fuxi_instance:
-        await _fuxi_instance.sleep()
-        logging.getLogger("server").info("[Fuxi] 伏羲已休眠")
+        if engine == "v2":
+            # 八卦体系停止
+            _fuxi_instance.stop()
+            logging.getLogger("server").info("[Fuxi] 八卦体系已停止 ☰")
+        else:
+            # 旧版 Fuxi 休眠
+            await _fuxi_instance.sleep()
+            logging.getLogger("server").info("[Fuxi] 伏羲已休眠")
 
 @app.on_event("startup")
 async def startup():
     await _start_fuxi()
 
+    # ── 启动烟雾测试（由 FUXI_EVAL_AUTO_RUN 控制）──
+    from src.config import EVAL_AUTO_RUN
+    if EVAL_AUTO_RUN:
+        try:
+            from src.services.eval_automation import get_eval_automation
+            automation = get_eval_automation()
+            report = await automation.run_smoke_test()
+            if not report.get("passed", False):
+                logger.warning(
+                    "[Startup] 启动烟雾测试未全部通过，服务继续启动。"
+                    f" 失败项: {report.get('errors', [])}"
+                )
+            else:
+                logger.info("[Startup] 启动烟雾测试全部通过 ✓")
+        except Exception as e:
+            logger.warning(
+                f"[Startup] 启动烟雾测试执行异常（不影响启动）: {e}",
+                exc_info=True
+            )
+
 @app.on_event("shutdown")
 async def shutdown():
-    await _stop_fuxi()
+    """v2.1: 使用三步清理法优雅关机
+
+    如果 _fuxi_instance 上的 _shutdown_handler 已注册，
+    则由 bagua.shutdown 的 GracefulShutdown 处理。
+    此处作为兜底：直接调用 _fuxi.sleep()。
+    """
+    # 兜底：如果 shutdown handler 未被注册，直接休眠
+    try:
+        from src.bagua.shutdown import get_shutdown_handler
+        handler = get_shutdown_handler()
+        if handler is not None and not handler.is_shutting_down:
+            await handler.shutdown()
+        else:
+            await _stop_fuxi()
+    except ImportError:
+        await _stop_fuxi()
+    except Exception:
+        await _stop_fuxi()
 
 # 注册统一异常处理器
 # from src.services.error_handler import setup_error_handlers
@@ -123,6 +298,30 @@ try:
 except ImportError:
     limiter = None
 
+# ============ v2.1 引擎路由中间件 ============
+@app.middleware("http")
+async def engine_middleware(request: Request, call_next):
+    """检测引擎版本并设置 request.state.engine
+
+    检测来源（优先级从高到低）：
+      1. Query 参数 ?engine=v1|v2
+      2. Header X-Fuxi-Engine: v1|v2
+      3. 环境变量 FUXI_ENGINE（默认 v2）
+    """
+    engine = request.query_params.get("engine", "")
+    if not engine:
+        engine = request.headers.get("X-Fuxi-Engine", "")
+    if not engine:
+        engine = getattr(app.state, "engine", "v2")
+    engine = engine.lower()
+    if engine not in ("v1", "v2"):
+        engine = "v2"  # 默认安全回退
+    request.state.engine = engine
+    request.state.intent_mode = getattr(app.state, "intent_mode", "rule_based")
+    response = await call_next(request)
+    response.headers["X-Fuxi-Engine"] = engine
+    return response
+
 # ============ 请求指标中间件 ============
 @app.middleware("http")
 async def metrics_middleware(request: Request, call_next):
@@ -135,16 +334,16 @@ async def metrics_middleware(request: Request, call_next):
         try:
             from src.infra.request_metrics import get_request_metrics
             get_request_metrics().record_request(duration_ms, response.status_code < 500)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Exception 失败: %s", e, exc_info=True)
         return response
     except Exception as e:
         duration_ms = (time.time() - start) * 1000
         try:
             from src.infra.request_metrics import get_request_metrics
             get_request_metrics().record_request(duration_ms, False)
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Exception 失败: %s", e, exc_info=True)
         raise
 
 # ============ 注册路由 ============
@@ -167,6 +366,11 @@ from src.api.documents import router as documents_router
 # from src.services.mineru import apply_patches
 # apply_patches()
 app.include_router(documents_router)
+
+# ── P0 修复：/api/files 路由别名，前端 Files.vue 调用 /api/files/* ──
+# 将所有 /api/documents 端点别名到 /api/files
+from src.api.files_alias import router as files_alias_router
+app.include_router(files_alias_router)
 
 # 知识图谱路由 — /api/graph, /api/graph/path, /api/graph/build, /api/graph/nodes
 from src.api.graph import router as graph_router
@@ -191,6 +395,7 @@ from fastapi.responses import Response
 from src.services.metrics import get_metrics_response, update_store_stats
 
 @app.get("/api/metrics")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def prometheus_metrics():
     """Prometheus 指标端点"""
     try:
@@ -201,8 +406,8 @@ async def prometheus_metrics():
             sqlite_count=len(chunks) if chunks else 0,
             vector_count=count_chunks()
         )
-    except:
-        pass
+    except Exception as e:
+        logger.warning("Prometheus指标更新失败: %s", e, exc_info=True)
     return Response(content=get_metrics_response(), media_type="text/plain")
 from src.api.worldtree import router as worldtree_router
 app.include_router(worldtree_router)
@@ -229,6 +434,7 @@ async def mcp_handler(request: Request):
     return await server.handle_request(body)
 
 @app.get("/api/mcp/tools")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def mcp_list_tools():
     """列出所有MCP工具"""
     server = get_mcp_server()
@@ -286,58 +492,27 @@ async def eval_history():
 from src.taiyin.growth_api import get_growth_overview, get_symbols_status
 
 @app.get("/api/symbols/status")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def symbols_status():
     """四象状态"""
     return get_symbols_status()
 
 @app.get("/api/growth/overview")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def growth_overview():
     """成长概览"""
     return get_growth_overview()
 
-# ============ 健康检查 + 系统监控 API ============
-@app.get("/api/health")
-async def health_check():
-    """健康检查"""
-    try:
-        from src.infra.health_check import get_health_checker
-        checker = get_health_checker()
-        result = await checker.check_all()
-        return result
-    except Exception as e:
-        return {"status": "error", "error": str(e)}
-
-@app.get("/api/system/stats")
-async def system_stats():
-    """系统统计"""
-    try:
-        from src.infra.system_monitor import get_system_monitor
-        return get_system_monitor().get_system_stats()
-    except Exception as e:
-        return {"error": str(e)}
-
-@app.get("/api/cache/stats")
-async def cache_stats():
-    """缓存统计"""
-    try:
-        from src.infra.cache_stats import get_cache_stats
-        return get_cache_stats().get_stats()
-    except Exception as e:
-        return {"error": str(e)}
-
-@app.get("/api/errors/stats")
-async def error_stats():
-    """错误统计"""
-    try:
-        from src.infra.error_tracker import get_error_tracker
-        return get_error_tracker().get_error_stats()
-    except Exception as e:
-        return {"error": str(e)}
+# ============ 系统路由（已迁移至 src/api/system_routes.py）============
+# /api/health, /api/system/stats, /api/cache/stats, /api/errors/stats
+from src.api.system_routes import router as system_router
+app.include_router(system_router)
 
 # ============ Feature Flag API ============
 from src.services.feature_flags import load_flags, set_flag, DEFAULT_FLAGS
 
 @app.get("/api/feature-flags")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def list_feature_flags():
     """获取所有 Feature Flag 状态"""
     return {"flags": load_flags(), "defaults": DEFAULT_FLAGS}
@@ -355,6 +530,7 @@ async def update_feature_flag(name: str, request: Request):
 
 # ============ 认证 API (仅 /api/auth/me, login/register 由 auth_routes.py 提供) ============
 @app.get("/api/auth/me")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def auth_me(request: Request):
     return {"username": getattr(request.state, "user", "anonymous"), "role": getattr(request.state, "role", "user")}
 
@@ -362,22 +538,46 @@ async def auth_me(request: Request):
 from fastapi.responses import HTMLResponse, FileResponse
 
 @app.get("/login", response_class=HTMLResponse)
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def login_page():
     f = STATIC_DIR / "login.html"
     return HTMLResponse(f.read_text(encoding="utf-8") if f.exists() else "<h1>login.html not found</h1>")
 
 @app.get("/", response_class=HTMLResponse)
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def index_page():
     f = STATIC_DIR / "index.html"
     return HTMLResponse(f.read_text(encoding="utf-8") if f.exists() else "<h1>index.html not found</h1>")
 
 @app.get("/admin", response_class=HTMLResponse)
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def admin_page():
     f = STATIC_DIR / "index.html"
     return HTMLResponse(f.read_text(encoding="utf-8") if f.exists() else "<h1>index.html not found</h1>")
 
 # 静态资源挂载
 app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+
+# ============ v1.50 僵尸服务注册 ============
+# 注册 AI 工具服务 — 6 端点 (POST /api/ai/summarize, /translate, /keywords, /entities, /classify, GET /api/ai/health)
+from src.services.ai_tools.routes import router as ai_tools_router
+app.include_router(ai_tools_router)
+
+# 注册数据分析服务 — 15 端点 (GET|POST /api/analytics/stats, /trends, /report, /storage, /export, GET /api/analytics/health)
+from src.services.data_analytics.routes import router as analytics_router
+app.include_router(analytics_router, prefix="/api/analytics")
+
+# 注册文档工具服务 — 10 端点 (POST /api/tools/convert, /merge, /split, /compress, /image-info, /compress-image, /text-extract, GET /api/tools/health)
+from src.services.doc_tools.routes import router as doc_tools_router
+app.include_router(doc_tools_router)
+
+# 注册 DXF 看图服务 — 5 端点 (POST /api/dxf/upload, GET /api/dxf/files, /view/{hash}, /download/{hash}, /health)
+from src.services.dxf_viewer.api import router as dxf_viewer_router
+app.include_router(dxf_viewer_router)
+
+# 注册文件查看服务 — 3 端点 (GET /api/view/{file_hash}, /api/download/{file_hash}, /api/antenna/search)
+from src.api.files_view import router as files_view_router
+app.include_router(files_view_router)
 
 # 管理面板路由 — /, /admin, /api/health, /api/stats, /api/admin/*
 # v1.41: 八卦体征端点
@@ -387,6 +587,7 @@ app.include_router(v2_router)
 
 # ============ D5: Prometheus Metrics ============
 @app.get("/metrics")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def metrics():
     """暴露 Prometheus 格式指标 — 浏览器直开 http://<host>:<port>/metrics"""
     from src.services.metrics import generate_metrics_text
@@ -394,6 +595,7 @@ async def metrics():
     return PlainTextResponse(generate_metrics_text(), media_type="text/plain; charset=utf-8")
 
 @app.get("/api/admin/metrics-summary")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def admin_metrics_summary():
     """管理面板：可观测性指标摘要（延迟 P50/P95/P99 + 错误率）"""
     from src.services.metrics import generate_health_summary
@@ -403,7 +605,10 @@ async def admin_metrics_summary():
 
 # ============ 启动 ============
 
-# v4.0: 代理路由 — 前端通过后端访问装载机
+# ============ v4.0: 代理路由（保留在 server.py 中）============
+# 代理路由（proxy/loader）涉及 aiohttp 异步 HTTP 客户端和LOADER_URL 配置，
+# 逻辑复杂且与 server.py 中的顶层配置紧密耦合，暂保留在此文件中。
+# 后续可考虑迁移至独立的 src/api/proxy_routes.py。
 @app.get("/api/proxy/loader/files")
 async def proxy_loader_files():
     """代理: 获取装载机文件列表"""

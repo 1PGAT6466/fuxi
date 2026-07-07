@@ -55,6 +55,7 @@ class CacheManager:
             for k in sorted_keys[:self.MAX_L1 // 10]:
                 del self._exact[k]
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def get_semantic(self, query: str) -> Optional[list]:
         """L2: 语义匹配"""
         try:

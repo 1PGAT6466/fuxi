@@ -17,6 +17,7 @@ class TableAgent(BaseAgent):
     def __init__(self):
         super().__init__(agent_id="table", description="表格/结构化数据查询")
         self.register_tool("query_table", self._query_table)
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def run(self, ctx: AgentContext) -> Dict:
         """查询表格数据"""
@@ -31,6 +32,7 @@ class TableAgent(BaseAgent):
             duration = (time.time() - start) * 1000
             self._record_run(duration, error=True)
             return {"success": False, "results": [], "error": str(e)}
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def _query_table(self, query: str, top_k: int = 5) -> List[Dict]:
         """表格查询工具"""

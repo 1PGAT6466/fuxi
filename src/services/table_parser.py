@@ -1,0 +1,12 @@
+# PLACEHOLDER: 该服务模块预留扩展，当前无实际逻辑
+# v1.50: 已迁移至 src.taiyang.table_parser，此文件仅为向后兼容层
+# 新代码请直接使用 src.taiyang.table_parser 或 from src.services import ...
+"""
+services/table_parser.py — 兼容层（重定向到 src.taiyang.table_parser）
+v1.50 HIGH 修复：将 import * 改为显式导入。
+"""
+from src.taiyang.table_parser import (
+    parse_table_to_rows,
+    extract_tables_from_markdown,
+    search_table,
+)

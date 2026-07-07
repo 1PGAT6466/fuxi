@@ -1,27 +1,56 @@
-# === 核心框架 ===
-fastapi>=0.104.0
-uvicorn[standard]>=0.24.0
-pydantic>=2.5.0
+﻿# === 鏍稿績妗嗘灦 ===
+fastapi>=0.139.0,<1.0.0
+uvicorn[standard]>=0.24.0,<1.0.0
+pydantic>=2.5.0,<3.0.0
+python-dotenv>=1.2.2
 
-# === 数据库 ===
-chromadb>=0.4.0
+# === 鏁版嵁搴?===
+chromadb>=0.4.0,<1.0.0
 
 # === NLP ===
-jieba>=0.42.1
+jieba>=0.42.1,<1.0.0
+sentence_transformers>=3.1.0
 
 # === HTTP ===
-aiohttp>=3.9.0
-requests>=2.31.0
+aiohttp>=3.14.1,<4.0.0
+requests>=2.34.2,<3.0.0
 
-# === 安全 ===
-slowapi>=0.1.9
-python-magic>=0.4.27
-PyJWT>=2.8.0
-bcrypt>=4.1.0
+# === 瀹夊叏 ===
+slowapi>=0.1.9,<1.0.0
+PyJWT>=2.13.0,<3.0.0
+bcrypt>=4.1.0,<5.0.0
 
-# === 监控 ===
-prometheus-client>=0.19.0
+# === 鏂囨。瑙ｆ瀽 ===
+Pillow>=12.2.0
+pdfplumber>=0.10.0
+pypdf>=6.10.2
+PyPDF2>=3.0.0
+PyMuPDF>=1.26.7       # fitz — 由 shaoyang/ingest.py、multimodal.py、pipeline/parsers.py 使用
+python-docx>=1.0.0
+openpyxl>=3.1.0
+xlrd>=2.0.0
+python-pptx>=0.6.0
+olefile>=0.46
+mistune>=3.1.0
+beautifulsoup4>=4.12.0
+reportlab>=4.0.0       # 鐢?services/doc_tools/routes.py 浣跨敤锛圥DF 鍚堝苟/鐢熸垚锛?
 
-# === 测试 ===
-pytest>=7.4.0
-pytest-asyncio>=0.23.0
+# === 鏂囨。瑙ｆ瀽锛堝彲閫変緷璧?鈥?try/except ImportError 闄嶇骇鏂规锛?==
+# unstructured>=0.15.0    # 鐢?shaoyang/mineru.py 浣跨敤 鈥?缁撴瀯鍖栨枃妗ｆ彁鍙栫殑澶囬€夊紩鎿?
+# magic-pdf>=0.6.0        # 鐢?shaoyang/mineru.py 浣跨敤 鈥?MinerU RAG DataReader
+
+# === 鏁版嵁澶勭悊 ===
+numpy>=1.26.0
+pandas>=2.0.0
+PyYAML>=6.0.0
+
+# === CAD ===
+ezdxf>=1.0.0,<2.0.0
+
+# === 鐩戞帶 ===
+prometheus-client>=0.19.0,<1.0.0
+psutil>=5.9.0
+
+# === 娴嬭瘯 ===
+pytest>=7.4.0,<9.0.0
+pytest-asyncio>=0.23.0,<1.0.0

@@ -7,7 +7,10 @@ metrics.py — Prometheus 指标暴露 (v1.50)
   - Token 消耗统计
 """
 import time
+import logging
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, REGISTRY
+
+logger = logging.getLogger(__name__)
 
 
 def _get_or_create(metric_class, name, documentation, labelnames=None, **kwargs):
@@ -147,16 +150,16 @@ def inc_counter(name: str, value: int = 1):
     try:
         if name in _counter_map and _counter_map[name]:
             _counter_map[name].inc(value)
-    except Exception:
-        pass
+    except Exception as e:
+        pass  # 静默：Exception 失败不影响主流程
 
 def observe_histogram(name: str, value: float):
     """兼容旧版直方图调用"""
     try:
         if name == "kb_search_latency_seconds":
             search_duration_seconds.observe(value)
-    except Exception:
-        pass
+    except Exception as e:
+        pass  # 静默：Exception 失败不影响主流程
 
 
 def generate_health_summary():
@@ -165,7 +168,8 @@ def generate_health_summary():
     from src.db.data_store import load_chunks
     try:
         chunks = load_chunks()
-    except:
+    except Exception as e:
+        logger.warning("加载chunks指标失败: %s", e, exc_info=True)
         chunks = []
     uptime_hours = round((time.time() - START_TIME) / 3600, 1)
     chunk_count = len(chunks) if chunks else 0

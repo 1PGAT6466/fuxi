@@ -7,7 +7,10 @@ metrics.py — Prometheus 指标暴露 (v1.50)
   - Token 消耗统计
 """
 import time
+import logging
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, REGISTRY
+
+logger = logging.getLogger(__name__)
 
 # ── 请求级指标 ──
 http_requests_total = Counter(
@@ -149,7 +152,8 @@ def generate_health_summary():
     from src.db.data_store import load_chunks
     try:
         chunks = load_chunks()
-    except:
+    except Exception as e:
+        logger.warning("加载chunks指标失败: %s", e, exc_info=True)
         chunks = []
     uptime_hours = round((time.time() - START_TIME) / 3600, 1)
     chunk_count = len(chunks) if chunks else 0

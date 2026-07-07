@@ -1,0 +1,11 @@
+{
+  "id": "doc-tools",
+  "name": "文档工具服务",
+  "version": "1.0.0",
+  "description": "PDF转换、图片处理、Office文档操作工具",
+  "service_type": "utility",
+  "api_prefix": "/api/tools",
+  "health_endpoint": "/health",
+  "capabilities": ["pdf", "image", "convert", "ocr", "merge", "compress"],
+  "config": {}
+}

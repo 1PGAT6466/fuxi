@@ -102,7 +102,8 @@ def normalize_entity(name: str) -> str:
 def load_graph() -> dict:
     try:
         return json.loads(GRAPH_PATH.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception as e:
+        logger.warning("Exception 失败: %s", e, exc_info=True)
         return {}
 
 

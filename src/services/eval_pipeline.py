@@ -10,7 +10,8 @@ from pathlib import Path
 
 logger = logging.getLogger("services.eval_pipeline")
 
-EVAL_DIR = Path("data/evaluation")
+from src.config import DATA_DIR as CONFIG_DATA_DIR
+EVAL_DIR = Path(CONFIG_DATA_DIR) / "evaluation"
 
 
 class EvalPipeline:
@@ -19,6 +20,7 @@ class EvalPipeline:
     def __init__(self):
         EVAL_DIR.mkdir(parents=True, exist_ok=True)
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def evaluate_search(self, query: str, results: List[Dict],
                                expected: List[str] = None) -> Dict:
         """评估检索质量"""
@@ -49,6 +51,7 @@ class EvalPipeline:
 
         return eval_result
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def evaluate_answer(self, query: str, answer: str,
                                sources: List[Dict] = None) -> Dict:
         """评估答案质量"""
@@ -104,6 +107,7 @@ class EvalPipeline:
         except Exception as e:
             logger.warning(f"[Eval] 保存评测结果失败: {e}")
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def get_eval_stats(self) -> Dict:
         """获取评测统计"""
         eval_file = EVAL_DIR / "eval_results.jsonl"
@@ -117,10 +121,10 @@ class EvalPipeline:
                 for line in f:
                     try:
                         results.append(json.loads(line.strip()))
-                    except:
-                        pass
-        except Exception:
-            pass
+                    except Exception as e:
+                        logger.warning("JSON解析评测结果失败: %s", e, exc_info=True)
+        except Exception as e:
+            logger.warning("读取评测结果文件失败: %s", e, exc_info=True)
 
         if not results:
             return {"total_evals": 0, "metrics": {}}

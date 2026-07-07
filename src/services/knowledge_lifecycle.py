@@ -10,7 +10,8 @@ from pathlib import Path
 
 logger = logging.getLogger("services.knowledge_lifecycle")
 
-LIFECYCLE_DIR = Path("data/knowledge_lifecycle")
+from src.config import DATA_DIR as CONFIG_DATA_DIR
+LIFECYCLE_DIR = Path(CONFIG_DATA_DIR) / "knowledge_lifecycle"
 
 
 class KnowledgeLifecycle:
@@ -34,6 +35,7 @@ class KnowledgeLifecycle:
         LIFECYCLE_DIR.mkdir(parents=True, exist_ok=True)
         self._events: List[Dict] = []
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def record_event(self, event_type: str, data: Dict):
         """记录知识生命周期事件"""
         event = {
@@ -68,6 +70,7 @@ class KnowledgeLifecycle:
 
         return triggers
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def get_candidates(self, event_type: str) -> List[Dict]:
         """获取候选知识"""
         log_file = LIFECYCLE_DIR / f"{event_type}.jsonl"
@@ -82,13 +85,14 @@ class KnowledgeLifecycle:
                     try:
                         event = json.loads(line.strip())
                         candidates.append(event.get("data", {}))
-                    except:
-                        pass
-        except Exception:
-            pass
+                    except Exception as e:
+                        logger.warning("JSON解析生命周期事件失败: %s", e, exc_info=True)
+        except Exception as e:
+            logger.warning("加载知识生命周期事件失败: %s", e, exc_info=True)
 
         return candidates
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def _count_events(self, event_type: str, period_days: int) -> int:
         """统计事件数量"""
         log_file = LIFECYCLE_DIR / f"{event_type}.jsonl"
@@ -106,10 +110,10 @@ class KnowledgeLifecycle:
                         event = json.loads(line.strip())
                         if event.get("timestamp", 0) > cutoff:
                             count += 1
-                    except:
-                        pass
-        except Exception:
-            pass
+                    except Exception as e:
+                        logger.warning("JSON解析生命周期事件统计失败: %s", e, exc_info=True)
+        except Exception as e:
+            logger.warning("统计知识生命周期事件数量失败: %s", e, exc_info=True)
 
         return count
 

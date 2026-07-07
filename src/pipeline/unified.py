@@ -91,8 +91,8 @@ class UnifiedParser:
             doc.close()
             if text.strip():
                 return {"text": text, "tables": tables, "metadata": {"parser": "fitz"}}
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Exception 失败: %s", e, exc_info=True)
 
         # 方式2: pdfplumber — 表格提取
         try:
@@ -110,8 +110,8 @@ class UnifiedParser:
                 text = "\n".join(pages_text)
                 if text.strip():
                     return {"text": text, "tables": tables, "metadata": {"parser": "pdfplumber"}}
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Exception 失败: %s", e, exc_info=True)
 
         # 方式3: PyPDF2 — 兜底
         try:
@@ -359,6 +359,7 @@ class UnifiedSaver:
 
     def __init__(self, config: Dict = None):
         self.config = config or {}
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def save(self, chunks: List[Chunk]):
         """存储到 SQLite + ChromaDB"""
@@ -440,6 +441,7 @@ class UnifiedExtractor:
         all_entities = self._deduplicate_entities(all_entities)
 
         return all_entities, all_events
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def _extract_single(self, chunk: Chunk, index: int, all_chunks: List[Chunk]) -> Dict:
         """单个 chunk 提取"""
@@ -476,8 +478,8 @@ class UnifiedExtractor:
                         clean_response = clean_response[:-3]
                     clean_response = clean_response.strip()
                     return json.loads(clean_response)
-                except json.JSONDecodeError:
-                    pass
+                except json.JSONDecodeError as e:
+                    logger.warning("json.JSONDecodeError 失败: %s", e, exc_info=True)
 
         except Exception as e:
             logger.debug(f"[Extractor] LLM提取失败: {e}")
@@ -616,8 +618,8 @@ class UnifiedPipeline:
                     except Exception as e:
                         logger.warning(f"[Pipeline] 事件/实体提取失败，跳过: {e}")
                         result.errors.append(f"ExtractError: {e}")
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Exception 失败: %s", e, exc_info=True)
 
             result.duration_ms = (time.time() - start_time) * 1000
             logger.info(f"[Pipeline] 完成: {file_path} → {len(result.chunks)} chunks, {result.duration_ms:.0f}ms")

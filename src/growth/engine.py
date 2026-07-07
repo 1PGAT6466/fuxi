@@ -12,7 +12,8 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger("growth.engine")
 
-GROWTH_DIR = Path("data/growth")
+from src.config import DATA_DIR as CONFIG_DATA_DIR
+GROWTH_DIR = Path(CONFIG_DATA_DIR) / "growth"
 
 
 @dataclass
@@ -46,6 +47,7 @@ class GrowthEngine:
         self._events: Dict[str, list] = {}
         self._baselines: Dict[str, float] = {}
         self._adjustments: List[AdjustmentRecord] = []
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def record_event(self, symbol: str, metric: str, value: float, context: Dict = None):
         """记录成长事件"""
@@ -110,6 +112,7 @@ class GrowthEngine:
             "endpoint": endpoint,
             "status_code": status_code,
         })
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def evaluate(self, symbol: str) -> Dict:
         """评估成长状态"""
@@ -123,10 +126,10 @@ class GrowthEngine:
                 for line in f:
                     try:
                         events.append(json.loads(line.strip()))
-                    except:
-                        pass
-        except Exception:
-            pass
+                    except Exception as e:
+                        logger.warning("JSON解析成长事件失败: %s", e, exc_info=True)
+        except Exception as e:
+            logger.warning("Exception 失败: %s", e, exc_info=True)
 
         # 计算各指标的统计
         metrics = {}
@@ -171,7 +174,8 @@ class GrowthEngine:
                 with open(log_file, "r", encoding="utf-8") as f:
                     lines = f.readlines()
                 stats[symbol] = {"events": len(lines)}
-            except:
+            except Exception as e:
+                logger.warning("读取成长统计失败 [%s]: %s", symbol, e, exc_info=True)
                 stats[symbol] = {"events": 0}
         return stats
 

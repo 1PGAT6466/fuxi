@@ -69,7 +69,8 @@ def get_audit_stats(hours: int = 24) -> Dict:
         ).fetchall()
         conn.close()
         return {r[0]: {"count": r[1], "avg_ms": round(r[2] or 0)} for r in rows}
-    except Exception:
+    except Exception as e:
+        logger.warning("Exception 失败: %s", e, exc_info=True)
         return {}
 
 
@@ -86,5 +87,6 @@ def get_recent_audits(limit: int = 50) -> list:
             {"timestamp": r[0], "user_id": r[1], "action": r[2], "query": r[3][:100], "result": r[4][:100], "duration_ms": r[5], "status": r[6]}
             for r in rows
         ]
-    except Exception:
+    except Exception as e:
+        logger.warning("Exception 失败: %s", e, exc_info=True)
         return []

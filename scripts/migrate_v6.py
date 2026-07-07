@@ -39,7 +39,8 @@ for filepath in docx_files:
     try:
         d = docx_lib.Document(str(filepath))
         text = "\n".join(p.text for p in d.paragraphs if p.text.strip())
-    except:
+    except Exception as e:
+        print(f"[migrate_v6] 读取docx失败 {fname}: {e}")
         text = ""
 
     if not text:
@@ -78,7 +79,8 @@ for doc_id, fname, old, new in changes:
             m["category"] = new
             collection.update(ids=[doc_id], metadatas=[m])
             ok_chroma += 1
-    except:
+    except Exception as e:
+        print(f"[migrate_v6] ChromaDB更新失败 {doc_id}: {e}")
         err += 1
 
 conn.commit()

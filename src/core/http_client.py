@@ -9,6 +9,7 @@ logger = logging.getLogger(__name__)
 
 # Shared session (reused across requests)
 _session = None
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 async def get_session():
     global _session

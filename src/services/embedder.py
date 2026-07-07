@@ -39,6 +39,7 @@ class EmbedResponse(BaseModel):
     vectors: list[list[float]]
 
 @app.post("/embed", response_model=EmbedResponse)
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def embed(req: EmbedRequest):
     """文本批量向量化（单线程大批量，利用 numpy C 扩展释放 GIL）"""
     if not req.texts:
@@ -63,6 +64,7 @@ class RerankResponse(BaseModel):
     indices: List[int]
 
 @app.post("/rerank", response_model=RerankResponse)
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def rerank(body: RerankRequest):
     """基于 BGE 模型的精度重排（semantic similarity rerank）"""
     import numpy as np
@@ -85,6 +87,7 @@ async def rerank(body: RerankRequest):
     )
 
 @app.get("/health")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def health():
     import threading
     return {
@@ -122,9 +125,8 @@ async def embed_text(text: str) -> list:
                 if resp.status == 200:
                     data = await resp.json()
                     return data.get("vectors", data.get("embeddings", [[]]))[0]
-    except Exception:
-        logger.warning(f"[embed] suppressed exception", exc_info=True)
-        pass
+    except Exception as e:
+        logger.warning("embed_text 操作失败: %s", e, exc_info=True)
     return []
 
 
@@ -142,9 +144,8 @@ async def batch_embed(texts: list) -> list:
                 if resp.status == 200:
                     data = await resp.json()
                     return data.get("vectors", data.get("embeddings", []))
-    except Exception:
-        logger.warning(f"[embed] suppressed exception", exc_info=True)
-        pass
+    except Exception as e:
+        logger.warning("batch_embed 操作失败: %s", e, exc_info=True)
     return [[]] * len(texts)
 
 

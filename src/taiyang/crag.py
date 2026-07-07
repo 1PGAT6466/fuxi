@@ -16,6 +16,7 @@ REWRITE_PROMPT = """你是一个搜索改写助手。用户的原始问题是：
 请改写用户问题，使其更容易搜索到相关文档。只输出改写后的问题，不要解释。"""
 
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def evaluate_retrieval(query: str, docs: list) -> str:
     """轻量校验：判断检索文档能否回答 query
     
@@ -84,7 +85,10 @@ async def retrieve_with_correction(query: str, retriever, top_k: int = 20, max_r
         })
         
         if verdict == "PASS":
-            logger.info(f"CRAG PASS: attempt {attempt+1} for '{query[:50]}'")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.info(f"CRAG PASS: attempt {attempt+1} for '{query[:50]}'")
+            else:
+                logger.info(f"CRAG PASS: attempt {attempt+1}, query_len={len(query)}")
             return {"docs": docs, "attempts": attempt + 1, "degraded": False, "history": history}
         
         if attempt < max_retries:
@@ -94,10 +98,16 @@ async def retrieve_with_correction(query: str, retriever, top_k: int = 20, max_r
             }
             reason = reason_map.get(verdict, verdict)
             current_query = await rewrite_for_retry(query, reason)
-            logger.info(f"CRAG RETRY: attempt {attempt+1}/{max_retries} for '{query[:50]}' → '{current_query[:50]}'")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.info(f"CRAG RETRY: attempt {attempt+1}/{max_retries} for '{query[:50]}' → '{current_query[:50]}'")
+            else:
+                logger.info(f"CRAG RETRY: attempt {attempt+1}/{max_retries}, query_len={len(query)}→{len(current_query)}")
     
     # 穷尽重试，降级
-    logger.warning(f"CRAG DEGRADED: all {max_retries+1} attempts failed for '{query[:50]}'")
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.warning(f"CRAG DEGRADED: all {max_retries+1} attempts failed for '{query[:50]}'")
+    else:
+        logger.warning(f"CRAG DEGRADED: all {max_retries+1} attempts failed, query_len={len(query)}")
     return {"docs": docs, "attempts": max_retries + 1, "degraded": True, "history": history}
 
 async def rewrite_and_retry(query: str, bad_docs: list, top_k: int = 10) -> list:

@@ -53,8 +53,9 @@ def enhance_table_extraction(page_text: str, tables: list) -> str:
 # Part B: SiliconFlow 多模态图片转录
 # ============================================
 
-# SiliconFlow 配置（复用已有 API Key）
-DEEPSEEK_BASE = "https://api.deepseek.com/v1"
+# SiliconFlow 配置（复用已有 API Key，URL 从统一配置读取）
+from src.config import DEEPSEEK_BASE_URL as _DEEPSEEK_BASE_URL, SILICONFLOW_BASE_URL as SF_FULL_URL
+DEEPSEEK_BASE = f"{_DEEPSEEK_BASE_URL}/v1"
 DEEPSEEK_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 
 # 多模态模型选择

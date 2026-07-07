@@ -29,29 +29,6 @@ async function loadOverview(){
   }catch(e){_adminError('overviewStats',e.message)}
 }
 
-async function loadOrgans(){
-  var grid=document.getElementById('organGrid');
-  grid.innerHTML='<div style="text-align:center;padding:40px"><div class="loading-dots">加载中<span>.</span><span>.</span><span>.</span></div></div>';
-  try{
-    const d=await api('/api/v2/status');
-    const bagua=(d.bagua||[]);
-    const emojiMap={brain:'🧠',spleen:'🩸',heart:'🫀',kidney:'🫘',liver:'🛡️',nose:'👃',lung:'🫁',skin:'🧖'};
-    const dutyMap={brain:'意识中心/决策调度',spleen:'数据存储入藏',heart:'路由调度中枢',kidney:'数据精炼过滤',liver:'质量过滤与免疫',nose:'异常监控告警',lung:'LLM生成蒸馏',skin:'前端UI/系统屏障/触角外探'};
-    const baguaGrid=['xun','li','kun','zhen','zhonggong','dui','gen','kan','qian'];
-    const items=baguaGrid.map(trigram=>{
-      if(trigram==='zhonggong')return {trigram:'zhonggong',symbol:'⊕',organ_name:'中宫·消化',emoji:'🍽️',alive:true,status:'healthy',duty:'消化转化中枢'};
-      const b=bagua.find(x=>x.trigram===trigram)||{};
-      return {trigram,symbol:b.symbol||'?',organ_name:b.organ_name||trigram,emoji:emojiMap[b.organ_id]||'⚙️',alive:b.alive!==false,status:b.status||'unknown',duty:dutyMap[b.organ_id]||''};
-    });
-    grid.innerHTML='<div style="display:grid;grid-template-columns:repeat(3,1fr);gap:12px">'+
-      items.map(b=>{
-        const sc=b.alive?'#34c759':'#ff3b30';
-        const stText=b.alive?(b.status==='healthy'?'运行中':'忙碌中'):'离线';
-        return '<div class="card" style="padding:14px;text-align:center"><div style="font-size:20px;margin-bottom:4px">'+b.symbol+'</div><div style="font-size:24px">'+b.emoji+'</div><div style="font-size:13px;font-weight:600;margin:4px 0">'+esc(b.organ_name)+'</div><div style="font-size:11px;color:var(--text3)">'+esc(b.duty)+'</div><div style="margin-top:6px"><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:'+sc+'"></span><span style="font-size:10px;color:var(--text3);margin-left:4px">'+stText+'</span></div></div>'}).join('')+
-      '</div>';
-  }catch(e){_adminError('organGrid',e.message)}
-}
-
 async function loadEval(){
   var s=document.getElementById('evalStats');
   s.innerHTML='<div style="text-align:center;padding:20px"><div class="loading-dots">加载中<span>.</span><span>.</span><span>.</span></div></div>';
@@ -114,10 +91,10 @@ async function loadFeedback(){
 
 // ===== 四象状态 =====
 var SYMBOLS = {
-  shaoyang: { name: '少阳·消化', emoji: '🌱', color: '#4caf50', organs: ['胃', '脾', '肺', '小肠'] },
-  taiyang:  { name: '太阳·筑基', emoji: '☀️', color: '#ff9800', organs: ['肾', '肝', '鼻', '胆', '四肢', '骨骼'] },
-  shaoyin:  { name: '少阴·炼化', emoji: '🌙', color: '#9c27b0', organs: ['大脑'] },
-  taiyin:   { name: '太阴·显化', emoji: '🌑', color: '#2196f3', organs: ['皮肤', '三焦'] }
+  shaoyang: { name: '少阳·消化', emoji: '🌱', color: '#4caf50', organs: ['stomach', 'spleen', 'lung', 'small_intestine'] },
+  taiyang:  { name: '太阳·筑基', emoji: '☀️', color: '#ff9800', organs: ['kidney', 'liver', 'nose', 'gallbladder', 'limbs', 'skeleton'] },
+  shaoyin:  { name: '少阴·炼化', emoji: '🌙', color: '#9c27b0', organs: ['brain'] },
+  taiyin:   { name: '太阴·显化', emoji: '🌑', color: '#2196f3', organs: ['skin', 'sanjiao'] }
 };
 
 async function loadSymbols(){
@@ -126,30 +103,45 @@ async function loadSymbols(){
   grid.innerHTML = '<div style="text-align:center;padding:40px"><div class="loading-dots">加载中<span>.</span><span>.</span><span>.</span></div></div>';
 
   try {
-    var symbols = {};
-    try { symbols = (await api('/api/v2/status')).symbols || {}; } catch(e) {}
+    var result = {};
+    try { result = await api('/api/symbols/status'); } catch(e) {}
+    var symbols = result.symbols || {};
+    var organs = result.organs || {};
 
-    // 四象卡片
-    grid.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px">' +
+    // 四象卡片（包含器官）
+    grid.innerHTML = '<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px">' +
       Object.entries(SYMBOLS).map(function([id, config]) {
         var s = symbols[id] || {};
         var alive = s.alive !== false;
         var status = s.status || 'idle';
-        return '<div class="card" style="padding:20px;border-left:4px solid ' + config.color + '">' +
+        var symbolOrgans = config.organs.map(function(organId) {
+          var organ = organs[organId] || {};
+          var organAlive = organ.alive !== false;
+          return '<div style="display:flex;align-items:center;gap:6px;padding:4px 8px;background:var(--bg);border-radius:6px;font-size:11px">' +
+            '<span style="font-size:14px">' + (organ.emoji || '⚙️') + '</span>' +
+            '<span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(organ.name || organId) + '</span>' +
+            '<span style="display:inline-block;width:6px;height:6px;border-radius:50%;background:' + (organAlive ? '#34c759' : '#ff3b30') + '"></span>' +
+            '</div>';
+        }).join('');
+
+        return '<div class="card" style="padding:16px;border-left:4px solid ' + config.color + '">' +
           '<div style="display:flex;align-items:center;gap:8px;margin-bottom:12px">' +
           '<span style="font-size:28px">' + config.emoji + '</span>' +
-          '<div><div style="font-size:16px;font-weight:600">' + config.name + '</div>' +
-          '<div style="font-size:11px;color:var(--text3)">' + config.organs.join('·') + '</div></div></div>' +
-          '<div style="display:flex;align-items:center;gap:6px;margin-bottom:8px">' +
+          '<div><div style="font-size:16px;font-weight:600">' + config.name + '</div></div>' +
+          '<div style="margin-left:auto;display:flex;align-items:center;gap:6px">' +
           '<span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:' + (alive ? '#34c759' : '#ff3b30') + '"></span>' +
-          '<span style="font-size:12px;color:var(--text3)">' + (alive ? (status === 'processing' ? '处理中' : '运行中') : '离线') + '</span></div>' +
+          '<span style="font-size:12px;color:var(--text3)">' + (alive ? '运行中' : '离线') + '</span></div></div>' +
+          '<div style="display:grid;grid-template-columns:repeat(2,1fr);gap:6px">' + symbolOrgans + '</div>' +
           '</div>';
       }).join('') + '</div>';
 
     // 统计卡片
+    var aliveOrgans = Object.values(organs).filter(function(o){return o.alive!==false}).length;
+    var totalOrgans = Object.keys(organs).length;
     stats.innerHTML =
-      '<div class="stat"><div class="stat-icon" style="background:#e8f5e9">🌱</div><div><div class="stat-value">' + Object.keys(SYMBOLS).length + '</div><div class="stat-label">四象模块</div></div></div>' +
-      '<div class="stat"><div class="stat-icon" style="background:#e3f2fd">🔗</div><div><div class="stat-value">' + Object.values(symbols).filter(function(s){return s.alive!==false}).length + '</div><div class="stat-label">运行中</div></div></div>';
+      '<div class="stat"><div class="stat-icon" style="background:#e8f5e9">🌱</div><div><div class="stat-value">' + Object.keys(SYMBOLS).length + '</div><div class="stat-label">四象系统</div></div></div>' +
+      '<div class="stat"><div class="stat-icon" style="background:#e3f2fd">🫀</div><div><div class="stat-value">' + totalOrgans + '</div><div class="stat-label">器官总数</div></div></div>' +
+      '<div class="stat"><div class="stat-icon" style="background:#e8f5e9">✅</div><div><div class="stat-value">' + aliveOrgans + '</div><div class="stat-label">运行中</div></div></div>';
 
   } catch(e) { _adminError('symbolGrid', e.message); }
 }

@@ -1,0 +1,15 @@
+﻿[src/config.py DEFAULT VALUES]
+EMBEDDER_URL = http://localhost:8081
+MIMO_BASE_URL = https://token-plan-cn.xiaomimimo.com/v1
+MIMO_MODEL = mimo-v2.5
+JWT_SECRET = not read from env
+LOADER_URL = http://localhost:8090
+KB_RERANK_PROXY = not read from env
+
+[src/infra/config.py DEFAULT VALUES]
+EMBEDDER_URL = http://localhost:8091
+MIMO_BASE_URL = https://api.mimo.ai/v1
+MIMO_MODEL = mimo-v2.5-pro
+JWT_SECRET = change-me-in-production (env JWT_SECRET)
+LOADER_URL = http://localhost:8090
+KB_RERANK_PROXY = '' (read from env)

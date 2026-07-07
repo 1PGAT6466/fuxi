@@ -80,8 +80,8 @@ def _safe_json_parse(value, default=None):
     # Try JSON first
     try:
         return json.loads(value)
-    except (json.JSONDecodeError, ValueError):
-        pass
+    except (json.JSONDecodeError, ValueError) as e:
+        logger.warning("(json.JSONDecodeError, ValueError) 失败: %s", e, exc_info=True)
     # Try comma-separated
     if "," in value:
         return [t.strip() for t in value.split(",") if t.strip()]
@@ -435,7 +435,8 @@ class WikiEngine:
                         "similarity": round(sim, 4)
                     })
             return out
-        except Exception:
+        except Exception as e:
+            logger.warning("Exception 失败: %s", e, exc_info=True)
             return []
 
     

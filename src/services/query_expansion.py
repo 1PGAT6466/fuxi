@@ -44,9 +44,8 @@ def expand_query(query: str) -> str:
                 if token_lower in _SYNONYM_MAP:
                     tokens.extend(_SYNONYM_MAP[token_lower][:2])
             rewritten = " ".join(tokens)
-    except Exception:
-        logger.warning(f"[retrieval] suppressed exception", exc_info=True)
-        pass
+    except Exception as e:
+        logger.warning("expand_query 操作失败: %s", e, exc_info=True)
     return rewritten
 
 
@@ -73,9 +72,8 @@ async def llm_rewrite_query(query: str) -> str:
         if rewritten and 3 < len(rewritten.strip()) < 200:
             logger.info(f"[LLM Rewrite] '{query}' → '{rewritten.strip()}'")
             return rewritten.strip()
-    except Exception:
-        logger.warning(f"[retrieval] LLM rewrite failed", exc_info=True)
-        pass
+    except Exception as e:
+        logger.warning("llm_rewrite_query 操作失败: %s", e, exc_info=True)
     return query
 
 
@@ -97,11 +95,13 @@ async def hyde_expand_query(query: str) -> str:
             call_ai_raw(prompt, max_tokens=150), timeout=10.0
         )
         if hyde_response and len(hyde_response.strip()) > 10:
-            logger.info(f"[HyDE] generated {len(hyde_response)} chars for '{query[:30]}...'")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.info(f"[HyDE] generated {len(hyde_response)} chars for '{query[:30]}...'")
+            else:
+                logger.info(f"[HyDE] generated {len(hyde_response)} chars, query_len={len(query)}")
             return hyde_response.strip()
-    except Exception:
-        logger.warning(f"[retrieval] suppressed exception", exc_info=True)
-        pass
+    except Exception as e:
+        logger.warning("hyde_expand_query 操作失败: %s", e, exc_info=True)
     return ""
 
 

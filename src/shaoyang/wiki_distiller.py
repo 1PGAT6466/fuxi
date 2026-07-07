@@ -71,8 +71,8 @@ async def verify_wiki_page(wiki_content: str, source_text: str) -> dict:
             if result.startswith("```"):
                 result = result.split("\n", 1)[1].rsplit("```", 1)[0]
             return json.loads(result)
-        except json.JSONDecodeError:
-            pass
+        except json.JSONDecodeError as e:
+            logger.warning("json.JSONDecodeError 失败: %s", e, exc_info=True)
     return {"faithful": True, "issues": ["LLM 校验失败"], "score": 0.5}
 
 

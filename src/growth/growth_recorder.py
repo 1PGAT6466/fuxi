@@ -18,6 +18,7 @@ class GrowthRecorder:
 
     def __init__(self):
         os.makedirs(GROWTH_DIR, exist_ok=True)
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def record(self, symbol: str, metric: str, value: float,
                      context: Dict = None):
@@ -36,6 +37,7 @@ class GrowthRecorder:
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
         except Exception as e:
             logger.warning(f"[Growth] 写入失败: {e}")
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def query(self, symbol: str, metric: str = None,
                     since: str = None) -> List[Dict]:
@@ -60,7 +62,8 @@ class GrowthRecorder:
                         continue
 
                     records.append(record)
-                except:
+                except Exception as e:
+                    logger.warning("JSON解析成长记录失败: %s", e, exc_info=True)
                     continue
 
         return records

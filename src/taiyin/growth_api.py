@@ -177,7 +177,8 @@ def _get_symbol_metrics(symbol: str) -> Dict:
     try:
         with open(growth_file, "r", encoding="utf-8") as f:
             records = [json.loads(line) for line in f if line.strip()]
-    except:
+    except Exception as e:
+        logger.warning("读取象指标失败 [%s]: %s", symbol, e, exc_info=True)
         return {"query_count": 0, "avg_latency_ms": 0, "avg_confidence": 0}
 
     if not records:

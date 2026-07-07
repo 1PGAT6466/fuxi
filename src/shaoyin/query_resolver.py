@@ -74,7 +74,10 @@ async def resolve_query(query: str, history: List[dict], llm_fn=None) -> str:
         resolved = resolved.strip().strip('"').strip("'")
         
         if resolved and resolved != query:
-            logger.info(f"[QueryResolver] '{query[:30]}' → '{resolved[:50]}'")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.info(f"[QueryResolver] '{query[:30]}' → '{resolved[:50]}'")
+            else:
+                logger.info(f"[QueryResolver] resolved: query_len={len(query)}, result_len={len(resolved)}")
         return resolved if resolved else query
     except Exception as e:
         logger.warning(f"[QueryResolver] failed: {e}")

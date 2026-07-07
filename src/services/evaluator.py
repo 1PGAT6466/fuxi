@@ -55,7 +55,9 @@ def eval_relevancy(query: str, results: List[Dict]) -> Dict:
         e = resp.rfind("}") + 1
         if s >= 0 and e > s:
             return json.loads(resp[s:e])
-    except:
+    except json.JSONDecodeError as e:
+        logger.error(f"eval_relevancy JSON 解析失败: {e}, resp={resp[:200]}")
+    except Exception:
         pass
     return {"score": 0.5, "detail": "LLM 评判解析失败"}
 
@@ -77,7 +79,9 @@ def eval_faithfulness(query: str, answer: str, context: str) -> Dict:
         e = resp.rfind("}") + 1
         if s >= 0 and e > s:
             return json.loads(resp[s:e])
-    except:
+    except json.JSONDecodeError as e:
+        logger.error(f"eval_faithfulness JSON 解析失败: {e}, resp={resp[:200]}")
+    except Exception:
         pass
     return {"faithfulness_score": 0.5, "detail": "LLM 评判解析失败"}
 
@@ -94,5 +98,6 @@ def eval_answer_relevancy(query: str, answer: str) -> float:
     resp = _llm_judge(prompt, max_tokens=10)
     try:
         return float(resp.strip())
-    except:
+    except Exception as e:
+        logger.warning("回答相关性评分解析失败: %s", e, exc_info=True)
         return 0.5

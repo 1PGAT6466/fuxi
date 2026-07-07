@@ -54,6 +54,7 @@ class AgenticRAG:
             "total_tokens": total_tokens,
         }
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def _plan(self, query: str, history: List[Dict]) -> Dict:
         """规划下一步"""
         return {"tool": "search_knowledge", "query": query}

@@ -49,6 +49,7 @@ def _quick_plan(query: str) -> Optional[List[PlanStep]]:
                 PlanStep(2, f"{m.group(1).strip()} {m.group(2).strip()}", "vector", f"向量检索属性"),
             ]
     return None
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 
 async def _llm_plan(query: str) -> Optional[List[PlanStep]]:

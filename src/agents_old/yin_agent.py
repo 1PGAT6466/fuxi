@@ -147,6 +147,7 @@ class YinAgent(BaseAgent):
             "need_redo": need_redo,
             "reason": f"规则校验得分 {score}/100" if not issues else f"发现 {len(issues)} 个问题",
         }
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def _llm_verify(self, answer: str, sources: List[Dict], query: str, rule_issues: List[str]) -> Dict:
         """LLM 校验：慢、有成本，仅在规则发现问题时调用"""
@@ -178,8 +179,8 @@ class YinAgent(BaseAgent):
                     "need_redo": judge.get("need_redo", False),
                     "reason": judge.get("reason", ""),
                 }
-            except json.JSONDecodeError:
-                pass
+            except json.JSONDecodeError as e:
+                logger.warning("json.JSONDecodeError 失败: %s", e, exc_info=True)
 
         return {
             "passed": False,

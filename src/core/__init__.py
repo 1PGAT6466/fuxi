@@ -41,8 +41,8 @@ def parse_json(raw: str) -> dict | list | None:
     for _ in range(5):
         try:
             return json.loads(raw, strict=False)
-        except json.JSONDecodeError:
-            pass
+        except json.JSONDecodeError as e:
+            logger.warning("json.JSONDecodeError 失败: %s", e, exc_info=True)
         # 尝试提取 [...] 或 {...}
         for bracket, end_b in [('[', ']'), ('{', '}')]:
             s = raw.find(bracket)

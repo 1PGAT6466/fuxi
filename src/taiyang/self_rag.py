@@ -8,6 +8,7 @@ from typing import List, Dict
 logger = logging.getLogger(__name__)
 
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def check_relevance(query: str, docs: List[Dict], threshold: float = 0.3) -> Dict:
     """Self-RAG: 检查检索结果与 query 的相关性
     
@@ -40,7 +41,10 @@ async def check_relevance(query: str, docs: List[Dict], threshold: float = 0.3) 
     is_relevant = combined_score >= threshold
     
     if not is_relevant:
-        logger.info(f"[Self-RAG] 低相关性: score={combined_score:.2f}, hit_ratio={hit_ratio:.2f}, query='{query[:30]}'")
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.info(f"[Self-RAG] 低相关性: score={combined_score:.2f}, hit_ratio={hit_ratio:.2f}, query='{query[:30]}'")
+        else:
+            logger.info(f"[Self-RAG] 低相关性: score={combined_score:.2f}, hit_ratio={hit_ratio:.2f}, query_len={len(query)}")
     
     return {
         "is_relevant": is_relevant,

@@ -56,6 +56,7 @@ async def sag_explain(query: str) -> Dict:
         return {"error": str(e)}
 
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def sag_status() -> Dict:
     """MCP 工具：获取系统状态"""
     from src.infra.meridian_monitor import get_monitor

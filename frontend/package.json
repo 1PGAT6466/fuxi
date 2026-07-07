@@ -1,0 +1,24 @@
+{
+  "name": "fuxi-frontend",
+  "version": "1.50.0",
+  "description": "伏羲体系企业知识认知平台前端",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "keywords": [
+    "fuxi",
+    "knowledge",
+    "rag"
+  ],
+  "author": "伏羲团队",
+  "license": "ISC",
+  "devDependencies": {
+    "vite": "^5.4.0"
+  },
+  "dependencies": {
+    "@rollup/rollup-win32-x64-msvc": "^4.62.2"
+  }
+}

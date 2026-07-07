@@ -5,9 +5,10 @@
 
 const TITLES = {
   chat: '智能对话', search: '知识搜索', graph: '知识图谱', wiki: 'Wiki 知识',
-  files: '文件管理', 'admin-overview': '系统概览', 'admin-organs': '器官状态',
-  'admin-symbols': '四象状态', 'admin-growth': '成长面板',
-  'admin-eval': '评测报告', 'admin-flags': 'Feature Flags', 'admin-feedback': '用户反馈'
+  files: '文件管理', 'admin-overview': '系统概览',
+  'admin-symbols': '系统状态', 'admin-growth': '成长面板',
+  'admin-eval': '评测报告',   'admin-flags': 'Feature Flags', 'admin-feedback': '用户反馈',
+  'admin-services': '服务管理'
 };
 
 function switchPage(name) {
@@ -23,12 +24,12 @@ function switchPage(name) {
   if (name === 'wiki') loadWikiTree();
   if (name === 'files') { if (typeof loadFiles === 'function') loadFiles(); }
   if (name === 'admin-overview') loadOverview();
-  if (name === 'admin-organs') loadOrgans();
   if (name === 'admin-symbols') loadSymbols();
   if (name === 'admin-growth') loadGrowth();
   if (name === 'admin-eval') loadEval();
   if (name === 'admin-flags') loadFlags();
   if (name === 'admin-feedback') loadFeedback();
+  if (name === 'admin-services') loadServices();
 }
 
 function initApp() {
@@ -86,3 +87,28 @@ function initApp() {
     });
   }
 })();
+
+// 快捷键支持
+document.addEventListener('keydown', function(e) {
+  // Ctrl/Cmd + K: 快速搜索
+  if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+    e.preventDefault();
+    switchPage('search');
+    var searchInput = document.getElementById('searchInput');
+    if (searchInput) searchInput.focus();
+  }
+  // Ctrl/Cmd + /: 切换到对话
+  if ((e.ctrlKey || e.metaKey) && e.key === '/') {
+    e.preventDefault();
+    switchPage('chat');
+    var chatInput = document.getElementById('chatInput');
+    if (chatInput) chatInput.focus();
+  }
+  // Escape: 关闭弹窗/返回
+  if (e.key === 'Escape') {
+    var modals = document.querySelectorAll('.modal.active');
+    if (modals.length) {
+      modals.forEach(function(m) { m.classList.remove('active'); });
+    }
+  }
+});

@@ -60,7 +60,7 @@ class TestKidneyFilter:
     def test_filter_empty(self, kidney):
         with patch("src.db.data_store.load_chunks", return_value=[]):
             result = asyncio.run(kidney._filter_blood())
-            assert result["chunks"] == 0
+            assert result["total_chunks"] == 0
             assert result["essence"] == 0
 
     def test_filter_with_chunks(self, kidney):
@@ -68,10 +68,9 @@ class TestKidneyFilter:
             {"file_hash": "abc", "text": "精华", "access_count": 20, "created_at": "2026-06-01T00:00:00Z"},
             {"file_hash": "def", "text": "废物", "access_count": 0, "created_at": "2025-01-01T00:00:00Z"},
         ]
-        # _load_access_counts 从空磁盘返回 {}，会覆写 access_count 为 0
-        # 但 created_at + 文本完整性仍能给出合理分
+        # Mock 数据层的方法
         with patch("src.db.data_store.load_chunks", return_value=fake):
-            with patch.object(kidney, "_load_access_counts", return_value={"abc": 20, "def": 0}):
+            with patch.object(kidney._data_layer, "load_access_counts", return_value={"abc": 20, "def": 0}):
                 result = asyncio.run(kidney._filter_blood())
                 assert result["total_chunks"] == 2
                 assert result["essence"] >= 1
@@ -79,7 +78,7 @@ class TestKidneyFilter:
     def test_filter_triggers_purge_on_overflow(self, kidney):
         fake = [{"file_hash": f"h{i}", "text": "x", "access_count": 0, "created_at": "2025-01-01T00:00:00Z"} for i in range(9000)]
         with patch("src.db.data_store.load_chunks", return_value=fake):
-            with patch.object(kidney, "_purge_waste", return_value={"purged": 100}) as mock_purge:
+            with patch.object(kidney._business_layer, "purge_waste", return_value={"purged": 100}) as mock_purge:
                 asyncio.run(kidney._filter_blood())
                 mock_purge.assert_called_once()
 

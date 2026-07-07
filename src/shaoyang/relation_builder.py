@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 # ============ 快速通道: 共现分析 ============
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def extract_relations_cooccurrence(chunks: list) -> list:
     """基于共现: 在同一 chunk 中出现的 entities → 建立关系"""
     try:

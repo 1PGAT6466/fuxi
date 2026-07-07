@@ -1,0 +1,11 @@
+{
+  "id": "dxf-viewer",
+  "name": "DXF看图服务",
+  "version": "1.0.0",
+  "description": "专业DXF文件查看、测量、标注服务",
+  "service_type": "extension",
+  "api_prefix": "/api/dxf",
+  "health_endpoint": "/health",
+  "capabilities": ["view", "measure", "annotate"],
+  "config": {}
+}

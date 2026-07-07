@@ -94,6 +94,7 @@ def _table_quality_score(table: str) -> float:
     return min(score, 1.0)
 
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def _llm_fix_table(bad_table: str, context: str = "") -> Optional[str]:
     """LLM 修复低质量表格"""
     prompt = f"""你是一个表格修复专家。下面是一段从 PDF 中提取的表格文本，可能格式混乱、列错位、合并单元格被拆散。

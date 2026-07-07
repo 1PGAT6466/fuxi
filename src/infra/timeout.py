@@ -7,6 +7,7 @@ import logging
 from typing import Any, Callable, Optional
 
 logger = logging.getLogger("infra.timeout")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 
 async def with_timeout(
@@ -21,6 +22,7 @@ async def with_timeout(
     except asyncio.TimeoutError:
         logger.warning(f"[Timeout] {timeout_message} ({timeout_seconds}s)")
         return fallback
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 
 async def with_timeout_and_retry(

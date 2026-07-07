@@ -62,8 +62,8 @@ def _get_adjacent_chunk(store, file_hash: str, chunk_index: int) -> Dict:
         if rows:
             import json
             return json.loads(rows[0][0])
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Exception 失败: %s", e, exc_info=True)
     return None
 
 

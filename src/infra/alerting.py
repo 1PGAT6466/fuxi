@@ -7,6 +7,11 @@ import time
 from typing import Dict, List, Optional
 from dataclasses import dataclass, field
 
+try:
+    import aiohttp
+except ImportError:
+    aiohttp = None
+
 logger = logging.getLogger("infra.alerting")
 
 
@@ -46,6 +51,7 @@ class AlertManager:
     def __init__(self):
         self._alerts: List[Alert] = []
         self._max_alerts = 1000
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def check_metrics(self, metrics: Dict) -> List[Alert]:
         """检查指标并生成告警"""
@@ -119,3 +125,86 @@ def get_alert_manager() -> AlertManager:
     if _alert_manager is None:
         _alert_manager = AlertManager()
     return _alert_manager
+
+
+# ---------------------------------------------------------------------------
+# v2.1: Webhook 告警发送（兼容 test_infra_components.py）
+# ---------------------------------------------------------------------------
+
+def _build_dingtalk_body(title: str, content: str, level: str = "info") -> Dict:
+    """构建钉钉机器人 Markdown 消息体"""
+    level_emoji = {"critical": "🔴", "warning": "🟡", "info": "🔵"}
+    emoji = level_emoji.get(level, "🔵")
+    return {
+        "msgtype": "markdown",
+        "markdown": {
+            "title": f"{emoji} [{level.upper()}] {title}",
+            "text": f"## {emoji} {title}\n\n{content}\n\n---\n> 告警级别: {level.upper()}"
+        }
+    }
+
+
+def _build_feishu_body(title: str, content: str, level: str = "info") -> Dict:
+    """构建飞书卡片消息体"""
+    color_map = {"critical": "red", "warning": "yellow", "info": "blue"}
+    template = color_map.get(level, "blue")
+    return {
+        "msg_type": "interactive",
+        "card": {
+            "header": {
+                "title": {"content": f"[{level.upper()}] {title}", "tag": "plain_text"},
+                "template": template
+            },
+            "elements": [
+                {"tag": "div", "text": {"tag": "plain_text", "content": content}}
+            ]
+        }
+    }
+
+
+async def send_webhook(url: str, title: str, message: str, level: str = "info") -> bool:
+    """发送 Webhook 告警（钉钉/飞书自动检测）"""
+    if aiohttp is None:
+        logger.error("aiohttp 未安装，无法发送 Webhook")
+        return False
+    try:
+        if "dingtalk" in url:
+            body = _build_dingtalk_body(title, message, level)
+        elif "feishu" in url:
+            body = _build_feishu_body(title, message, level)
+        else:
+            body = {"title": title, "content": message, "level": level}
+
+        async with aiohttp.ClientSession() as session:
+            async with session.post(url, json=body, timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                if resp.status == 200:
+                    logger.info(f"Webhook 发送成功: {url}")
+                    return True
+                else:
+                    logger.warning(f"Webhook 发送失败: {resp.status} {await resp.text()}")
+                    return False
+    except Exception as e:
+        logger.error(f"Webhook 发送异常: {e}")
+        return False
+
+
+async def send_alert(title: str, message: str, level: str = "warning") -> bool:
+    """发送告警到所有配置的 Webhook 地址"""
+    import os
+    urls = []
+    dt_url = os.environ.get("DINGTALK_WEBHOOK_URL", "")
+    fs_url = os.environ.get("FEISHU_WEBHOOK_URL", "")
+    if dt_url:
+        urls.append(dt_url)
+    if fs_url:
+        urls.append(fs_url)
+
+    if not urls:
+        logger.warning("未配置任何 Webhook URL，告警未发送")
+        return False
+
+    results = []
+    for url in urls:
+        result = await send_webhook(url, title, message, level)
+        results.append(result)
+    return any(results)

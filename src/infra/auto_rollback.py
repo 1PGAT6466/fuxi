@@ -21,6 +21,7 @@ class AutoRollback:
     def __init__(self):
         self._check_history: List[Dict] = []
         self._last_check_time = 0
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def check_and_rollback(self, metrics: Dict) -> Dict:
         """检查指标并决定是否回滚"""

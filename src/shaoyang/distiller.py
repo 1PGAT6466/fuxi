@@ -18,7 +18,7 @@ from typing import Dict, List, Tuple
 
 import aiohttp
 
-from src.config import DATA_DIR
+from src.config import DATA_DIR, DEEPSEEK_BASE_URL as DEEPSEEK_BASE
 from src.core import make_id, now_iso, clean_text, parse_json, get_deepseek_key
 
 logger = logging.getLogger("worldtree")
@@ -34,6 +34,7 @@ BATCH_SIZE = 8           # 每批蒸馏的 chunk 数（增大提升效率）
 LLM_TIMEOUT = 180        # DeepSeek API 超时
 
 # ============ LLM 调用（async + aiohttp） ============
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 async def _call_llm_async(
     session: aiohttp.ClientSession,
@@ -45,7 +46,7 @@ async def _call_llm_async(
         return ""
     try:
         async with session.post(
-            "https://api.deepseek.com/v1/chat/completions",
+            f"{DEEPSEEK_BASE}/v1/chat/completions",
             headers={
                 "Authorization": f"Bearer {API_KEY}",
                 "Content-Type": "application/json",
@@ -133,40 +134,111 @@ DEEP_FALLBACK = {
 
 WEAVER_KW = ["泛微", "E-cology", "ecology", "weaver", "协同管理平台"]
 
-def classify(fname: str, text: str, raw_cat: str = "") -> dict:
-    sample = (text[:800] + " " + fname).lower()
-    is_weaver = any(kw.lower() in text[:300] for kw in WEAVER_KW) or \
-                any(kw in fname for kw in ["泛微","E-cology","ecology","协同管理平台","组织权限","流程引擎","门户引擎","内容引擎","建模引擎","移动引擎","集成模块"])
-    if is_weaver:
-        best_sub, best_score = "其他功能", 0
-        for sub, rules in ECOLOGY_SUB.items():
-            s = sum((3 if kw.lower() in fname.lower() else 0) for kw in rules["file"])
-            s += sum(1 for kw in rules["content"] if kw.lower() in sample)
-            if s > best_score: best_score, best_sub = s, sub
-        p = f"泛微E-cology > {best_sub}" if best_score >= 2 else "泛微E-cology"
-        return {"top_cat": "操作手册", "sub_cat": p, "confidence": min(0.95, 0.5+best_score*0.1)}
-    it_best_sub, it_best = "", 0
+# ============================================================
+# v6.0: classify 分解 — 每个分类域独立函数
+# ============================================================
+
+
+def _classify_weaver_ecology(fname: str, sample: str) -> dict | None:
+    """分类：泛微 E-cology 操作手册子模块"""
+    is_weaver = any(kw.lower() in sample[:300] for kw in WEAVER_KW) or \
+                any(kw in fname for kw in ["泛微", "E-cology", "ecology", "协同管理平台",
+                                            "组织权限", "流程引擎", "门户引擎", "内容引擎",
+                                            "建模引擎", "移动引擎", "集成模块"])
+    if not is_weaver:
+        return None
+    best_sub, best_score = "其他功能", 0
+    for sub, rules in ECOLOGY_SUB.items():
+        s = sum((3 if kw.lower() in fname.lower() else 0) for kw in rules["file"])
+        s += sum(1 for kw in rules["content"] if kw.lower() in sample)
+        if s > best_score:
+            best_score, best_sub = s, sub
+    p = f"泛微E-cology > {best_sub}" if best_score >= 2 else "泛微E-cology"
+    return {"top_cat": "操作手册", "sub_cat": p, "confidence": min(0.95, 0.5 + best_score * 0.1)}
+
+
+def _classify_it_system(sample: str) -> dict | None:
+    """分类：IT 系统子模块（交换路由/网络拓扑/无线/安全等）"""
+    best_sub, best = "", 0
     for sub, kws in IT_SUB.items():
         s = sum(1 for kw in kws if kw.lower() in sample)
-        if s > it_best: it_best, it_best_sub = s, sub
-    if it_best >= 3:
-        return {"top_cat": "IT系统", "sub_cat": it_best_sub, "confidence": min(0.95, 0.5+it_best*0.1)}
+        if s > best:
+            best, best_sub = s, sub
+    if best >= 3:
+        return {"top_cat": "IT系统", "sub_cat": best_sub, "confidence": min(0.95, 0.5 + best * 0.1)}
+    return None
+
+
+def _classify_deep_fallback(fname: str, sample: str) -> dict | None:
+    """分类：深度规则回退（机械设计/模具/材料/SMT 等）"""
     for cp, rules in DEEP_FALLBACK.items():
         score = 0
         for pat in rules["patterns"]:
-            if re.search(pat, fname, re.IGNORECASE) or re.search(pat, sample, re.IGNORECASE): score += 3
+            if re.search(pat, fname, re.IGNORECASE) or re.search(pat, sample, re.IGNORECASE):
+                score += 3
         for kw in rules["keywords"]:
-            if kw.lower() in sample: score += 1
+            if kw.lower() in sample:
+                score += 1
         if score >= 3:
             top, sub = cp.split(" > ", 1)
-            return {"top_cat": top, "sub_cat": sub, "confidence": min(0.9, 0.5+score*0.1)}
-    if "标准件" in fname or "BOM" in fname.upper(): return {"top_cat": "02-机械设计", "sub_cat": "标准件库", "confidence": 0.6}
-    if "连接器" in fname or "connector" in fname.lower() or "端子" in sample: return {"top_cat": "01-模具设计", "sub_cat": "连接器设计", "confidence": 0.6}
-    if "SMT" in sample or "贴片" in sample: return {"top_cat": "制造工艺", "sub_cat": "SMT贴片", "confidence": 0.6}
-    if "合同" in sample or "采购" in sample: return {"top_cat": "07-公司制度", "sub_cat": "财务制度", "confidence": 0.5}
-    if "人事" in sample or "考勤" in sample or "年假" in sample: return {"top_cat": "07-公司制度", "sub_cat": "行政人事", "confidence": 0.5}
-    if "材料" in sample or "合金" in sample or "塑料" in sample: return {"top_cat": "材料工程", "sub_cat": "材料选型", "confidence": 0.5}
-    if "AI" in sample or "RAG" in sample or "Agent" in sample: return {"top_cat": "AI", "sub_cat": "RAG", "confidence": 0.5}
+            return {"top_cat": top, "sub_cat": sub, "confidence": min(0.9, 0.5 + score * 0.1)}
+    return None
+
+
+# 快速关键词分类规则表：(触发条件, top_cat, sub_cat, confidence)
+_QUICK_CLASSIFY_RULES = [
+    (lambda f, s: "标准件" in f or "BOM" in f.upper(), "02-机械设计", "标准件库", 0.6),
+    (lambda f, s: "连接器" in f or "connector" in f.lower() or "端子" in s, "01-模具设计", "连接器设计", 0.6),
+    (lambda f, s: "SMT" in s or "贴片" in s, "制造工艺", "SMT贴片", 0.6),
+    (lambda f, s: "合同" in s or "采购" in s, "07-公司制度", "财务制度", 0.5),
+    (lambda f, s: "人事" in s or "考勤" in s or "年假" in s, "07-公司制度", "行政人事", 0.5),
+    (lambda f, s: "材料" in s or "合金" in s or "塑料" in s, "材料工程", "材料选型", 0.5),
+    (lambda f, s: "AI" in s or "RAG" in s or "Agent" in s, "AI", "RAG", 0.5),
+]
+
+
+def classify(fname: str, text: str, raw_cat: str = "") -> dict:
+    """
+    统一文档分类 v6.0 — 从文件名+内容推断分类路径。
+
+    分类策略链（短路求值）:
+      1. 泛微 E-cology 操作手册（WEAVER_KW 检测 → ECOLOGY_SUB 子模块匹配）
+      2. IT 系统子模块（IT_SUB 关键词打分）
+      3. 深度规则回退（DEEP_FALLBACK 正则+关键词）
+      4. 快速关键词分类（_QUICK_CLASSIFY_RULES）
+      5. 默认 → 待分类
+
+    Args:
+        fname: 文件名
+        text: 文档文本内容
+        raw_cat: 原始分类（保留参数兼容性，当前未使用）
+
+    Returns:
+        {"top_cat": str, "sub_cat": str, "confidence": float}
+    """
+    sample = (text[:800] + " " + fname).lower()
+
+    # Step 1: 泛微 E-cology
+    result = _classify_weaver_ecology(fname, sample)
+    if result:
+        return result
+
+    # Step 2: IT 系统
+    result = _classify_it_system(sample)
+    if result:
+        return result
+
+    # Step 3: 深度规则回退
+    result = _classify_deep_fallback(fname, sample)
+    if result:
+        return result
+
+    # Step 4: 快速关键词分类
+    for condition, top_cat, sub_cat, confidence in _QUICK_CLASSIFY_RULES:
+        if condition(fname, sample):
+            return {"top_cat": top_cat, "sub_cat": sub_cat, "confidence": confidence}
+
+    # Step 5: 默认
     return {"top_cat": "待分类", "sub_cat": "", "confidence": 0.1}
 
 def _entity_type(name: str, ctx: str = "") -> str:
@@ -256,6 +328,7 @@ def distill_sync(path: str, chunks: list, llm_text: str) -> dict:
                     cross_wt.append((title,tn))
     
     return {"wiki_pages":wiki_pages,"entities":all_entities,"terms":all_terms,"relations":[],"cross_links":{"wiki_entity_pairs":cross_we,"wiki_term_pairs":cross_wt}}
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 
 async def distill_batch_async(

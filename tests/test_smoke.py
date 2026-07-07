@@ -85,7 +85,7 @@ def test_bcrypt_hash_and_verify():
 
 
 def test_bcrypt_lazy_migration():
-    """bcrypt懒迁移: 旧SHA256格式应可验证"""
+    """bcrypt验证: 旧SHA256格式已被拒绝（v1.50安全升级）"""
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
     from src.api.auth_routes import _verify_password
     import hashlib, secrets
@@ -95,8 +95,8 @@ def test_bcrypt_lazy_migration():
     h = hashlib.sha256(f"{salt}:{password}".encode()).hexdigest()
     old_format = f"{salt}${h}"
     
-    assert _verify_password(password, old_format), "Old SHA256 format should still verify"
-    assert not _verify_password("wrongpassword", old_format), "Wrong password should fail for old format"
+    # v1.50: 旧格式密码被拒绝，强制升级到bcrypt
+    assert not _verify_password(password, old_format), "Old SHA256 format should be rejected in v1.50"
 
 
 def test_bcrypt_empty_stored():
@@ -111,6 +111,10 @@ def test_bcrypt_empty_stored():
 def test_jwt_create_and_verify():
     """JWT标准实现: 创建和验证token"""
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    os.environ["FUXI_JWT_SECRET"] = "test-secret-for-unit-tests-only-12345678"
+    import importlib
+    if "src.api.auth" in __import__("sys").modules:
+        importlib.reload(__import__("sys").modules["src.api.auth"])
     from src.api.auth import create_jwt_token, verify_jwt_token
     
     token = create_jwt_token("testuser", "user")
@@ -127,6 +131,10 @@ def test_jwt_create_and_verify():
 def test_jwt_verify_invalid_token():
     """JWT标准实现: 无效token应抛出异常"""
     sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    os.environ["FUXI_JWT_SECRET"] = "test-secret-for-unit-tests-only-12345678"
+    import importlib
+    if "src.api.auth" in __import__("sys").modules:
+        importlib.reload(__import__("sys").modules["src.api.auth"])
     from src.api.auth import verify_jwt_token
     from fastapi import HTTPException
     
@@ -135,6 +143,19 @@ def test_jwt_verify_invalid_token():
         assert False, "Should have raised HTTPException"
     except HTTPException as e:
         assert e.status_code == 401, f"Expected 401, got {e.status_code}"
+
+
+def test_documents_endpoint_uses_limit_param():
+    """验证/documents端点使用limit参数名（而非page_size）"""
+    import inspect
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
+    from src.api.documents import documents
+    
+    sig = inspect.signature(documents)
+    params = list(sig.parameters.keys())
+    assert "limit" in params, f"Expected 'limit' parameter, got: {params}"
+    assert "page_size" not in params, f"'page_size' should be renamed to 'limit'"
+    assert sig.parameters["limit"].default == 50, f"Expected default=50, got {sig.parameters['limit'].default}"
 
 
 if __name__ == "__main__":

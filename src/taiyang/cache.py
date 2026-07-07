@@ -49,9 +49,12 @@ async def get_cache(query: str, category: str = "", top_k: int = 15) -> Optional
                 try:
                     from src.infra.cache_stats import get_cache_stats
                     get_cache_stats().record_hit(latency_ms)
-                except Exception:
-                    pass
-                logger.info(f"[Cache] L1 hit: '{query[:40]}...'")
+                except Exception as e:
+                    logger.warning("Exception 失败: %s", e, exc_info=True)
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.info(f"[Cache] L1 hit: '{query[:40]}...'")
+                else:
+                    logger.info(f"[Cache] L1 hit: query_len={len(query)}")
                 return entry["results"]
             else:
                 del _l1_cache[key]
@@ -76,9 +79,12 @@ async def get_cache(query: str, category: str = "", top_k: int = 15) -> Optional
                             try:
                                 from src.infra.cache_stats import get_cache_stats
                                 get_cache_stats().record_hit(latency_ms)
-                            except Exception:
-                                pass
-                            logger.info(f"[Cache] L2 hit (sim={sim:.3f}): '{query[:40]}...'")
+                            except Exception as e:
+                                logger.warning("Exception 失败: %s", e, exc_info=True)
+                            if logger.isEnabledFor(logging.DEBUG):
+                                logger.info(f"[Cache] L2 hit (sim={sim:.3f}): '{query[:40]}...'")
+                            else:
+                                logger.info(f"[Cache] L2 hit: sim={sim:.3f}, query_len={len(query)}")
                             return results
                     # 如果大量过期，触发清理
                     if len(_l2_cache) - valid_count > 10:
@@ -91,8 +97,8 @@ async def get_cache(query: str, category: str = "", top_k: int = 15) -> Optional
     try:
         from src.infra.cache_stats import get_cache_stats
         get_cache_stats().record_miss(latency_ms)
-    except Exception:
-        pass
+    except Exception as e:
+        logger.warning("Exception 失败: %s", e, exc_info=True)
     return None
 
 

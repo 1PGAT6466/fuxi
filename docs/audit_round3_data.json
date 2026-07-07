@@ -1,0 +1,2751 @@
+{
+  "summary": {
+    "total_py_files": 330,
+    "total_functions": 1845
+  },
+  "bare_excepts": [
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+      "line": 428,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+      "line": 205,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\growth\\adjustment_log.py",
+      "line": 71,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\growth\\engine.py",
+      "line": 128,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\growth\\engine.py",
+      "line": 176,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\growth\\growth_recorder.py",
+      "line": 65,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\connection_pool.py",
+      "line": 71,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\evaluator.py",
+      "line": 58,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\evaluator.py",
+      "line": 80,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\evaluator.py",
+      "line": 97,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\eval_automation.py",
+      "line": 206,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\eval_pipeline.py",
+      "line": 123,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\knowledge_lifecycle.py",
+      "line": 87,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\knowledge_lifecycle.py",
+      "line": 112,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\memory.py",
+      "line": 115,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\metrics.py",
+      "line": 168,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\online_eval.py",
+      "line": 94,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\online_eval.py",
+      "line": 134,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\crag_corrector.py",
+      "line": 32,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\crag_corrector.py",
+      "line": 39,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\smart_self_rag.py",
+      "line": 105,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\smart_self_rag.py",
+      "line": 115,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\multi_hop.py",
+      "line": 45,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\seed_score_ab.py",
+      "line": 101,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyin\\growth_api.py",
+      "line": 180,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    },
+    {
+      "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyin\\metrics.py",
+      "line": 152,
+      "code": "except:",
+      "severity": "HIGH",
+      "suggestion": "Replace bare \"except:\" with specific exception type(s), or at minimum \"except Exception:\""
+    }
+  ],
+  "type_annotations": {
+    "total": 1845,
+    "with_return_annotation": 1078,
+    "with_arg_annotations": 1703,
+    "with_both": 1052,
+    "without_any": 116,
+    "return_annotation_rate": 58.4,
+    "arg_annotation_rate": 92.3,
+    "public_missing": [
+      {
+        "name": "detect_logger_name",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\fix_exception_swallow.py",
+        "line": 14
+      },
+      {
+        "name": "fix_file",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\fix_exception_swallow.py",
+        "line": 36
+      },
+      {
+        "name": "fix_file",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fixer.py",
+        "line": 14
+      },
+      {
+        "name": "main",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fixer.py",
+        "line": 229
+      },
+      {
+        "name": "startup",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 90
+      },
+      {
+        "name": "shutdown",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 94
+      },
+      {
+        "name": "metrics_middleware",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 128
+      },
+      {
+        "name": "prometheus_metrics",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 195
+      },
+      {
+        "name": "mcp_handler",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 226
+      },
+      {
+        "name": "mcp_list_tools",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 234
+      },
+      {
+        "name": "mcp_sag_search",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 240
+      },
+      {
+        "name": "mcp_sag_ingest",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 247
+      },
+      {
+        "name": "mcp_sag_explain",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 254
+      },
+      {
+        "name": "mcp_sag_status",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 261
+      },
+      {
+        "name": "eval_run",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 270
+      },
+      {
+        "name": "eval_report",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 276
+      },
+      {
+        "name": "eval_history",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 282
+      },
+      {
+        "name": "symbols_status",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 292
+      },
+      {
+        "name": "growth_overview",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 298
+      },
+      {
+        "name": "health_check",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 304
+      },
+      {
+        "name": "system_stats",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 316
+      },
+      {
+        "name": "cache_stats",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 326
+      },
+      {
+        "name": "error_stats",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 336
+      },
+      {
+        "name": "list_feature_flags",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 349
+      },
+      {
+        "name": "update_feature_flag",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 354
+      },
+      {
+        "name": "auth_me",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 367
+      },
+      {
+        "name": "login_page",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 375
+      },
+      {
+        "name": "index_page",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 381
+      },
+      {
+        "name": "admin_page",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 387
+      },
+      {
+        "name": "metrics",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 403
+      }
+    ]
+  },
+  "docstring_coverage": {
+    "total": 1845,
+    "with_docstring": 1120,
+    "without_docstring": 725,
+    "coverage_rate": 60.7,
+    "public_missing": [
+      {
+        "name": "fix_file",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fixer.py",
+        "line": 14
+      },
+      {
+        "name": "main",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fixer.py",
+        "line": 229
+      },
+      {
+        "name": "get_domain",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 393
+      },
+      {
+        "name": "get_domain_prompt",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 397
+      },
+      {
+        "name": "get_entity_type_category",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 401
+      },
+      {
+        "name": "get_keywords",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 405
+      },
+      {
+        "name": "ProtocolMessage.to_dict",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\protocols.py",
+        "line": 41
+      },
+      {
+        "name": "ProtocolMessage.is_expired",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\protocols.py",
+        "line": 55
+      },
+      {
+        "name": "ProtocolMessage.from_dict",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\protocols.py",
+        "line": 59
+      },
+      {
+        "name": "startup",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 90
+      },
+      {
+        "name": "shutdown",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 94
+      },
+      {
+        "name": "auth_me",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 367
+      },
+      {
+        "name": "login_page",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 375
+      },
+      {
+        "name": "index_page",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 381
+      },
+      {
+        "name": "admin_page",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "line": 387
+      },
+      {
+        "name": "get_orchestrator",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\agents_old\\orchestrator.py",
+        "line": 89
+      },
+      {
+        "name": "AgentMessage.to_dict",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\agents_old\\__init__.py",
+        "line": 24
+      },
+      {
+        "name": "AuthMiddleware.dispatch",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\auth.py",
+        "line": 37
+      },
+      {
+        "name": "InputLimitMiddleware.dispatch",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\auth.py",
+        "line": 56
+      },
+      {
+        "name": "login",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\auth_routes.py",
+        "line": 28
+      },
+      {
+        "name": "register",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\auth_routes.py",
+        "line": 56
+      },
+      {
+        "name": "search_history",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\search.py",
+        "line": 27
+      },
+      {
+        "name": "get_db_path",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\core\\db.py",
+        "line": 17
+      },
+      {
+        "name": "count_worldtree",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\core\\db.py",
+        "line": 39
+      },
+      {
+        "name": "get_wiki_tree",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\core\\db.py",
+        "line": 49
+      },
+      {
+        "name": "get_wiki_pages",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\core\\db.py",
+        "line": 65
+      },
+      {
+        "name": "get_knowledge_graph",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\core\\db.py",
+        "line": 80
+      },
+      {
+        "name": "log_search_to_db",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\core\\db.py",
+        "line": 96
+      },
+      {
+        "name": "save_test_cases",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\core\\evaluation.py",
+        "line": 43
+      },
+      {
+        "name": "get_session",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\core\\http_client.py",
+        "line": 14
+      }
+    ]
+  },
+  "cyclomatic_complexity": {
+    "avg": 3.3,
+    "max": 75,
+    "over_15_count": 25,
+    "over_15": [
+      {
+        "name": "_extract_text",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\ingest.py",
+        "line": 262,
+        "complexity": 75
+      },
+      {
+        "name": "fix_file",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fixer.py",
+        "line": 14,
+        "complexity": 59
+      },
+      {
+        "name": "hybrid_search",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\retrieval.py",
+        "line": 86,
+        "complexity": 39
+      },
+      {
+        "name": "classify",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\distiller.py",
+        "line": 137,
+        "complexity": 38
+      },
+      {
+        "name": "ingest_document",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\ingest.py",
+        "line": 646,
+        "complexity": 37
+      },
+      {
+        "name": "_execute_tool",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\agentic_rag_v2.py",
+        "line": 204,
+        "complexity": 26
+      },
+      {
+        "name": "route_entity_with_neighbors",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\graph_router.py",
+        "line": 218,
+        "complexity": 26
+      },
+      {
+        "name": "fix_file",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\fix_exception_swallow.py",
+        "line": 36,
+        "complexity": 25
+      },
+      {
+        "name": "_extract_pdf_mineru",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\mineru.py",
+        "line": 9,
+        "complexity": 25
+      },
+      {
+        "name": "distill_sync",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\distiller.py",
+        "line": 209,
+        "complexity": 23
+      },
+      {
+        "name": "_extract_pdf_dual",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\ingest.py",
+        "line": 169,
+        "complexity": 23
+      },
+      {
+        "name": "Instinct.classify_intent",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\brain.py",
+        "line": 72,
+        "complexity": 22
+      },
+      {
+        "name": "save_batch",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\distiller.py",
+        "line": 281,
+        "complexity": 21
+      },
+      {
+        "name": "YinAgent._rule_check",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\agents_old\\yin_agent.py",
+        "line": 87,
+        "complexity": 20
+      },
+      {
+        "name": "index_tables_from_chunks",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\table_view.py",
+        "line": 148,
+        "complexity": 20
+      },
+      {
+        "name": "run_full_async",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\distiller.py",
+        "line": 371,
+        "complexity": 20
+      },
+      {
+        "name": "YinAgent._rule_check",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\validator.py",
+        "line": 18,
+        "complexity": 20
+      },
+      {
+        "name": "match_category",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 300,
+        "complexity": 19
+      },
+      {
+        "name": "compress_image",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\doc_tools\\routes.py",
+        "line": 460,
+        "complexity": 19
+      },
+      {
+        "name": "_classify_text",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\ingest.py",
+        "line": 29,
+        "complexity": 19
+      },
+      {
+        "name": "get_entity_type",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\db\\ontology.py",
+        "line": 217,
+        "complexity": 17
+      },
+      {
+        "name": "table_view_recall",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\table_view.py",
+        "line": 280,
+        "complexity": 17
+      },
+      {
+        "name": "load_graph",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\db\\data_store.py",
+        "line": 170,
+        "complexity": 16
+      },
+      {
+        "name": "enhance_pdf_extraction",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\multimodal.py",
+        "line": 181,
+        "complexity": 16
+      },
+      {
+        "name": "exact_match_boost",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\fusion.py",
+        "line": 91,
+        "complexity": 16
+      }
+    ]
+  },
+  "function_length": {
+    "avg": 14.3,
+    "max": 265,
+    "over_100_count": 7,
+    "over_100": [
+      {
+        "name": "_extract_text",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\ingest.py",
+        "line": 262,
+        "lines": 265
+      },
+      {
+        "name": "hybrid_search",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\retrieval.py",
+        "line": 86,
+        "lines": 218
+      },
+      {
+        "name": "fix_file",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fixer.py",
+        "line": 14,
+        "lines": 213
+      },
+      {
+        "name": "ingest_document",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\ingest.py",
+        "line": 646,
+        "lines": 151
+      },
+      {
+        "name": "route_entity_with_neighbors",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\graph_router.py",
+        "line": 218,
+        "lines": 137
+      },
+      {
+        "name": "run_full_async",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\distiller.py",
+        "line": 371,
+        "lines": 116
+      },
+      {
+        "name": "TaiyangRetrieval.refine",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\retrieval.py",
+        "line": 29,
+        "lines": 107
+      }
+    ]
+  },
+  "duplicates": [
+    {
+      "name": "__init__",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\nose\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\spleen.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\pipeline\\unified.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\spleen\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\small_intestine\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\lung.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\heart.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\skin.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\small_intestine.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\brain.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\kidney.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\wiki.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\gallbladder.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\lung\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\nose.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\heart\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\meridian_monitor.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\sanjiao\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\kidney\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\liver.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\limbs.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\liver\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\skeleton\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\sanjiao.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\limbs\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\db\\memory_store.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\skeleton.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\gallbladder\\signal_layer.py"
+      ],
+      "count": 28
+    },
+    {
+      "name": "run",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\agents_old\\orchestrator.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\agentic_rag_v2.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\agents_old\\yang_agent.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\agents_old\\table_agent.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\agents_old\\yin_agent.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\agents_old\\generation_agent.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\agents_old\\reflection_agent.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\agents_old\\graph_agent.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\agents_old\\retrieval_agent.py"
+      ],
+      "count": 9
+    },
+    {
+      "name": "to_dict",
+      "arg_count": 1,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\models\\relation.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\models\\chunk.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\protocols.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\models\\entity.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\models\\event.py"
+      ],
+      "count": 5
+    },
+    {
+      "name": "from_dict",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\models\\relation.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\models\\chunk.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\protocols.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\models\\entity.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\models\\event.py"
+      ],
+      "count": 5
+    },
+    {
+      "name": "_classify_text",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\ingest.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\spleen.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\spleen\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\small_intestine\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\small_intestine.py"
+      ],
+      "count": 5
+    },
+    {
+      "name": "get_stats",
+      "arg_count": 1,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\cache_stats.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\growth\\engine.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\cache_manager.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\request_metrics.py"
+      ],
+      "count": 4
+    },
+    {
+      "name": "__init__",
+      "arg_count": 1,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\fuxi.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\meridian.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\concurrency.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\cache_manager.py"
+      ],
+      "count": 4
+    },
+    {
+      "name": "stats",
+      "arg_count": 1,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\skeleton\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\spleen\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\skeleton.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\spleen.py"
+      ],
+      "count": 4
+    },
+    {
+      "name": "start_service",
+      "arg_count": 0,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\dxf_viewer\\server.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\doc_tools\\server.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\ai_tools\\__init__.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\data_analytics\\server.py"
+      ],
+      "count": 4
+    },
+    {
+      "name": "_filter_loop",
+      "arg_count": 1,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\kidney\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\liver.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\liver\\signal_layer.py"
+      ],
+      "count": 3
+    },
+    {
+      "name": "parse",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\pipeline\\unified.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\pipeline\\parsers.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\parser.py"
+      ],
+      "count": 3
+    },
+    {
+      "name": "_parse_pdf",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\pipeline.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\pipeline\\unified.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\pipeline\\parsers.py"
+      ],
+      "count": 3
+    },
+    {
+      "name": "_get_conn",
+      "arg_count": 0,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\eval_dataset.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyin\\audit.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\graph_traversal.py"
+      ],
+      "count": 3
+    },
+    {
+      "name": "main",
+      "arg_count": 0,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\tests\\performance_test.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\_fixer.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_rule_check",
+      "arg_count": 4,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\validator.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\agents_old\\yin_agent.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_save_to_db",
+      "arg_count": 3,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\extractor.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\db\\memory_store.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "query",
+      "arg_count": 4,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\growth\\growth_recorder.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\db\\vector_store.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "evaluate",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\growth\\engine.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\seed_score_ab.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "__init__",
+      "arg_count": 4,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\circuit_breaker.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\brain.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "think",
+      "arg_count": 3,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\brain.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\fuxi.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_handle_decide",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\gallbladder.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\gallbladder\\signal_layer.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_classify",
+      "arg_count": 3,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\gallbladder.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\gallbladder\\signal_layer.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_decide_route",
+      "arg_count": 3,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\gallbladder.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\gallbladder\\signal_layer.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_beat",
+      "arg_count": 1,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\heart\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\heart.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_handle_store_memory",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\heart\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\heart.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_handle_search",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\limbs\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\limbs.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_handle_table",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\limbs\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\limbs.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_search",
+      "arg_count": 4,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\limbs\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\limbs.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_fallback_search",
+      "arg_count": 4,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\limbs\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\limbs.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_handle_learn",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\liver.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\liver\\signal_layer.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_filter",
+      "arg_count": 3,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\liver.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\liver\\signal_layer.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "quick_assess",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\liver.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\liver\\signal_layer.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_load_immune_memory",
+      "arg_count": 1,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\liver.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\liver\\signal_layer.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_handle_detect_fever",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\liver.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\liver\\signal_layer.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_breathe_cycle",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\lung\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\lung.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_inhale",
+      "arg_count": 1,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\lung\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\lung.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_exhale",
+      "arg_count": 1,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\lung\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\lung.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_run_distillation",
+      "arg_count": 1,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\lung\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\lung.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_breath_loop",
+      "arg_count": 1,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\lung\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\lung.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_handle_collect_health",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\lung\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\lung.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_sniff",
+      "arg_count": 1,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\nose\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\nose.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_check_search_logs",
+      "arg_count": 1,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\nose\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\nose.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_check_zero_results",
+      "arg_count": 1,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\nose\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\nose.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_check_latency",
+      "arg_count": 1,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\nose\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\nose.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_handle_read",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\sanjiao\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\sanjiao.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_handle_write",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\sanjiao\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\sanjiao.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_handle_stats",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\sanjiao\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\sanjiao.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_query",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\skeleton\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\skeleton.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_extract_relations",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\skeleton\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\skeleton.py"
+      ],
+      "count": 2
+    },
+    {
+      "name": "_save_relations",
+      "arg_count": 2,
+      "files": [
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\skeleton\\signal_layer.py",
+        "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\skeleton.py"
+      ],
+      "count": 2
+    }
+  ],
+  "dead_code": {
+    "unreferenced_files": [
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\fix_exception_swallow.py",
+        "module": "fix_exception_swallow"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\migration_map.py",
+        "module": "migration_map"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fixer.py",
+        "module": "_fixer"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fix_missing_as_e.py",
+        "module": "_fix_missing_as_e"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_scan_all.py",
+        "module": "_scan_all"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_scan_except_pass.py",
+        "module": "_scan_except_pass"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_scan_except_pass2.py",
+        "module": "_scan_except_pass2"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_scan_fake_async.py",
+        "module": "_scan_fake_async"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_scan_return_none.py",
+        "module": "_scan_return_none"
+      }
+    ],
+    "uncalled_private_count": 28,
+    "uncalled_private": [
+      {
+        "name": "BaseAgent._record_run",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\agents_old\\__init__.py",
+        "line": 113
+      },
+      {
+        "name": "MemoryStore._inverted",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\db\\memory_store.py",
+        "line": 449
+      },
+      {
+        "name": "MemoryStore._loaded",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\db\\memory_store.py",
+        "line": 454
+      },
+      {
+        "name": "MemoryStore._db_conn_public",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\db\\memory_store.py",
+        "line": 470
+      },
+      {
+        "name": "MemoryStore._save_to_db",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\db\\memory_store.py",
+        "line": 474
+      },
+      {
+        "name": "_jaccard_similarity",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\eval\\runner.py",
+        "line": 36
+      },
+      {
+        "name": "KidneyAgent._save_access_counts",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\kidney.py",
+        "line": 97
+      },
+      {
+        "name": "KidneyAgent._score_chunk",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\kidney\\signal_layer.py",
+        "line": 179
+      },
+      {
+        "name": "KidneyAgent._load_access_counts",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\kidney\\signal_layer.py",
+        "line": 183
+      },
+      {
+        "name": "KidneyAgent._save_access_counts",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\kidney\\signal_layer.py",
+        "line": 187
+      },
+      {
+        "name": "KidneyAgent._filter_blood",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\kidney\\signal_layer.py",
+        "line": 191
+      },
+      {
+        "name": "KidneyAgent._purge_waste",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\kidney\\signal_layer.py",
+        "line": 195
+      },
+      {
+        "name": "KidneyAgent._detect_deficiency",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\kidney\\signal_layer.py",
+        "line": 199
+      },
+      {
+        "name": "SymbolBase._set_status",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\symbol_base.py",
+        "line": 49
+      },
+      {
+        "name": "SymbolBase._handle_growth_rollback",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\symbol_base.py",
+        "line": 55
+      },
+      {
+        "name": "_expand_parent_child",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\results_postprocess.py",
+        "line": 118
+      },
+      {
+        "name": "_sanitize_filename",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\ingest.py",
+        "line": 16
+      },
+      {
+        "name": "_classify_text",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\ingest.py",
+        "line": 29
+      },
+      {
+        "name": "_audit_text",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\ingest.py",
+        "line": 62
+      },
+      {
+        "name": "_clean_text",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\ingest.py",
+        "line": 74
+      },
+      {
+        "name": "_generate_summary",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\ingest.py",
+        "line": 102
+      },
+      {
+        "name": "_smart_chunk",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\ingest.py",
+        "line": 127
+      },
+      {
+        "name": "_compute_file_hash",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\ingest.py",
+        "line": 250
+      },
+      {
+        "name": "ShaoyangPipeline._get_metrics",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\pipeline.py",
+        "line": 236
+      },
+      {
+        "name": "ShaoyinBrain._get_metrics",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\brain.py",
+        "line": 219
+      },
+      {
+        "name": "YinAgent._rule_check",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\validator.py",
+        "line": 18
+      },
+      {
+        "name": "TaiyangRetrieval._get_metrics",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\retrieval.py",
+        "line": 214
+      },
+      {
+        "name": "TaiyinServer._get_metrics",
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyin\\server.py",
+        "line": 205
+      }
+    ]
+  },
+  "todos": {
+    "total": 0,
+    "by_tag": {},
+    "items": []
+  },
+  "test_coverage": {
+    "total_src": 296,
+    "covered": 59,
+    "uncovered": [
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "module": "category_registry.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\config.py",
+        "module": "config.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\protocols.py",
+        "module": "protocols.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\server.py",
+        "module": "server.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\agents_old\\generation_agent.py",
+        "module": "agents_old\\generation_agent.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\agents_old\\graph_agent.py",
+        "module": "agents_old\\graph_agent.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\agents_old\\orchestrator.py",
+        "module": "agents_old\\orchestrator.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\agents_old\\reflection_agent.py",
+        "module": "agents_old\\reflection_agent.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\agents_old\\retrieval_agent.py",
+        "module": "agents_old\\retrieval_agent.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\agents_old\\table_agent.py",
+        "module": "agents_old\\table_agent.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\admin.py",
+        "module": "api\\admin.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\auth.py",
+        "module": "api\\auth.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\auth_routes.py",
+        "module": "api\\auth_routes.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\chat.py",
+        "module": "api\\chat.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\dashboard.py",
+        "module": "api\\dashboard.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\documents.py",
+        "module": "api\\documents.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\evaluation.py",
+        "module": "api\\evaluation.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\evolution.py",
+        "module": "api\\evolution.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\feedback.py",
+        "module": "api\\feedback.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\files_view.py",
+        "module": "api\\files_view.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\graph.py",
+        "module": "api\\graph.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\metadata.py",
+        "module": "api\\metadata.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\search.py",
+        "module": "api\\search.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\v2_routes.py",
+        "module": "api\\v2_routes.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\wiki.py",
+        "module": "api\\wiki.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\api\\worldtree.py",
+        "module": "api\\worldtree.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\core\\db.py",
+        "module": "core\\db.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\core\\evaluation.py",
+        "module": "core\\evaluation.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\core\\http_client.py",
+        "module": "core\\http_client.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\db\\data_store.py",
+        "module": "db\\data_store.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\db\\ontology.py",
+        "module": "db\\ontology.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\db\\vector_store.py",
+        "module": "db\\vector_store.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\eval\\runner.py",
+        "module": "eval\\runner.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\fuxi_platform\\events.py",
+        "module": "fuxi_platform\\events.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\fuxi_platform\\gateway.py",
+        "module": "fuxi_platform\\gateway.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\fuxi_platform\\registry.py",
+        "module": "fuxi_platform\\registry.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\growth\\adjustment_log.py",
+        "module": "growth\\adjustment_log.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\growth\\decision_growth.py",
+        "module": "growth\\decision_growth.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\growth\\engine.py",
+        "module": "growth\\engine.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\growth\\experience_growth.py",
+        "module": "growth\\experience_growth.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\growth\\extraction_growth.py",
+        "module": "growth\\extraction_growth.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\growth\\growth_recorder.py",
+        "module": "growth\\growth_recorder.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\growth\\retrieval_growth.py",
+        "module": "growth\\retrieval_growth.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\fuxi.py",
+        "module": "hypothalamus\\fuxi.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\balance\\five_elements.py",
+        "module": "hypothalamus\\balance\\five_elements.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\balance\\meridian_rhythm.py",
+        "module": "hypothalamus\\balance\\meridian_rhythm.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\balance\\stem_scheduler.py",
+        "module": "hypothalamus\\balance\\stem_scheduler.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\gallbladder.py",
+        "module": "hypothalamus\\organs\\gallbladder.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\organ_base.py",
+        "module": "hypothalamus\\organs\\organ_base.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\sanjiao.py",
+        "module": "hypothalamus\\organs\\sanjiao.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\skin.py",
+        "module": "hypothalamus\\organs\\skin.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\small_intestine.py",
+        "module": "hypothalamus\\organs\\small_intestine.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\gallbladder\\business_layer.py",
+        "module": "hypothalamus\\organs\\gallbladder\\business_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\gallbladder\\data_layer.py",
+        "module": "hypothalamus\\organs\\gallbladder\\data_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\gallbladder\\signal_layer.py",
+        "module": "hypothalamus\\organs\\gallbladder\\signal_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\gallbladder\\utility_layer.py",
+        "module": "hypothalamus\\organs\\gallbladder\\utility_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\heart\\business_layer.py",
+        "module": "hypothalamus\\organs\\heart\\business_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\heart\\data_layer.py",
+        "module": "hypothalamus\\organs\\heart\\data_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\heart\\signal_layer.py",
+        "module": "hypothalamus\\organs\\heart\\signal_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\heart\\utility_layer.py",
+        "module": "hypothalamus\\organs\\heart\\utility_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\kidney\\business_layer.py",
+        "module": "hypothalamus\\organs\\kidney\\business_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\kidney\\data_layer.py",
+        "module": "hypothalamus\\organs\\kidney\\data_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\kidney\\signal_layer.py",
+        "module": "hypothalamus\\organs\\kidney\\signal_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\kidney\\utility_layer.py",
+        "module": "hypothalamus\\organs\\kidney\\utility_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\limbs\\business_layer.py",
+        "module": "hypothalamus\\organs\\limbs\\business_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\limbs\\data_layer.py",
+        "module": "hypothalamus\\organs\\limbs\\data_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\limbs\\signal_layer.py",
+        "module": "hypothalamus\\organs\\limbs\\signal_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\limbs\\utility_layer.py",
+        "module": "hypothalamus\\organs\\limbs\\utility_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\liver\\business_layer.py",
+        "module": "hypothalamus\\organs\\liver\\business_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\liver\\data_layer.py",
+        "module": "hypothalamus\\organs\\liver\\data_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\liver\\signal_layer.py",
+        "module": "hypothalamus\\organs\\liver\\signal_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\liver\\utility_layer.py",
+        "module": "hypothalamus\\organs\\liver\\utility_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\lung\\business_layer.py",
+        "module": "hypothalamus\\organs\\lung\\business_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\lung\\data_layer.py",
+        "module": "hypothalamus\\organs\\lung\\data_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\lung\\signal_layer.py",
+        "module": "hypothalamus\\organs\\lung\\signal_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\lung\\utility_layer.py",
+        "module": "hypothalamus\\organs\\lung\\utility_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\nose\\business_layer.py",
+        "module": "hypothalamus\\organs\\nose\\business_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\nose\\data_layer.py",
+        "module": "hypothalamus\\organs\\nose\\data_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\nose\\signal_layer.py",
+        "module": "hypothalamus\\organs\\nose\\signal_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\nose\\utility_layer.py",
+        "module": "hypothalamus\\organs\\nose\\utility_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\sanjiao\\business_layer.py",
+        "module": "hypothalamus\\organs\\sanjiao\\business_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\sanjiao\\data_layer.py",
+        "module": "hypothalamus\\organs\\sanjiao\\data_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\sanjiao\\signal_layer.py",
+        "module": "hypothalamus\\organs\\sanjiao\\signal_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\sanjiao\\utility_layer.py",
+        "module": "hypothalamus\\organs\\sanjiao\\utility_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\skeleton\\business_layer.py",
+        "module": "hypothalamus\\organs\\skeleton\\business_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\skeleton\\data_layer.py",
+        "module": "hypothalamus\\organs\\skeleton\\data_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\skeleton\\signal_layer.py",
+        "module": "hypothalamus\\organs\\skeleton\\signal_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\skeleton\\utility_layer.py",
+        "module": "hypothalamus\\organs\\skeleton\\utility_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\skin\\business_layer.py",
+        "module": "hypothalamus\\organs\\skin\\business_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\skin\\data_layer.py",
+        "module": "hypothalamus\\organs\\skin\\data_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\skin\\signal_layer.py",
+        "module": "hypothalamus\\organs\\skin\\signal_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\skin\\utility_layer.py",
+        "module": "hypothalamus\\organs\\skin\\utility_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\small_intestine\\business_layer.py",
+        "module": "hypothalamus\\organs\\small_intestine\\business_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\small_intestine\\data_layer.py",
+        "module": "hypothalamus\\organs\\small_intestine\\data_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\small_intestine\\signal_layer.py",
+        "module": "hypothalamus\\organs\\small_intestine\\signal_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\small_intestine\\utility_layer.py",
+        "module": "hypothalamus\\organs\\small_intestine\\utility_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\spleen\\business_layer.py",
+        "module": "hypothalamus\\organs\\spleen\\business_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\spleen\\data_layer.py",
+        "module": "hypothalamus\\organs\\spleen\\data_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\spleen\\signal_layer.py",
+        "module": "hypothalamus\\organs\\spleen\\signal_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\hypothalamus\\organs\\spleen\\utility_layer.py",
+        "module": "hypothalamus\\organs\\spleen\\utility_layer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\alerting.py",
+        "module": "infra\\alerting.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\auto_rollback.py",
+        "module": "infra\\auto_rollback.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\cache_stats.py",
+        "module": "infra\\cache_stats.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\circuit_breaker.py",
+        "module": "infra\\circuit_breaker.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\concurrency.py",
+        "module": "infra\\concurrency.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\config.py",
+        "module": "infra\\config.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\config_validation.py",
+        "module": "infra\\config_validation.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\connection_pool.py",
+        "module": "infra\\connection_pool.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\embedder.py",
+        "module": "infra\\embedder.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\error_tracker.py",
+        "module": "infra\\error_tracker.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\health_check.py",
+        "module": "infra\\health_check.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\llm.py",
+        "module": "infra\\llm.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\logging.py",
+        "module": "infra\\logging.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\meridian_monitor.py",
+        "module": "infra\\meridian_monitor.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\metrics_collector.py",
+        "module": "infra\\metrics_collector.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\protocol.py",
+        "module": "infra\\protocol.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\rate_limiter.py",
+        "module": "infra\\rate_limiter.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\request_metrics.py",
+        "module": "infra\\request_metrics.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\retry.py",
+        "module": "infra\\retry.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\symbol_base.py",
+        "module": "infra\\symbol_base.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\system_monitor.py",
+        "module": "infra\\system_monitor.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\timeout.py",
+        "module": "infra\\timeout.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\trace_cleanup.py",
+        "module": "infra\\trace_cleanup.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\trace_logger.py",
+        "module": "infra\\trace_logger.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\infra\\validation.py",
+        "module": "infra\\validation.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\models\\chunk.py",
+        "module": "models\\chunk.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\models\\entity.py",
+        "module": "models\\entity.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\models\\event.py",
+        "module": "models\\event.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\models\\relation.py",
+        "module": "models\\relation.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\orchestration\\message_bus.py",
+        "module": "orchestration\\message_bus.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\orchestration\\state_manager.py",
+        "module": "orchestration\\state_manager.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\pipeline\\chunkers.py",
+        "module": "pipeline\\chunkers.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\pipeline\\cleaners.py",
+        "module": "pipeline\\cleaners.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\pipeline\\errors.py",
+        "module": "pipeline\\errors.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\pipeline\\parsers.py",
+        "module": "pipeline\\parsers.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\pipeline\\unified.py",
+        "module": "pipeline\\unified.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\agentic_rag_v2.py",
+        "module": "services\\agentic_rag_v2.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\cache.py",
+        "module": "services\\cache.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\distiller.py",
+        "module": "services\\distiller.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\embedder.py",
+        "module": "services\\embedder.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\evaluator.py",
+        "module": "services\\evaluator.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\eval_automation.py",
+        "module": "services\\eval_automation.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\eval_dataset.py",
+        "module": "services\\eval_dataset.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\eval_pipeline.py",
+        "module": "services\\eval_pipeline.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\eval_updater.py",
+        "module": "services\\eval_updater.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\evolver.py",
+        "module": "services\\evolver.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\feature_flags.py",
+        "module": "services\\feature_flags.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\feedback_store.py",
+        "module": "services\\feedback_store.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\graph_router.py",
+        "module": "services\\graph_router.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\graph_traversal.py",
+        "module": "services\\graph_traversal.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\knowledge_lifecycle.py",
+        "module": "services\\knowledge_lifecycle.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\learner.py",
+        "module": "services\\learner.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\llm.py",
+        "module": "services\\llm.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\metrics.py",
+        "module": "services\\metrics.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\multimodal.py",
+        "module": "services\\multimodal.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\online_eval.py",
+        "module": "services\\online_eval.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\output_aligner.py",
+        "module": "services\\output_aligner.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\parsers.py",
+        "module": "services\\parsers.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\query_expansion.py",
+        "module": "services\\query_expansion.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\query_router.py",
+        "module": "services\\query_router.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\relation_builder.py",
+        "module": "services\\relation_builder.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\results_postprocess.py",
+        "module": "services\\results_postprocess.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\synonym_loader.py",
+        "module": "services\\synonym_loader.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\table_parser.py",
+        "module": "services\\table_parser.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\table_view.py",
+        "module": "services\\table_view.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\wiki.py",
+        "module": "services\\wiki.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\ai_tools\\routes.py",
+        "module": "services\\ai_tools\\routes.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\data_analytics\\routes.py",
+        "module": "services\\data_analytics\\routes.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\data_analytics\\server.py",
+        "module": "services\\data_analytics\\server.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\doc_tools\\routes.py",
+        "module": "services\\doc_tools\\routes.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\doc_tools\\server.py",
+        "module": "services\\doc_tools\\server.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\dxf_viewer\\dedup.py",
+        "module": "services\\dxf_viewer\\dedup.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\dxf_viewer\\parser.py",
+        "module": "services\\dxf_viewer\\parser.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\dxf_viewer\\renderer.py",
+        "module": "services\\dxf_viewer\\renderer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\services\\dxf_viewer\\server.py",
+        "module": "services\\dxf_viewer\\server.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\auto_classifier.py",
+        "module": "shaoyang\\auto_classifier.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\chunker_quality.py",
+        "module": "shaoyang\\chunker_quality.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\cleaner.py",
+        "module": "shaoyang\\cleaner.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\distiller.py",
+        "module": "shaoyang\\distiller.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\extractor.py",
+        "module": "shaoyang\\extractor.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\ingest.py",
+        "module": "shaoyang\\ingest.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\kg_extractor.py",
+        "module": "shaoyang\\kg_extractor.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\long_doc_handler.py",
+        "module": "shaoyang\\long_doc_handler.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\mineru.py",
+        "module": "shaoyang\\mineru.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\multimodal.py",
+        "module": "shaoyang\\multimodal.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\parser.py",
+        "module": "shaoyang\\parser.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\pipeline.py",
+        "module": "shaoyang\\pipeline.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\relation_builder.py",
+        "module": "shaoyang\\relation_builder.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\semantic_chunker.py",
+        "module": "shaoyang\\semantic_chunker.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyang\\wiki_distiller.py",
+        "module": "shaoyang\\wiki_distiller.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\agentic_rag_v2.py",
+        "module": "shaoyin\\agentic_rag_v2.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\composer.py",
+        "module": "shaoyin\\composer.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\context_compressor.py",
+        "module": "shaoyin\\context_compressor.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\crag_corrector.py",
+        "module": "shaoyin\\crag_corrector.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\fact_check.py",
+        "module": "shaoyin\\fact_check.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\judge.py",
+        "module": "shaoyin\\judge.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\judge_v2.py",
+        "module": "shaoyin\\judge_v2.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\orchestrator.py",
+        "module": "shaoyin\\orchestrator.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\query_planner.py",
+        "module": "shaoyin\\query_planner.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\query_resolver.py",
+        "module": "shaoyin\\query_resolver.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\query_router.py",
+        "module": "shaoyin\\query_router.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\resolver.py",
+        "module": "shaoyin\\resolver.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\router.py",
+        "module": "shaoyin\\router.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\smart_self_rag.py",
+        "module": "shaoyin\\smart_self_rag.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\strategy.py",
+        "module": "shaoyin\\strategy.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\shaoyin\\tools.py",
+        "module": "shaoyin\\tools.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\cache.py",
+        "module": "taiyang\\cache.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\cache_manager.py",
+        "module": "taiyang\\cache_manager.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\crag.py",
+        "module": "taiyang\\crag.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\degradation_chain.py",
+        "module": "taiyang\\degradation_chain.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\dynamic_alpha.py",
+        "module": "taiyang\\dynamic_alpha.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\expand.py",
+        "module": "taiyang\\expand.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\fusion.py",
+        "module": "taiyang\\fusion.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\graph.py",
+        "module": "taiyang\\graph.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\graph_router.py",
+        "module": "taiyang\\graph_router.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\graph_traversal.py",
+        "module": "taiyang\\graph_traversal.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\integrated_search.py",
+        "module": "taiyang\\integrated_search.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\l5_crag.py",
+        "module": "taiyang\\l5_crag.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\multi_hop.py",
+        "module": "taiyang\\multi_hop.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\quality.py",
+        "module": "taiyang\\quality.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\query_expansion.py",
+        "module": "taiyang\\query_expansion.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\rerank.py",
+        "module": "taiyang\\rerank.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\results_postprocess.py",
+        "module": "taiyang\\results_postprocess.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\seed_score_ab.py",
+        "module": "taiyang\\seed_score_ab.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\self_rag.py",
+        "module": "taiyang\\self_rag.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\synonym_loader.py",
+        "module": "taiyang\\synonym_loader.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\table_parser.py",
+        "module": "taiyang\\table_parser.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyang\\wiki.py",
+        "module": "taiyang\\wiki.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyin\\audit.py",
+        "module": "taiyin\\audit.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyin\\error_handler.py",
+        "module": "taiyin\\error_handler.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyin\\flags.py",
+        "module": "taiyin\\flags.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyin\\growth_api.py",
+        "module": "taiyin\\growth_api.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyin\\mcp_protocol.py",
+        "module": "taiyin\\mcp_protocol.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyin\\mcp_tools.py",
+        "module": "taiyin\\mcp_tools.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyin\\metrics.py",
+        "module": "taiyin\\metrics.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyin\\monitor.py",
+        "module": "taiyin\\monitor.py"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\taiyin\\server.py",
+        "module": "taiyin\\server.py"
+      }
+    ],
+    "coverage_rate": 19.9
+  },
+  "magic_numbers": {
+    "total": 2013,
+    "top_numbers": [
+      {
+        "number": 5,
+        "count": 340
+      },
+      {
+        "number": 3,
+        "count": 274
+      },
+      {
+        "number": 10,
+        "count": 209
+      },
+      {
+        "number": 8,
+        "count": 178
+      },
+      {
+        "number": 50,
+        "count": 106
+      },
+      {
+        "number": 4,
+        "count": 85
+      },
+      {
+        "number": 30,
+        "count": 67
+      },
+      {
+        "number": 15,
+        "count": 63
+      },
+      {
+        "number": 60,
+        "count": 59
+      },
+      {
+        "number": 20,
+        "count": 52
+      },
+      {
+        "number": 6,
+        "count": 47
+      },
+      {
+        "number": 7,
+        "count": 39
+      },
+      {
+        "number": 9,
+        "count": 39
+      },
+      {
+        "number": 401,
+        "count": 30
+      },
+      {
+        "number": 41,
+        "count": 26
+      },
+      {
+        "number": 25,
+        "count": 22
+      },
+      {
+        "number": 503,
+        "count": 22
+      },
+      {
+        "number": 404,
+        "count": 20
+      },
+      {
+        "number": 16,
+        "count": 20
+      },
+      {
+        "number": 80,
+        "count": 20
+      }
+    ],
+    "samples": [
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\fix_exception_swallow.py",
+        "line": 3,
+        "number": 50,
+        "context": "xcept 和异常吞噬 — 伏羲 v1.50 代码层质量修复"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\fix_exception_swallow.py",
+        "line": 9,
+        "number": 44,
+        "context": "r'E:\\easyclaw\\伏羲-v1.44\\repo\\src'"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\fix_exception_swallow.py",
+        "line": 16,
+        "number": 8,
+        "context": "path, encoding='utf-8') as f:"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\fix_exception_swallow.py",
+        "line": 38,
+        "number": 8,
+        "context": "path, encoding='utf-8') as f:"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\fix_exception_swallow.py",
+        "line": 65,
+        "number": 15,
+        "context": "(lines) and j < i + 15:"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\fix_exception_swallow.py",
+        "line": 105,
+        "number": 10,
+        "context": "line and ri >= i - 10:"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\fix_exception_swallow.py",
+        "line": 118,
+        "number": 8,
+        "context": "'w', encoding='utf-8') as f:"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fixer.py",
+        "line": 3,
+        "number": 50,
+        "context": "Fuxi v1.50 Fixer — Combined Ta"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fixer.py",
+        "line": 8,
+        "number": 44,
+        "context": "r'E:\\easyclaw\\伏羲-v1.44\\repo\\src'"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fixer.py",
+        "line": 16,
+        "number": 8,
+        "context": "'r', encoding='utf-8') as f:"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fixer.py",
+        "line": 37,
+        "number": 3,
+        "context": "art = e_match.group(3).strip()"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fixer.py",
+        "line": 38,
+        "number": 4,
+        "context": "lon = e_match.group(4)"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fixer.py",
+        "line": 39,
+        "number": 6,
+        "context": "est = e_match.group(6).strip()"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fixer.py",
+        "line": 119,
+        "number": 3,
+        "context": "art = e_match.group(3).strip()"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fixer.py",
+        "line": 120,
+        "number": 6,
+        "context": "est = e_match.group(6).strip()"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fixer.py",
+        "line": 185,
+        "number": 3,
+        "context": "m.group(1), m.group(3)))"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fixer.py",
+        "line": 225,
+        "number": 8,
+        "context": "'w', encoding='utf-8') as f:"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fixer.py",
+        "line": 243,
+        "number": 60,
+        "context": "print(f'\\n{\"=\" * 60}')"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fix_missing_as_e.py",
+        "line": 8,
+        "number": 44,
+        "context": "r'E:\\easyclaw\\伏羲-v1.44\\repo\\src'"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fix_missing_as_e.py",
+        "line": 17,
+        "number": 8,
+        "context": "'r', encoding='utf-8') as f:"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fix_missing_as_e.py",
+        "line": 31,
+        "number": 3,
+        "context": "colon = m.group(3)"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_fix_missing_as_e.py",
+        "line": 73,
+        "number": 8,
+        "context": "'w', encoding='utf-8') as f:"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_scan_all.py",
+        "line": 2,
+        "number": 44,
+        "context": "r'E:\\easyclaw\\伏羲-v1.44\\repo\\src'"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_scan_all.py",
+        "line": 14,
+        "number": 8,
+        "context": "'r', encoding='utf-8') as f:"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_scan_all.py",
+        "line": 35,
+        "number": 8,
+        "context": "'r', encoding='utf-8') as f:"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_scan_except_pass.py",
+        "line": 2,
+        "number": 44,
+        "context": "r'E:\\easyclaw\\伏羲-v1.44\\repo\\src'"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_scan_except_pass.py",
+        "line": 11,
+        "number": 8,
+        "context": "'r', encoding='utf-8') as f:"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_scan_except_pass2.py",
+        "line": 2,
+        "number": 44,
+        "context": "r'E:\\easyclaw\\伏羲-v1.44\\repo\\src'"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_scan_except_pass2.py",
+        "line": 11,
+        "number": 8,
+        "context": "'r', encoding='utf-8') as f:"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_scan_fake_async.py",
+        "line": 2,
+        "number": 44,
+        "context": "r'E:\\easyclaw\\伏羲-v1.44\\repo\\src'"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_scan_fake_async.py",
+        "line": 13,
+        "number": 8,
+        "context": "'r', encoding='utf-8') as f:"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_scan_return_none.py",
+        "line": 3,
+        "number": 44,
+        "context": "r'E:\\easyclaw\\伏羲-v1.44\\repo\\src'"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_scan_return_none.py",
+        "line": 14,
+        "number": 8,
+        "context": "'r', encoding='utf-8') as f:"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\_scan_return_none.py",
+        "line": 30,
+        "number": 3,
+        "context": "r[1]}: {r[2]} -> {r[3]}')"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 2,
+        "number": 43,
+        "context": "类注册表 — 全系统唯一分类定义 v1.43"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 14,
+        "number": 10,
+        "context": "\"priority\": 10,"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 24,
+        "number": 8,
+        "context": "\"priority\": 8,"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 34,
+        "number": 8,
+        "context": "\"priority\": 8,"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 44,
+        "number": 6,
+        "context": "\"priority\": 6,"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 54,
+        "number": 6,
+        "context": "\"priority\": 6,"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 64,
+        "number": 7,
+        "context": "\"priority\": 7,"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 74,
+        "number": 5,
+        "context": "\"priority\": 5,"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 83,
+        "number": 5,
+        "context": "\"priority\": 5,"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 92,
+        "number": 4,
+        "context": "\"priority\": 4,"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 101,
+        "number": 6,
+        "context": "\"priority\": 6,"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 120,
+        "number": 3,
+        "context": "\"priority\": 3,"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 138,
+        "number": 5,
+        "context": "\"priority\": 5,"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 147,
+        "number": 5,
+        "context": "\"priority\": 5,"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 156,
+        "number": 6,
+        "context": "\"priority\": 6,"
+      },
+      {
+        "file": "E:\\easyclaw\\伏羲-v1.44\\repo\\src\\category_registry.py",
+        "line": 181,
+        "number": 8,
+        "context": "\"priority\": 8,"
+      }
+    ]
+  }
+}

@@ -3,7 +3,10 @@
 ========================================
 所有模块必须从这里导入分类信息，禁止自行定义。
 """
+import logging
 from typing import List, Dict, Optional
+
+logger = logging.getLogger(__name__)
 
 # ============================================================
 # 主分类定义 — 唯一事实来源
@@ -425,5 +428,6 @@ def llm_classify(text: str) -> str:
             timeout=10
         )
         return r.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-    except:
+    except Exception as e:
+        logger.warning("LLM分类失败: %s", e, exc_info=True)
         return ""

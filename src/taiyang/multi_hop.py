@@ -21,7 +21,10 @@ class SAGMultiHopSearch:
 
         # 2. 边界情况：无实体 → 统一降级策略
         if not entities:
-            logger.info(f"[SAG多跳] 无实体查询: {query[:30]}..., 降级为向量检索")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.info(f"[SAG多跳] 无实体查询: {query[:30]}..., 降级为向量检索")
+            else:
+                logger.info(f"[SAG多跳] 无实体查询 (len={len(query)}), 降级为向量检索")
             return await self._fallback_vector_search(query, top_k)
 
         # 3. 边界情况：单实体 → 单跳扩展
@@ -42,7 +45,8 @@ class SAGMultiHopSearch:
             import jieba.posseg as pseg
             words = pseg.cut(query)
             jieba_entities = [w for w, flag in words if flag in ['nr', 'ns', 'nt', 'nz', 'eng']]
-        except:
+        except Exception as e:
+            logger.warning("jieba词性标注失败: %s", e, exc_info=True)
             jieba_entities = []
 
         entities = list(set(regex_entities + jieba_entities))
@@ -114,6 +118,7 @@ class SAGMultiHopSearch:
         results = deduplicate(results)
         return results[:top_k]
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def _get_chunks_by_entity(self, entity: str) -> List[Dict]:
         """通过实体名查找关联碎片"""
         try:
@@ -229,6 +234,7 @@ async def multi_hop_search(query: str, max_hops: int = 2, top_k: int = 15) -> li
     return await searcher.search(query, top_k)
 
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def entity_recall(query: str, top_k: int = 10) -> list:
     """从实体表中直接匹配"""
     try:
@@ -243,16 +249,19 @@ async def entity_recall(query: str, top_k: int = 10) -> list:
         return []
 
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def entity_vector_recall(query: str, top_k: int = 10) -> list:
     """向量检索实体"""
     return []
 
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def event_vector_recall(query: str, top_k: int = 20) -> list:
     """向量检索事件"""
     return []
 
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def get_events_by_entity(entity_name: str) -> list:
     """通过实体名找到关联事件"""
     try:
@@ -275,6 +284,7 @@ async def get_events_by_entity(entity_name: str) -> list:
         return []
 
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def get_chunk_by_id(chunk_id: str) -> dict:
     """通过碎片ID获取碎片"""
     try:

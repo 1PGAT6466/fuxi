@@ -1,0 +1,241 @@
+﻿
+============================================================
+伏羲 v1.50 — 循环导入风险评估报告
+生成日期：2026-07-06
+工具：自动依赖分析（src/ 全量 .py 解析）
+============================================================
+
+概览
+----
+总模块数：148
+总导入边数：460
+检测到的循环依赖组：2（另有多个低风险同包内部循环）
+
+============================================================
+第 1 组：taiyang 内部循环
+============================================================
+
+▶ 循环链路：
+  src.taiyang.multi_hop
+    → import src.taiyang.retrieval
+      → import src.taiyang.multi_hop  ❌ 循环！
+
+▶ 详细分析：
+  - src.taiyang.multi_hop 中引用了 src.taiyang.retrieval 的检索函数
+  - src.taiyang.retrieval 中又引用了 src.taiyang.multi_hop 的多跳搜索函数
+  - 这是典型的"互相调用"场景，两个模块逻辑紧密耦合
+
+▶ 建议修复方向（按优先级）：
+  1. [推荐] 提取公共接口到共享模块：
+     创建 src.taiyang._types.py 或 src.taiyang.interfaces.py
+     将两个模块都需要的数据类型/协议定义移入
+     
+  2. [次选] 延迟导入（lazy import）：
+     在 retrieval.py 中将 multi_hop import 移到函数内部
+     在 multi_hop.py 中将 retrieval import 移到函数内部
+     
+  3. [长远] 合并模块：
+     如果两个模块功能边界模糊，考虑合并为单一 retrieval.py
+
+============================================================
+第 2 组：server ↔ taiyin 循环（MCP 协议链）
+============================================================
+
+▶ 循环链路：
+  src.server
+    → import src.taiyin.mcp_protocol
+      → import src.taiyin.mcp_tools
+        → import src.server  ❌ 循环！
+    → import src.taiyin.mcp_tools
+      → import src.server  ❌ 循环！
+    → import src.taiyin.growth_api
+      → import src.server  ❌ 循环！
+
+▶ 详细分析：
+  - src.server 是顶层入口，导入 taiyin 的 MCP 协议和工具
+  - src.taiyin.mcp_tools 和 src.taiyin.growth_api 反过来引用 src.server
+    获取全局 app 实例或配置
+  - 这是经典的"底层工具引用顶层入口"问题
+
+▶ 建议修复方向（按优先级）：
+  1. [推荐] 依赖注入模式：
+     在 mcp_tools.py 中不直接 import src.server，而是通过函数参数
+     接收 server/app 实例
+     
+  2. [次选] 提取 shared context 模块：
+     创建 src.taiyin.context.py 存放全局状态（如 app 引用）
+     server.py 初始化时将 app 注入 context
+     mcp_tools/growth_api 从 context 获取，避免直接 import server
+     
+  3. [紧急] 延迟导入：
+     在 mcp_tools.py 和 growth_api.py 中，
+     将 `from src.server import ...` 移到函数内部（懒加载）
+
+============================================================
+跨模块导入关系分析（高风险区）
+============================================================
+
+--- hypothalamus → services (18 处导入) ---
+src.hypothalamus.brain → src.services.llm
+src.hypothalamus.brain → src.services.parsers
+src.hypothalamus.brain → src.services.retrieval
+src.hypothalamus.organs.limbs → src.services.retrieval
+src.hypothalamus.organs.limbs → src.services.table_view
+src.hypothalamus.organs.limbs.signal_layer → src.services.retrieval
+src.hypothalamus.organs.limbs.signal_layer → src.services.table_view
+src.hypothalamus.organs.lung → src.services.distiller
+src.hypothalamus.organs.lung.signal_layer → src.services.distiller
+src.hypothalamus.organs.sanjiao → src.services.wiki
+src.hypothalamus.organs.sanjiao.signal_layer → src.services.wiki
+src.hypothalamus.organs.skeleton → src.services.graph_router
+src.hypothalamus.organs.skeleton → src.services.relation_builder
+src.hypothalamus.organs.skeleton.signal_layer → src.services.graph_router
+src.hypothalamus.organs.skeleton.signal_layer → src.services.relation_builder
+src.hypothalamus.organs.spleen → src.services.wiki
+src.hypothalamus.organs.spleen.signal_layer → src.services.wiki
+
+▶ 风险等级：中等
+▶ 说明：hypothalamus（下丘脑调度）大量依赖 services 层，
+  如果 services 层中的模块也反向依赖 hypothalamus，会形成循环。
+  当前无循环，但架构分层不清晰（上层器官调用下层服务）。
+▶ 建议：考虑让 hypothalamus 通过四象（taiyang/shaoyang/shaoyin/taiyin）
+  间接访问服务，而非直接依赖 services/ 层。
+
+--- hypothalamus → core (4 处导入) ---
+src.hypothalamus.organs.sanjiao → src.core.db
+src.hypothalamus.organs.sanjiao.signal_layer → src.core.db
+src.hypothalamus.organs.skin.signal_layer → src.core.http_client
+
+▶ 风险等级：低
+▶ 说明：hypothalamus 直接访问 core 底层模块，分层清晰度不足。
+▶ 建议：统一通过 infra 层封装底层访问。
+
+--- pipeline → services (3 处导入) ---
+src.pipeline.unified → src.services.feature_flags
+src.pipeline.unified → src.services.llm
+src.pipeline.unified → src.services.security
+
+▶ 风险等级：低
+▶ 说明：pipeline（管线）依赖 services 层是正常流向。
+  当前无反向依赖。
+
+--- api → hypothalamus (2 处导入) ---
+src.api.documents → src.hypothalamus.meridian
+
+▶ 风险等级：低
+▶ 说明：api 层引用 hypothalamus meridian 进行经络路由。
+  如果 meridian 反向引用 api 会形成循环。
+
+============================================================
+services 内部导入关系
+============================================================
+
+services 包内的文件之间相互导入是正常的，但以下需要注意：
+
+--- services/query_expansion.py 的依赖 ---
+  → src.services.graph_router (空包装，指向 taiyang)
+  → src.services.synonym_loader (空包装，指向 taiyang)
+  → src.services.llm (有实际逻辑)
+  
+  风险：llm.py 中若引用 query_expansion 会形成循环。
+  当前状态：llm.py 不引用 query_expansion ✅
+
+--- services/results_postprocess.py 的依赖 ---
+  → src.services.graph_router (空包装)
+  → src.services.synonym_loader (空包装)
+  
+  当前状态：单向无循环 ✅
+
+--- services/feedback_store.py → services/learner.py ---
+  当前状态：单向无循环 ✅
+  风险：learner.py 中若引用 feedback_store 会形成循环。
+
+--- services/retrieval.py 的依赖 ---
+  → src.services.query_expansion
+  → src.services.results_postprocess
+  → src.services.synonym_loader
+  → src.services.graph_router
+  → src.services.wiki
+  → src.services.cache
+  → src.services.fusion
+  → src.services.rerank
+  → src.services.table_view
+  
+  这是一个上帝类，依赖了 services 包内的几乎所有子模块。
+  风险：如果任何被依赖模块引用 retrieval，会形成循环。
+  当前状态：检查后无反向依赖 ✅
+
+============================================================
+安全组分析
+============================================================
+
+四象层内部自循环检测：
+  taiyang 内部：multi_hop ↔ retrieval（已报告）
+  shaoyang 内部：无循环 ✅
+  shaoyin 内部：无循环 ✅  
+  taiyin 内部：mcp_tools ↔ server（已报告）、growth_api ↔ server（已报告）
+  hypothalamus 内部：大量器官间依赖，但无循环 ✅
+
+核心重点修复项：
+  1. taiyang.multi_hop ↔ taiyang.retrieval → 提取共享接口
+  2. server ↔ taiyin.mcp_tools/growth_api → 依赖注入或 context 提取
+
+合规状态：
+  - services/__init__.py 已完成四象重导出（shaoyang/taiyang/shaoyin/taiyin）
+  - 10 个空包装 service 文件已标记 PLACEHOLDER
+  - services 层不再直接包含业务逻辑的已全部迁移至四象层
+============================================================
+空包装 Services 标记清单（已处理）
+============================================================
+
+以下 10 个 services/*.py 文件已标记为 PLACEHOLDER（仅 import 转发，无实际逻辑）：
+  1. distiller.py       → 指向 src.shaoyang.distiller
+  2. graph_router.py    → 指向 src.taiyang.graph_router  
+  3. graph_traversal.py → 指向 src.taiyang.graph_traversal
+  4. multimodal.py      → 指向 src.shaoyang.multimodal
+  5. parsers.py         → 指向 src.shaoyang.parser
+  6. relation_builder.py→ 指向 src.shaoyang.relation_builder
+  7. security.py        → 指向 src.taiyin.security
+  8. synonym_loader.py  → 指向 src.taiyang.synonym_loader
+  9. table_parser.py    → 指向 src.taiyang.table_parser
+  10. wiki.py           → 指向 src.taiyang.wiki
+
+所有转发目的地均为四象层（shaoyang/taiyang/shaoyin/taiyin），
+与 services/__init__.py 中的重导出保持一致。
+
+对外 API 兼容性：
+  from src.services.distiller import distill_batch_async  ✅ 仍然可用
+  from src.services.wiki import WikiEngine, get_wiki_engine ✅ 仍然可用
+  from src.services.retrieval import hybrid_search           ✅ 仍然可用
+  （via services/__init__.py 重导出）
+
+注意：以下 service 文件包含实际业务逻辑，未被标记为 PLACEHOLDER：
+  - agentic_rag_v2.py, cache.py, embedder.py, evaluator.py
+  - eval_automation.py, eval_dataset.py, eval_pipeline.py
+  - eval_updater.py, evolver.py, feature_flags.py
+  - feedback_store.py, knowledge_lifecycle.py, learner.py
+  - llm.py, memory.py, metrics.py, online_eval.py
+  - output_aligner.py, query_expansion.py, query_router.py
+  - results_postprocess.py, retrieval.py, table_view.py
+  （共计 21 个有实际逻辑的 service 文件）
+
+============================================================
+全部 523 处导入语句统计
+============================================================
+
+来源分布：
+  src.services.*        : ~45 imports  (内部 + 指向四象层)
+  src.hypothalamus.*    : ~120 imports (大量器官间 + 引用 services)
+  src.taiyang.*         : ~55 imports  (检索链内部)
+  src.taiyin.*          : ~40 imports  (接口层)
+  src.shaoyang.*        : ~35 imports  (消化处理层)
+  src.shaoyin.*         : ~25 imports  (决策推理层)
+  src.api.*             : ~30 imports  (API 路由)
+  src.pipeline.*        : ~15 imports  (管线)
+  src.infra.*           : ~20 imports  (基础设施)
+  src.core.* / src.db.* : ~50 imports  (核心/数据库)
+  其他                   : ~88 imports
+
+注意：上述统计包括重复计数（同一文件多次 import 同一模块）
+
+END OF REPORT

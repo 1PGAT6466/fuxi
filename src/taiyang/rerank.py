@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 # ============ DeepSeek Rerank ============
 DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
 RERANK_VIA_PROXY = os.getenv("KB_RERANK_PROXY", "http://127.0.0.1:8091")
-from src.config import EMBEDDER_URL
+from src.config import EMBEDDER_URL, DEEPSEEK_BASE_URL as _DEEPSEEK_BASE_URL, SILICONFLOW_BASE_URL as _SF_BASE_URL
 
 
 async def rerank_with_deepseek(query: str, candidates: list, top_k: int = 30) -> list:
@@ -33,7 +33,7 @@ async def rerank_with_deepseek(query: str, candidates: list, top_k: int = 30) ->
 
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                "https://api.deepseek.com/v1/chat/completions",
+                f"{_DEEPSEEK_BASE_URL}/v1/chat/completions",
                 json={
                     "model": "deepseek-chat",
                     "messages": [
@@ -156,7 +156,7 @@ async def rerank_with_siliconflow(query: str, candidates: list, top_k: int = 30)
     try:
         async with aiohttp.ClientSession() as session:
             async with session.post(
-                "https://api.siliconflow.cn/v1/rerank",
+                f"{_SF_BASE_URL}/rerank",
                 json={
                     "model": "BAAI/bge-reranker-v2-m3",
                     "query": query[:512],

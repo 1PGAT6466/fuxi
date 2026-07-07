@@ -116,36 +116,55 @@ class SAGExtractor:
             logger.warning(f"[SAG] 提取失败: {e}")
             return ExtractionResult()
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def _save_to_db(self, result: ExtractionResult, chunk_meta: Dict = None):
-        """将提取结果写入数据库表"""
+        """将提取结果写入数据库表（使用 MemoryStore 新方法）"""
         try:
             from src.db.memory_store import get_store
             store = get_store()
             meta = chunk_meta or {}
+            chunk_id = meta.get("chunk_id", "")
+            file_hash = meta.get("file_hash", "")
+            file_name = meta.get("file_name", "")
+            import time as _time
 
-            # 写入events表
+            # 写入 events 表
             for event in result.events:
-                event_id = f"evt_{int(time.time()*1000)}_{id(event)}"
-                store._db_conn.execute(
-                    "INSERT OR REPLACE INTO events (event_id, title, summary, content, category, keywords, priority, level, chunk_ids, entity_names, file_hash, file_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (event_id, event.get("title", ""), event.get("summary", ""), event.get("content", ""),
-                     meta.get("category", ""), json.dumps(event.get("keywords", []), ensure_ascii=False),
-                     event.get("priority", "UNKNOWN"), event.get("level", 1),
-                     json.dumps([meta.get("chunk_id", "")], ensure_ascii=False),
-                     json.dumps(event.get("entities", []) + event.get("participants", []), ensure_ascii=False),
-                     meta.get("file_hash", ""), meta.get("file_name", ""))
-                )
+                event_data = {
+                    "event_id": f"evt_{int(_time.time()*1000)}_{id(event)}",
+                    "chunk_id": chunk_id,
+                    "title": event.get("title", ""),
+                    "summary": event.get("summary", ""),
+                    "content": event.get("content", event.get("summary", "")),
+                    "entities": event.get("participants", []) + event.get("entities", []),
+                    "event_type": event.get("action", ""),
+                    "keywords": event.get("keywords", []),
+                    "priority": event.get("priority", "UNKNOWN"),
+                    "level": event.get("level", 1),
+                    "chunk_ids": [chunk_id],
+                    "entity_names": event.get("participants", []) + event.get("entities", []),
+                    "parent_event_id": "",
+                    "file_hash": file_hash,
+                    "file_name": file_name,
+                }
+                store.add_event(event_data)
 
-            # 写入entities表
+            # 写入 entities 表
             for entity in result.entities:
-                entity_id = f"ent_{int(time.time()*1000)}_{id(entity)}"
-                store._db_conn.execute(
-                    "INSERT OR REPLACE INTO entities (entity_id, name, entity_type, description, file_hash, file_name) VALUES (?, ?, ?, ?, ?, ?)",
-                    (entity_id, entity.get("name", ""), entity.get("type", ""),
-                     entity.get("description", ""), meta.get("file_hash", ""), meta.get("file_name", ""))
-                )
+                entity_data = {
+                    "entity_id": f"ent_{int(_time.time()*1000)}_{id(entity)}",
+                    "name": entity.get("name", ""),
+                    "entity_type": entity.get("type", ""),
+                    "description": entity.get("description", ""),
+                    "aliases": entity.get("aliases", []),
+                    "chunk_ids": [chunk_id],
+                    "event_ids": [],
+                    "source": "sag_extractor",
+                    "file_hash": file_hash,
+                    "file_name": file_name,
+                }
+                store.add_entity(entity_data)
 
-            store._db_conn.commit()
         except Exception as e:
             logger.warning(f"[SAG] 写入数据库失败: {e}")
 

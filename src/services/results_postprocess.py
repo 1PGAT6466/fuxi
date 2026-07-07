@@ -115,6 +115,7 @@ def _split_sentences_zh(text: str) -> list:
     return [p.strip() for p in parts if p.strip() and len(p.strip()) >= 2]
 
 
+# DEPRECATED: 未使用，v1.50 标记待删除
 def _expand_parent_child(hits: list, all_chunks: list) -> list:
     """P1-3: Parent-Child chunk expansion.
     When a chunk has parent_idx metadata (from parent_child_chunk),

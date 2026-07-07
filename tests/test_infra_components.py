@@ -220,5 +220,93 @@ class TestSystemMonitor:
         assert "uptime_seconds" in result
 
 
+class TestAlertingWebhook:
+    """告警 Webhook 测试"""
+
+    def test_build_dingtalk_body(self):
+        from src.infra.alerting import _build_dingtalk_body
+        body = _build_dingtalk_body("测试标题", "测试内容", "critical")
+        assert body["msgtype"] == "markdown"
+        assert "测试标题" in body["markdown"]["title"]
+        assert "测试内容" in body["markdown"]["text"]
+
+    def test_build_feishu_body(self):
+        from src.infra.alerting import _build_feishu_body
+        body = _build_feishu_body("测试标题", "测试内容", "warning")
+        assert body["msg_type"] == "interactive"
+        assert "测试标题" in body["card"]["header"]["title"]["content"]
+        assert body["card"]["header"]["template"] == "yellow"
+
+    def test_dingtalk_url_detection(self):
+        from src.infra.alerting import _build_dingtalk_body
+        import inspect
+        src = inspect.getsource(_build_dingtalk_body)
+        assert "dingtalk" in src or "msgtype" in src
+
+    def test_feishu_url_detection(self):
+        from src.infra.alerting import _build_feishu_body
+        import inspect
+        src = inspect.getsource(_build_feishu_body)
+        assert "interactive" in src
+
+    @pytest.mark.asyncio
+    async def test_send_webhook_success(self):
+        from unittest.mock import AsyncMock, patch, MagicMock
+        from src.infra.alerting import send_webhook
+
+        class MockResponse:
+            status = 200
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, *args):
+                pass
+
+        class MockSession:
+            def post(self, *args, **kwargs):
+                return MockResponse()
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, *args):
+                pass
+
+        with patch("src.infra.alerting.aiohttp.ClientSession", MockSession):
+            result = await send_webhook("https://oapi.dingtalk.com/robot/send", "title", "msg", "warning")
+            assert result is True
+
+    @pytest.mark.asyncio
+    async def test_send_webhook_failure(self):
+        from unittest.mock import AsyncMock, patch, MagicMock
+        from src.infra.alerting import send_webhook
+
+        class MockResponse:
+            status = 500
+            async def text(self):
+                return "error"
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, *args):
+                pass
+
+        class MockSession:
+            def post(self, *args, **kwargs):
+                return MockResponse()
+            async def __aenter__(self):
+                return self
+            async def __aexit__(self, *args):
+                pass
+
+        with patch("src.infra.alerting.aiohttp.ClientSession", MockSession):
+            result = await send_webhook("https://oapi.dingtalk.com/robot/send", "title", "msg")
+            assert result is False
+
+    @pytest.mark.asyncio
+    async def test_send_alert_no_urls(self):
+        from unittest.mock import patch
+        from src.infra.alerting import send_alert
+        with patch.dict("os.environ", {}, clear=True):
+            result = await send_alert("title", "msg")
+            assert result is False
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

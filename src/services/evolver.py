@@ -134,8 +134,8 @@ def evolve_graph(new_entities: dict, file_name: str = ""):
     if GRAPH_FILE.exists():
         try:
             graph = json.loads(GRAPH_FILE.read_text(encoding='utf-8'))
-        except (json.JSONDecodeError, Exception):
-            pass
+        except (json.JSONDecodeError, Exception) as e:
+            logger.warning("(json.JSONDecodeError, Exception) 失败: %s", e, exc_info=True)
     
     graph.setdefault("nodes", {})
     graph.setdefault("edges", [])
@@ -205,7 +205,8 @@ def get_graph_stats() -> dict:
         return {"total_entities": 0, "total_edges": 0}
     try:
         graph = json.loads(GRAPH_FILE.read_text(encoding='utf-8'))
-    except Exception:
+    except Exception as e:
+        logger.warning("get_graph_stats 读取图谱失败: %s", e, exc_info=True)
         return {"total_entities": 0, "total_edges": 0}
     
     type_counts = {}
@@ -227,7 +228,8 @@ def get_graph_nodes() -> dict:
         return {"nodes": [], "edges": []}
     try:
         graph = json.loads(GRAPH_FILE.read_text(encoding='utf-8'))
-    except Exception:
+    except Exception as e:
+        logger.warning("get_graph_nodes 读取图谱失败: %s", e, exc_info=True)
         return {"nodes": [], "edges": []}
     
     nodes_list = []

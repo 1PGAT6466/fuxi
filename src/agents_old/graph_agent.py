@@ -18,6 +18,7 @@ class GraphAgent(BaseAgent):
         super().__init__(agent_id="graph", description="知识图谱实体链接 + 路径推理")
         self.register_tool("entity_link", self._entity_link)
         self.register_tool("graph_route", self._graph_route)
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def run(self, ctx: AgentContext) -> Dict:
         """执行图谱推理"""
@@ -37,12 +38,14 @@ class GraphAgent(BaseAgent):
             duration = (time.time() - start) * 1000
             self._record_run(duration, error=True)
             return {"success": False, "entity_context": "", "categories": [], "error": str(e)}
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def _entity_link(self, query: str) -> Dict:
         """实体链接工具"""
         from src.services.graph_router import get_entity_context
         ctx = get_entity_context(query)
         return {"context": ctx} if ctx else {}
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def _graph_route(self, query: str) -> Dict:
         """图谱路由工具"""

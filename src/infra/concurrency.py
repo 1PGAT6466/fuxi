@@ -18,6 +18,7 @@ class RateLimiter:
         self.period_seconds = period_seconds
         self._requests: list = []
         self._lock = asyncio.Lock()
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def acquire(self) -> bool:
         """获取许可"""

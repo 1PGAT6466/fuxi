@@ -10,7 +10,8 @@ from dataclasses import dataclass, field
 
 logger = logging.getLogger("growth.adjustment_log")
 
-ADJUSTMENT_DIR = Path("data/growth")
+from src.config import DATA_DIR as CONFIG_DATA_DIR
+ADJUSTMENT_DIR = Path(CONFIG_DATA_DIR) / "growth"
 
 
 @dataclass
@@ -32,6 +33,7 @@ class AdjustmentLog:
     def __init__(self):
         ADJUSTMENT_DIR.mkdir(parents=True, exist_ok=True)
         self._records: List[AdjustmentRecord] = []
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def record(self, record: AdjustmentRecord):
         """记录调整"""
@@ -53,6 +55,7 @@ class AdjustmentLog:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
         except Exception as e:
             logger.warning(f"[AdjustmentLog] 写入失败: {e}")
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def get_pending_adjustments(self, symbol: str = None) -> List[Dict]:
         """获取待处理的调整"""
@@ -66,12 +69,13 @@ class AdjustmentLog:
                 for line in f:
                     try:
                         records.append(json.loads(line.strip()))
-                    except:
-                        pass
-        except Exception:
-            pass
+                    except Exception as e:
+                        logger.warning("JSON解析调整记录失败: %s", e, exc_info=True)
+        except Exception as e:
+            logger.warning("Exception 失败: %s", e, exc_info=True)
 
         return records[-20:]
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def rollback(self, record: Dict):
         """回滚调整"""

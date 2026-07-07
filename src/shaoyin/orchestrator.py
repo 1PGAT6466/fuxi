@@ -30,6 +30,7 @@ class Orchestrator:
             "sources": result.get("sources", []),
             "loops": 1,
         }
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def _plan(self, query: str, strategy: str) -> Dict:
         return {"query": query, "strategy": strategy, "steps": ["search", "compose", "validate"]}
@@ -38,6 +39,7 @@ class Orchestrator:
         from src.taiyang.retrieval import hybrid_search
         results = await hybrid_search(plan["query"], top_k=10)
         return {"answer": "", "sources": results, "results": results}
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def _reflect(self, query: str, result: Dict) -> Dict:
         sources = result.get("sources", [])

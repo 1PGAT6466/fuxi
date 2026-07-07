@@ -35,8 +35,8 @@ async def extract_entities_llm(text: str, file_name: str) -> List[Dict]:
             if result.startswith("```"):
                 result = result.split("\n", 1)[1].rsplit("```", 1)[0]
             return json.loads(result)
-        except json.JSONDecodeError:
-            pass
+        except json.JSONDecodeError as e:
+            logger.warning("json.JSONDecodeError 失败: %s", e, exc_info=True)
     return []
 
 
@@ -52,8 +52,8 @@ async def extract_relations_llm(text: str, entities: List[Dict]) -> List[Dict]:
             if result.startswith("```"):
                 result = result.split("\n", 1)[1].rsplit("```", 1)[0]
             return json.loads(result)
-        except json.JSONDecodeError:
-            pass
+        except json.JSONDecodeError as e:
+            logger.warning("json.JSONDecodeError 失败: %s", e, exc_info=True)
     return []
 
 

@@ -12,8 +12,9 @@ from datetime import datetime
 
 logger = logging.getLogger("services.eval_automation")
 
-EVAL_DIR = Path("data/evaluation")
-REPORT_DIR = Path("data/evaluation/reports")
+from src.config import DATA_DIR as CONFIG_DATA_DIR
+EVAL_DIR = Path(CONFIG_DATA_DIR) / "evaluation"
+REPORT_DIR = Path(CONFIG_DATA_DIR) / "evaluation" / "reports"
 
 
 class EvalAutomation:
@@ -23,6 +24,91 @@ class EvalAutomation:
         EVAL_DIR.mkdir(parents=True, exist_ok=True)
         REPORT_DIR.mkdir(parents=True, exist_ok=True)
         self._eval_history: List[Dict] = []
+
+    async def run_smoke_test(self) -> Dict:
+        """启动时轻量烟雾测试：验证搜索 API 返回正确格式 + 嵌入 API 正常。
+        不跑完整 benchmark，仅做连通性 + 格式校验。
+        失败时返回 passed=False + 错误详情，但不会抛异常。
+        """
+        report = {
+            "timestamp": time.time(),
+            "type": "smoke_test",
+            "passed": True,
+            "checks": {},
+            "errors": [],
+        }
+
+        # ── 检查 1：搜索 API 格式校验 ──
+        try:
+            import aiohttp
+            from src.config import PORT, HOST as _CFG_HOST
+            host = "127.0.0.1" if _CFG_HOST == "0.0.0.0" else _CFG_HOST
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"http://{host}:{PORT}/api/search",
+                    params={"q": "测试", "top_k": 3},
+                    timeout=aiohttp.ClientTimeout(total=10),
+                ) as resp:
+                    body = await resp.json()
+                    has_results = "results" in body and isinstance(body["results"], list)
+                    has_query = "query" in body
+                    status_ok = resp.status == 200
+                    search_passed = status_ok and has_results and has_query
+
+                    report["checks"]["search"] = {
+                        "passed": search_passed,
+                        "status": resp.status,
+                        "has_results": has_results,
+                        "has_query": has_query,
+                        "result_count": len(body.get("results", [])),
+                    }
+                    if not search_passed:
+                        report["errors"].append(
+                            f"搜索 API 格式校验失败: status={resp.status}, "
+                            f"has_results={has_results}, has_query={has_query}"
+                        )
+        except Exception as e:
+            logger.warning(f"[EvalAutomation] 搜索 API 连通性测试失败: {e}")
+            report["checks"]["search"] = {"passed": False, "error": str(e)}
+            report["errors"].append(f"搜索 API 连通性测试失败: {e}")
+
+        # ── 检查 2：嵌入 API 健康检查 ──
+        try:
+            import aiohttp
+            from src.config import EMBEDDER_URL
+            async with aiohttp.ClientSession() as session:
+                async with session.get(
+                    f"{EMBEDDER_URL}/health",
+                    timeout=aiohttp.ClientTimeout(total=5),
+                ) as resp:
+                    body = await resp.json()
+                    embed_healthy = resp.status == 200 and body.get("status") == "ready"
+                    report["checks"]["embedder"] = {
+                        "passed": embed_healthy,
+                        "status": resp.status,
+                        "model": body.get("model", ""),
+                    }
+                    if not embed_healthy:
+                        report["errors"].append(
+                            f"嵌入 API 不健康: status={resp.status}, "
+                            f"body_status={body.get('status')}"
+                        )
+        except Exception as e:
+            logger.warning(f"[EvalAutomation] 嵌入 API 连通性测试失败: {e}")
+            report["checks"]["embedder"] = {"passed": False, "error": str(e)}
+            report["errors"].append(f"嵌入 API 连通性测试失败: {e}")
+
+        report["passed"] = len(report["errors"]) == 0
+
+        if not report["passed"]:
+            logger.warning(
+                f"[EvalAutomation] 启动烟雾测试未通过 ({len(report['errors'])} 项失败): "
+                f"{'; '.join(report['errors'])}"
+            )
+        else:
+            logger.info(f"[EvalAutomation] 启动烟雾测试通过 ✓ (搜索 + 嵌入)")
+
+        return report
 
     async def run_daily_eval(self) -> Dict:
         """运行每日评测"""
@@ -95,6 +181,7 @@ class EvalAutomation:
             logger.warning(f"[EvalAutomation] 答案质量评测失败: {e}")
             return {}
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def _eval_performance(self) -> Dict:
         """评测系统性能"""
         try:
@@ -115,6 +202,7 @@ class EvalAutomation:
             logger.warning(f"[EvalAutomation] 性能评测失败: {e}")
             return {}
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def _check_degradation(self, metrics: Dict) -> Dict:
         """检查退化"""
         degradation = {
@@ -184,6 +272,7 @@ class EvalAutomation:
         except Exception as e:
             logger.warning(f"[EvalAutomation] 保存报告失败: {e}")
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def get_eval_history(self, days: int = 7) -> List[Dict]:
         """获取评测历史"""
         history_file = EVAL_DIR / "eval_history.jsonl"
@@ -200,13 +289,14 @@ class EvalAutomation:
                         record = json.loads(line.strip())
                         # 简单的日期比较
                         records.append(record)
-                    except:
-                        pass
-        except Exception:
-            pass
+                    except Exception as e:
+                        logger.warning("JSON解析评测历史记录失败: %s", e, exc_info=True)
+        except Exception as e:
+            logger.warning("读取评测历史记录失败: %s", e, exc_info=True)
 
         return records[-days:]
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def get_latest_report(self) -> Optional[Dict]:
         """获取最新的评测报告"""
         date = datetime.now().strftime("%Y-%m-%d")
@@ -223,7 +313,8 @@ class EvalAutomation:
         try:
             with open(report_file, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception:
+        except Exception as e:
+            logger.warning("读取评测报告失败: %s", e, exc_info=True)
             return None
 
 

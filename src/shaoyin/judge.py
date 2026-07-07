@@ -39,7 +39,11 @@ async def judge_answer(query: str, answer: str, contexts: list) -> dict:
             result = result.strip()
             if result.startswith('```'):
                 result = result.split('\n', 1)[1].rsplit('```', 1)[0]
-            return json.loads(result)
+            try:
+                return json.loads(result)
+            except json.JSONDecodeError as e:
+                logger.error(f"[Judge] JSON 解析失败: {e}, raw_result={result[:200]}")
+                return {"overall": 3, "passed": True, "issues": ["JSON 解析失败"]}
         return {"overall": 3, "passed": True, "issues": []}
     except Exception as e:
         logger.warning(f"[Judge] LLM-as-Judge failed: {e}")

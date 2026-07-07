@@ -201,8 +201,134 @@ async def _call_mimo_with_tools(query: str, context: List[Dict], step: int) -> D
             }
 
 
+# ============================================================
+# v3.0: _execute_tool 调度字典重构 — 每个工具独立 handler
+# ============================================================
+
+
+async def _tool_search_knowledge(args: dict) -> str:
+    """工具: 知识库关键词搜索"""
+    from src.services.retrieval import hybrid_search
+    results = await hybrid_search(args.get("query", ""), top_k=args.get("top_k", 5))
+    snippets = []
+    for r in results[:5]:
+        snippets.append({
+            "text": r.get("text", "")[:300],
+            "file": r.get("file_name", "?"),
+            "score": round(r.get("score", 0), 2)
+        })
+    return json.dumps(snippets, ensure_ascii=False)
+
+
+async def _tool_search_wiki(args: dict) -> str:
+    """工具: Wiki 知识库搜索"""
+    from src.services.wiki import search_wiki_pages
+    results = await search_wiki_pages(args.get("query", ""))
+    return json.dumps([{
+        "title": r.get("title", ""),
+        "summary": r.get("summary", "")[:200]
+    } for r in results[:3]], ensure_ascii=False)
+
+
+def _tool_query_graph(args: dict) -> str:
+    """工具: 知识图谱查询（direct / traverse）"""
+    from src.services.graph_router import get_entity_context
+    from src.services.graph_traversal import multi_hop_traverse
+    entity = args.get("entity", "")
+    mode = args.get("mode", "direct")
+    if mode == "traverse":
+        result = multi_hop_traverse(entity, max_hops=3)
+        return json.dumps(result, ensure_ascii=False)
+    else:
+        ctx = get_entity_context(entity)
+        return ctx if ctx else f"图谱中未找到 '{entity}' 的关系"
+
+
+def _tool_read_doc(args: dict) -> str:
+    """工具: 读取指定文档的完整内容"""
+    from src.db.memory_store import get_store
+    file_name = args.get("file_name", "")
+    chunk_idx = args.get("chunk_index", 0)
+    store = get_store()
+    all_chunks = store.get_all() if hasattr(store, 'get_all') else []
+    matched = [c for c in all_chunks if file_name.lower() in c.get("file_name", "").lower()]
+    if matched:
+        target = matched[0] if chunk_idx == 0 else next(
+            (c for c in matched if c.get("chunk_index") == chunk_idx), matched[0]
+        )
+        return f"[{target.get('file_name', '?')} #{target.get('chunk_index', 0)}]\n{target.get('text', '')[:1500]}"
+    return f"未找到文件 '{file_name}'"
+
+
+async def _tool_extract_table(args: dict) -> str:
+    """工具: 提取和查询文档中的表格数据"""
+    from src.services.table_view import search_tables
+    results = search_tables(args.get("query", ""))
+    if results:
+        return json.dumps(results[:3], ensure_ascii=False)
+    # fallback: 从 chunk 中搜索表格内容
+    from src.services.retrieval import hybrid_search
+    results = await hybrid_search(args.get("query", ""), top_k=3)
+    table_hits = [r for r in results if "|" in r.get("text", "") or "表格" in r.get("text", "")]
+    if table_hits:
+        return table_hits[0].get("text", "")[:800]
+    return "未找到相关表格数据"
+
+
+async def _tool_describe_image(args: dict) -> str:
+    """工具: 描述文档中的图片内容（多模态 → 知识库 fallback）"""
+    image_path = args.get("image_path", "")
+    try:
+        from src.services.multimodal import transcribe_image
+        result = transcribe_image(image_path)
+        if result:
+            return f"图片描述: {result}"
+        from src.services.retrieval import hybrid_search
+        results = await hybrid_search(image_path, top_k=3)
+        img_results = [r for r in results if r.get("result_type") == "image" or "图片" in r.get("text", "")]
+        if img_results:
+            return img_results[0].get("text", "")[:500]
+        return f"无法描述图片。路径: {image_path}"
+    except Exception as e:
+        return f"图片描述失败: {str(e)[:200]}"
+
+
+def _tool_clarify(args: dict) -> str:
+    """工具: 向用户追问以澄清需求"""
+    return f"需要用户澄清: {args.get('question', '?')}"
+
+
+def _tool_done(args: dict) -> str:
+    """工具: 标记检索完成"""
+    return "DONE: " + args.get("reason", "信息已充分")
+
+
+# 工具名 → handler 函数的调度字典
+_TOOL_HANDLERS = {
+    "search_knowledge": _tool_search_knowledge,
+    "search_wiki": _tool_search_wiki,
+    "query_graph": _tool_query_graph,
+    "read_doc": _tool_read_doc,
+    "extract_table": _tool_extract_table,
+    "describe_image": _tool_describe_image,
+    "clarify": _tool_clarify,
+    "done": _tool_done,
+}
+
+
 async def _execute_tool(tool_call: Dict) -> str:
-    """执行单个工具调用"""
+    """
+    执行单个工具调用 — v3.0 调度字典重构。
+
+    通过 _TOOL_HANDLERS 字典将工具名映射到对应的 handler 函数，
+    消除巨型 if-elif 链。保持与外部调用者的完全兼容。
+
+    Args:
+        tool_call: MiMo function calling 返回的工具调用对象
+
+    Returns:
+        工具执行结果的 JSON 字符串或描述文本
+    """
     func = tool_call.get("function", {})
     func_name = func.get("name", "")
     try:
@@ -210,96 +336,19 @@ async def _execute_tool(tool_call: Dict) -> str:
     except json.JSONDecodeError:
         args = {}
 
+    handler = _TOOL_HANDLERS.get(func_name)
+    if handler is None:
+        return f"未知工具: {func_name}"
+
     try:
-        if func_name == "search_knowledge":
-            from src.services.retrieval import hybrid_search
-            results = await hybrid_search(args.get("query", ""), top_k=args.get("top_k", 5))
-            snippets = []
-            for r in results[:5]:
-                snippets.append({
-                    "text": r.get("text", "")[:300],
-                    "file": r.get("file_name", "?"),
-                    "score": round(r.get("score", 0), 2)
-                })
-            return json.dumps(snippets, ensure_ascii=False)
-
-        elif func_name == "search_wiki":
-            from src.services.wiki import search_wiki_pages
-            results = await search_wiki_pages(args.get("query", ""))
-            return json.dumps([{
-                "title": r.get("title", ""),
-                "summary": r.get("summary", "")[:200]
-            } for r in results[:3]], ensure_ascii=False)
-
-        elif func_name == "query_graph":
-            from src.services.graph_router import get_entity_context
-            from src.services.graph_traversal import multi_hop_traverse
-            entity = args.get("entity", "")
-            mode = args.get("mode", "direct")
-            if mode == "traverse":
-                result = multi_hop_traverse(entity, max_hops=3)
-                return json.dumps(result, ensure_ascii=False)
-            else:
-                ctx = get_entity_context(entity)
-                return ctx if ctx else f"图谱中未找到 '{entity}' 的关系"
-
-        elif func_name == "read_doc":
-            from src.db.data_store import load_chunks
-            from src.db.memory_store import get_store
-            file_name = args.get("file_name", "")
-            chunk_idx = args.get("chunk_index", 0)
-            store = get_store()
-            # 模糊匹配文件名
-            all_chunks = store.get_all() if hasattr(store, 'get_all') else []
-            matched = [c for c in all_chunks if file_name.lower() in c.get("file_name", "").lower()]
-            if matched:
-                target = matched[0] if chunk_idx == 0 else next(
-                    (c for c in matched if c.get("chunk_index") == chunk_idx), matched[0]
-                )
-                return f"[{target.get('file_name', '?')} #{target.get('chunk_index', 0)}]\n{target.get('text', '')[:1500]}"
-            return f"未找到文件 '{file_name}'"
-
-        elif func_name == "extract_table":
-            from src.services.table_view import search_tables
-            results = search_tables(args.get("query", ""))
-            if results:
-                return json.dumps(results[:3], ensure_ascii=False)
-            # fallback: 从 chunk 中搜索表格内容
-            from src.services.retrieval import hybrid_search
-            results = await hybrid_search(args.get("query", ""), top_k=3)
-            table_hits = [r for r in results if "|" in r.get("text", "") or "表格" in r.get("text", "")]
-            if table_hits:
-                return table_hits[0].get("text", "")[:800]
-            return "未找到相关表格数据"
-
-        elif func_name == "describe_image":
-            image_path = args.get("image_path", "")
-            try:
-                from src.services.multimodal import transcribe_image
-                result = transcribe_image(image_path)
-                if result:
-                    return f"图片描述: {result}"
-                # Fallback: 从知识库搜索图片相关内容
-                from src.services.retrieval import hybrid_search
-                results = await hybrid_search(image_path, top_k=3)
-                img_results = [r for r in results if r.get("result_type") == "image" or "图片" in r.get("text", "")]
-                if img_results:
-                    return img_results[0].get("text", "")[:500]
-                return f"无法描述图片。路径: {image_path}"
-            except Exception as e:
-                return f"图片描述失败: {str(e)[:200]}"
-
-        elif func_name == "clarify":
-            return f"需要用户澄清: {args.get('question', '?')}"
-
-        elif func_name == "done":
-            return "DONE: " + args.get("reason", "信息已充分")
-
+        # 所有 handler 都接受 args dict，部分为 async
+        if asyncio.iscoroutinefunction(handler):
+            return await handler(args)
+        else:
+            return handler(args)
     except Exception as e:
         logger.warning(f"Tool {func_name} error: {e}")
         return f"工具执行失败: {str(e)[:200]}"
-
-    return f"未知工具: {func_name}"
 
 
 async def agentic_search(query: str) -> Dict:

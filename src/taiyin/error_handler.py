@@ -100,6 +100,7 @@ def setup_error_handlers(app):
     """向 FastAPI app 注册统一异常处理器"""
 
     @app.exception_handler(KbError)
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def kb_error_handler(request: Request, exc: KbError):
         logger.error(f"[{exc.code}] {exc.message} | {exc.detail}")
         return JSONResponse(
@@ -108,6 +109,7 @@ def setup_error_handlers(app):
         )
 
     @app.exception_handler(Exception)
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def catch_all_handler(request: Request, exc: Exception):
         """兜底：未知异常统一格式"""
         # FastAPI HTTPException 保持原始状态码

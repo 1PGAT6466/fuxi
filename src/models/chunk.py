@@ -113,8 +113,8 @@ class Chunk:
         chunk_type = ChunkType.TEXT
         try:
             chunk_type = ChunkType(d.get("chunk_type", "text"))
-        except ValueError:
-            pass
+        except ValueError as e:
+            pass  # 静默：ValueError 失败不影响主流程
 
         return cls(
             chunk_id=d.get("chunk_id", d.get("file_hash", "") + ":" + str(d.get("chunk_index", 0))),

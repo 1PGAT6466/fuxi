@@ -29,14 +29,16 @@ class RetrievalEvaluator:
         try:
             import jieba
             query_keywords = set(jieba.cut(query))
-        except:
+        except Exception as e:
+            logger.warning("jieba分词失败(查询): %s", e, exc_info=True)
             query_keywords = set(query.split())
 
         for r in results[:3]:
             text = r.get("text", "")
             try:
                 result_keywords = set(jieba.cut(text))
-            except:
+            except Exception as e:
+                logger.warning("jieba分词失败(结果): %s", e, exc_info=True)
                 result_keywords = set(text.split())
 
             overlap = len(query_keywords & result_keywords) / len(query_keywords) if query_keywords else 0

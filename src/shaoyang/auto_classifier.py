@@ -107,7 +107,8 @@ def reclassify_store(store, batch_size: int = 200) -> Tuple[int, int]:
     import sqlite3
     from pathlib import Path
     
-    db_path = Path("data/chunks.db")
+    from src.config import CHUNKS_DB_PATH
+    db_path = Path(CHUNKS_DB_PATH)
     if not db_path.exists():
         logger.warning("chunks.db not found")
         return (0, 0)
@@ -184,7 +185,8 @@ def sync_graph_to_categories():
     import json, logging
     logger = logging.getLogger(__name__)
     try:
-        graph = json.load(open("data/knowledge_graph.json", encoding="utf-8"))
+        with open("data/knowledge_graph.json", encoding="utf-8") as f:
+            graph = json.load(f)
         nodes = graph.get("nodes", {})
         
         # 实体类型 → 分类补充关键词

@@ -7,6 +7,7 @@ import logging
 from typing import Callable, Any, Optional
 
 logger = logging.getLogger("infra.retry")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 
 async def retry_async(

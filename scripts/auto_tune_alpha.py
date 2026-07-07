@@ -17,8 +17,8 @@ def get_feedback_queries():
         if "feedback_log" in tables:
             rows = conn.execute("SELECT query, rating FROM feedback_log WHERE rating <= 2 ORDER BY created_at DESC LIMIT 50").fetchall()
             return [{"query": r[0], "rating": r[1]} for r in rows]
-    except:
-        pass
+    except Exception as e:
+        print(f"[auto_tune_alpha] DB查询失败: {e}")
     finally:
         conn.close()
     return []

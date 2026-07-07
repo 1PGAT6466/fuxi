@@ -61,6 +61,7 @@ class SeedScoreABTest:
             weights["dual_channel_weight"] * dual_channel_score
         )
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def record_test_data(self, query: str, group: str,
                                 results: List[Dict], trace_id: str = ""):
         """记录测试数据"""
@@ -84,6 +85,7 @@ class SeedScoreABTest:
 class SeedScoreEvaluator:
     """seed_score 评估器"""
 
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def evaluate(self, test_name: str = "seed_score_weight_optimization") -> Dict:
         """评估A/B测试结果"""
         test_file = os.path.join(TEST_DIR, f"{test_name}.jsonl")
@@ -96,8 +98,8 @@ class SeedScoreEvaluator:
             for line in f:
                 try:
                     data.append(json.loads(line.strip()))
-                except:
-                    pass
+                except Exception as e:
+                    logger.warning("JSON解析A/B测试数据失败: %s", e, exc_info=True)
 
         control_data = [d for d in data if d.get("group") == "control"]
         treatment_data = [d for d in data if d.get("group") == "treatment"]

@@ -1,0 +1,114 @@
+# ===========================
+# 伏羲 Fuxi v1.50 - Docker Compose
+# ===========================
+# 启动: docker compose up -d
+# 停止: docker compose down
+# 查看日志: docker compose logs -f fuxi-server
+# ===========================
+
+version: "3.8"
+
+services:
+  # ---- 伏羲知识库服务器 ----
+  fuxi-server:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: fuxi-server
+    ports:
+      - "${KB_PORT:-8080}:8080"
+    environment:
+      # 安全 — v1.50 修复：FUXI_JWT_SECRET 必须手动设置，不再提供硬编码默认值
+      - FUXI_JWT_SECRET=${FUXI_JWT_SECRET:?请设置环境变量 FUXI_JWT_SECRET}
+      - JWT_EXPIRY_HOURS=${JWT_EXPIRY_HOURS:-24}
+      - FUXI_ALLOW_REGISTRATION=${FUXI_ALLOW_REGISTRATION:-true}
+      - KB_ADMIN_TOKEN=${KB_ADMIN_TOKEN:-change_me_in_production}
+      # LLM
+      - MIMO_API_KEY=${MIMO_API_KEY:-}
+      - MIMO_BASE_URL=${MIMO_BASE_URL:-https://token-plan-cn.xiaomimimo.com/v1}
+      - MIMO_MODEL=${MIMO_MODEL:-mimo-v2.5}
+      - MIMO_TIMEOUT=${MIMO_TIMEOUT:-60}
+      - DEEPSEEK_API_KEY=${DEEPSEEK_API_KEY:-}
+      - SILICONFLOW_API_KEY=${SILICONFLOW_API_KEY:-}
+      # 服务
+      - KB_HOST=0.0.0.0
+      - KB_PORT=8080
+      - KB_CORS_ORIGINS=${KB_CORS_ORIGINS:-http://localhost:8080,http://127.0.0.1:8080}
+      - KB_AI_TIMEOUT=${KB_AI_TIMEOUT:-30}
+      - KB_UPLOAD_MAX_MB=${KB_UPLOAD_MAX_MB:-200}
+      # 数据
+      - FUXI_DATA_DIR=/app/data
+      # 知识库
+      - KB_EMBEDDER_URL=${KB_EMBEDDER_URL:-http://localhost:8081}
+      - KB_EMBEDDER_WORKERS=${KB_EMBEDDER_WORKERS:-4}
+      - KB_CHROMA_DIR=${KB_CHROMA_DIR:-/app/data/chroma}
+      - KB_MODEL=${KB_MODEL:-BAAI/bge-large-zh-v1.5}
+      - CHUNK_SIZE=${CHUNK_SIZE:-1000}
+      - CHUNK_OVERLAP=${CHUNK_OVERLAP:-100}
+      - MAX_FILE_MB=${MAX_FILE_MB:-200}
+      # 缓存
+      - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      # 搜索
+      - BRAVE_API_KEY=${BRAVE_API_KEY:-}
+      # 代理
+      - LOADER_URL=${LOADER_URL:-http://127.0.0.1:8090}
+      - KB_RERANK_PROXY=${KB_RERANK_PROXY:-http://127.0.0.1:8091}
+      # 开发
+      - FUXI_ENV=${FUXI_ENV:-production}
+      - FUXI_LOG_LEVEL=${FUXI_LOG_LEVEL:-INFO}
+    volumes:
+      - fuxi-data:/app/data
+    depends_on:
+      redis:
+        condition: service_started
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+
+  # ---- ChromaDB 向量数据库 ----
+  chromadb:
+    image: chromadb/chroma:latest
+    container_name: fuxi-chromadb
+    ports:
+      - "${CHROMA_PORT:-8000}:8000"
+    environment:
+      - IS_PERSISTENT=TRUE
+      - PERSIST_DIRECTORY=/chroma/chroma
+      - ANONYMIZED_TELEMETRY=FALSE
+    volumes:
+      - chroma-data:/chroma/chroma
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/v1/heartbeat"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
+
+  # ---- Redis 缓存 ----
+  redis:
+    image: redis:7-alpine
+    container_name: fuxi-redis
+    ports:
+      - "${REDIS_PORT:-6379}:6379"
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  fuxi-data:
+    driver: local
+  chroma-data:
+    driver: local
+  redis-data:
+    driver: local

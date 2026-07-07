@@ -26,6 +26,11 @@ DB_PATH = CHUNKS_DB_PATH  # legacy alias
 WORLDTREE_DB_PATH = DATA_DIR / "worldtree.db"
 # P2-4: wiki.db merged into worldtree.db, kept as legacy alias
 WIKI_DB_PATH = WORLDTREE_DB_PATH  # legacy alias → worldtree.db
+CHROMA_PATH = str(BASE_DIR / "chroma_db")
+
+# 分块参数
+CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1000"))
+CHUNK_OVERLAP = int(os.getenv("CHUNK_OVERLAP", "100"))
 
 # 文件
 CHUNKS_FILE = DATA_DIR / "chunks.json"
@@ -47,13 +52,26 @@ for d in [DATA_DIR, UPLOAD_DIR, LOG_DIR, BACKUP_DIR, STATIC_DIR, CONFIG_HISTORY_
 HOST = os.getenv("KB_HOST", "0.0.0.0")
 PORT = int(os.getenv("KB_PORT", "8080"))
 EMBEDDER_URL = os.getenv("KB_EMBEDDER_URL", "http://localhost:8081")
+RERANK_URL = os.getenv("KB_RERANK_PROXY", "")
 _default_cors = f"http://localhost:{PORT},http://127.0.0.1:{PORT}"
 CORS_ORIGINS: List[str] = os.getenv("KB_CORS_ORIGINS", _default_cors).split(",")
 
 # ============ 安全 ============
+# JWT 配置 (安全相关)
+# v1.50 安全修复：消除硬编码默认值，启动时必须设置环境变量
+_JWT_SECRET_FROM_ENV = os.getenv("FUXI_JWT_SECRET")
+if not _JWT_SECRET_FROM_ENV:
+    raise RuntimeError(
+        "FUXI_JWT_SECRET 环境变量未设置！"
+        "请在 .env 或系统环境变量中设置安全的 JWT 密钥。"
+        "示例: FUXI_JWT_SECRET=<至少32字符的随机字符串>"
+    )
+JWT_SECRET = _JWT_SECRET_FROM_ENV
+JWT_EXPIRY_HOURS = int(os.getenv("JWT_EXPIRY_HOURS", "24"))
+
 ADMIN_TOKEN = os.getenv("KB_ADMIN_TOKEN", "")
-MAX_FILE_MB = 200
-UPLOAD_MAX_MB = int(os.getenv("KB_UPLOAD_MAX_MB", "200"))
+MAX_FILE_MB = int(os.getenv("KB_UPLOAD_MAX_MB", os.getenv("MAX_FILE_MB", "200")))
+UPLOAD_MAX_MB = MAX_FILE_MB
 LOADER_URL = os.getenv("LOADER_URL", "http://localhost:8090")
 AI_TIMEOUT_SECONDS = int(os.getenv("KB_AI_TIMEOUT", "30"))
 
@@ -63,8 +81,29 @@ MIMO_BASE_URL = os.getenv("MIMO_BASE_URL", "https://token-plan-cn.xiaomimimo.com
 MIMO_MODEL = os.getenv("MIMO_MODEL", "mimo-v2.5")
 MIMO_TIMEOUT = int(os.getenv("MIMO_TIMEOUT", "60"))
 
+# ============ DeepSeek API 配置 ============
+DEEPSEEK_API_KEY = os.getenv("DEEPSEEK_API_KEY", "")
+DEEPSEEK_BASE_URL = os.getenv("DEEPSEEK_BASE_URL", "https://api.deepseek.com")
+DEEPSEEK_MODEL = os.getenv("DEEPSEEK_MODEL", "deepseek-v4-pro")
+DEEPSEEK_TIMEOUT = int(os.getenv("DEEPSEEK_TIMEOUT", "60"))
+
+# ============ OpenAI 4o-mini 降级配置（v1.50 L1 第三重试） ============
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+OPENAI_BASE_URL = os.getenv("OPENAI_BASE_URL", "https://api.openai.com/v1")
+OPENAI_TIMEOUT = int(os.getenv("OPENAI_TIMEOUT", "30"))
+
+# ============ TokenBudget 会话成本预算（v1.50 方案第13条） ============
+FUXI_SESSION_BUDGET = float(os.getenv("FUXI_SESSION_BUDGET", "0.15"))  # ¥0.15 默认硬上限
+
+# ============ SiliconFlow API 配置 ============
+SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY", "")
+SILICONFLOW_BASE_URL = os.getenv("SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1")
+
 
 # ============ 模型 ============
+
+# ============ 评测自动化 ============
+EVAL_AUTO_RUN = os.getenv("FUXI_EVAL_AUTO_RUN", "false").lower() == "true"
 
 # ============ 版本 ============
 VERSION = "1.50"
@@ -119,4 +158,61 @@ PROMPTS = {
 - 技术文档、办公文档、标准件选型
 你的回答专业、精准、有来源。不确定时会诚实说明，绝不编造。
 引用格式：[来源: 文件名]（如果有的话）。""",
+}
+
+
+# ============ SAG 三阶段管线配置 (ADR-001, Round 2 G-1) ============
+# 安全审计 (Round 3): 配置项均通过环境变量可覆盖，避免硬编码生产参数
+SAG_CONFIG = {
+    # 阶段 1: 种子检索
+    "MAX_SEED_CHUNKS": int(os.getenv("SAG_MAX_SEED_CHUNKS", "200")),
+    "PATH_A_TOP_K": int(os.getenv("SAG_PATH_A_TOP_K", "100")),
+    "PATH_B_TOP_K": int(os.getenv("SAG_PATH_B_TOP_K", "100")),
+
+    # 阶段 2: 多跳扩展
+    "MAX_MULTI_HOP_EVENTS": int(os.getenv("SAG_MAX_MULTI_HOP_EVENTS", "50")),
+    "MAX_EVENTS_TO_CHUNKS": int(os.getenv("SAG_MAX_EVENTS_TO_CHUNKS", "30")),
+    "MULTI_HOP_DEPTH": int(os.getenv("SAG_MULTI_HOP_DEPTH", "1")),
+
+    # 阶段 3: LLM 精排
+    "COARSE_RANK_TOP": int(os.getenv("SAG_COARSE_RANK_TOP", "100")),
+    "LLM_RERANK_TOP_K": int(os.getenv("SAG_LLM_RERANK_TOP_K", "15")),
+
+    # 降级阈值
+    "DEGRADE_CHUNK_MIN": int(os.getenv("SAG_DEGRADE_CHUNK_MIN", "3")),
+    "SEARCH_TIMEOUT_MS": int(os.getenv("SAG_SEARCH_TIMEOUT_MS", "30000")),
+}
+
+# L5 CRAG 纠正检索配置 (ADR-005)
+L5_CRAG_CONFIG = {
+    "conditions": [
+        {"metric": "agent_loops", "operator": ">", "value": 3},
+        {"metric": "total_tokens", "operator": ">", "value": 4000},
+        {"metric": "agent_confidence", "operator": "<", "value": 0.3},
+        {"metric": "agent_timeout", "operator": "==", "value": True},
+    ],
+    "execution": {
+        "strategy": "rewrite_and_retry",
+        "max_retries": 2,
+        "timeout": 5.0,
+    },
+    "fallback": {
+        "action": "return_partial",
+        "include_reason": True,
+        "log_level": "WARNING",
+    },
+}
+
+# seed_score A/B 测试配置 (ADR-007)
+SEED_SCORE_TEST_CONFIG = {
+    "test_name": "seed_score_weight_optimization",
+    "traffic_split": 0.5,
+    "variants": {
+        "control": {
+            "name": "SAG 论文权重",
+            "vector_weight": 0.85,
+            "entity_weight": 0.15,
+            "dual_channel_weight": 0.05,
+        },
+    },
 }

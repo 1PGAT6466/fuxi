@@ -78,9 +78,11 @@ class BaseAgent(ABC):
         return []
 
     @abstractmethod
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def run(self, ctx: AgentContext) -> Dict:
         """执行 Agent 主逻辑"""
         pass
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def reflect(self, ctx: AgentContext, result: Dict) -> Dict:
         """反思执行结果，决定是否需要重试"""
@@ -108,6 +110,7 @@ class BaseAgent(ABC):
         )
         return {**self._metrics, "avg_duration_ms": round(avg_duration, 1)}
 
+    # DEPRECATED: 未使用，v1.50 标记待删除
     def _record_run(self, duration_ms: float, tokens: int = 0, error: bool = False):
         """记录运行指标"""
         self._metrics["total_runs"] += 1

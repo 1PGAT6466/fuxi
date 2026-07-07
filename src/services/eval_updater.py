@@ -35,8 +35,8 @@ def _load_search_logs(days: int = 7) -> list:
             file_date = datetime.strptime(date_str, "%Y%m%d")
             if file_date < cutoff.replace(hour=0, minute=0, second=0):
                 continue
-        except ValueError:
-            pass
+        except ValueError as e:
+            logger.warning("ValueError 失败: %s", e, exc_info=True)
         try:
             with open(fn, encoding="utf-8") as f:
                 for line in f:
@@ -46,11 +46,10 @@ def _load_search_logs(days: int = 7) -> list:
                     try:
                         entry = json.loads(line)
                         logs.append(entry)
-                    except json.JSONDecodeError:
-                        pass
-        except Exception:
-            logger.warning(f"[eval_updater] suppressed exception", exc_info=True)
-            pass
+                    except json.JSONDecodeError as e:
+                        logger.warning("json.JSONDecodeError 失败: %s", e, exc_info=True)
+        except Exception as e:
+            logger.warning("_load_search_logs 操作失败: %s", e, exc_info=True)
     return logs
 
 
@@ -129,7 +128,8 @@ def update_eval_set() -> dict:
             existing = json.loads(EVAL_CASES_FILE.read_text(encoding="utf-8"))
             if not isinstance(existing, list):
                 existing = []
-        except Exception:
+        except Exception as e:
+            logger.warning("加载评估用例文件失败: %s", e, exc_info=True)
             existing = []
     
     # 保留手动用例（非 auto- 开头的 source）
@@ -170,7 +170,8 @@ def should_update() -> bool:
             return True
         last_update = datetime.fromisoformat(latest)
         return (datetime.now() - last_update).days >= UPDATE_INTERVAL_DAYS
-    except Exception:
+    except Exception as e:
+        logger.warning("should_update 检查失败: %s", e, exc_info=True)
         return True
 
 

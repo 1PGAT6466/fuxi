@@ -49,7 +49,11 @@ async def judge_answer(query: str, context: str, answer: str) -> Dict:
             import re
             match = re.search(r'\{[^}]+\}', result)
             if match:
-                return json.loads(match.group())
+                try:
+                    return json.loads(match.group())
+                except json.JSONDecodeError as e:
+                    logger.error(f"[Judge V2] 正则提取的 JSON 解析失败: {e}, matched={match.group()[:200]}")
+                    return {"overall": 0, "reason": "JSON 解析失败"}
             return {"overall": 0, "reason": "解析失败"}
     except Exception as e:
         logger.warning(f"Judge 评分失败: {e}")

@@ -1,35 +1,37 @@
 """
 synonym_loader.py — Phase 0.4.2: 统一同义词加载器
 """
-import yaml, logging
+import yaml, logging, threading
 from pathlib import Path
 from typing import Dict
 
 logger = logging.getLogger(__name__)
 
-SYNONYMS_PATH = Path(__file__).parent.parent / "config" / "synonyms.yaml"
+SYNONYMS_PATH = Path(__file__).parent.parent / "data" / "synonyms.yaml"
 
 _synonyms_cache: Dict[str, list] = None
+_synonyms_lock = threading.Lock()
 
 
 def load_synonyms() -> Dict[str, list]:
-    """加载同义词映射表（惰性加载 + 缓存）"""
+    """加载同义词映射表（惰性加载 + 缓存，threadsafe）"""
     global _synonyms_cache
-    if _synonyms_cache is not None:
-        return _synonyms_cache
-    
-    try:
-        if SYNONYMS_PATH.exists():
-            with open(SYNONYMS_PATH, encoding='utf-8') as f:
-                data = yaml.safe_load(f)
-            _synonyms_cache = data.get('synonyms', {})
-            logger.info(f"[Synonyms] Loaded {len(_synonyms_cache)} synonym groups")
-        else:
+    with _synonyms_lock:
+        if _synonyms_cache is not None:
+            return _synonyms_cache
+        
+        try:
+            if SYNONYMS_PATH.exists():
+                with open(SYNONYMS_PATH, encoding='utf-8') as f:
+                    data = yaml.safe_load(f)
+                _synonyms_cache = data.get('synonyms', {})
+                logger.info(f"[Synonyms] Loaded {len(_synonyms_cache)} synonym groups")
+            else:
+                _synonyms_cache = {}
+                logger.warning(f"[Synonyms] File not found: {SYNONYMS_PATH}")
+        except Exception as e:
             _synonyms_cache = {}
-            logger.warning(f"[Synonyms] File not found: {SYNONYMS_PATH}")
-    except Exception as e:
-        _synonyms_cache = {}
-        logger.warning(f"[Synonyms] Load failed: {e}")
+            logger.warning(f"[Synonyms] Load failed: {e}")
     
     return _synonyms_cache
 

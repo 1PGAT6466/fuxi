@@ -34,8 +34,8 @@ class ShaoyinBrain(SymbolBase):
             try:
                 from src.shaoyin.smart_self_rag import SmartSelfRAG
                 self._self_rag = SmartSelfRAG()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Exception 失败: %s", e, exc_info=True)
         return self._self_rag
 
     def _get_crag(self):
@@ -44,8 +44,8 @@ class ShaoyinBrain(SymbolBase):
             try:
                 from src.shaoyin.crag_corrector import CRAGCorrector
                 self._crag = CRAGCorrector()
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Exception 失败: %s", e, exc_info=True)
         return self._crag
 
     async def think(self, query: str, history: List[Dict] = None, trace_id: str = None) -> Dict:
@@ -98,6 +98,33 @@ class ShaoyinBrain(SymbolBase):
             # Step 6: 合成
             answer = await self._compose(query, results, history)
 
+            # Step 6.5: L5 CRAG 答案质量评估 + 补充检索
+            try:
+                from src.taiyang.l5_crag import L5CRAGExecutor
+                crag_executor = L5CRAGExecutor()
+
+                # 将 answer 包装为结果格式用于评估
+                answer_as_results = [{"text": answer, "score": 1.0}]
+                crag_result = await crag_executor.execute(
+                    query=query,
+                    partial_results=answer_as_results,
+                    trace_id=trace_id or "unknown",
+                )
+
+                if crag_result.get("mode") == "l5_crag":
+                    # CRAG 评估认为答案质量不足，已触发补充检索
+                    supplementary = crag_result.get("results", [])
+                    if supplementary:
+                        logger.info(f"[{trace_id}] [少阴] L5 CRAG 补充检索: {len(supplementary)} 条")
+                        results.extend(supplementary)
+                        # 用补充检索结果重新合成
+                        new_answer = await self._compose(query, results, history)
+                        if new_answer:
+                            answer = new_answer
+                            logger.info(f"[{trace_id}] [少阴] L5 CRAG 重新合成完成")
+            except Exception as e:
+                logger.debug(f"[{trace_id}] [少阴] L5 CRAG 评估跳过: {e}")
+
             # Step 7: 校验
             confidence = self._validate(answer, results)
 
@@ -118,10 +145,13 @@ class ShaoyinBrain(SymbolBase):
                     confidence=confidence, retry_count=1 if confidence < 0.5 else 0,
                     duration_ms=duration,
                 )
-            except Exception:
-                pass
+            except Exception as e:
+                logger.warning("Exception 失败: %s", e, exc_info=True)
 
-            logger.info(f"[{trace_id}] [少阴] 决策完成: {query[:30]}... → confidence={confidence:.2f}, {duration:.0f}ms")
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.info(f"[{trace_id}] [少阴] 决策完成: {query[:30]}... → confidence={confidence:.2f}, {duration:.0f}ms")
+            else:
+                logger.info(f"[{trace_id}] [少阴] 决策完成: query_len={len(query)}, confidence={confidence:.2f}, {duration:.0f}ms")
 
             return {
                 "answer": answer,
@@ -144,8 +174,19 @@ class ShaoyinBrain(SymbolBase):
     def _classify_intent(self, query: str) -> Dict:
         """意图识别"""
         try:
-            from src.hypothalamus.brain import Instinct
-            return Instinct.classify_intent(query)
+            from src.bagua.qian import QianGua, _match_intent_preload
+            import os
+            cache = {}
+            _load = getattr(QianGua, '_load_intent_preload_cache', None)
+            if _load:
+                try:
+                    cache = _load()
+                except Exception:
+                    pass
+            result = _match_intent_preload(query, cache)
+            if result:
+                return {"intent": result, "confidence": 0.98, "reasoning": "预加载匹配"}
+            return {"intent": "SEARCH", "confidence": 0.85, "reasoning": "默认检索"}
         except Exception:
             return {"intent": "general_search", "intents": {}, "count": 0}
 
@@ -203,8 +244,8 @@ class ShaoyinBrain(SymbolBase):
             answer = await call_deepseek(prompt)
             if answer:
                 return answer
-        except Exception:
-            pass
+        except Exception as e:
+            logger.warning("Exception 失败: %s", e, exc_info=True)
         return "知识库中未找到相关信息。"
 
     def _extract_sources(self, results: List[Dict]) -> List[str]:
@@ -216,6 +257,7 @@ class ShaoyinBrain(SymbolBase):
                 sources.append(fn)
         return sources
 
+    # DEPRECATED: 未使用，v1.50 标记待删除
     def _get_metrics(self) -> dict:
         """返回决策指标"""
         return {
