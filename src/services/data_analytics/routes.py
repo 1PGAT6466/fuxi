@@ -85,7 +85,7 @@ class ExportRequest(BaseModel):
 
 def _get_chroma_stats() -> dict:
     """从 ChromaDB 获取向量存储统计"""
-    chroma_path = DATA_DIR / "chroma" / "chroma.sqlite3"
+    chroma_path = DATA_DIR / "chromadb" / "chroma.sqlite3"
     result = {
         "collections": 0,
         "embeddings": 0,
@@ -118,7 +118,7 @@ def _get_chroma_stats() -> dict:
             conn.close()
 
         # 存储大小：chroma 目录总大小
-        chroma_dir = DATA_DIR / "chroma"
+        chroma_dir = DATA_DIR / "chromadb"
         if chroma_dir.exists():
             total_bytes = sum(
                 f.stat().st_size

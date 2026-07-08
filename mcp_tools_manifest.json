@@ -1,0 +1,251 @@
+{
+  "manifest_version": "1.50",
+  "server_name": "fuxi-knowledge",
+  "description": "伏羲 v1.50 MCP 工具清单 — 供外部 Agent (Claude Code/Codex/Cursor) 自动发现",
+  "total_tools": 24,
+  "endpoints": {
+    "tools_list": "GET /api/mcp/tools",
+    "tools_call": "POST /api/mcp/call",
+    "jsonrpc": "POST /api/mcp"
+  },
+  "tools": [
+    {
+      "name": "sag_search",
+      "description": "搜索伏羲知识库 — 混合检索（向量 + 关键词）",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "搜索查询" },
+          "top_k": { "type": "integer", "description": "返回结果数量", "default": 10 }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "sag_ingest",
+      "description": "入库文档到伏羲知识库 — 文档解析 + 分块 + 向量化",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file_path": { "type": "string", "description": "文件路径" },
+          "category": { "type": "string", "description": "分类", "default": "" }
+        },
+        "required": ["file_path"]
+      }
+    },
+    {
+      "name": "sag_explain",
+      "description": "解释查询结果 — 通过 LLM 生成自然语言解释",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "查询" }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "sag_status",
+      "description": "获取系统状态 — 四象、八卦、基础设施健康报告",
+      "inputSchema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "kb_search",
+      "description": "知识库语义搜索 — 向量相似度 + 全文搜索",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "搜索查询" },
+          "top_k": { "type": "integer", "description": "返回结果数量", "default": 5 },
+          "mode": { "type": "string", "description": "搜索模式: semantic/keyword/hybrid", "default": "semantic" }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "kb_list_documents",
+      "description": "列出知识库文档 — 返回所有已入库文档的列表",
+      "inputSchema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "kb_get_document",
+      "description": "获取单个文档内容 — 通过 doc_id 获取完整文档的所有 chunks",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "doc_id": { "type": "string", "description": "文档 ID (file_hash)" }
+        },
+        "required": ["doc_id"]
+      }
+    },
+    {
+      "name": "graph_query",
+      "description": "知识图谱查询 — 按实体/边类型/置信度查询图谱边",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity": { "type": "string", "description": "实体名称（模糊匹配 source 或 target）", "default": "" },
+          "source": { "type": "string", "description": "按源实体过滤", "default": "" },
+          "target": { "type": "string", "description": "按目标实体过滤", "default": "" },
+          "edge_type": { "type": "string", "description": "按边类型过滤", "default": "" },
+          "min_confidence": { "type": "number", "description": "最小置信度 (0-1)", "default": 0.0 },
+          "limit": { "type": "integer", "description": "返回上限", "default": 100 }
+        }
+      }
+    },
+    {
+      "name": "graph_stats",
+      "description": "图谱统计 — 节点数、边数、类型分布",
+      "inputSchema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "wiki_search",
+      "description": "Wiki 页面搜索 — 全文搜索标题+内容+标签",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "q": { "type": "string", "description": "搜索关键词", "default": "" },
+          "category": { "type": "string", "description": "按分类过滤", "default": "" },
+          "limit": { "type": "integer", "description": "返回上限", "default": 20 }
+        }
+      }
+    },
+    {
+      "name": "wiki_get",
+      "description": "获取 Wiki 页面 — 通过 page_id 获取完整页面内容+关联页面",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page_id": { "type": "string", "description": "Wiki 页面 ID" }
+        },
+        "required": ["page_id"]
+      }
+    },
+    {
+      "name": "dream_cycle_run",
+      "description": "触发夜间消化循环 — 运行 digest→enrich→consolidate→gap_scan 四阶段",
+      "inputSchema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "dream_cycle_report",
+      "description": "获取最新日报 — 返回最后一次 Dream Cycle 生成的 Markdown 日报",
+      "inputSchema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "gap_analyze",
+      "description": "运行 Gap Analysis — 分析知识库覆盖缺口，发现缺失的知识领域",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "分析主题/查询", "default": "" },
+          "topic": { "type": "string", "description": "分析主题（备用）", "default": "" }
+        }
+      }
+    },
+    {
+      "name": "entity_expand",
+      "description": "实体向量扩展 — 输入实体名，返回向量相似度排序的扩展实体列表",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity_name": { "type": "string", "description": "实体名称" },
+          "top_k": { "type": "integer", "description": "返回扩展数", "default": 10 }
+        },
+        "required": ["entity_name"]
+      }
+    },
+    {
+      "name": "cross_entity_synthesize",
+      "description": "跨实体合成 — 查找两个实体之间的直接/间接关联路径",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "entity_a": { "type": "string", "description": "实体 A 名称" },
+          "entity_b": { "type": "string", "description": "实体 B 名称" }
+        },
+        "required": ["entity_a", "entity_b"]
+      }
+    },
+    {
+      "name": "file_upload",
+      "description": "文件上传 — 从本地文件路径入库（文档解析+分块+向量化）",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "file_path": { "type": "string", "description": "本地文件路径" },
+          "category": { "type": "string", "description": "分类标签", "default": "" }
+        },
+        "required": ["file_path"]
+      }
+    },
+    {
+      "name": "file_list",
+      "description": "文件列表 — 返回所有已上传文件的列表",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": { "type": "integer", "description": "页码", "default": 1 },
+          "page_size": { "type": "integer", "description": "每页数量", "default": 50 }
+        }
+      }
+    },
+    {
+      "name": "chat_query",
+      "description": "对话查询（简单版）— 向伏羲提问，返回 LLM 生成的回答",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "query": { "type": "string", "description": "用户问题" },
+          "history": { "type": "array", "description": "对话历史", "default": [] }
+        },
+        "required": ["query"]
+      }
+    },
+    {
+      "name": "eval_run",
+      "description": "运行评测 — 执行烟雾测试验证系统功能",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "dataset": { "type": "string", "description": "评测数据集名称", "default": "" },
+          "test_name": { "type": "string", "description": "测试名称", "default": "" }
+        }
+      }
+    },
+    {
+      "name": "notifications_list",
+      "description": "获取通知列表 — 返回系统通知",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "page": { "type": "integer", "description": "页码", "default": 1 },
+          "page_size": { "type": "integer", "description": "每页数量", "default": 20 },
+          "unread_only": { "type": "boolean", "description": "只返回未读", "default": false }
+        }
+      }
+    },
+    {
+      "name": "feature_flags_list",
+      "description": "列出功能开关 — 返回所有 Feature Flag 及其当前状态",
+      "inputSchema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "health_check",
+      "description": "系统健康检查 — 返回服务器、数据库、八卦模块健康状态",
+      "inputSchema": { "type": "object", "properties": {} }
+    },
+    {
+      "name": "audit_logs",
+      "description": "审计日志查询 — 查询系统操作审计记录",
+      "inputSchema": {
+        "type": "object",
+        "properties": {
+          "user": { "type": "string", "description": "按用户过滤", "default": "" },
+          "action": { "type": "string", "description": "按操作类型过滤", "default": "" },
+          "days": { "type": "integer", "description": "最近几天", "default": 1 },
+          "limit": { "type": "integer", "description": "返回上限", "default": 100 }
+        }
+      }
+    }
+  ]
+}

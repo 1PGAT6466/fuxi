@@ -97,7 +97,8 @@ class WikiEngine:
         self._wiki_collection = None
         try:
             import os
-            _cdir = os.path.join(str(DATA_DIR), "chroma_wiki")
+            # v1.50 S-01: 统一使用 KB_CHROMA_DIR 路径，用独立 collection 区分 wiki 数据
+            _cdir = os.path.join(str(DATA_DIR), "chromadb")
             os.makedirs(_cdir, exist_ok=True)
             _cli = chromadb.PersistentClient(path=_cdir, settings=_ChromaSettings(anonymized_telemetry=False))
             self._wiki_collection = _cli.get_or_create_collection(name="wiki_summaries", metadata={"hnsw:space": "cosine"})

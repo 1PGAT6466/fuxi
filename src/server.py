@@ -469,6 +469,95 @@ async def mcp_sag_status():
     from src.taiyin.mcp_tools import sag_status
     return await sag_status()
 
+
+# ============ v1.50 Phase F: MCP 通用工具调用端点 ============
+
+# MCP 工具处理器注册表 — 直接 map tool_name → handler
+MCP_TOOL_HANDLERS = {
+    "sag_search": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["sag_search"]).sag_search(
+        query=args.get("query", ""), top_k=args.get("top_k", 10)),
+    "sag_ingest": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["sag_ingest"]).sag_ingest(
+        file_path=args.get("file_path", ""), category=args.get("category", "")),
+    "sag_explain": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["sag_explain"]).sag_explain(
+        query=args.get("query", "")),
+    "sag_status": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["sag_status"]).sag_status(),
+    "kb_search": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["kb_search"]).kb_search(
+        query=args.get("query", ""), top_k=args.get("top_k", 5), mode=args.get("mode", "semantic")),
+    "kb_list_documents": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["kb_list_documents"]).kb_list_documents(),
+    "kb_get_document": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["kb_get_document"]).kb_get_document(
+        doc_id=args.get("doc_id", "")),
+    "graph_query": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["graph_query"]).graph_query(
+        entity=args.get("entity", ""), source=args.get("source", ""),
+        target=args.get("target", ""), edge_type=args.get("edge_type", ""),
+        min_confidence=float(args.get("min_confidence", 0.0)), limit=int(args.get("limit", 100))),
+    "graph_stats": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["graph_stats"]).graph_stats(),
+    "wiki_search": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["wiki_search"]).wiki_search(
+        q=args.get("q", ""), category=args.get("category", ""), limit=int(args.get("limit", 20))),
+    "wiki_get": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["wiki_get"]).wiki_get(
+        page_id=args.get("page_id", "")),
+    "dream_cycle_run": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["dream_cycle_run"]).dream_cycle_run(),
+    "dream_cycle_report": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["dream_cycle_report"]).dream_cycle_report(),
+    "gap_analyze": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["gap_analyze"]).gap_analyze(
+        query=args.get("query", ""), topic=args.get("topic", "")),
+    "entity_expand": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["entity_expand"]).entity_expand(
+        entity_name=args.get("entity_name", ""), top_k=int(args.get("top_k", 10))),
+    "cross_entity_synthesize": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["cross_entity_synthesize"]).cross_entity_synthesize(
+        entity_a=args.get("entity_a", ""), entity_b=args.get("entity_b", "")),
+    "file_upload": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["file_upload"]).file_upload(
+        file_path=args.get("file_path", ""), category=args.get("category", "")),
+    "file_list": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["file_list"]).file_list(
+        page=int(args.get("page", 1)), page_size=int(args.get("page_size", 50))),
+    "chat_query": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["chat_query"]).chat_query(
+        query=args.get("query", ""), history=args.get("history", [])),
+    "eval_run": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["eval_run"]).eval_run(
+        dataset=args.get("dataset", ""), test_name=args.get("test_name", "")),
+    "notifications_list": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["notifications_list"]).notifications_list(
+        page=int(args.get("page", 1)), page_size=int(args.get("page_size", 20)),
+        unread_only=bool(args.get("unread_only", False))),
+    "feature_flags_list": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["feature_flags_list"]).feature_flags_list(),
+    "health_check": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["health_check"]).health_check(),
+    "audit_logs": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["audit_logs"]).audit_logs(
+        user=args.get("user", ""), action=args.get("action", ""),
+        days=int(args.get("days", 1)), limit=int(args.get("limit", 100))),
+}
+
+
+@app.post("/api/mcp/call")
+async def mcp_call(request: Request):
+    """MCP 通用工具调用端点 — v1.50 Phase F
+
+    请求体:
+      {"tool": "health_check", "args": {}}
+
+    返回:
+      工具执行结果（JSON）
+
+    支持所有 24 个 MCP 工具。
+    """
+    import traceback
+    body = await request.json()
+    tool_name = body.get("tool", "")
+    args = body.get("args", {})
+
+    if not tool_name:
+        return {"error": "缺少 tool 参数", "available_tools": list(MCP_TOOL_HANDLERS.keys())}
+
+    handler = MCP_TOOL_HANDLERS.get(tool_name)
+    if handler is None:
+        return {"error": f"未知工具: {tool_name}", "available_tools": list(MCP_TOOL_HANDLERS.keys())}
+
+    try:
+        result = handler(args)
+        # 支持 async handler
+        import inspect
+        if inspect.isawaitable(result):
+            result = await result
+        return {"ok": True, "tool": tool_name, "result": result}
+    except Exception as e:
+        logger.error(f"[MCP/call] {tool_name} 执行失败: {e}\n{traceback.format_exc()}")
+        return {"ok": False, "tool": tool_name, "error": str(e)}
+
+
 # ============ 评测自动化 API ============
 from src.services.eval_automation import get_eval_automation
 
@@ -607,6 +696,10 @@ app.include_router(rag_router)
 
 from src.api.kb import router as kb_router
 app.include_router(kb_router)
+
+# ============ v1.50 Phase D: Synthesis 跨实体合成 ============
+from src.api.synthesis import router as synthesis_router
+app.include_router(synthesis_router)
 
 # 管理面板路由 — /, /admin, /api/health, /api/stats, /api/admin/*
 # v1.41: 八卦体征端点

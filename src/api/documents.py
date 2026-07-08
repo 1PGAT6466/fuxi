@@ -1,4 +1,5 @@
 # v1.50 统一响应格式 — 文档路由
+# v1.50 Phase E: 新增文档可见性修改 API（Company Brain 权限隔离）
 from fastapi import APIRouter, HTTPException, Request, UploadFile, File
 from pathlib import Path
 
@@ -155,3 +156,105 @@ async def delete_document(file_hash: str, request: Request = None):
         if _wants_v2:
             return error("删除失败", status_code=500, detail=str(e))
         raise HTTPException(500, f"删除失败: {str(e)}")
+
+
+# ============================================================================
+# v1.50 Phase E: Company Brain 权限隔离 — 文档可见性 API
+# ============================================================================
+
+@router.put("/api/documents/{doc_id}/visibility")
+async def update_document_visibility(doc_id: str, request: Request):
+    """修改文档可见性
+
+    请求体:
+        {
+            "visibility": "team"   // 可选: "private" | "team" | "public"
+            "team_id": "team-eng"  // 可选: 指定文档所属团队（visibility=team 时建议指定）
+        }
+
+    权限要求:
+      - 文档所有者可修改
+      - 管理员可修改所有文档
+    """
+    from src.api.response import success, error, unauthorized, bad_request
+    import logging
+    _logger = logging.getLogger(__name__)
+
+    try:
+        body = await request.json()
+        visibility = body.get("visibility", "public")
+        team_id = body.get("team_id", "")
+
+        # 验证权限字段
+        from src.api.permissions import get_permission_manager, PermissionManager
+        pm = get_permission_manager()
+
+        visibility = PermissionManager.validate_visibility(visibility)
+
+        # 获取当前用户
+        user_id = getattr(request.state, "user", "anonymous") if request else "anonymous"
+
+        # 检查写权限：需要是文档 owner 或 admin
+        # 先找到文档的当前 owner
+        doc_owner_id = None
+        try:
+            from src.db.data_store import load_chunks
+            chunks = load_chunks()
+            for c in chunks:
+                if c.get("file_hash", "") == doc_id:
+                    doc_owner_id = c.get("owner_id", "")
+                    break
+        except Exception:
+            pass
+
+        if not pm.check_write(user_id, doc_owner_id):
+            return unauthorized("无权修改此文档的可见性", "仅文档所有者和管理员可执行此操作")
+
+        # 更新 chunks.db 中文档的 metadata
+        updated_count = 0
+        try:
+            from src.db.data_store import load_chunks, save_chunks
+            chunks = load_chunks()
+            for c in chunks:
+                if c.get("file_hash", "") == doc_id:
+                    c["visibility"] = visibility
+                    if team_id:
+                        c["team_id"] = team_id
+                    if not c.get("owner_id"):
+                        c["owner_id"] = user_id
+                    updated_count += 1
+            if updated_count > 0:
+                save_chunks(chunks)
+        except Exception as e:
+            _logger.warning(f"chunks.db metadata 更新失败: {e}")
+
+        # 也尝试更新向量库中的 metadata
+        try:
+            from src.db.vector_store import get_vector_store
+            vs = get_vector_store()
+            if vs:
+                vs.update_metadata_by_file(doc_id, {
+                    "visibility": visibility,
+                    "team_id": team_id or "public",
+                })
+        except Exception as e:
+            _logger.warning(f"向量库 metadata 更新失败（非致命）: {e}")
+
+        result_data = {
+            "doc_id": doc_id,
+            "visibility": visibility,
+            "team_id": team_id or "public",
+            "chunks_updated": updated_count,
+        }
+
+        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        if _wants_v2:
+            return success(data=result_data, message=f"文档 {doc_id} 可见性已更新为 {visibility}")
+        return {"status": "ok", **result_data, "message": f"文档可见性已更新为 {visibility}"}
+
+    except Exception as e:
+        _logger.exception(f"update_document_visibility 失败: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal server error", "detail": str(e)}
+        )

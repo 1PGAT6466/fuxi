@@ -1,7 +1,9 @@
 # 兼容层 - 管理路由
 # v1.44 Phase 1 Fix: 移除 require_admin 依赖（尚未实现）, 使用 request.state 判断角色
-from fastapi import APIRouter, Request
+# v1.50 Phase E: 新增团队管理 API（Company Brain 权限隔离）
+from fastapi import APIRouter, Request, Depends
 from fastapi.responses import JSONResponse
+from src.api.auth import require_admin
 import json
 import logging
 
@@ -277,4 +279,230 @@ async def admin_delete_user(user_id: str, request: Request = None):
         return {"ok": True, "message": f"用户 {user_id} 已删除"}
     except Exception as e:
         logger.exception(f"admin_delete_user 失败: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
+
+
+# ============================================================================
+# v1.50 Phase E: Company Brain 权限隔离 — 团队管理 API
+# ============================================================================
+
+# ── GET /api/admin/teams — 团队列表 ──
+
+@router.get("/api/admin/teams")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+async def admin_teams_list(request: Request = None):
+    """管理面板：团队列表
+
+    返回所有已注册团队的列表，包括默认 public 团队。
+    """
+    try:
+        from src.api.permissions import get_permission_manager
+        pm = get_permission_manager()
+        teams = pm.list_teams()
+
+        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        if _wants_v2:
+            from src.api.response import success
+            return success(data={"teams": teams, "total": len(teams)}, message="团队列表")
+        return {"ok": True, "teams": teams, "total": len(teams)}
+    except Exception as e:
+        logger.exception(f"admin_teams_list 失败: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
+
+
+# ── POST /api/admin/teams — 创建团队 ──
+
+@router.post("/api/admin/teams")
+async def admin_create_team(request: Request):
+    """管理面板：创建团队
+
+    请求体:
+        {
+            "team_id": "team-eng",      // 团队唯一标识（必填）
+            "name": "工程部",            // 团队名称（必填）
+            "description": "工程部团队",  // 团队描述（可选）
+            "member_ids": ["alice", "bob"] // 初始成员列表（可选）
+        }
+
+    创建者自动成为团队 owner 并加入团队。
+    """
+    try:
+        body = await request.json()
+        team_id = body.get("team_id", "").strip()
+        name = body.get("name", "").strip()
+        description = body.get("description", "")
+        member_ids = body.get("member_ids", [])
+
+        if not team_id or not name:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "参数错误", "detail": "team_id 和 name 不能为空"}
+            )
+
+        # 获取当前用户作为 owner
+        owner_id = getattr(request.state, "user", "admin") if request else "admin"
+
+        from src.api.permissions import get_permission_manager
+        pm = get_permission_manager()
+
+        team = pm.create_team(
+            team_id=team_id,
+            name=name,
+            owner_id=owner_id,
+            description=description,
+            member_ids=member_ids,
+        )
+
+        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        if _wants_v2:
+            from src.api.response import success
+            return success(data=team.to_dict(), message=f"团队 {name} 创建成功")
+        return {"ok": True, "team": team.to_dict()}
+
+    except ValueError as e:
+        return JSONResponse(status_code=400, content={"error": "参数错误", "detail": str(e)})
+    except Exception as e:
+        logger.exception(f"admin_create_team 失败: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
+
+
+# ── GET /api/admin/teams/{team_id} — 团队详情 ──
+
+@router.get("/api/admin/teams/{team_id}")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+async def admin_get_team(team_id: str, request: Request = None):
+    """管理面板：团队详情"""
+    try:
+        from src.api.permissions import get_permission_manager
+        pm = get_permission_manager()
+        team = pm.get_team(team_id)
+
+        if not team:
+            return JSONResponse(status_code=404, content={"error": "团队未找到", "detail": f"团队 {team_id} 不存在"})
+
+        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        if _wants_v2:
+            from src.api.response import success
+            return success(data=team.to_dict(), message="团队详情")
+        return {"ok": True, "team": team.to_dict()}
+    except Exception as e:
+        logger.exception(f"admin_get_team 失败: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
+
+
+# ── DELETE /api/admin/teams/{team_id} — 删除团队 ──
+
+@router.delete("/api/admin/teams/{team_id}")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+async def admin_delete_team(team_id: str, request: Request = None):
+    """管理面板：删除团队
+
+    不允许删除 'public' 默认团队。
+    """
+    try:
+        from src.api.permissions import get_permission_manager
+        pm = get_permission_manager()
+
+        success = pm.delete_team(team_id)
+        if not success:
+            return JSONResponse(status_code=400, content={"error": "无法删除团队", "detail": "团队不存在或为 public 默认团队"})
+
+        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        if _wants_v2:
+            from src.api.response import success as resp_success
+            return resp_success(data=None, message=f"团队 {team_id} 已删除")
+        return {"ok": True, "message": f"团队 {team_id} 已删除"}
+    except Exception as e:
+        logger.exception(f"admin_delete_team 失败: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
+
+
+# ── POST /api/admin/teams/{team_id}/members — 添加团队成员 ──
+
+@router.post("/api/admin/teams/{team_id}/members")
+async def admin_add_team_member(team_id: str, request: Request):
+    """管理面板：向团队添加成员
+
+    请求体:
+        {
+            "user_id": "alice"    // 要添加的用户 ID（必填）
+        }
+    """
+    try:
+        body = await request.json()
+        user_id = body.get("user_id", "").strip()
+
+        if not user_id:
+            return JSONResponse(status_code=400, content={"error": "参数错误", "detail": "user_id 不能为空"})
+
+        from src.api.permissions import get_permission_manager
+        pm = get_permission_manager()
+
+        ok = pm.add_member(team_id, user_id)
+        if not ok:
+            return JSONResponse(status_code=404, content={"error": "团队未找到", "detail": f"团队 {team_id} 不存在"})
+
+        team = pm.get_team(team_id)
+
+        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        if _wants_v2:
+            from src.api.response import success
+            return success(data=team.to_dict() if team else {}, message=f"用户 {user_id} 已加入团队 {team_id}")
+        return {"ok": True, "team": team.to_dict() if team else {}, "message": f"用户 {user_id} 已加入团队"}
+    except Exception as e:
+        logger.exception(f"admin_add_team_member 失败: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
+
+
+# ── DELETE /api/admin/teams/{team_id}/members/{user_id} — 移除团队成员 ──
+
+@router.delete("/api/admin/teams/{team_id}/members/{user_id}")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+async def admin_remove_team_member(team_id: str, user_id: str, request: Request = None):
+    """管理面板：从团队移除成员
+
+    不允许移除团队的 owner。
+    """
+    try:
+        from src.api.permissions import get_permission_manager
+        pm = get_permission_manager()
+
+        ok = pm.remove_member(team_id, user_id)
+        if not ok:
+            return JSONResponse(status_code=400, content={"error": "无法移除成员", "detail": "无法移除团队所有者或成员不存在"})
+
+        team = pm.get_team(team_id)
+
+        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        if _wants_v2:
+            from src.api.response import success
+            return success(data=team.to_dict() if team else {}, message=f"用户 {user_id} 已从团队 {team_id} 移除")
+        return {"ok": True, "team": team.to_dict() if team else {}, "message": f"用户 {user_id} 已从团队移除"}
+    except Exception as e:
+        logger.exception(f"admin_remove_team_member 失败: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
+
+
+# ── GET /api/user/teams — 当前用户所属团队列表 ──
+
+@router.get("/api/user/teams")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+async def user_teams(request: Request = None):
+    """获取当前用户所属的团队列表"""
+    try:
+        user_id = getattr(request.state, "user", "anonymous") if request else "anonymous"
+
+        from src.api.permissions import get_permission_manager
+        pm = get_permission_manager()
+
+        teams = pm.get_user_teams(user_id)
+        team_list = [t.to_dict() for t in teams]
+
+        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        if _wants_v2:
+            from src.api.response import success
+            return success(data={"teams": team_list, "user_id": user_id}, message="用户团队列表")
+        return {"ok": True, "teams": team_list, "user_id": user_id}
+    except Exception as e:
+        logger.exception(f"user_teams 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})

@@ -260,6 +260,17 @@ class KunGua(GuaBase):
             top_k = params.get("top_k", 5)
             return self.recall_wiki(query=query, top_k=top_k)
 
+        # ---- v1.50 Phase E: 带权限过滤的检索 ----
+        if action == "recall_memory":
+            query = params.get("query", "")
+            top_k = params.get("top_k", 10)
+            user_id = params.get("user_id", "")
+            team_id = params.get("team_id", None)
+            return self.recall_memory(
+                query=query, top_k=top_k,
+                user_id=user_id, team_id=team_id,
+            )
+
         if action == "stats":
             # 合并两种统计
             mem_stats = self.get_stats()
@@ -314,7 +325,8 @@ class KunGua(GuaBase):
             f"[{self.GUA_NAME}] 未知 action: {action}。"
             f"支持: store_conversation, recall_conversation, "
             f"set_preference, get_preference, push, recall, stats, clear, "
-            f"store_vector, store_wiki, store_graph, build_kg, auto_graph, get_graph_stats"
+            f"store_vector, store_wiki, store_graph, build_kg, auto_graph, get_graph_stats, "
+            f"recall_memory"
         )
 
     # ========================================================================
@@ -660,6 +672,82 @@ class KunGua(GuaBase):
             if wiki_cb:
                 wiki_cb.record_failure()
             return []
+
+    # ========================================================================
+    # v1.50 Phase E: Company Brain 权限隔离 — 带权限过滤的检索
+    # ========================================================================
+
+    def recall_memory(
+        self,
+        query: str = "",
+        top_k: int = 10,
+        user_id: str = "",
+        team_id: Optional[str] = None,
+        use_vector: bool = True,
+    ) -> List[Dict[str, Any]]:
+        """带权限过滤的文档检索
+
+        对标 GBrain Company Brain：团队每个成员只看到自己有权限的数据。
+
+        检索流程:
+          1. 执行向量/keyword 检索
+          2. 调用 PermissionManager 过滤结果
+          3. 只返回用户有权访问的文档
+
+        Args:
+            query:     检索查询词
+            top_k:     返回结果数（过滤前）
+            user_id:   当前用户 ID
+            team_id:   当前用户团队 ID（可选）
+            use_vector: 是否尝试向量检索
+
+        Returns:
+            过滤后的结果列表
+        """
+        # 步骤 1: 检索
+        results = self.recall_wiki(query=query, top_k=max(top_k * 2, 20))
+
+        if not results:
+            return []
+
+        # 步骤 2: 权限过滤
+        try:
+            from src.api.permissions import get_permission_manager
+            pm = get_permission_manager()
+        except ImportError:
+            logger.warning("☷ [坤] permissions 模块不可用，跳过权限过滤")
+            return results[:top_k]
+
+        # 如果未指定 team_id，尝试从用户信息中获取
+        if not team_id and user_id:
+            team_id = pm.get_user_team_id(user_id)
+
+        filtered = []
+        for r in results:
+            metadata = r if isinstance(r, dict) else {}
+            doc_owner_id = metadata.get("owner_id", "")
+            doc_team_id = metadata.get("team_id", "public")
+            doc_visibility = metadata.get("visibility", "public")
+
+            if pm.check_read(
+                user_id=user_id,
+                team_id=team_id,
+                doc_owner_id=doc_owner_id,
+                doc_team_id=doc_team_id,
+                doc_visibility=doc_visibility,
+            ):
+                filtered.append(r)
+                if len(filtered) >= top_k:
+                    break
+
+        filtered_count = len(results) - len(filtered)
+        if filtered_count > 0:
+            logger.debug(
+                "☷ [坤] 🔒 权限过滤: %d/%d 条结果已过滤 (user=%s, team=%s)",
+                filtered_count, len(results), user_id, team_id,
+            )
+
+        return filtered
 
     def get_wiki_stats(self) -> Dict[str, Any]:
         """获取 Wiki 统计信息

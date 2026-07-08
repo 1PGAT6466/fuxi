@@ -26,7 +26,8 @@ DB_PATH = CHUNKS_DB_PATH  # legacy alias
 WORLDTREE_DB_PATH = DATA_DIR / "worldtree.db"
 # P2-4: wiki.db merged into worldtree.db, kept as legacy alias
 WIKI_DB_PATH = WORLDTREE_DB_PATH  # legacy alias → worldtree.db
-CHROMA_PATH = str(BASE_DIR / "chroma_db")
+# ChromaDB 向量持久化目录（统一使用 KB_CHROMA_DIR 环境变量，默认 data/chromadb）
+CHROMA_PATH = os.getenv("KB_CHROMA_DIR", str(BASE_DIR / "chromadb"))
 
 # 分块参数
 CHUNK_SIZE = int(os.getenv("CHUNK_SIZE", "1000"))

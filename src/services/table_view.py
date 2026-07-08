@@ -129,7 +129,7 @@ def get_table_store():
     from chromadb.config import Settings as ChromaSettings
     import os
     
-    persist_dir = os.path.join(os.getenv("KB_CHROMA_DIR", "data/chroma"))
+    persist_dir = os.path.join(os.getenv("KB_CHROMA_DIR", "data/chromadb"))
     client = chromadb.PersistentClient(
         path=persist_dir,
         settings=ChromaSettings(anonymized_telemetry=False),

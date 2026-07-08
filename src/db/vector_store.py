@@ -26,7 +26,7 @@ from src.config import EMBEDDER_URL
 _embedder_available = None
 _embedder_last_check = 0
 _EMBEDDER_CHECK_INTERVAL = 30  # 30秒检查一次
-CHROMA_DIR = os.getenv("KB_CHROMA_DIR", "data/chromadb")
+CHROMA_DIR = os.getenv("KB_CHROMA_DIR", "data/chromadb")  # 统一路径配置
 COLLECTION_NAME = "kb_chunks"
 
 # ============ 自愈阈值 ============
@@ -41,7 +41,7 @@ class VectorStore:
         self.db_dir = db_dir
         self.collection_name = collection_name
         self._fail_count = 0
-        persist_dir = os.path.join(db_dir, "chroma")
+        persist_dir = os.path.join(db_dir, "chromadb")
         os.makedirs(persist_dir, exist_ok=True)
         self._client = chromadb.PersistentClient(
             path=persist_dir,
@@ -64,7 +64,7 @@ class VectorStore:
     def _reset_connection(self) -> bool:
         """惰性重建 collection 引用（ChromaDB 进程重启后恢复）"""
         try:
-            persist_dir = os.path.join(self.db_dir, "chroma")
+            persist_dir = os.path.join(self.db_dir, "chromadb")
             self._client = chromadb.PersistentClient(
                 path=persist_dir,
                 settings=ChromaSettings(anonymized_telemetry=False),
@@ -228,6 +228,63 @@ class VectorStore:
         except Exception:
             logger.error(
                 f"VectorStore.delete_by_file({file_hash}) failed", exc_info=True
+            )
+            self._mark_failure()
+            return False
+
+    # ---------- v1.50 Phase E: 更新 metadata ----------
+
+    def update_metadata_by_file(
+        self,
+        file_hash: str,
+        metadata_updates: Dict[str, Any],
+    ) -> bool:
+        """按文件哈希批量更新 metadata
+
+        用于 Company Brain 权限隔离：更新文档的 visibility/team_id 等权限字段。
+
+        Args:
+            file_hash: 文件哈希标识
+            metadata_updates: 要更新的 metadata 键值对
+
+        Returns:
+            True 成功（包括无匹配数据时）；False 操作失败
+        """
+        try:
+            # 获取匹配的所有向量
+            results = self._collection.get(
+                where={"file_hash": file_hash},
+                include=["metadatas"],
+            )
+
+            if not results or not results.get("ids"):
+                logger.debug(f"VectorStore.update_metadata_by_file: 无匹配数据 for {file_hash}")
+                return True  # 无数据不算失败
+
+            ids = results["ids"]
+            metadatas = results.get("metadatas", [])
+
+            # 针对每个匹配的向量，更新其 metadata
+            for i, chunk_id in enumerate(ids):
+                current_meta = metadatas[i] if i < len(metadatas) else {}
+                updated_meta = {**current_meta, **metadata_updates}
+                clean_meta = self._clean_metadata(updated_meta)
+
+                self._collection.update(
+                    ids=[chunk_id],
+                    metadatas=[clean_meta],
+                )
+
+            self._mark_success()
+            logger.info(
+                f"VectorStore: updated metadata for {len(ids)} vectors (file={file_hash})"
+            )
+            return True
+
+        except Exception:
+            logger.error(
+                f"VectorStore.update_metadata_by_file({file_hash}) failed",
+                exc_info=True,
             )
             self._mark_failure()
             return False
