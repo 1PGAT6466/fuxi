@@ -61,6 +61,7 @@ app = FastAPI(
     version=_VERSION,
     docs_url="/docs",
     redoc_url="/redoc",
+    redirect_slashes=False,
 )
 
 # ============ 伏羲 1.50 生命体启动 ============
