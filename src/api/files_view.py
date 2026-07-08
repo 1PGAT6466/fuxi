@@ -92,6 +92,7 @@ def download_document(file_hash: str, request: Request):
 
 
 @router.get("/api/antenna/search")
+@router.post("/api/antenna/search")
 def antenna_search(request: Request, q: str = ""):
     """天线搜索 — Web搜索代理"""
     return {
