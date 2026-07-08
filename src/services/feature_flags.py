@@ -41,6 +41,10 @@ DEFAULT_FLAGS = {
     "wiki_search": False,
     "table_view": False,
     "session_memory": False,
+
+    # v1.50 Phase C: Dream Cycle
+    "enable_dream_cycle_notifications": False,  # 日报通知推送（默认关闭，后续接入飞书/企微后开启）
+    "enable_gap_llm": False,                    # gap_scan LLM 增强（默认关闭，零 LLM 设计）
 }
 
 _flags = None

@@ -53,6 +53,7 @@ from src.bagua.base_gua import (
     DegradationRule,
     FallbackAction,
 )
+from src.bagua.auto_graph import get_auto_graph_builder
 
 logger = logging.getLogger("bagua.kun")
 
@@ -298,11 +299,22 @@ class KunGua(GuaBase):
                 doc_id=params.get("doc_id", ""),
             )
 
+        # ---- v1.50 Phase B: 自动知识图谱构建 - 零 LLM - ---
+        if action == "auto_graph":
+            return self.auto_graph_from_doc(
+                doc_id=params.get("doc_id", ""),
+                content=params.get("content", ""),
+                doc_name=params.get("doc_name", ""),
+            )
+
+        if action == "get_graph_stats":
+            return self.get_auto_graph_stats()
+
         raise ValueError(
             f"[{self.GUA_NAME}] 未知 action: {action}。"
             f"支持: store_conversation, recall_conversation, "
             f"set_preference, get_preference, push, recall, stats, clear, "
-            f"store_vector, store_wiki, store_graph, build_kg"
+            f"store_vector, store_wiki, store_graph, build_kg, auto_graph, get_graph_stats"
         )
 
     # ========================================================================
@@ -577,15 +589,20 @@ class KunGua(GuaBase):
             if wiki_cb:
                 wiki_cb.record_success()
 
+            # v1.50 Phase B: 自动建图 — 零 LLM 抽取实体+边
+            auto_graph_result = self._try_auto_graph(content, doc_id)
+
             logger.info(
-                "[%s] Wiki 页面已存储: %s (len=%d, cat=%s)",
+                "[%s] Wiki 页面已存储: %s (len=%d, cat=%s) | auto_graph=%s",
                 self.GUA_NAME, doc_id, len(content), doc["category"],
+                "ok" if auto_graph_result and auto_graph_result.get("ok") else "skip",
             )
             return {
                 "ok": True,
                 "doc_id": doc_id,
                 "is_new": True,
                 "stored_total": self._stored_total,
+                "auto_graph": auto_graph_result,
             }
 
         except Exception as e:
@@ -1578,6 +1595,221 @@ class KunGua(GuaBase):
         )
 
         return entities, relations
+
+    # ========================================================================
+    # v1.50 Phase B: 自动知识图谱构建（零 LLM）
+    # ========================================================================
+
+    def _try_auto_graph(self, content: str, doc_id: str) -> Dict[str, Any]:
+        """尝试对文档内容执行自动图谱构建（内部方法，非阻塞）
+        
+        在 push_to_wiki 成功后自动调用。
+        纯规则驱动，零 LLM 调用，不抛异常。
+        
+        Args:
+            content: 文档内容
+            doc_id:  文档标识
+        
+        Returns:
+            {"ok": True/False, "entities": int, "edges": int, ...}
+        """
+        result = {"ok": False, "doc_id": doc_id, "entities": 0, "edges": 0}
+        
+        try:
+            builder = get_auto_graph_builder()
+            
+            # 提取实体
+            entities = builder.extract_entities(content)
+            
+            # 构建边
+            edges = builder.build_from_text(content, doc_id)
+            
+            result["entities"] = len(entities)
+            result["edges"] = len(edges)
+            
+            # 如果有实体或边，写入存储
+            if entities or edges:
+                graph_data = builder.build_full_graph(content, doc_id)
+                
+                store_result = self.store_graph(
+                    entities=graph_data["entities"],
+                    relations=graph_data["edges"],
+                    doc_id=doc_id,
+                )
+                result["ok"] = store_result.get("ok", False)
+                result["stored"] = store_result.get("ok", False)
+            else:
+                result["ok"] = True
+                result["stored"] = False
+            
+            logger.debug(
+                "☷ [坤] auto_graph: doc=%s → %d 实体, %d 边",
+                doc_id, len(entities), len(edges),
+            )
+        
+        except Exception as e:
+            logger.warning(
+                "☷ [坤] auto_graph 跳过 (doc=%s): %s", doc_id, e,
+            )
+            result["error"] = str(e)
+        
+        return result
+    
+    def auto_graph_from_doc(
+        self,
+        doc_id: str = "",
+        content: str = "",
+        doc_name: str = "",
+    ) -> Dict[str, Any]:
+        """对指定文档执行自动图谱构建（显式 API）
+        
+        支持通过 execute(action="auto_graph") 显式调用。
+        可用于批量后端重建图谱。
+        
+        Args:
+            doc_id:   文档标识（为空时从 content hash 生成）
+            content:  文档内容
+            doc_name: 文档名称（可选，用于日志）
+        
+        Returns:
+            {
+                "ok": True/False,
+                "doc_id": str,
+                "doc_name": str,
+                "entities": [...],   # 提取的实体列表
+                "edges": [...],       # 提取的边列表
+                "entity_count": int,
+                "edge_count": int,
+                "graph_stored": bool,
+                "error": str (仅失败时),
+            }
+        """
+        result: Dict[str, Any] = {
+            "ok": False,
+            "doc_id": doc_id,
+            "doc_name": doc_name,
+            "entities": [],
+            "edges": [],
+            "entity_count": 0,
+            "edge_count": 0,
+            "graph_stored": False,
+        }
+        
+        if not content or not content.strip():
+            result["error"] = "content 为空"
+            return result
+        
+        if not doc_id:
+            doc_id = hashlib.md5(content.encode("utf-8")).hexdigest()[:16]
+            result["doc_id"] = doc_id
+        
+        try:
+            builder = get_auto_graph_builder()
+            graph_data = builder.build_full_graph(content, doc_id)
+            
+            result["entities"] = graph_data["entities"]
+            result["edges"] = graph_data["edges"]
+            result["entity_count"] = graph_data["stats"]["entity_count"]
+            result["edge_count"] = graph_data["stats"]["edge_count"]
+            
+            # 写入知识图谱存储
+            if result["entities"] or result["edges"]:
+                store_result = self.store_graph(
+                    entities=result["entities"],
+                    relations=result["edges"],
+                    doc_id=doc_id,
+                )
+                result["graph_stored"] = store_result.get("ok", False)
+            
+            result["ok"] = True
+            
+            logger.info(
+                "☷ [坤] auto_graph_from_doc: doc=%s → %d 实体, %d 边",
+                doc_id, result["entity_count"], result["edge_count"],
+            )
+        
+        except Exception as e:
+            logger.error(
+                "☷ [坤] auto_graph_from_doc 失败: %s", e, exc_info=True,
+            )
+            result["error"] = str(e)
+        
+        return result
+    
+    def get_auto_graph_stats(self) -> Dict[str, Any]:
+        """获取自动图谱构建器统计信息
+        
+        Returns:
+            AutoGraphBuilder stats + 坤卦内部知识图谱统计
+        """
+        builder = get_auto_graph_builder()
+        builder_stats = builder.get_stats()
+        
+        # 读取知识图谱存储统计
+        kg_stats = {"nodes_count": 0, "edges_count": 0, "graph_file": ""}
+        try:
+            from src.config import GRAPH_PATH
+            kg_stats["graph_file"] = str(GRAPH_PATH)
+            if os.path.exists(GRAPH_PATH):
+                with open(GRAPH_PATH, "r", encoding="utf-8") as f:
+                    kg_data = json.load(f)
+                    nodes = kg_data.get("nodes", kg_data.get("entities", {}))
+                    kg_stats["nodes_count"] = len(nodes)
+                    kg_stats["edges_count"] = len(kg_data.get("edges", []))
+        except Exception:
+            pass
+        
+        return {
+            "builder": builder_stats,
+            "storage": kg_stats,
+            "method": "auto_graph",
+            "llm_calls": 0,  # 零 LLM 保证
+        }
+    
+    def _add_graph_edge(self, edge: Dict[str, Any]) -> bool:
+        """添加单条图谱边（内部方法）
+        
+        将自动提取的边写入 ChromaDB kb_events collection。
+        
+        Args:
+            edge: 边数据 {source, target, type, confidence, doc_id, evidence}
+        
+        Returns:
+            是否成功
+        """
+        try:
+            import sqlite3
+            from src.config import DATA_DIR
+            
+            db_path = str(DATA_DIR / "chunks.db")
+            conn = sqlite3.connect(db_path, timeout=10)
+            conn.execute("PRAGMA journal_mode=WAL")
+            
+            edge_key = f'{edge.get("source","")}_{edge.get("target","")}_{edge.get("type","")}'
+            relation_id = f"auto_{hashlib.md5(edge_key.encode()).hexdigest()[:12]}"
+            
+            conn.execute("""
+                INSERT OR REPLACE INTO relations
+                (relation_id, source_type, source_id, target_type, target_id,
+                 relation_type, weight, created_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+            """, (
+                relation_id,
+                "entity",
+                edge.get("source", ""),
+                "entity",
+                edge.get("target", ""),
+                edge.get("type", "related_to"),
+                edge.get("confidence", 0.8),
+                time.strftime("%Y-%m-%d %H:%M"),
+            ))
+            conn.commit()
+            conn.close()
+            return True
+        
+        except Exception as e:
+            logger.warning("☷ [坤] _add_graph_edge 失败: %s", e)
+            return False
 
 
 # ============================================================================

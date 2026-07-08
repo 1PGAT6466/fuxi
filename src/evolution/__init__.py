@@ -60,6 +60,7 @@ from src.evolution.lifecycle import (
     get_lifecycle_candidates,
     classify_lifecycle_confidence,
 )
+from src.evolution.dream_cycle import DreamCycle
 
 __all__ = [
     # 核心
@@ -88,4 +89,6 @@ __all__ = [
     "check_lifecycle_triggers",
     "get_lifecycle_candidates",
     "classify_lifecycle_confidence",
+    # v1.50 Phase C: Dream Cycle
+    "DreamCycle",
 ]

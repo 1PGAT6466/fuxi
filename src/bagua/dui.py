@@ -26,6 +26,10 @@ from src.bagua.base_gua import (
     DegradationRule,
     FallbackAction,
 )
+from src.bagua.gap_analyzer import (
+    GapAnalyzer,
+    is_gap_analysis_enabled,
+)
 
 logger = logging.getLogger("bagua.dui")
 
@@ -490,6 +494,7 @@ class DuiGua(GuaBase):
         sources: Optional[List[str]] = None,
         confidence: float = 0.0,
         mode: str = "",
+        enable_gap_analysis: Optional[bool] = None,
     ) -> Dict[str, Any]:
         """格式化最终答案为对话友好的格式
 
@@ -499,6 +504,7 @@ class DuiGua(GuaBase):
           - 可折叠的引用来源
           - 置信度指示器
           - 格式元数据
+          - Gap Analysis 知识盲区标注（v1.50 Phase A）
 
         Args:
             query:      用户原始提问
@@ -506,6 +512,8 @@ class DuiGua(GuaBase):
             sources:    信息来源列表
             confidence: 答案置信度
             mode:       执行模式
+            enable_gap_analysis: 是否启用 Gap Analysis
+                                （None=使用全局 Feature Flag）
 
         Returns:
             {
@@ -516,9 +524,28 @@ class DuiGua(GuaBase):
                 "mode": str,              # 执行模式
                 "has_sources": bool,      # 是否有来源引用
                 "timestamp": float,       # 时间戳
+                "gap_analysis": {...},    # Gap Analysis 结果（v1.50）
             }
         """
         sources = sources or []
+
+        # ================================================================
+        # v1.50 Phase A: Gap Analysis — 知识盲区标注
+        # ================================================================
+        gap_result = None
+        _do_gap = enable_gap_analysis if enable_gap_analysis is not None else is_gap_analysis_enabled()
+
+        if _do_gap and answer and sources:
+            try:
+                gap_analyzer = GapAnalyzer()
+                gap_result = gap_analyzer.analyze(answer=answer, sources=sources)
+                # 如果存在 gaps，将 gap_text 追加到 answer
+                if gap_result.has_gaps and gap_result.gap_text:
+                    answer = answer.rstrip() + "\n\n" + gap_result.gap_text
+            except Exception:
+                logger.warning(
+                    "☱ [兑] Gap Analysis 执行失败，跳过", exc_info=True
+                )
 
         # 置信度标签
         if confidence >= 0.85:
@@ -561,6 +588,13 @@ class DuiGua(GuaBase):
             "mode": mode,
             "has_sources": len(sources) > 0,
             "timestamp": time.time(),
+            "gap_analysis": {
+                "enabled": _do_gap,
+                "has_gaps": gap_result.has_gaps if gap_result else False,
+                "gap_count": len(gap_result.gaps) if gap_result else 0,
+                "coverage_rate": gap_result.coverage_rate if gap_result else 1.0,
+                "gap_text": gap_result.gap_text if gap_result else "",
+            },
         }
 
     # ========================================================================
