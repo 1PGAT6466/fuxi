@@ -308,6 +308,7 @@ import { ref, computed, onMounted } from 'vue';
 import DOMPurify from 'dompurify';
 import TokenManager from '@/utils/TokenManager';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { logger } from '@/utils/logger';
 import {
   Upload,
   UploadFilled,
@@ -504,12 +505,17 @@ async function fetchDocuments(collectionId: string): Promise<void> {
 
 // ───── 集合切换 ─────
 async function toggleCollection(col: CollectionItem): Promise<void> {
-  if (activeCollection.value === col.id) {
-    activeCollection.value = null;
-    documents.value = [];
-  } else {
-    activeCollection.value = col.id;
-    await fetchDocuments(col.id);
+  try {
+    if (activeCollection.value === col.id) {
+      activeCollection.value = null;
+      documents.value = [];
+    } else {
+      activeCollection.value = col.id;
+      await fetchDocuments(col.id);
+    }
+  } catch (error) {
+    logger.error('切换知识集合失败', error);
+    ElMessage.error('操作失败，请稍后重试');
   }
 }
 

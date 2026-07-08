@@ -178,4 +178,4 @@ def should_update() -> bool:
 # ============ CLI ============
 if __name__ == "__main__":
     result = update_eval_set()
-    print(json.dumps(result, indent=2, ensure_ascii=False))
+    logger.info(json.dumps(result, indent=2, ensure_ascii=False))

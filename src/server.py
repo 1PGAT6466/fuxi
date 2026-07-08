@@ -15,7 +15,7 @@ if _env_file.exists():
             if line and not line.startswith("#") and "=" in line:
                 key, _, val = line.partition("=")
                 os.environ[key.strip()] = val.strip().strip('"').strip("'")
-    print("Loaded .env")
+    logger.info("Loaded .env")
 
 # 确保项目根目录在 sys.path 中
 _project_root = Path(__file__).parent.parent
@@ -42,14 +42,15 @@ logging.basicConfig(
 logger = logging.getLogger('伏羲·内世界')
 
 import uvicorn
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Depends, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
 
 from src.config import HOST, PORT, VERSION, CORS_ORIGINS, LOADER_URL
+from src.api.auth import require_admin
 
-# 静态资源目录指向 frontend/
-STATIC_DIR = _project_root / "frontend"
+# 静态资源目录指向 Vue3 构建产物
+STATIC_DIR = _project_root / "frontend" / "vue3-migration" / "dist"
 
 # ============ 创建 FastAPI 应用 ============
 from fastapi.staticfiles import StaticFiles
@@ -273,6 +274,28 @@ async def shutdown():
 # from src.services.error_handler import setup_error_handlers
 # setup_error_handlers(app)
 # ============ 中间件 ============
+
+# ── 安全响应头中间件 ──
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    """安全响应头中间件：为所有 HTTP 响应添加安全头。
+
+    仅在 HTTP 协议下生效，WebSocket 升级请求会跳过（因为不会返回普通 HTTP 响应）。
+    检测响应是否为 WebSocket（101 Switching Protocols），避免干扰。
+    """
+    response = await call_next(request)
+
+    # 跳过 WebSocket 升级响应（status_code 101 = Switching Protocols）
+    if response.status_code == 101:
+        return response
+
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["X-XSS-Protection"] = "1; mode=block"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    return response
+
 # ── API 认证中间件 ──
 from src.api.auth import AuthMiddleware, InputLimitMiddleware
 from src.api.auth_routes import router as auth_router
@@ -346,49 +369,35 @@ async def metrics_middleware(request: Request, call_next):
             logger.warning("Exception 失败: %s", e, exc_info=True)
         raise
 
-# ============ 注册路由 ============
+# ============ v2.1 服务路由自动发现 ============
+# 自动扫描 src/api/ 目录，发现并注册所有 APIRouter
+# 替代原先手写的 include_router 列表
+from src.api._auto_discovery import auto_discover_routers
+auto_discover_routers(app)
 
-# 搜索路由 — /api/search, /api/search-history, /api/images/*
-from src.api.search import router as search_router
-app.include_router(search_router)
-
-# AI 对话路由 — /api/chat, /api/chat/agent
-from src.api.chat import router as chat_router
-app.include_router(chat_router)
-
-# Auth routes — /api/auth/login, /api/auth/register
+# ============ Auth routes（保留手动注册，特殊中间件依赖）============
 app.include_router(auth_router)
 
-# 文档管理路由 — /api/documents/*, /api/raw-store, /api/ingest-batch, /api/reindex, /api/reset
-from src.api.documents import router as documents_router
+# ============ v2.1 新增路由（手动注册）============
+# /api/services — 服务聚合清单
+from src.api.services import router as services_router
+app.include_router(services_router)
 
-# v10.1: MinerU + Unstructured dual engine
-# from src.services.mineru import apply_patches
-# apply_patches()
-app.include_router(documents_router)
+# /api/unified-search — 跨服务统一搜索
+from src.api.unified_search import router as unified_search_router
+app.include_router(unified_search_router)
 
-# ── P0 修复：/api/files 路由别名，前端 Files.vue 调用 /api/files/* ──
-# 将所有 /api/documents 端点别名到 /api/files
-from src.api.files_alias import router as files_alias_router
-app.include_router(files_alias_router)
+# /api/notifications — 通知中心
+from src.api.notifications import router as notifications_router
+app.include_router(notifications_router)
 
-# 知识图谱路由 — /api/graph, /api/graph/path, /api/graph/build, /api/graph/nodes
-from src.api.graph import router as graph_router
-# 元数据中心路由 — /api/metadata/*
-from src.api.metadata import router as metadata_router
-app.include_router(metadata_router)
+# /api/user/preferences — 用户偏好 CRUD
+from src.api.user_preferences import router as user_preferences_router
+app.include_router(user_preferences_router)
 
-app.include_router(graph_router)
-
-# 反馈与用户路由 — /api/feedback, /api/behavior, /api/user/preferences
-from src.api.feedback import router as feedback_router
-app.include_router(feedback_router)
-
-# 评测仪表板路由 — /api/dashboard
-from src.api.dashboard import router as dashboard_router
-
-# LLM-Wiki + 反馈闭环路由 — /api/wiki/*, /api/feedback/*
-from src.api.wiki import router as wiki_router
+# Feature Flags WebSocket 推送
+from src.api.feature_flags_ws import router as ff_ws_router
+app.include_router(ff_ws_router)
 
 # ── Prometheus Metrics ──
 from fastapi.responses import Response
@@ -409,13 +418,6 @@ async def prometheus_metrics():
     except Exception as e:
         logger.warning("Prometheus指标更新失败: %s", e, exc_info=True)
     return Response(content=get_metrics_response(), media_type="text/plain")
-from src.api.worldtree import router as worldtree_router
-app.include_router(worldtree_router)
-# Admin router must be before wiki (wiki has /{wiki_id} catch-all)
-from src.api.admin import router as admin_router
-app.include_router(admin_router)
-app.include_router(wiki_router)
-app.include_router(dashboard_router)
 
 # ============ v11 评测 + 进化 API ============
 from src.api.evaluation import router as evaluation_router
@@ -504,9 +506,19 @@ async def growth_overview():
     return get_growth_overview()
 
 # ============ 系统路由（已迁移至 src/api/system_routes.py）============
-# /api/health, /api/system/stats, /api/cache/stats, /api/errors/stats
+# /api/health, /api/system/stats, /api/cache/stats, /api/errors/stats, /api/audit/logs, /api/audit/stats
 from src.api.system_routes import router as system_router
 app.include_router(system_router)
+
+# ============ v2.1 新增：通知中心 + 统一搜索 + 用户偏好 ============
+from src.api.notifications import router as notifications_router
+app.include_router(notifications_router)
+
+from src.api.unified_search import router as unified_search_router
+app.include_router(unified_search_router)
+
+from src.api.user_preferences import router as user_prefs_router
+app.include_router(user_prefs_router)
 
 # ============ Feature Flag API ============
 from src.services.feature_flags import load_flags, set_flag, DEFAULT_FLAGS
@@ -516,6 +528,16 @@ from src.services.feature_flags import load_flags, set_flag, DEFAULT_FLAGS
 async def list_feature_flags():
     """获取所有 Feature Flag 状态"""
     return {"flags": load_flags(), "defaults": DEFAULT_FLAGS}
+
+@app.get("/api/feature-flags/{name}")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+async def get_feature_flag(name: str):
+    """获取单个 Feature Flag 状态"""
+    flags = load_flags()
+    if name not in DEFAULT_FLAGS:
+        from fastapi import HTTPException
+        raise HTTPException(404, f"未知 flag: {name}")
+    return {"flag": name, "value": flags.get(name, False), "default": DEFAULT_FLAGS.get(name, False)}
 
 @app.put("/api/feature-flags/{name}")
 async def update_feature_flag(name: str, request: Request):
@@ -579,6 +601,13 @@ app.include_router(dxf_viewer_router)
 from src.api.files_view import router as files_view_router
 app.include_router(files_view_router)
 
+# ============ v1.44 Phase 1 Fix: RAG & KB 路由注册 ============
+from src.api.rag import router as rag_router
+app.include_router(rag_router)
+
+from src.api.kb import router as kb_router
+app.include_router(kb_router)
+
 # 管理面板路由 — /, /admin, /api/health, /api/stats, /api/admin/*
 # v1.41: 八卦体征端点
 from src.api.v2_routes import router as v2_router
@@ -594,7 +623,7 @@ async def metrics():
     from fastapi.responses import PlainTextResponse
     return PlainTextResponse(generate_metrics_text(), media_type="text/plain; charset=utf-8")
 
-@app.get("/api/admin/metrics-summary")
+@app.get("/api/admin/metrics-summary", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def admin_metrics_summary():
     """管理面板：可观测性指标摘要（延迟 P50/P95/P99 + 错误率）"""

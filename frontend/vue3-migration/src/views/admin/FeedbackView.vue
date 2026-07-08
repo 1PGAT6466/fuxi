@@ -1,6 +1,6 @@
 <template>
   <!--
-    伏羲 v2.1 — 用户反馈
+    伏羲 v1.44 — 用户反馈
     反馈列表 + 新增反馈对话框 + 状态管理
   -->
   <div class="feedback-view">
@@ -19,6 +19,13 @@
     <div v-if="loading" class="feedback-loading">
       <el-skeleton :rows="6" animated />
     </div>
+
+    <!-- 错误状态 — API 失败且 mock 为空时显示 -->
+    <ErrorState
+      v-else-if="error && feedbacks.length === 0"
+      message="无法加载反馈数据，请检查后端服务"
+      @retry="fetchFeedbacks"
+    />
 
     <!-- 空状态 -->
     <div v-else-if="feedbacks.length === 0" class="feedback-empty">
@@ -115,6 +122,7 @@ import { Plus, UserFilled, Delete } from '@element-plus/icons-vue';
 import type { FormInstance, FormRules } from 'element-plus';
 import apiClient from '@/api';
 import { formatDate } from '@/utils/helpers';
+import ErrorState from '@/components/common/ErrorState.vue';
 
 // ─── 类型 ───
 interface FeedbackItem {
@@ -133,6 +141,7 @@ interface FeedbackForm {
 
 // ─── 状态 ───
 const loading = ref(false);
+const error = ref(false);
 const feedbacks = ref<FeedbackItem[]>([]);
 const showAddDialog = ref(false);
 const submitting = ref(false);
@@ -212,12 +221,17 @@ function statusLabel(status: string): string {
 // ─── 数据加载 ───
 async function fetchFeedbacks(): Promise<void> {
   loading.value = true;
+  error.value = false;
   try {
     const data = (await apiClient.get('/api/feedback/weekly')) as Record<string, unknown>;
     feedbacks.value = (data.feedbacks || data.data || []) as FeedbackItem[];
   } catch {
     console.warn('[FeedbackView] API 不可用，使用 mock 数据');
     feedbacks.value = getMockFeedbacks();
+    // 如果 mock 也为空（不应发生），设置 error
+    if (feedbacks.value.length === 0) {
+      error.value = true;
+    }
   } finally {
     loading.value = false;
   }

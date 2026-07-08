@@ -1,6 +1,6 @@
 <template>
   <!--
-    伏羲 v2.1 — 登录页面（重构版）
+    伏羲 v1.44 — 登录页面（重构版）
     小米简约风 · 双角色Tab · 背景太极旋转动画 · 登录失败输入框抖动
     参考飞书登录风格，保留 auth store 逻辑不变
   -->
@@ -83,7 +83,7 @@
           </svg>
         </div>
         <h1 class="login-title">伏 羲</h1>
-        <p class="login-subtitle">FuXi v2.1 — 人工智能知识平台</p>
+        <p class="login-subtitle">FuXi v1.44 — 人工智能知识平台</p>
       </div>
 
       <!-- 双角色 Tab 切换（参考飞书登录风格） -->
@@ -188,7 +188,7 @@
 
     <!-- 底部版本信息 -->
     <div class="login-footer">
-      <span>伏羲 FuXi v2.1</span>
+      <span>伏羲 FuXi v1.44</span>
       <span class="login-footer-divider">·</span>
       <span>基于八卦体系 · 人工智能知识平台</span>
     </div>

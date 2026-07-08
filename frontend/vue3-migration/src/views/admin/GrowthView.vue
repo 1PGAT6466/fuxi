@@ -1,6 +1,6 @@
 <template>
   <!--
-    伏羲 v2.1 — 成长面板
+    伏羲 v1.44 — 成长面板
     四维指标卡片 + ECharts 趋势折线图 + 历史数据
   -->
   <div class="growth-view">
@@ -23,6 +23,13 @@
         </template>
       </el-skeleton>
     </div>
+
+    <!-- 错误状态 — API 失败且 mock 为空时显示 -->
+    <ErrorState
+      v-else-if="error && !hasData"
+      message="无法加载成长数据，请检查后端服务或稍后重试"
+      @retry="fetchGrowth"
+    />
 
     <!-- 空状态 -->
     <div v-else-if="!hasData" class="growth-empty">
@@ -91,6 +98,7 @@ import { LineChart } from 'echarts/charts';
 import { GridComponent, TooltipComponent, LegendComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 import apiClient from '@/api';
+import ErrorState from '@/components/common/ErrorState.vue';
 
 echarts.use([LineChart, GridComponent, TooltipComponent, LegendComponent, CanvasRenderer]);
 
@@ -112,6 +120,7 @@ interface GrowthData {
 
 // ─── State ───
 const loading = ref(true);
+const error = ref(false);
 const hasData = ref(false);
 const timeRange = ref<'day' | 'week' | 'month'>('week');
 const chartRef = ref<HTMLDivElement | null>(null);
@@ -186,11 +195,23 @@ function getMockGrowth(): GrowthData {
 
 // ─── Computed ───
 const metricsKeys = computed(() => metrics.value.map((m) => m.key));
+
+// F-03: 使用 CSS 变量替代硬编码颜色
+// 四维指标对应八卦/五行颜色：
+// extraction=震(青/绿), retrieval=巽(绿), decision=离(红/火), experience=兑(白/浅灰)
 const metricColors: Record<string, string> = {
-  extraction: '#FF6700',
-  retrieval: '#3A6B8C',
-  decision: '#C9A84C',
-  experience: '#4A7C59',
+  extraction: 'var(--zhen-color, #4CAF50)',
+  retrieval: 'var(--xun-color, #81C784)',
+  decision: 'var(--li-color, #E53935)',
+  experience: 'var(--kun-color, #C8A96E)',
+};
+
+// 仍保留硬编码 ast 值用于 ECharts option（ECharts 不支持 CSS 变量）
+const metricColorValues: Record<string, string> = {
+  extraction: '#4CAF50',
+  retrieval: '#81C784',
+  decision: '#E53935',
+  experience: '#C8A96E',
 };
 
 const metricNames: Record<string, string> = {
@@ -203,6 +224,7 @@ const metricNames: Record<string, string> = {
 // ─── API 请求 ───
 async function fetchGrowth(): Promise<void> {
   loading.value = true;
+  error.value = false;
   try {
     const data = (await apiClient.get('/api/growth/overview')) as GrowthData;
     if (data?.metrics && data.metrics.length > 0) {
@@ -215,6 +237,10 @@ async function fetchGrowth(): Promise<void> {
     }
   } catch {
     applyMock();
+    // 如果 mock 应用后仍无数据，标记 error
+    if (!hasData.value) {
+      error.value = true;
+    }
   } finally {
     loading.value = false;
     if (hasData.value) {
@@ -259,15 +285,14 @@ function renderChart(): void {
   const allTrends = trendsData.value[timeRange.value] || [];
   const series = metricsKeys.value.map((key, i) => {
     const trendRow = allTrends[i] || [];
-    // 第一个元素是数据点数，其余是值
     const values = trendRow.length > 1 ? trendRow.slice(1) : [];
     return {
       name: metricNames[key] || key,
       type: 'line' as const,
       data: values,
       smooth: true,
-      lineStyle: { color: metricColors[key], width: 2 },
-      itemStyle: { color: metricColors[key] },
+      lineStyle: { color: metricColorValues[key], width: 2 },
+      itemStyle: { color: metricColorValues[key] },
     };
   });
 
@@ -402,21 +427,23 @@ onUnmounted(() => {
   justify-content: center;
   flex-shrink: 0;
 
+  // F-03: 使用 CSS 变量替代硬编码
+  // extraction=震(青) retrieval=巽(绿) decision=离(红) experience=坤(土)
   &--extraction {
-    background: rgba(255, 103, 0, 0.1);
-    color: #FF6700;
+    background: var(--zhen-color-light, rgba(76, 175, 80, 0.1));
+    color: var(--zhen-color, #4CAF50);
   }
   &--retrieval {
-    background: rgba(58, 107, 140, 0.1);
-    color: #3A6B8C;
+    background: var(--xun-color-light, rgba(129, 199, 132, 0.1));
+    color: var(--xun-color, #81C784);
   }
   &--decision {
-    background: rgba(201, 168, 76, 0.1);
-    color: #C9A84C;
+    background: var(--li-color-light, rgba(229, 57, 53, 0.1));
+    color: var(--li-color, #E53935);
   }
   &--experience {
-    background: rgba(74, 124, 89, 0.1);
-    color: #4A7C59;
+    background: var(--kun-color-light, rgba(200, 169, 110, 0.1));
+    color: var(--kun-color, #C8A96E);
   }
 }
 

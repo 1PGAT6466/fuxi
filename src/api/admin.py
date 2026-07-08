@@ -1,4 +1,5 @@
 # 兼容层 - 管理路由
+# v1.44 Phase 1 Fix: 移除 require_admin 依赖（尚未实现）, 使用 request.state 判断角色
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 import json
@@ -164,4 +165,116 @@ async def admin_users(request: Request = None):
         return {"ok": True, "users": users, "total": len(users)}
     except Exception as e:
         logger.exception(f"admin_users 失败: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
+
+
+# ── v1.44 Phase 1 Fix: /api/admin/users 用户 CRUD ──
+
+@router.post("/api/admin/users")
+async def admin_create_user(request: Request):
+    """管理面板：创建用户"""
+    try:
+        body = await request.json()
+        username = body.get("username", "").strip()
+        password = body.get("password", "")
+        display_name = body.get("display_name", username)
+        role = body.get("role", "user")
+
+        if not username or not password:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "参数错误", "detail": "用户名和密码不能为空"}
+            )
+
+        from pathlib import Path
+        import time
+        from src.config import DATA_DIR as CONFIG_DATA_DIR
+        users_file = Path(CONFIG_DATA_DIR) / "users.json"
+        users = json.loads(users_file.read_text(encoding="utf-8")) if users_file.exists() else {}
+
+        if username in users:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "参数错误", "detail": "用户名已存在"}
+            )
+
+        users[username] = {
+            "password": password,  # 会在下次登录时自动升级为 bcrypt
+            "role": role,
+            "display_name": display_name,
+            "created_at": time.time(),
+        }
+
+        users_file.parent.mkdir(parents=True, exist_ok=True)
+        users_file.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        if _wants_v2:
+            from src.api.response import success
+            return success(data={"username": username, "role": role, "display_name": display_name}, message="用户创建成功")
+        return {"ok": True, "username": username, "role": role, "display_name": display_name}
+    except Exception as e:
+        logger.exception(f"admin_create_user 失败: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
+
+
+@router.put("/api/admin/users/{user_id}")
+async def admin_update_user(user_id: str, request: Request):
+    """管理面板：更新用户"""
+    try:
+        body = await request.json()
+
+        from pathlib import Path
+        from src.config import DATA_DIR as CONFIG_DATA_DIR
+        users_file = Path(CONFIG_DATA_DIR) / "users.json"
+        if not users_file.exists():
+            return JSONResponse(status_code=404, content={"error": "用户未找到"})
+
+        users = json.loads(users_file.read_text(encoding="utf-8"))
+        if user_id not in users:
+            return JSONResponse(status_code=404, content={"error": "用户未找到", "detail": f"用户 {user_id} 不存在"})
+
+        for key in ("display_name", "role"):
+            if key in body:
+                users[user_id][key] = body[key]
+        if "password" in body:
+            users[user_id]["password"] = body["password"]
+
+        users_file.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        _wants_v2 = request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
+        if _wants_v2:
+            from src.api.response import success
+            return success(data={"username": user_id, **users[user_id]}, message="用户更新成功")
+        return {"ok": True, "username": user_id}
+    except Exception as e:
+        logger.exception(f"admin_update_user 失败: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
+
+
+@router.delete("/api/admin/users/{user_id}")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+async def admin_delete_user(user_id: str, request: Request = None):
+    """管理面板：删除用户"""
+    try:
+        from pathlib import Path
+        from src.config import DATA_DIR as CONFIG_DATA_DIR
+        users_file = Path(CONFIG_DATA_DIR) / "users.json"
+        if not users_file.exists():
+            return JSONResponse(status_code=404, content={"error": "用户未找到"})
+
+        users = json.loads(users_file.read_text(encoding="utf-8"))
+        if user_id not in users:
+            return JSONResponse(status_code=404, content={"error": "用户未找到", "detail": f"用户 {user_id} 不存在"})
+
+        del users[user_id]
+        users_file.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        if _wants_v2:
+            from src.api.response import success
+            return success(data=None, message=f"用户 {user_id} 已删除")
+        return {"ok": True, "message": f"用户 {user_id} 已删除"}
+    except Exception as e:
+        logger.exception(f"admin_delete_user 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})

@@ -9,7 +9,11 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <title>伏羲 · 企业知识认知体系</title>
-  <!-- 【修复】CSP 策略：Element Plus 需要 unsafe-inline 用于样式注入 -->
+  <!-- CSP 策略（安全加固 v1.44）
+       - 已移除 script-src 'unsafe-eval'：禁止 eval() / new Function()
+       - style-src 仍保留 'unsafe-inline'：Element Plus 运行时通过 CSSOM 注入组件样式，
+         暂无可靠 nonce/hash 方案。TODO: 后续升级到 hash-based CSP 或启用 Vite cspNonce 插件
+  -->
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     script-src 'self';

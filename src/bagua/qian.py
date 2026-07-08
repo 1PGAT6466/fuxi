@@ -1023,7 +1023,7 @@ class QianGua(GuaBase):
             history=[],
             session_id="session-123",
         )
-        print(result["answer"])
+        logger.info(f"Qian answer generated, length={len(result.get('answer', ''))}")
 
         gua.stop()
 

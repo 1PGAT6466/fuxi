@@ -74,6 +74,9 @@ _SKIP_FILES: set = {
     "unified_search.py",
     "user_preferences.py",
     "feature_flags_ws.py",
+    # v1.44 Phase 1 Fix: 手动注册以避免路径冲突
+    "rag.py",
+    "kb.py",
 }
 
 # ── 已发现的 router 信息 ──

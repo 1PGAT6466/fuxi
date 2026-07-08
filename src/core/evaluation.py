@@ -139,4 +139,4 @@ def run_evaluation(search_fn, test_cases: list = None) -> dict:
         "details": results,
     }
 
-print("lib/evaluation.py 加载完成")
+logger.info("lib/evaluation.py 加载完成")

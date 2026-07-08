@@ -24,10 +24,12 @@
 
 <script setup lang="ts">
 import { ref, nextTick, watch } from 'vue';
+import { ElMessage } from 'element-plus';
 import { useChatStore } from '@/stores/chat';
 import { WarningFilled } from '@element-plus/icons-vue';
 import ChatMessage from '@/components/chat/ChatMessage.vue';
 import ChatInput from '@/components/chat/ChatInput.vue';
+import { logger } from '@/utils/logger';
 
 const chatStore = useChatStore();
 const messagesContainer = ref<HTMLElement | null>(null);
@@ -45,7 +47,12 @@ watch(
 );
 
 async function handleSend(query: string) {
-  await chatStore.sendMessage(query);
+  try {
+    await chatStore.sendMessage(query);
+  } catch (error) {
+    logger.error('发送消息失败', error);
+    ElMessage.error('发送消息失败，请稍后重试');
+  }
 }
 
 // 重试最后一条消息

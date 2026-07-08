@@ -1,4 +1,5 @@
 # v1.50 统一响应格式 — 认证路由
+# v1.44 Phase 1 Fix: 新增 refresh/logout 端点
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
@@ -134,3 +135,91 @@ def register(body: LoginRequest, request: Request = None):
     except Exception as e:
         logger.exception(f"register 失败: {e}")
         return server_error("注册服务异常", detail=str(e))
+
+
+# ============ v1.44 Phase 1 Fix: Token 刷新 & 登出 ============
+
+class RefreshRequest(BaseModel):
+    token: Optional[str] = None  # 可选，不传则从 Authorization header 获取
+
+
+@router.post("/refresh")
+async def auth_refresh(body: RefreshRequest = None, request: Request = None):
+    """JWT Token 刷新端点
+
+    从 Authorization header 或请求体获取当前 token，验证后签发新 token。
+    旧 token 在有效期内仍可使用，但建议客户端切换到新 token。
+    """
+    from src.api.response import success, error, unauthorized, server_error
+    try:
+        from src.api.auth import create_jwt_token, verify_jwt_token
+
+        # 获取 token：优先从 Authorization header，其次从请求体
+        token = None
+        if request:
+            auth = request.headers.get("Authorization", "")
+            if auth.startswith("Bearer "):
+                token = auth[7:]
+        if not token and body and body.token:
+            token = body.token
+
+        if not token:
+            return unauthorized("缺少认证 token", "请在 Authorization header 或请求体中提供 token")
+
+        # 验证旧 token
+        try:
+            payload = verify_jwt_token(token)
+        except HTTPException as e:
+            return JSONResponse(
+                status_code=e.status_code,
+                content={"detail": e.detail}
+            )
+
+        username = payload.get("sub", "unknown")
+        role = payload.get("role", "user")
+
+        # 签发新 token
+        new_token = create_jwt_token(username, role)
+
+        # v2 格式支持
+        _wants_v2 = request and (
+            request.query_params.get("format") == "v2"
+            or request.headers.get("X-API-Format", "").lower() == "v2"
+        )
+        if _wants_v2:
+            return success(data={"token": new_token, "username": username, "role": role}, message="Token 已刷新")
+        return {"token": new_token, "username": username, "role": role}
+
+    except Exception as e:
+        logger.exception(f"auth_refresh 失败: {e}")
+        return server_error("Token 刷新服务异常", detail=str(e))
+
+
+@router.post("/logout")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+async def auth_logout(request: Request = None):
+    """用户登出端点
+
+    当前为无状态 JWT，登出仅做标记（实际撤销需靠 token 过期自然失效）。
+    后续可集成 token 黑名单机制。
+    """
+    from src.api.response import success
+    try:
+        # 获取用户信息用于日志
+        username = getattr(request.state, "user", "anonymous") if request else "anonymous"
+        logger.info(f"用户 {username} 已登出")
+
+        _wants_v2 = request and (
+            request.query_params.get("format") == "v2"
+            or request.headers.get("X-API-Format", "").lower() == "v2"
+        )
+        if _wants_v2:
+            return success(data=None, message="已登出")
+        return {"ok": True, "message": "已登出"}
+
+    except Exception as e:
+        logger.exception(f"auth_logout 失败: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal server error", "detail": str(e)}
+        )

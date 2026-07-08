@@ -133,7 +133,7 @@ class GuaBase(ABC, GuaHandler):
         gua = QianGua()
         gua.start()
         result = gua.execute({"query": "test"})
-        print(gua.health_summary())
+        logger.info(gua.health_summary())
         gua.stop()
     """
 

@@ -57,7 +57,7 @@ class ServiceEventBus {
    * @param event - 事件名（命名空间格式：service:{id}:{event} 或 global:{event}）
    * @param payload - 事件载荷
    */
-  emit(event: string, ...payload: any[]): void {
+  emit(event: string, ...payload: unknown[]): void {
     // 1. 精确匹配的监听器
     const exactListeners = this.listeners.get(event);
     if (exactListeners) {
@@ -134,7 +134,7 @@ class ServiceEventBus {
    * @returns 取消监听的函数
    */
   once(event: string, handler: EventHandler): () => void {
-    const wrapper: EventHandler = (...args: any[]) => {
+    const wrapper: EventHandler = (...args: unknown[]) => {
       this.off(event, wrapper);
       handler(...args);
     };

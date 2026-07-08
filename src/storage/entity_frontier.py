@@ -429,9 +429,9 @@ class EntityFrontier:
 
 if __name__ == "__main__":
     ef = EntityFrontier()
-    print("backend:", ef.backend_name)
+    logger.info("backend: %s", ef.backend_name)
     entities = ef.expand_seed(["evt_001", "evt_002"])
-    print(f"expand_seed: {len(entities)} entities")
+    logger.info("expand_seed: %d entities", len(entities))
     events = ef.hop_entities(["ent_pa66", "ent_gear"], hop_limit=1)
-    print(f"hop_entities: {len(events)} events")
-    print("OK — EntityFrontier 就绪")
+    logger.info("hop_entities: %d events", len(events))
+    logger.info("OK — EntityFrontier 就绪")

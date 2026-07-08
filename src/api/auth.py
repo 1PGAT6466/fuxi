@@ -116,6 +116,23 @@ class AuthMiddleware(BaseHTTPMiddleware):
 
         return await call_next(request)
 
+# ============ 管理员角色校验依赖 ============
+
+def require_admin(request: Request):
+    """FastAPI 依赖函数：校验当前请求是否来自管理员。
+
+    用法：在路由中添加 Depends(require_admin)，例如：
+        @router.get("/api/admin/users", dependencies=[Depends(require_admin)])
+
+    AuthMiddleware 已将 JWT payload 中的 role 注入 request.state.role，
+    此函数仅做二次校验。如果 AuthMiddleware 未注入 role（白名单绕过），
+    默认拒绝（因 admin API 不应在白名单中）。
+    """
+    role = getattr(request.state, "role", None)
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="需要管理员权限")
+
+
 class InputLimitMiddleware(BaseHTTPMiddleware):
     async def dispatch(self, request: Request, call_next):
         return await call_next(request)

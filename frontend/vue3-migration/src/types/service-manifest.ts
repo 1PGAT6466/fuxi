@@ -112,7 +112,7 @@ export interface ServiceWindow {
   position: { x: number; y: number };
   minimizedPosition?: { x: number; y: number };
   openedAt: number;
-  data?: Record<string, any>;
+  data?: Record<string, unknown>;
 }
 
 // ============================
@@ -133,7 +133,7 @@ export interface WindowLayout {
 // ============================
 
 /** 事件处理器类型 */
-export type EventHandler = (...args: any[]) => void;
+export type EventHandler = (...args: unknown[]) => void;
 
 // ============================
 // 服务窗口协议
@@ -145,6 +145,6 @@ export interface ServiceWindowExposed {
   beforeClose: () => Promise<boolean> | boolean;
   onActivated: () => void;
   onDeactivated: () => void;
-  serialize: () => Record<string, any>;
-  deserialize: (data: Record<string, any>) => void;
+  serialize: () => Record<string, unknown>;
+  deserialize: (data: Record<string, unknown>) => void;
 }

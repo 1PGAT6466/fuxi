@@ -2,6 +2,9 @@ import type { AxiosError } from 'axios';
 import axios, { type AxiosResponse, type InternalAxiosRequestConfig } from 'axios';
 import { TOKEN_KEY } from '@/constants/storage-keys';
 import TokenManager from '@/utils/TokenManager';
+import { createLogger } from '@/utils/logger';
+
+const logger = createLogger('api');
 
 // ============================
 // 类型扩展：给请求附加 _retry 标记
@@ -59,7 +62,7 @@ apiClient.interceptors.response.use(
 
       if (newToken) {
         // 刷新成功：用新 token 重试原请求
-        console.log('[API] Token 刷新成功，重试原请求');
+        logger.info('[API] Token 刷新成功，重试原请求');
         if (config.headers) {
           config.headers.Authorization = `Bearer ${newToken}`;
         }

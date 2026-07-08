@@ -105,7 +105,7 @@ export const useWindowManager = defineStore('windowManager', () => {
    * @param context - 可选的上下文数据（路由参数、查询参数等）
    * @returns 打开的窗口实例
    */
-  function open(service: ServiceManifest, context?: Record<string, any>): ServiceWindow {
+  function open(service: ServiceManifest, context?: Record<string, unknown>): ServiceWindow {
     // singleton 检查（排除 closed 和 closing 状态的窗口）
     if (service.singleton) {
       const existing = windows.value.find(

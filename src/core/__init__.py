@@ -90,7 +90,7 @@ def safe_filename(name: str) -> str:
     return re.sub(r'[<>:"/\\|?*]', '_', name).strip()[:200]
 
 if __name__ == "__main__":
-    print(f"世界树工具库已加载")
-    print(f"  DeepSeek Key: {'已配置' if get_deepseek_key() else '未配置'}")
-    print(f"  ID示例: {make_id('wiki', '测试标题')}")
-    print(f"  JSON解析: {parse_json(chr(123)+chr(34)+chr(97)+chr(34)+chr(58)+chr(49)+chr(125))}")
+    logger.info("世界树工具库已加载")
+    logger.info(f"DeepSeek Key: {'已配置' if get_deepseek_key() else '未配置'}")
+    logger.info(f"ID示例: {make_id('wiki', '测试标题')}")
+    logger.info(f"JSON解析: {parse_json(chr(123)+chr(34)+chr(97)+chr(34)+chr(58)+chr(49)+chr(125))}")

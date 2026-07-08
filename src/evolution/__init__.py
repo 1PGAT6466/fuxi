@@ -23,10 +23,13 @@ Usage::
     result = gua.execute({"action": "feedback", "user_id": "u1", "query": "test"})
 
     # 查询健康
-    print(gua.health_summary())
+    logger.info(gua.health_summary())
 
     gua.stop()
 """
+
+import logging
+logger = logging.getLogger(__name__)
 
 from src.evolution.evolution_gua import EvolutionGua
 from src.evolution.feedback_loop import (

@@ -1,6 +1,6 @@
 <template>
   <!--
-    伏羲 v2.1 — 四象系统状态
+    伏羲 v1.44 — 四象系统状态
     四象卡片布局：少阳(消化)/太阳(探索)/少阴(判断)/太阴(守护)
     每个卡片内显示关联器官网格 + 健康状态指示 + 2×2 响应式布局
   -->
@@ -8,8 +8,25 @@
     <h2 class="page-title">四象系统状态</h2>
     <p class="page-desc">监测四象模块运行状态与关联能力映射</p>
 
+    <!-- 加载态 — 必须在内容之前渲染 -->
+    <div v-if="loading" class="symbols-loading">
+      <el-skeleton :rows="8" animated />
+    </div>
+
+    <!-- 错误状态 — API 失败且无 mock/mock 为空时显示 -->
+    <ErrorState
+      v-else-if="error && symbols.length === 0"
+      message="无法获取四象系统状态，请检查后端服务是否正常运行"
+      @retry="fetchSymbols"
+    />
+
+    <!-- 空状态 -->
+    <div v-else-if="symbols.length === 0 && !loading" class="symbols-empty">
+      <el-empty description="暂无四象数据" />
+    </div>
+
     <!-- 四象卡片：2×2 布局 -->
-    <div class="symbols-grid">
+    <div v-else class="symbols-grid">
       <div
         v-for="symbol in symbols"
         :key="symbol.id"
@@ -62,16 +79,6 @@
         </div>
       </div>
     </div>
-
-    <!-- 加载态 -->
-    <div v-if="loading" class="symbols-loading">
-      <el-skeleton :rows="8" animated />
-    </div>
-
-    <!-- 空状态 -->
-    <div v-else-if="symbols.length === 0 && !loading" class="symbols-empty">
-      <el-empty description="暂无四象数据" />
-    </div>
   </div>
 </template>
 
@@ -79,6 +86,7 @@
 import { ref, onMounted } from 'vue';
 import { Sunny, Moon, Sunrise, Sunset, Loading } from '@element-plus/icons-vue';
 import apiClient from '@/api';
+import ErrorState from '@/components/common/ErrorState.vue';
 
 // ─── 类型 ───
 interface OrganInfo {
@@ -102,6 +110,7 @@ interface SymbolData {
 
 // ─── 状态 ───
 const loading = ref(false);
+const error = ref(false);
 const symbols = ref<SymbolData[]>([]);
 
 // ─── Mock 数据 ───
@@ -209,12 +218,23 @@ function organStatusLabel(status: string): string {
 // ─── 数据加载 ───
 async function fetchSymbols(): Promise<void> {
   loading.value = true;
+  error.value = false;
   try {
     const data = (await apiClient.get('/api/symbols/status')) as Record<string, unknown>;
-    symbols.value = (data.symbols || data.data || []) as SymbolData[];
+    const result = (data.symbols || data.data || []) as SymbolData[];
+    if (result.length > 0) {
+      symbols.value = result;
+    } else {
+      // 后端返回空数据时也用 mock
+      symbols.value = getMockSymbols();
+    }
   } catch {
     console.warn('[SymbolsView] API 不可用，使用 mock 数据');
     symbols.value = getMockSymbols();
+    // 如果 mock 也为空（不应发生），才设置 error
+    if (symbols.value.length === 0) {
+      error.value = true;
+    }
   } finally {
     loading.value = false;
   }
@@ -267,17 +287,22 @@ onMounted(() => {
     box-shadow: var(--shadow-md);
   }
 
+  // F-03: 使用 CSS 变量替代硬编码颜色
+  // 少阳 — 对应八卦 "震" 色系（消化=震）
   &--shaoyang {
-    border-top-color: #FF6700; // 暖橙 — 少阳
+    border-top-color: var(--zhen-color, #4CAF50);
   }
+  // 太阳 — 对应八卦 "离" 色系（探索=离/火）
   &--taiyang {
-    border-top-color: #E74C3C; // 红 — 太阳
+    border-top-color: var(--li-color, #E53935);
   }
+  // 少阴 — 对应八卦 "坎" 色系（判断=坎/水）
   &--shaoyin {
-    border-top-color: #3A6B8C; // 蓝 — 少阴
+    border-top-color: var(--kan-color, #424242);
   }
+  // 太阴 — 对应八卦 "坤" 色系（守护=坤/土）
   &--taiyin {
-    border-top-color: #4A7C59; // 绿 — 太阴
+    border-top-color: var(--kun-color, #C8A96E);
   }
 }
 
@@ -299,20 +324,20 @@ onMounted(() => {
   flex-shrink: 0;
 
   .symbol-card--shaoyang & {
-    background: rgba(255, 103, 0, 0.1);
-    color: #FF6700;
+    background: var(--zhen-color-light, rgba(76, 175, 80, 0.1));
+    color: var(--zhen-color, #4CAF50);
   }
   .symbol-card--taiyang & {
-    background: rgba(231, 76, 60, 0.1);
-    color: #E74C3C;
+    background: var(--li-color-light, rgba(229, 57, 53, 0.1));
+    color: var(--li-color, #E53935);
   }
   .symbol-card--shaoyin & {
-    background: rgba(58, 107, 140, 0.1);
-    color: #3A6B8C;
+    background: var(--kan-color-light, rgba(66, 66, 66, 0.1));
+    color: var(--kan-color, #424242);
   }
   .symbol-card--taiyin & {
-    background: rgba(74, 124, 89, 0.1);
-    color: #4A7C59;
+    background: var(--kun-color-light, rgba(200, 169, 110, 0.1));
+    color: var(--kun-color, #C8A96E);
   }
 }
 
@@ -347,16 +372,16 @@ onMounted(() => {
   border-radius: 50%;
 
   &--healthy {
-    background: #34C759;
-    box-shadow: 0 0 6px rgba(52, 199, 89, 0.4);
+    background: var(--status-healthy, #34C759);
+    box-shadow: 0 0 6px var(--status-healthy-bg, rgba(52, 199, 89, 0.4));
   }
   &--warning {
-    background: #FF9500;
-    box-shadow: 0 0 6px rgba(255, 149, 0, 0.4);
+    background: var(--status-warning, #FF9500);
+    box-shadow: 0 0 6px var(--status-warning-bg, rgba(255, 149, 0, 0.4));
   }
   &--critical {
-    background: #FF3B30;
-    box-shadow: 0 0 6px rgba(255, 59, 48, 0.4);
+    background: var(--status-error, #FF3B30);
+    box-shadow: 0 0 6px var(--status-error-bg, rgba(255, 59, 48, 0.4));
   }
 }
 
@@ -381,13 +406,13 @@ onMounted(() => {
   border-left: 3px solid transparent;
 
   &--healthy {
-    border-left-color: #34C759;
+    border-left-color: var(--status-healthy, #34C759);
   }
   &--warning {
-    border-left-color: #FF9500;
+    border-left-color: var(--status-warning, #FF9500);
   }
   &--critical {
-    border-left-color: #FF3B30;
+    border-left-color: var(--status-error, #FF3B30);
   }
 }
 

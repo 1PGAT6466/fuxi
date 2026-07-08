@@ -196,6 +196,7 @@
 import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 import { Plus, CircleCheckFilled, CircleCloseFilled } from '@element-plus/icons-vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
+import { logger } from '@/utils/logger';
 // P0-3: 按需导入 echarts
 import * as echarts from 'echarts/core';
 import { BarChart } from 'echarts/charts';
@@ -439,7 +440,12 @@ function createRule(): void {
 }
 
 async function toggleRule(rule: EvolutionRule): Promise<void> {
-  ElMessage.success(`规则「${rule.name}」${rule.enabled ? '已启用' : '已禁用'}`);
+  try {
+    ElMessage.success(`规则「${rule.name}」${rule.enabled ? '已启用' : '已禁用'}`);
+  } catch (error) {
+    logger.error('切换规则状态失败', error);
+    ElMessage.error('操作失败，请稍后重试');
+  }
 }
 
 async function deleteRule(rule: EvolutionRule): Promise<void> {

@@ -8,6 +8,9 @@
  * - 与 ServiceLoader 集成，自动加载 manifest
  */
 
+import { createLogger } from '@/utils/logger';
+const logger = createLogger('ServiceRegistry');
+
 import type { ServiceManifest, ServiceCategory } from '@/types/service-manifest';
 import { serviceLoader } from './ServiceLoader';
 
@@ -36,7 +39,7 @@ class ServiceRegistry {
         this.services.set(manifest.id, manifest);
       }
       this.initialized = true;
-      console.log(`[ServiceRegistry] 注册完成: ${this.services.size} 个服务`);
+      logger.info(`[ServiceRegistry] 注册完成: ${this.services.size} 个服务`);
     });
 
     await this.initPromise;

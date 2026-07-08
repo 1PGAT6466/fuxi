@@ -116,4 +116,4 @@ def apply_patches():
         return original_extract_text(file_path, ext)
     ingest._extract_text = enhanced_extract_text
     
-    print("[伏羲·内世界] MinerU RAG DataReader + Unstructured dual engine activated (v10.2)")
+    logger.info("[伏羲·内世界] MinerU RAG DataReader + Unstructured dual engine activated (v10.2)")

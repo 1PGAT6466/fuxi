@@ -8,6 +8,9 @@
  */
 
 import { defineComponent } from 'vue';
+import { createLogger } from '@/utils/logger';
+
+const logger = createLogger('ServiceRouter');
 import type { RouteRecordRaw, Router } from 'vue-router';
 import type { ServiceManifest } from '@/types/service-manifest';
 
@@ -82,5 +85,5 @@ export function registerServiceRoutes(
     router.addRoute(parentPath, route);
   }
 
-  console.log(`[ServiceRouter] 注册了 ${manifests.length} 个服务路由`);
+  logger.info(`[ServiceRouter] 注册了 ${manifests.length} 个服务路由`);
 }

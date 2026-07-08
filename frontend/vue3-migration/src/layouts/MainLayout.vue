@@ -171,7 +171,8 @@
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue';
 import { useRoute, useRouter } from 'vue-router';
-import { ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { logger } from '@/utils/logger';
 import {
   Search,
   Bell,
@@ -386,7 +387,10 @@ async function handleLogout() {
     });
     authStore.logout();
     router.push('/login');
-  } catch {}
+  } catch (error) {
+    logger.error('退出登录失败', error);
+    ElMessage.error('退出登录失败，请稍后重试');
+  }
 }
 
 // ============================

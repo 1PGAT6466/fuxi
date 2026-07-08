@@ -26,7 +26,7 @@ export function getEvaluationDatasets() {
 }
 
 /** 创建评测 */
-export function createEvaluation(data: any) {
+export function createEvaluation(data: Record<string, unknown>) {
   return apiClient.post('/api/evaluation', data);
 }
 

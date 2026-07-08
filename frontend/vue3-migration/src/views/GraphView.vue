@@ -2,7 +2,7 @@
   <!--
     伏羲 v2.1 — 知识图谱（升级版）
     统计可视化 + 节点/边数据 + 实体类型分布饼图 + 关系类型柱状图 + 节点列表
-    「完整力导向图」留口标记"建设中"
+    「完整力导向图」留口标记"建设中的"
   -->
   <div class="graph-view">
     <div class="graph-header">
@@ -86,7 +86,7 @@
           <span class="section-title">节点列表</span>
           <el-button type="primary" disabled class="force-btn">
             <el-icon><Connection /></el-icon>
-            完整力导向图（建设中）
+            完整力导向图（建设中的）
           </el-button>
         </div>
         <el-table :data="nodes" stripe size="small">

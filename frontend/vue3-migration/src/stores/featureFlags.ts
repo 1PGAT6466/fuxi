@@ -120,7 +120,7 @@ export const useFeatureFlags = defineStore('featureFlags', () => {
   /** 从后端拉取 Feature Flag 列表 */
   async function loadBackendFlags(): Promise<void> {
     try {
-      const data: any = await fetchBackendFlags();
+      const data = await fetchBackendFlags();
       if (data.flags) {
         backendFlags.value = data.flags;
       }

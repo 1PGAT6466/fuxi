@@ -100,7 +100,8 @@
 
 <script setup lang="ts">
 import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue';
-import { ElMessageBox } from 'element-plus';
+import { ElMessage, ElMessageBox } from 'element-plus';
+import { logger } from '@/utils/logger';
 import { Plus, Delete, ArrowLeft, ArrowRight, WarningFilled } from '@element-plus/icons-vue';
 import { useChatStore } from '@/stores/chat';
 import ChatSessionList from '@/components/chat/ChatSessionList.vue';
@@ -119,7 +120,12 @@ const isNearBottom = ref(true);
 // ============================
 
 async function handleNewSession(): Promise<void> {
-  await chatStore.addSession();
+  try {
+    await chatStore.addSession();
+  } catch (error) {
+    logger.error('创建会话失败', error);
+    ElMessage.error('创建会话失败，请稍后重试');
+  }
 }
 
 async function handleDeleteSession(sessionId: string): Promise<void> {
@@ -140,11 +146,16 @@ async function handleDeleteSession(sessionId: string): Promise<void> {
 // ============================
 
 async function handleSend(query: string): Promise<void> {
-  // 如果没有活跃会话，先创建
-  if (!chatStore.activeSessionId) {
-    await chatStore.addSession(query.slice(0, 20));
+  try {
+    // 如果没有活跃会话，先创建
+    if (!chatStore.activeSessionId) {
+      await chatStore.addSession(query.slice(0, 20));
+    }
+    await chatStore.sendMessage(query);
+  } catch (error) {
+    logger.error('发送消息失败', error);
+    ElMessage.error('发送消息失败，请稍后重试');
   }
-  await chatStore.sendMessage(query);
 }
 
 // ============================

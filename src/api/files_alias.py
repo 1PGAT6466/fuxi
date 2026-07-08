@@ -103,3 +103,48 @@ async def files_download(file_id: str, request: Request):
     """文件下载 — 别名 /api/download/{file_hash}"""
     from src.api.files_view import download_document
     return await download_document(file_hash=file_id, request=request)
+
+
+# ── v1.44 Phase 1 Fix: PUT /api/files/{file_id} ── 更新文件元数据 ──
+@router.put("/api/files/{file_id}")
+async def files_update(file_id: str, request: Request):
+    """更新文件元数据"""
+    try:
+        body = await request.json()
+
+        from src.db.data_store import load_chunks, save_chunks
+        chunks = load_chunks()
+        if not chunks:
+            raise HTTPException(404, f"文件 {file_id} 未找到")
+
+        # 匹配文件
+        matching = [c for c in chunks if c.get("file_hash", "") == file_id]
+        if not matching:
+            matching = [c for c in chunks if file_id in c.get("file_name", "")]
+        if not matching:
+            raise HTTPException(404, f"文件 {file_id} 未找到")
+
+        # 更新匹配的 chunks 中允许的字段
+        updated_count = 0
+        for c in matching:
+            changed = False
+            for key in ("file_name", "category", "tags"):
+                if key in body:
+                    c[key] = body[key]
+                    changed = True
+            if changed:
+                updated_count += 1
+
+        if updated_count > 0:
+            save_chunks(chunks)
+
+        return {
+            "ok": True,
+            "message": f"文件 {file_id} 元数据已更新",
+            "chunks_updated": updated_count,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.exception(f"files_update 失败: {e}")
+        raise HTTPException(500, f"更新失败: {str(e)}")

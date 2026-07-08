@@ -246,7 +246,7 @@ def enhance_pdf_extraction(file_path: str, extract_images: bool = False, api_key
 
 
 # 初始化
-print("P2.6 多模态转录模块已加载")
-print("  A: enhance_table_extraction() — 表格→Markdown")
-print("  B: transcribe_image() — 图片→文字 (需 SiliconFlow API Key)")
-print("  C: enhance_pdf_extraction() — A+B 一体化")
+logger.info("P2.6 多模态转录模块已加载")
+logger.info("A: enhance_table_extraction() — 表格→Markdown")
+logger.info("B: transcribe_image() — 图片→文字 (需 SiliconFlow API Key)")
+logger.info("C: enhance_pdf_extraction() — A+B 一体化")

@@ -112,4 +112,4 @@ def log_search_to_db(query: str, result_count: int, latency_ms: float, mode: str
         logger.warning(f"[db] suppressed exception", exc_info=True)
         pass
 
-print("lib/db.py 加载完成")
+logger.info("lib/db.py 加载完成")

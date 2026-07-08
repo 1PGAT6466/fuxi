@@ -1,6 +1,6 @@
 <template>
   <!--
-    伏羲 v2.1 — 工作空间侧边栏（重构版）
+    伏羲 v1.44 — 工作空间侧边栏（重构版）
     小米简约风：5 组手风琴分组，按业务领域组织，emoji 图标
     支持折叠/展开、分组标题、活跃状态高亮、Feature Flags 控制
   -->
@@ -121,7 +121,7 @@
               >
                 <span class="menu-item-emoji">{{ item.emoji }}</span>
                 <span class="menu-item-label">{{ item.label }}</span>
-                <span v-if="item.disabled" class="menu-item-construction">施工中</span>
+                <span v-if="item.disabled" class="menu-item-construction">建设中的</span>
               </div>
             </div>
           </el-collapse-item>
@@ -183,7 +183,7 @@
                 <span
                   v-if="item.construction"
                   class="menu-item-construction"
-                >施工中</span>
+                >建设中的</span>
               </div>
             </div>
           </el-collapse-item>
