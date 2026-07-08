@@ -4,7 +4,7 @@ auto_rollback.py — 自动回滚机制
 """
 import time
 import logging
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 logger = logging.getLogger("infra.auto_rollback")
 

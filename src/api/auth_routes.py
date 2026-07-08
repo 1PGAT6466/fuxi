@@ -1,5 +1,6 @@
 # v1.50 统一响应格式 — 认证路由
 # v1.44 Phase 1 Fix: 新增 refresh/logout 端点
+from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
