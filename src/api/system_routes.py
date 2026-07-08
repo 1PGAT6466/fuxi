@@ -59,30 +59,41 @@ async def _get_bagua_health(request: Request) -> dict:
         }
     """
     bagua_result = {}
-    gua_names = ["qian", "kun", "zhen", "xun", "kan", "li", "gen", "dui"]
+    # 英文查找名 → IntentBus 中的注册名映射
+    # 乾卦 GUA_NAME="乾"（中文），其他卦 GUA_NAME 为英文
+    gua_name_map: dict[str, str] = {
+        "qian": "\u4e7e",  # 乾
+        "kun": "kun",
+        "zhen": "zhen",
+        "xun": "xun",
+        "kan": "kan",
+        "li": "li",
+        "gen": "gen",
+        "dui": "dui",
+    }
 
     # 尝试从 IntentBus 获取注册表
     intent_bus = getattr(request.app.state, "intent_bus", None)
 
-    for name in gua_names:
+    for api_name, registered_name in gua_name_map.items():
         try:
             if intent_bus is not None:
                 # 通过 IntentBus 检查是否注册
-                registered = name in intent_bus.get_registered_guas()
+                registered = registered_name in intent_bus.get_registered_guas()
                 if registered:
-                    bagua_result[name] = "healthy"
+                    bagua_result[api_name] = "healthy"
                 else:
-                    bagua_result[name] = "unregistered"
+                    bagua_result[api_name] = "unregistered"
             else:
                 # 无 IntentBus → 尝试直接 call health_check()
                 fuxi = getattr(request.app.state, "fuxi", None)
                 if fuxi is not None and hasattr(fuxi, "health_check"):
                     health = fuxi.health_check()
-                    bagua_result[name] = health.get("status", "unknown")
+                    bagua_result[api_name] = health.get("status", "unknown")
                 else:
-                    bagua_result[name] = "unknown"
+                    bagua_result[api_name] = "unknown"
         except Exception:
-            bagua_result[name] = "error"
+            bagua_result[api_name] = "error"
 
     return bagua_result
 
