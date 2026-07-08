@@ -169,7 +169,7 @@ def auto_discover_routers(app: FastAPI, api_dir: Optional[Path] = None) -> int:
     registered = 0
     for prefix, (router, var_name, source_file) in discovered.items():
         try:
-            app.include_router(router, prefix=prefix if prefix else "")
+            app.include_router(router, prefix="")  # all routes use absolute paths
             registered += 1
         except Exception as e:
             logger.error(

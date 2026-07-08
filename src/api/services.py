@@ -241,6 +241,7 @@ _SERVICES_MANIFEST: List[dict] = [
 
 
 @router.get("")
+@router.get("/")
 # FAKE-ASYNC: 同步函数标记 async 仅为接口统一
 async def list_services(request: Request):
     """获取所有已注册服务的清单"""
