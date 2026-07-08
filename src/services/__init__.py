@@ -37,7 +37,6 @@ from src.taiyang.multi_hop import multi_hop_search, SAGMultiHopSearch, seed_scor
 from src.taiyang.dynamic_alpha import get_dynamic_alpha
 from src.taiyang.synonym_loader import load_synonyms
 from src.taiyang.cache import get_cache, clear_cache, get_cache_stats
-from src.taiyang.degradation_chain import DegradationChain
 from src.taiyang.l5_crag import L5CRAGExecutor
 
 # 少阴（决策）
