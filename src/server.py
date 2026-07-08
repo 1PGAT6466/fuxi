@@ -5,6 +5,7 @@
 """
 import os, sys
 from pathlib import Path
+from typing import Any
 
 # 加载 .env 环境变量
 _env_file = Path(__file__).parent.parent / ".env"
