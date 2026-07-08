@@ -5,7 +5,7 @@ async function loadServices() {
   grid.innerHTML = '';
 
   try {
-    var list = await api('/api/services/');
+    var list = await api('/api/services');
     if (!Array.isArray(list)) list = [];
 
     var running = list.filter(function(s) { return s.status === 'running'; }).length;

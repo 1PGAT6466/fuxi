@@ -22,7 +22,7 @@ var __DEFAULT_RETRIES = 2;
 function getToken() {
   var v = __STORE.getItem(__TK);
   if (!v) return '';
-  if (!/^[A-Za-z0-9._~+\/=]+$/.test(v)) {
+  if (!/^[A-Za-z0-9._~+\/=-]+$/.test(v)) {
     __STORE.removeItem(__TK);
     return '';
   }

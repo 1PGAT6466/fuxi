@@ -67,7 +67,7 @@ function initApp() {
 (function init() {
   var tok = getToken();
   if (!tok) { showLogin(); return; }
-  if (!/^[A-Za-z0-9._~+\/=]+$/.test(tok)) {
+  if (!/^[A-Za-z0-9._~+\/=-]+$/.test(tok)) {
     clearAuth();
     showLogin();
     return;
