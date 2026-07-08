@@ -51,7 +51,7 @@ from src.config import HOST, PORT, VERSION, CORS_ORIGINS, LOADER_URL
 from src.api.auth import require_admin
 
 # 静态资源目录指向 Vue3 构建产物
-STATIC_DIR = _project_root / "frontend" / "vue3-migration" / "dist"
+STATIC_DIR = _project_root / "frontend"
 
 # ============ 创建 FastAPI 应用 ============
 from fastapi.staticfiles import StaticFiles
