@@ -1,0 +1,257 @@
+================================================================================
+伏羲 v2.1 前端全维度代码审查报告
+审查时间: 2026-07-07T01:29:45.522Z
+审查范围: src/ 下 111 个 .ts/.vue 文件
+================================================================================
+
+问题统计: P0=7 P1=52 P2=20 总计=79
+
+────────────────────────────────────────────────────────────────────────────────
+## P0级别问题 (7项)
+────────────────────────────────────────────────────────────────────────────────
+
+### 📄 src/api/chat.ts
+  行26: [函数重复定义] 函数 data 在同一文件中被定义了多次
+  → 修复: 删除重复定义或将它们合并
+
+### 📄 src/layouts/MainLayout.vue
+  行0: [侧边栏路由不存在] 侧边栏引用了未注册的路由 /workspace/ai-tools
+  → 修复: 在 router/index.ts 中注册该路由
+
+### 📄 src/services/_registry/ServiceLoader.ts
+  行209: [函数重复定义] 函数 data 在同一文件中被定义了多次
+  → 修复: 删除重复定义或将它们合并
+
+### 📄 src/services/dxf-viewer/DxfCanvas.vue
+  行384: [函数重复定义] 函数 worldX 在同一文件中被定义了多次
+  → 修复: 删除重复定义或将它们合并
+  行385: [函数重复定义] 函数 worldY 在同一文件中被定义了多次
+  → 修复: 删除重复定义或将它们合并
+
+### 📄 src/stores/windowManager.ts
+  行317: [函数重复定义] 函数 calculateNextPosition 在同一文件中被定义了多次
+  → 修复: 删除重复定义或将它们合并
+
+### 📄 src/views/KnowledgeView.vue
+  行407: [函数重复定义] 函数 res 在同一文件中被定义了多次
+  → 修复: 删除重复定义或将它们合并
+
+────────────────────────────────────────────────────────────────────────────────
+## P1级别问题 (52项)
+────────────────────────────────────────────────────────────────────────────────
+
+### 📄 src/components/admin/EvaluationPanel.vue
+  行82: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/components/admin/KnowledgePanel.vue
+  行89: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/components/admin/SystemStatus.vue
+  行154: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/components/admin/UserPanel.vue
+  行156: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/router/index.ts
+  行28: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行366: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行423: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行432: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行437: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行441: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/services/_registry/ServiceEventBus.ts
+  行68: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行80: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/services/_registry/ServiceLoader.ts
+  行52: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行58: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行64: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行70: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行76: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行82: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行95: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行192: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行214: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行218: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/services/_registry/ServiceRegistry.ts
+  行39: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行50: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/services/_registry/ServiceRouter.ts
+  行76: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行82: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/services/ai-tools/AiToolsPage.vue
+  行112: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/services/ai-tools/api.ts
+  行40: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/services/data-analytics/api.ts
+  行0: [manifest与API不对齐] manifest.json 声明的端点 GET /health 在 api.ts 中未找到对应的路径字符串
+  → 修复: 确保 manifest.json 的 endpoints 与 api.ts 中的实际请求路径一致
+  行39: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/services/data-analytics/DataAnalyticsPage.vue
+  行121: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行143: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/services/data-analytics/StorageDistribution.vue
+  行93: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/services/data-analytics/TrendChart.vue
+  行105: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/services/doc-tools/api.ts
+  行0: [manifest与API不对齐] manifest.json 声明的端点 GET /health 在 api.ts 中未找到对应的路径字符串
+  → 修复: 确保 manifest.json 的 endpoints 与 api.ts 中的实际请求路径一致
+  行38: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/services/dxf-viewer/api.ts
+  行0: [manifest与API不对齐] manifest.json 声明的端点 GET /view/{hash} 在 api.ts 中未找到对应的路径字符串
+  → 修复: 确保 manifest.json 的 endpoints 与 api.ts 中的实际请求路径一致
+  行39: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行71: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行86: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行101: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/services/dxf-viewer/store.ts
+  行85: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+  行106: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/stores/theme.ts
+  行171: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/views/admin/DashboardView.vue
+  行257: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/views/admin/FeatureFlagsView.vue
+  行162: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/views/admin/UserManagement.vue
+  行223: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/views/FilesView.vue
+  行238: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/views/KnowledgeView.vue
+  行398: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/views/RagTestView.vue
+  行349: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/views/Search.vue
+  行78: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+### 📄 src/views/Wiki.vue
+  行257: [console.log调试残留] 生产代码中残留调试日志
+  → 修复: 使用专用 logger 或移除
+
+────────────────────────────────────────────────────────────────────────────────
+## P2级别问题 (20项)
+────────────────────────────────────────────────────────────────────────────────
+
+### 📄 src/services/_registry/ServiceEventBus.ts
+  行26: [any类型使用] 使用了any类型，降低类型安全性
+  → 修复: 考虑用具体类型或 unknown + 类型守卫替代
+  行27: [any类型使用] 使用了any类型，降低类型安全性
+  → 修复: 考虑用具体类型或 unknown + 类型守卫替代
+  行60: [any类型使用] 使用了any类型，降低类型安全性
+  → 修复: 考虑用具体类型或 unknown + 类型守卫替代
+  行137: [any类型使用] 使用了any类型，降低类型安全性
+  → 修复: 考虑用具体类型或 unknown + 类型守卫替代
+
+### 📄 src/services/_registry/ServiceLoader.ts
+  行168: [any类型使用] 使用了any类型，降低类型安全性
+  → 修复: 考虑用具体类型或 unknown + 类型守卫替代
+  行169: [any类型使用] 使用了any类型，降低类型安全性
+  → 修复: 考虑用具体类型或 unknown + 类型守卫替代
+
+### 📄 src/stores/windowManager.ts
+  行108: [any类型使用] 使用了any类型，降低类型安全性
+  → 修复: 考虑用具体类型或 unknown + 类型守卫替代
+
+### 📄 src/types/service-manifest.ts
+  行115: [any类型使用] 使用了any类型，降低类型安全性
+  → 修复: 考虑用具体类型或 unknown + 类型守卫替代
+  行136: [any类型使用] 使用了any类型，降低类型安全性
+  → 修复: 考虑用具体类型或 unknown + 类型守卫替代
+  行148: [any类型使用] 使用了any类型，降低类型安全性
+  → 修复: 考虑用具体类型或 unknown + 类型守卫替代
+  行149: [any类型使用] 使用了any类型，降低类型安全性
+  → 修复: 考虑用具体类型或 unknown + 类型守卫替代
+
+### 📄 src/views/FilesView.vue
+  行234: [any类型使用] 使用了any类型，降低类型安全性
+  → 修复: 考虑用具体类型或 unknown + 类型守卫替代
+  行265: [any类型使用] 使用了any类型，降低类型安全性
+  → 修复: 考虑用具体类型或 unknown + 类型守卫替代
+
+### 📄 src/views/KnowledgeView.vue
+  行356: [any类型使用] 使用了any类型，降低类型安全性
+  → 修复: 考虑用具体类型或 unknown + 类型守卫替代
+  行362: [any类型使用] 使用了any类型，降低类型安全性
+  → 修复: 考虑用具体类型或 unknown + 类型守卫替代
+  行395: [any类型使用] 使用了any类型，降低类型安全性
+  → 修复: 考虑用具体类型或 unknown + 类型守卫替代
+  行407: [any类型使用] 使用了any类型，降低类型安全性
+  → 修复: 考虑用具体类型或 unknown + 类型守卫替代
+  行436: [any类型使用] 使用了any类型，降低类型安全性
+  → 修复: 考虑用具体类型或 unknown + 类型守卫替代
+  行463: [any类型使用] 使用了any类型，降低类型安全性
+  → 修复: 考虑用具体类型或 unknown + 类型守卫替代
+
+### 📄 src/views/RagTestView.vue
+  行344: [any类型使用] 使用了any类型，降低类型安全性
+  → 修复: 考虑用具体类型或 unknown + 类型守卫替代

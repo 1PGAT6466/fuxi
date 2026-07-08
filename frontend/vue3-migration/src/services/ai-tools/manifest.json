@@ -1,0 +1,31 @@
+{
+  "id": "ai-tools",
+  "name": "AI 工具集",
+  "icon": "Cpu",
+  "description": "智能工具集，提供文本摘要、翻译、关键词提取、实体识别、文本分类等 NLP 能力",
+  "version": "2.1.0",
+  "category": "workspace",
+  "guaAffinity": {
+    "primary": "qian",
+    "secondary": "li"
+  },
+  "route": "/workspace/ai-tools",
+  "apiBase": "/api/ai",
+  "endpoints": [
+    { "method": "GET",  "path": "/health",    "description": "健康检查" },
+    { "method": "POST", "path": "/summarize", "description": "文本摘要" },
+    { "method": "POST", "path": "/translate", "description": "多语言翻译" },
+    { "method": "POST", "path": "/keywords",  "description": "关键词提取" },
+    { "method": "POST", "path": "/entities",  "description": "实体识别" },
+    { "method": "POST", "path": "/classify",  "description": "文本分类" }
+  ],
+  "requiredRole": "user",
+  "featureFlag": "ai-tools-enabled",
+  "windowMode": "tab",
+  "defaultSize": {
+    "width": 900,
+    "height": 680
+  },
+  "singleton": true,
+  "tags": ["AI", "NLP", "摘要", "翻译", "关键词", "实体识别", "分类"]
+}

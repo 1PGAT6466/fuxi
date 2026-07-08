@@ -1,0 +1,202 @@
+// ============================================
+// 伏羲 v2.1 动效 Token 体系
+// 呼吸动画 · 脉冲光晕 · 太极旋转 · 宫位3D翻转
+// 方案参考：fuxi-v2.1-frontend-platform-final.md §8
+// ============================================
+
+// ════════════════════════════════════════════
+// 动效持续时间 Token
+// ════════════════════════════════════════════
+:root {
+  --fuxi-duration-fast: 150ms;
+  --fuxi-duration-normal: 300ms;
+  --fuxi-duration-slow: 500ms;
+  --fuxi-duration-breathe: 4s;
+  --fuxi-duration-pulse: 2s;
+  --fuxi-duration-taiji: 0.6s;
+
+  // 缓动函数
+  --fuxi-ease-default: cubic-bezier(0.4, 0, 0.2, 1);
+  --fuxi-ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
+  --fuxi-ease-smooth: ease-in-out;
+}
+
+// ════════════════════════════════════════════
+// 呼吸动画 — 用于八卦宫位卡片
+// ════════════════════════════════════════════
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.85;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+.animate-breathe {
+  animation: breathe var(--fuxi-duration-breathe, 4s) ease-in-out infinite;
+}
+
+// ════════════════════════════════════════════
+// 活跃脉冲光晕 — 用于活跃任务宫位
+// ════════════════════════════════════════════
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 8px rgba(255, 103, 0, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 24px rgba(255, 103, 0, 0.6);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulse-glow var(--fuxi-duration-pulse, 2s) ease-in-out infinite;
+}
+
+// ════════════════════════════════════════════
+// 太极旋转过渡
+// ════════════════════════════════════════════
+@keyframes taiji-rotate {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-taiji-rotate {
+  animation: taiji-rotate 8s linear infinite;
+}
+
+.animate-taiji-transition {
+  transition: transform var(--fuxi-duration-taiji, 0.6s) var(--fuxi-ease-default, cubic-bezier(0.4, 0, 0.2, 1));
+}
+
+// ════════════════════════════════════════════
+// 宫位切换 3D 旋转
+// ════════════════════════════════════════════
+@keyframes bagua-flip-in {
+  from {
+    transform: rotateY(180deg);
+    opacity: 0;
+  }
+  to {
+    transform: rotateY(0deg);
+    opacity: 1;
+  }
+}
+
+@keyframes bagua-flip-out {
+  from {
+    transform: rotateY(0deg);
+    opacity: 1;
+  }
+  to {
+    transform: rotateY(-180deg);
+    opacity: 0;
+  }
+}
+
+.animate-bagua-flip-in {
+  animation: bagua-flip-in 0.5s var(--fuxi-ease-default, cubic-bezier(0.4, 0, 0.2, 1)) forwards;
+}
+
+.animate-bagua-flip-out {
+  animation: bagua-flip-out 0.5s var(--fuxi-ease-default, cubic-bezier(0.4, 0, 0.2, 1)) forwards;
+}
+
+// ════════════════════════════════════════════
+// 通用过渡工具类
+// ════════════════════════════════════════════
+.animate-fade-in {
+  animation: fade-in 0.3s ease-in-out forwards;
+}
+
+.animate-fade-out {
+  animation: fade-out 0.3s ease-in-out forwards;
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes fade-out {
+  from { opacity: 1; }
+  to { opacity: 0; }
+}
+
+// ════════════════════════════════════════════
+// 滑动动效
+// ════════════════════════════════════════════
+@keyframes slide-up {
+  from {
+    transform: translateY(16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-down {
+  from {
+    transform: translateY(-16px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.animate-slide-up {
+  animation: slide-up 0.3s var(--fuxi-ease-default) forwards;
+}
+
+.animate-slide-down {
+  animation: slide-down 0.3s var(--fuxi-ease-default) forwards;
+}
+
+// ════════════════════════════════════════════
+// 缩放动效
+// ════════════════════════════════════════════
+@keyframes scale-in {
+  from {
+    transform: scale(0.9);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+.animate-scale-in {
+  animation: scale-in 0.25s var(--fuxi-ease-bounce) forwards;
+}
+
+// ════════════════════════════════════════════
+// 偏好减少动画的用户适配
+// ════════════════════════════════════════════
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+
+  .animate-breathe,
+  .animate-pulse-glow,
+  .animate-taiji-rotate,
+  .animate-bagua-flip-in,
+  .animate-bagua-flip-out {
+    animation: none !important;
+  }
+}

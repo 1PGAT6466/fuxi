@@ -1,0 +1,352 @@
+// ============================================
+// 伏羲 v2.1 视觉规范 Token 体系
+// 阴阳双主题 · 8px 网格 · 小米暖橙色系
+// 方案参考：fuxi-v2.1-frontend-platform-final.md §8
+// ============================================
+
+// ============================================
+// SCSS 变量（编译时引用）
+// ============================================
+
+// ═══ 品牌色 ═══
+$fuxi-primary: #FF6700;          // 小米暖橙 — 主点缀色
+$fuxi-primary-light: #FF8533;
+$fuxi-primary-dark: #E55A00;
+
+// ═══ 八宫主题色 ═══
+$bagua-qian: #F0C040; // 乾金
+$bagua-kun:  #C8A96E; // 坤土
+$bagua-zhen: #4CAF50; // 震青
+$bagua-xun:  #81C784; // 巽绿
+$bagua-kan:  #424242; // 坎黑
+$bagua-li:   #E53935; // 离红
+$bagua-gen:  #8D6E63; // 艮棕
+$bagua-dui:  #FAFAFA; // 兑白
+
+// ═══ 语义色 ═══
+$color-success: #52c41a;
+$color-warning: #faad14;
+$color-danger: #f5222d;
+$color-info: #1890ff;
+
+// ═══ 阳模式文本色 ═══
+$text-primary-light: #333333;
+$text-secondary-light: #666666;
+$text-disabled-light: #CCCCCC;
+
+// ═══ 阴模式文本色 ═══
+$text-primary-dark: #E0E0E0;
+$text-secondary-dark: #999999;
+$text-disabled-dark: #555555;
+
+// ═══ 底板色 ═══
+$bg-light: #FAFAF5;   // 阳模式 — 米白
+$bg-dark: #1A1A2E;    // 阴模式 — 暗蓝黑
+
+// ═══ 圆角规范 ═══
+$radius-card: 12px;     // 卡片组件
+$radius-input: 8px;     // 输入框/按钮
+$radius-tag: 4px;       // 图标底/标签
+
+// ═══ 阴影规范 ═══
+$shadow-card: 0 2px 16px rgba(255, 103, 0, 0.06);
+$shadow-popup: 0 4px 24px rgba(0, 0, 0, 0.12);
+
+// ═══ 间距网格（基础 4px） ═══
+$grid-base: 4px;
+$spacing-xs: 4px;    // 1x
+$spacing-sm: 8px;    // 2x — 组件内间距
+$spacing-md: 12px;   // 3x — 组件内间距
+$spacing-lg: 16px;   // 4x — 组件内间距
+$spacing-xl: 24px;   // 6x — 模块间距
+$spacing-2xl: 32px;  // 8x — 页面边距
+$spacing-3xl: 48px;  // 12x
+$spacing-4xl: 64px;  // 16x
+
+// ═══ 字体 ═══
+$font-family-primary: 'MiSans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+$font-family-number: 'Inter', 'JetBrains Mono', monospace;
+
+// 字体大小层级
+$font-size-xs: 12px;
+$font-size-sm: 14px;
+$font-size-base: 16px;
+$font-size-lg: 18px;
+$font-size-xl: 20px;
+$font-size-2xl: 24px;
+$font-size-3xl: 32px;
+
+// ═══ 布局 ═══
+$sidebar-width: 240px;
+$topbar-height: 56px;
+$tabbar-height: 42px;
+
+// ============================================
+// CSS 自定义属性 — 亮色主题（阳模式·默认）
+// ============================================
+:root,
+[data-theme='light'] {
+  // ═══ 底板 ═══
+  --fuxi-bg: #{$bg-light};
+  --fuxi-bg-secondary: #FFFFFF;
+  --fuxi-bg-tertiary: #F5F2ED;
+
+  // ═══ 品牌/点缀色 ═══
+  --fuxi-primary: #{$fuxi-primary};
+  --fuxi-primary-light: #{$fuxi-primary-light};
+  --fuxi-primary-dark: #{$fuxi-primary-dark};
+
+  // ═══ 八宫主题色 ═══
+  --bagua-qian: #{$bagua-qian};
+  --bagua-kun: #{$bagua-kun};
+  --bagua-zhen: #{$bagua-zhen};
+  --bagua-xun: #{$bagua-xun};
+  --bagua-kan: #{$bagua-kan};
+  --bagua-li: #{$bagua-li};
+  --bagua-gen: #{$bagua-gen};
+  --bagua-dui: #{$bagua-dui};
+
+  // ═══ 文本色 ═══
+  --fuxi-text-primary: #{$text-primary-light};
+  --fuxi-text-secondary: #{$text-secondary-light};
+  --fuxi-text-disabled: #{$text-disabled-light};
+  --fuxi-text-inverse: #FFFFFF;
+
+  // ═══ 语义色 ═══
+  --fuxi-success: #{$color-success};
+  --fuxi-warning: #{$color-warning};
+  --fuxi-danger: #{$color-danger};
+  --fuxi-info: #{$color-info};
+
+  // ═══ 边框 ═══
+  --fuxi-border: #E8E4D9;
+  --fuxi-border-light: #F0EDE5;
+
+  // ═══ 圆角 ═══
+  --fuxi-radius-card: #{$radius-card};
+  --fuxi-radius-input: #{$radius-input};
+  --fuxi-radius-tag: #{$radius-tag};
+
+  // ═══ 阴影 ═══
+  --fuxi-shadow-card: #{$shadow-card};
+  --fuxi-shadow-popup: #{$shadow-popup};
+
+  // ═══ 间距 ═══
+  --fuxi-spacing-xs: #{$spacing-xs};
+  --fuxi-spacing-sm: #{$spacing-sm};
+  --fuxi-spacing-md: #{$spacing-md};
+  --fuxi-spacing-lg: #{$spacing-lg};
+  --fuxi-spacing-xl: #{$spacing-xl};
+  --fuxi-spacing-2xl: #{$spacing-2xl};
+
+  // ═══ 字体 ═══
+  --fuxi-font-family: #{$font-family-primary};
+  --fuxi-font-number: #{$font-family-number};
+  --fuxi-font-xs: #{$font-size-xs};
+  --fuxi-font-sm: #{$font-size-sm};
+  --fuxi-font-base: #{$font-size-base};
+  --fuxi-font-lg: #{$font-size-lg};
+  --fuxi-font-xl: #{$font-size-xl};
+  --fuxi-font-2xl: #{$font-size-2xl};
+  --fuxi-font-3xl: #{$font-size-3xl};
+
+  // ═══ 滚动条 ═══
+  --fuxi-scrollbar-track: #F0EDE5;
+  --fuxi-scrollbar-thumb: #D4CFC4;
+  --fuxi-scrollbar-thumb-hover: #B8B2A5;
+
+  // ═══ 组件背景 ═══
+  --fuxi-component-bg: #FFFFFF;
+  --fuxi-component-hover: #F5F2ED;
+
+  // ═══ 状态色背景 ═══
+  --fuxi-bg-error: #FEF0F0;
+  --fuxi-bg-warning: #FEF8E8;
+  --fuxi-bg-success: #F0FDF4;
+  --fuxi-bg-info: #EFF6FF;
+
+  // ═══ 消息气泡 ═══
+  --fuxi-bubble-user: #FFF3E8;
+  --fuxi-bubble-assistant: #F5F2ED;
+
+  // ============================================
+  // Element Plus 变量覆盖（阳模式）
+  // ============================================
+  --el-color-primary: #{$fuxi-primary};
+  --el-color-primary-light-3: #{$fuxi-primary-light};
+  --el-color-primary-dark-2: #{$fuxi-primary-dark};
+
+  --el-bg-color: #FFFFFF;
+  --el-bg-color-page: #{$bg-light};
+  --el-bg-color-overlay: #FFFFFF;
+
+  --el-text-color-primary: #{$text-primary-light};
+  --el-text-color-regular: #{$text-secondary-light};
+  --el-text-color-secondary: #{$text-secondary-light};
+  --el-text-color-placeholder: #{$text-disabled-light};
+  --el-text-color-disabled: #{$text-disabled-light};
+
+  --el-border-color: #E8E4D9;
+  --el-border-color-light: #F0EDE5;
+  --el-border-color-lighter: #F5F2ED;
+  --el-border-color-extra-light: #FAFAF5;
+
+  --el-fill-color: #F5F2ED;
+  --el-fill-color-light: #FAFAF5;
+  --el-fill-color-blank: #FFFFFF;
+
+  --el-box-shadow: #{$shadow-card};
+  --el-box-shadow-light: 0 1px 8px rgba(0, 0, 0, 0.04);
+  --el-box-shadow-lighter: 0 1px 4px rgba(0, 0, 0, 0.02);
+  --el-box-shadow-dark: #{$shadow-popup};
+
+  --el-overlay-color: rgba(0, 0, 0, 0.4);
+  --el-overlay-color-light: rgba(0, 0, 0, 0.2);
+  --el-overlay-color-lighter: rgba(0, 0, 0, 0.1);
+
+  --el-disabled-bg-color: #F5F2ED;
+  --el-disabled-text-color: #{$text-disabled-light};
+  --el-disabled-border-color: #E8E4D9;
+
+  // Element Plus 圆角覆盖
+  --el-border-radius-base: #{$radius-input};
+  --el-border-radius-small: #{$radius-tag};
+  --el-border-radius-round: #{$radius-card};
+}
+
+// ============================================
+// CSS 自定义属性 — 暗色主题（阴模式）
+// ============================================
+[data-theme='dark'] {
+  // ═══ 底板 ═══
+  --fuxi-bg: #{$bg-dark};
+  --fuxi-bg-secondary: #222236;
+  --fuxi-bg-tertiary: #2A2A42;
+
+  // ═══ 品牌/点缀色（暗色下稍亮） ═══
+  --fuxi-primary: #FF8533;
+  --fuxi-primary-light: #FFA366;
+  --fuxi-primary-dark: #FF6700;
+
+  // ═══ 八宫主题色（暗色下微调亮度） ═══
+  --bagua-qian: #F2C94C;
+  --bagua-kun: #D4B87A;
+  --bagua-zhen: #66BB6A;
+  --bagua-xun: #A5D6A7;
+  --bagua-kan: #616161;
+  --bagua-li: #EF5350;
+  --bagua-gen: #A1887F;
+  --bagua-dui: #E8E8E8;
+
+  // ═══ 文本色 ═══
+  --fuxi-text-primary: #{$text-primary-dark};
+  --fuxi-text-secondary: #{$text-secondary-dark};
+  --fuxi-text-disabled: #{$text-disabled-dark};
+  --fuxi-text-inverse: #FFFFFF;
+
+  // ═══ 语义色 ═══
+  --fuxi-success: #66BB6A;
+  --fuxi-warning: #FFB74D;
+  --fuxi-danger: #EF5350;
+  --fuxi-info: #42A5F5;
+
+  // ═══ 边框 ═══
+  --fuxi-border: #333355;
+  --fuxi-border-light: #2A2A42;
+
+  // ═══ 圆角（同阳模式） ═══
+  --fuxi-radius-card: #{$radius-card};
+  --fuxi-radius-input: #{$radius-input};
+  --fuxi-radius-tag: #{$radius-tag};
+
+  // ═══ 阴影 ═══
+  --fuxi-shadow-card: 0 2px 16px rgba(0, 0, 0, 0.2);
+  --fuxi-shadow-popup: 0 4px 24px rgba(0, 0, 0, 0.3);
+
+  // ═══ 间距 ═══
+  --fuxi-spacing-xs: #{$spacing-xs};
+  --fuxi-spacing-sm: #{$spacing-sm};
+  --fuxi-spacing-md: #{$spacing-md};
+  --fuxi-spacing-lg: #{$spacing-lg};
+  --fuxi-spacing-xl: #{$spacing-xl};
+  --fuxi-spacing-2xl: #{$spacing-2xl};
+
+  // ═══ 字体 ═══
+  --fuxi-font-family: #{$font-family-primary};
+  --fuxi-font-number: #{$font-family-number};
+  --fuxi-font-xs: #{$font-size-xs};
+  --fuxi-font-sm: #{$font-size-sm};
+  --fuxi-font-base: #{$font-size-base};
+  --fuxi-font-lg: #{$font-size-lg};
+  --fuxi-font-xl: #{$font-size-xl};
+  --fuxi-font-2xl: #{$font-size-2xl};
+  --fuxi-font-3xl: #{$font-size-3xl};
+
+  // ═══ 滚动条 ═══
+  --fuxi-scrollbar-track: #1A1A2E;
+  --fuxi-scrollbar-thumb: #333355;
+  --fuxi-scrollbar-thumb-hover: #444466;
+
+  // ═══ 组件背景 ═══
+  --fuxi-component-bg: #222236;
+  --fuxi-component-hover: #2A2A42;
+
+  // ═══ 状态色背景 ═══
+  --fuxi-bg-error: rgba(239, 83, 80, 0.15);
+  --fuxi-bg-warning: rgba(255, 183, 77, 0.15);
+  --fuxi-bg-success: rgba(102, 187, 106, 0.15);
+  --fuxi-bg-info: rgba(66, 165, 245, 0.15);
+
+  // ═══ 消息气泡 ═══
+  --fuxi-bubble-user: rgba(255, 103, 0, 0.15);
+  --fuxi-bubble-assistant: #222236;
+
+  // ============================================
+  // Element Plus 变量覆盖（阴模式）
+  // ============================================
+  --el-color-primary: #FF8533;
+  --el-color-primary-light-3: #FF6700;
+  --el-color-primary-dark-2: #E55A00;
+
+  --el-color-white: #FFFFFF;
+  --el-color-black: #000000;
+
+  --el-bg-color: #222236;
+  --el-bg-color-page: #{$bg-dark};
+  --el-bg-color-overlay: #2A2A42;
+
+  --el-text-color-primary: #{$text-primary-dark};
+  --el-text-color-regular: #{$text-secondary-dark};
+  --el-text-color-secondary: #{$text-secondary-dark};
+  --el-text-color-placeholder: #{$text-disabled-dark};
+  --el-text-color-disabled: #{$text-disabled-dark};
+
+  --el-border-color: #333355;
+  --el-border-color-light: #2A2A42;
+  --el-border-color-lighter: #222236;
+  --el-border-color-extra-light: #1A1A2E;
+
+  --el-fill-color: #2A2A42;
+  --el-fill-color-light: #222236;
+  --el-fill-color-lighter: #1A1A2E;
+  --el-fill-color-extra-light: #1A1A2E;
+  --el-fill-color-blank: #222236;
+
+  --el-box-shadow: 0 2px 16px rgba(0, 0, 0, 0.2);
+  --el-box-shadow-light: 0 2px 4px rgba(0, 0, 0, 0.15);
+  --el-box-shadow-lighter: 0 1px 2px rgba(0, 0, 0, 0.1);
+  --el-box-shadow-dark: 0 4px 24px rgba(0, 0, 0, 0.3);
+
+  --el-overlay-color: rgba(0, 0, 0, 0.6);
+  --el-overlay-color-light: rgba(0, 0, 0, 0.4);
+  --el-overlay-color-lighter: rgba(0, 0, 0, 0.2);
+
+  --el-disabled-bg-color: #2A2A42;
+  --el-disabled-text-color: #{$text-disabled-dark};
+  --el-disabled-border-color: #333355;
+
+  // Element Plus 暗色圆角
+  --el-border-radius-base: #{$radius-input};
+  --el-border-radius-small: #{$radius-tag};
+  --el-border-radius-round: #{$radius-card};
+}

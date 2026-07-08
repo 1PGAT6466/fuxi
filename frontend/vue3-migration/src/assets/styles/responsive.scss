@@ -1,0 +1,116 @@
+// ========================================
+// 伏羲前端 - 响应式断点与 Mixins
+// ========================================
+
+// 断点
+$breakpoint-xs: 480px;
+$breakpoint-sm: 576px;
+$breakpoint-md: 768px;
+$breakpoint-lg: 992px;
+$breakpoint-xl: 1200px;
+$breakpoint-xxl: 1600px;
+
+// 响应式 Mixin（作为文档注释使用）
+// 实际使用中通过媒体查询直接使用上述变量
+
+// 全局响应式基础样式
+// 这些样式会被 main.scss 引入
+
+// 移动端适配
+@media (max-width: $breakpoint-md) {
+  .hide-on-mobile {
+    display: none !important;
+  }
+
+  .el-table {
+    font-size: 12px;
+
+    .el-table__cell {
+      padding: 8px 4px;
+    }
+  }
+
+  .el-dialog {
+    width: 95% !important;
+    margin: 0 auto;
+
+    .el-dialog__body {
+      padding: 16px;
+    }
+  }
+
+  .el-form-item__label {
+    font-size: 13px;
+  }
+
+  .el-card {
+    border-radius: 8px;
+
+    .el-card__body {
+      padding: 12px;
+    }
+  }
+
+  .el-pagination {
+    .btn-prev,
+    .btn-next,
+    .el-pager li {
+      min-width: 28px;
+      height: 28px;
+      line-height: 28px;
+      font-size: 12px;
+    }
+  }
+}
+
+// 平板端适配
+@media (min-width: $breakpoint-md) and (max-width: $breakpoint-lg) {
+  .hide-on-tablet {
+    display: none !important;
+  }
+}
+
+// 桌面端
+@media (min-width: $breakpoint-lg) {
+  .hide-on-desktop {
+    display: none !important;
+  }
+}
+
+// 打印样式
+@media print {
+  .app-sidebar,
+  .app-header,
+  .chat-input,
+  .sidebar,
+  .topbar,
+  .el-button,
+  .el-pagination {
+    display: none !important;
+  }
+
+  .main-layout {
+    display: block;
+    height: auto;
+  }
+
+  .content {
+    overflow: visible;
+  }
+}
+
+// 暗色模式支持（可选）
+@media (prefers-color-scheme: dark) {
+  // 暂不实施，预留扩展点
+}
+
+// 减少动画（用户偏好）
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

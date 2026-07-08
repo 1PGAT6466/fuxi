@@ -1,0 +1,129 @@
+/**
+ * 伏羲 v2.1 — 认证 API 封装
+ *
+ * 提供 login / refreshToken / logout 三个核心接口
+ */
+
+import { TOKEN_KEY } from '@/constants/storage-keys';
+import TokenManager from '@/utils/TokenManager';
+import type { LoginResponse, ApiResponse } from '@/types';
+
+// ============================================
+// 类型定义
+// ============================================
+
+export interface LoginParams {
+  username: string;
+  password: string;
+  role: 'admin' | 'user';
+}
+
+export interface LoginResult {
+  token: string;
+  user: {
+    id: number | string;
+    username: string;
+    display_name?: string;
+    role: 'admin' | 'user';
+    avatar?: string;
+    email?: string;
+  };
+}
+
+// ============================================
+// API 函数
+// ============================================
+
+/**
+ * 用户登录
+ * @param username 用户名
+ * @param password 密码
+ * @param role 角色选择
+ * @returns 登录结果（含 token 和用户信息）
+ */
+export async function login(
+  username: string,
+  password: string,
+  role: 'admin' | 'user',
+): Promise<LoginResult> {
+  const response = await fetch('/api/auth/login', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ username, password, role }),
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || errorData.detail || `登录失败 (${response.status})`);
+  }
+
+  const data: ApiResponse<LoginResponse> = await response.json();
+
+  if (data.code !== 0 && data.code !== 200) {
+    throw new Error(data.message || '登录失败');
+  }
+
+  // 验证 role
+  if (data.data.user.role !== role) {
+    throw new Error(
+      role === 'admin'
+        ? '该账号不是管理员账号，请切换到普通用户登录'
+        : '该账号是管理员账号，请切换到管理员登录',
+    );
+  }
+
+  return {
+    token: data.data.token,
+    user: data.data.user,
+  };
+}
+
+/**
+ * 刷新 token
+ * @returns 新的 token 字符串
+ */
+export async function refreshToken(): Promise<string> {
+  const currentToken = TokenManager.getToken();
+
+  const response = await fetch('/api/auth/refresh', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: currentToken ? `Bearer ${currentToken}` : '',
+    },
+  });
+
+  if (!response.ok) {
+    throw new Error('Token 刷新失败，请重新登录');
+  }
+
+  const data: ApiResponse<{ token: string }> = await response.json();
+
+  if (data.code !== 0 && data.code !== 200) {
+    throw new Error(data.message || 'Token 刷新失败');
+  }
+
+  return data.data.token;
+}
+
+/**
+ * 退出登录
+ */
+export async function logout(): Promise<void> {
+  const token = TokenManager.getToken();
+
+  try {
+    await fetch('/api/auth/logout', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: token ? `Bearer ${token}` : '',
+      },
+    });
+  } catch (err) {
+    console.error('[Auth API] 退出登录请求失败', err);
+    // 即使后端请求失败，仍执行本地清除
+  }
+}

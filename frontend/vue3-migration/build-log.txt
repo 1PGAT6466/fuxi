@@ -1,0 +1,99 @@
+﻿[36mvite v5.4.21 [32mbuilding for production...[36m[39m
+transforming...
+node.exe : node_modules/@vueuse/core/dist/index.js (3362:0): A comment
+所在位置 行:1 字符: 1
++ & "C:\Users\Feng Shaoxuan\AppData\Local\easyclaw\ai\tool_cache\resour ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (node_modules/@v...2:0): A comment:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+
+"/* #__PURE__ */"
+
+in "node_modules/@vueuse/core/dist/index.js" contains an annotation that Rollup cannot interpret due to the position of
+ the comment. The comment will be removed to avoid issues.
+node_modules/@vueuse/core/dist/index.js (5780:22): A comment
+
+"/* #__PURE__ */"
+
+in "node_modules/@vueuse/core/dist/index.js" contains an annotation that Rollup cannot interpret due to the position of
+ the comment. The comment will be removed to avoid issues.
+[32m✓[39m 2507 modules transformed.
+rendering chunks...
+computing gzip size...
+[2mdist/[22m[32mindex.html                                    [39m[1m[2m  1.00 kB[22m[1m[22m[2m │ gzip:   0.60 kB[22m
+[2mdist/[22m[35massets/GraphView-DL4ohtQE.css                 [39m[1m[2m  0.79 kB[22m[1m[22m[2m │ gzip:   0.35 kB[22m
+[2mdist/[22m[35massets/WorldTreeView-HlCA-BDN.css             [39m[1m[2m  0.82 kB[22m[1m[22m[2m │ gzip:   0.35 kB[22m
+[2mdist/[22m[35massets/FileUpload-C45OAu3I.css                [39m[1m[2m  2.01 kB[22m[1m[22m[2m │ gzip:   0.69 kB[22m
+[2mdist/[22m[35massets/Files-DMurxar1.css                     [39m[1m[2m  2.11 kB[22m[1m[22m[2m │ gzip:   0.73 kB[22m
+[2mdist/[22m[35massets/NotFound-D7EzuXqm.css                  [39m[1m[2m  2.56 kB[22m[1m[22m[2m │ gzip:   0.86 kB[22m
+[2mdist/[22m[35massets/UserManagement-BGXO3iUw.css            [39m[1m[2m  3.21 kB[22m[1m[22m[2m │ gzip:   1.06 kB[22m
+[2mdist/[22m[35massets/FeatureFlagsView-RpKky2GG.css          [39m[1m[2m  3.23 kB[22m[1m[22m[2m │ gzip:   1.05 kB[22m
+[2mdist/[22m[35massets/FilesView-BQpbqeQh.css                 [39m[1m[2m  3.57 kB[22m[1m[22m[2m │ gzip:   1.14 kB[22m
+[2mdist/[22m[35massets/Search-cdQ4vtvd.css                    [39m[1m[2m  4.92 kB[22m[1m[22m[2m │ gzip:   1.07 kB[22m
+[2mdist/[22m[35massets/Wiki-BsQKATVQ.css                      [39m[1m[2m  5.05 kB[22m[1m[22m[2m │ gzip:   1.42 kB[22m
+[2mdist/[22m[35massets/Login-orfZICq7.css                     [39m[1m[2m  5.65 kB[22m[1m[22m[2m │ gzip:   1.52 kB[22m
+[2mdist/[22m[35massets/EvolutionView-DVEClA7y.css             [39m[1m[2m  5.76 kB[22m[1m[22m[2m │ gzip:   1.48 kB[22m
+[2mdist/[22m[35massets/EvaluationView-BH6gsYfu.css            [39m[1m[2m  5.96 kB[22m[1m[22m[2m │ gzip:   1.48 kB[22m
+[2mdist/[22m[35massets/DashboardView-D0WJTcGL.css             [39m[1m[2m  6.41 kB[22m[1m[22m[2m │ gzip:   1.66 kB[22m
+[2mdist/[22m[35massets/RagTestView-CoDxen78.css               [39m[1m[2m  7.06 kB[22m[1m[22m[2m │ gzip:   1.79 kB[22m
+[2mdist/[22m[35massets/KnowledgeView-CJ4gxc4u.css             [39m[1m[2m  8.03 kB[22m[1m[22m[2m │ gzip:   1.91 kB[22m
+[2mdist/[22m[35massets/Admin-Bp2J3idA.css                     [39m[1m[2m 13.35 kB[22m[1m[22m[2m │ gzip:   1.67 kB[22m
+[2mdist/[22m[35massets/HomeView-D1u_fdGk.css                  [39m[1m[2m 13.95 kB[22m[1m[22m[2m │ gzip:   2.64 kB[22m
+[2mdist/[22m[35massets/DocumentsView-DsdzVuzZ.css             [39m[1m[2m 15.62 kB[22m[1m[22m[2m │ gzip:   2.34 kB[22m
+[2mdist/[22m[35massets/DataAnalyticsPage-Bb4KndY6.css         [39m[1m[2m 20.75 kB[22m[1m[22m[2m │ gzip:   2.46 kB[22m
+[2mdist/[22m[35massets/ChatView-CZW7_Ogd.css                  [39m[1m[2m 21.79 kB[22m[1m[22m[2m │ gzip:   3.34 kB[22m
+[2mdist/[22m[35massets/AiToolsPage-Rz2R1B0j.css               [39m[1m[2m 22.85 kB[22m[1m[22m[2m │ gzip:   2.68 kB[22m
+[2mdist/[22m[35massets/MainLayout-Btwh00LY.css                [39m[1m[2m 22.87 kB[22m[1m[22m[2m │ gzip:   3.42 kB[22m
+[2mdist/[22m[35massets/DxfViewerPage-DsgOyWZW.css             [39m[1m[2m 28.33 kB[22m[1m[22m[2m │ gzip:   3.33 kB[22m
+[2mdist/[22m[35massets/DocToolsPage-iYTG-FlG.css              [39m[1m[2m 32.79 kB[22m[1m[22m[2m │ gzip:   3.47 kB[22m
+[2mdist/[22m[35massets/main-12xTCeEQ.css                      [39m[1m[2m369.76 kB[22m[1m[22m[2m │ gzip:  51.17 kB[22m
+[2mdist/[22m[36massets/_plugin-vue_export-helper-DlAUqK2U.js  [39m[1m[2m  0.09 kB[22m[1m[22m[2m │ gzip:   0.10 kB[22m
+[2mdist/[22m[36massets/markdown-CN9YJkx0.js                   [39m[1m[2m  0.43 kB[22m[1m[22m[2m │ gzip:   0.31 kB[22m
+[2mdist/[22m[36massets/helpers--wsVN0iD.js                    [39m[1m[2m  0.65 kB[22m[1m[22m[2m │ gzip:   0.37 kB[22m
+[2mdist/[22m[36massets/manifest-BR3xPi-I.js                   [39m[1m[2m  0.97 kB[22m[1m[22m[2m │ gzip:   0.66 kB[22m
+[2mdist/[22m[36massets/NotFound-Bs7flgDf.js                   [39m[1m[2m  0.99 kB[22m[1m[22m[2m │ gzip:   0.53 kB[22m
+[2mdist/[22m[36massets/manifest-BjjxEaF3.js                   [39m[1m[2m  1.02 kB[22m[1m[22m[2m │ gzip:   0.67 kB[22m
+[2mdist/[22m[36massets/manifest-BUJorvMP.js                   [39m[1m[2m  1.07 kB[22m[1m[22m[2m │ gzip:   0.67 kB[22m
+[2mdist/[22m[36massets/manifest-DmOukocC.js                   [39m[1m[2m  1.09 kB[22m[1m[22m[2m │ gzip:   0.70 kB[22m
+[2mdist/[22m[36massets/index-BdJgySDZ.js                      [39m[1m[2m  1.33 kB[22m[1m[22m[2m │ gzip:   0.81 kB[22m
+[2mdist/[22m[36massets/WorldTreeView-IQ8NPbfp.js              [39m[1m[2m  1.63 kB[22m[1m[22m[2m │ gzip:   0.79 kB[22m
+[2mdist/[22m[36massets/GraphView-DGOO8pBd.js                  [39m[1m[2m  1.64 kB[22m[1m[22m[2m │ gzip:   0.82 kB[22m
+[2mdist/[22m[36massets/FileUpload-CFtt4VVv.js                 [39m[1m[2m  1.91 kB[22m[1m[22m[2m │ gzip:   1.12 kB[22m
+[2mdist/[22m[36massets/files-CvElARYg.js                      [39m[1m[2m  2.65 kB[22m[1m[22m[2m │ gzip:   1.35 kB[22m
+[2mdist/[22m[36massets/theme-BsbrrPmk.js                      [39m[1m[2m  2.69 kB[22m[1m[22m[2m │ gzip:   1.10 kB[22m
+[2mdist/[22m[36massets/Files-DYNvZwhD.js                      [39m[1m[2m  2.81 kB[22m[1m[22m[2m │ gzip:   1.39 kB[22m
+[2mdist/[22m[36massets/Search-C2NlGp-_.js                     [39m[1m[2m  3.03 kB[22m[1m[22m[2m │ gzip:   1.49 kB[22m
+[2mdist/[22m[36massets/windowManager-CIvS24ei.js              [39m[1m[2m  3.55 kB[22m[1m[22m[2m │ gzip:   1.47 kB[22m
+[2mdist/[22m[36massets/Login-CFjn-hy2.js                      [39m[1m[2m  6.05 kB[22m[1m[22m[2m │ gzip:   2.82 kB[22m
+[2mdist/[22m[36massets/FeatureFlagsView-BC-cyiX4.js           [39m[1m[2m  6.84 kB[22m[1m[22m[2m │ gzip:   3.18 kB[22m
+[2mdist/[22m[36massets/FilesView-24IrVc3j.js                  [39m[1m[2m  7.32 kB[22m[1m[22m[2m │ gzip:   3.41 kB[22m
+[2mdist/[22m[36massets/DashboardView-BbwjlJWo.js              [39m[1m[2m  7.96 kB[22m[1m[22m[2m │ gzip:   3.44 kB[22m
+[2mdist/[22m[36massets/UserManagement-CKixOnM-.js             [39m[1m[2m  8.08 kB[22m[1m[22m[2m │ gzip:   3.38 kB[22m
+[2mdist/[22m[36massets/Wiki-D2VOppOm.js                       [39m[1m[2m  8.34 kB[22m[1m[22m[2m │ gzip:   3.40 kB[22m
+[2mdist/[22m[36massets/RagTestView-C8sod67f.js                [39m[1m[2m  9.05 kB[22m[1m[22m[2m │ gzip:   5.22 kB[22m
+[2mdist/[22m[36massets/EvolutionView-BpzqbXod.js              [39m[1m[2m 10.43 kB[22m[1m[22m[2m │ gzip:   4.65 kB[22m
+[2mdist/[22m[36massets/EvaluationView-7itf_i7t.js             [39m[1m[2m 12.34 kB[22m[1m[22m[2m │ gzip:   4.57 kB[22m
+[2mdist/[22m[36massets/KnowledgeView-D49BnhTl.js              [39m[1m[2m 13.16 kB[22m[1m[22m[2m │ gzip:   5.88 kB[22m
+[2mdist/[22m[36massets/ChatView-BSvQ_Ii6.js                   [39m[1m[2m 13.85 kB[22m[1m[22m[2m │ gzip:   5.94 kB[22m
+[2mdist/[22m[36massets/DocumentsView-CBh86zyu.js              [39m[1m[2m 14.25 kB[22m[1m[22m[2m │ gzip:   5.57 kB[22m
+[2mdist/[22m[36massets/Admin-BtUF5a4c.js                      [39m[1m[2m 17.17 kB[22m[1m[22m[2m │ gzip:   5.41 kB[22m
+[2mdist/[22m[36massets/HomeView-wPjO6RHt.js                   [39m[1m[2m 18.33 kB[22m[1m[22m[2m │ gzip:   6.90 kB[22m
+[2mdist/[22m[36massets/MainLayout-B8CwUPLD.js                 [39m[1m[2m 22.59 kB[22m[1m[22m[2m │ gzip:   7.95 kB[22m
+[2mdist/[22m[36massets/AiToolsPage-BYLt2qRd.js                [39m[1m[2m 23.25 kB[22m[1m[22m[2m │ gzip:   8.56 kB[22m
+[2mdist/[22m[36massets/DataAnalyticsPage-CTT0zMAu.js          [39m[1m[2m 24.26 kB[22m[1m[22m[2m │ gzip:   8.91 kB[22m
+[2mdist/[22m[36massets/DocToolsPage-r0ad1tES.js               [39m[1m[2m 33.30 kB[22m[1m[22m[2m │ gzip:  10.90 kB[22m
+[2mdist/[22m[36massets/DxfViewerPage-CgJ3YG6t.js              [39m[1m[2m 36.81 kB[22m[1m[22m[2m │ gzip:  11.77 kB[22m
+[2mdist/[22m[36massets/main-CiHnbyNh.js                       [39m[1m[2m 86.18 kB[22m[1m[22m[2m │ gzip:  31.20 kB[22m
+[2mdist/[22m[36massets/vue-vendor-IGXLzr0e.js                 [39m[1m[2m111.66 kB[22m[1m[22m[2m │ gzip:  43.88 kB[22m
+[2mdist/[22m[36massets/utils-BsjymMJ0.js                      [39m[1m[2m140.16 kB[22m[1m[22m[2m │ gzip:  49.46 kB[22m
+[2mdist/[22m[36massets/index-D3O55NA2.js                      [39m[1m[33m559.67 kB[39m[22m[2m │ gzip: 186.02 kB[22m
+[2mdist/[22m[36massets/installCanvasRenderer-DLmaPV1u.js      [39m[1m[33m574.77 kB[39m[22m[2m │ gzip: 198.08 kB[22m
+[2mdist/[22m[36massets/element-plus-CQvuEIM7.js               [39m[1m[33m930.46 kB[39m[22m[2m │ gzip: 298.45 kB[22m
+[33m
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-m
+anualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.[39m
+[32m✓ built in 31.89s[39m

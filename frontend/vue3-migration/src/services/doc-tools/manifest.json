@@ -1,0 +1,29 @@
+{
+  "id": "doc-tools",
+  "name": "文档工具",
+  "icon": "Document",
+  "description": "一站式文档处理工具，支持格式转换、PDF合并拆分、文件压缩、图片处理和文本提取",
+  "version": "2.1.0",
+  "category": "workspace",
+  "guaAffinity": {
+    "primary": "xun",
+    "secondary": "kun"
+  },
+  "route": "/workspace/doc-tools",
+  "apiBase": "/api/tools",
+  "endpoints": [
+    { "method": "GET",  "path": "/health",          "description": "健康检查" },
+    { "method": "POST", "path": "/convert",          "description": "文档格式转换" },
+    { "method": "POST", "path": "/merge",            "description": "PDF 合并" },
+    { "method": "POST", "path": "/split",            "description": "PDF 拆分" },
+    { "method": "POST", "path": "/compress",         "description": "文件压缩（含图片压缩）" },
+    { "method": "POST", "path": "/image-info",       "description": "图片元信息查询" },
+    { "method": "POST", "path": "/text-extract",     "description": "文本提取" }
+  ],
+  "requiredRole": "user",
+  "featureFlag": "doc-tools-enabled",
+  "windowMode": "drawer",
+  "defaultSize": { "width": 480, "height": 960 },
+  "singleton": false,
+  "tags": ["文档", "转换", "PDF", "压缩", "提取"]
+}

@@ -1,0 +1,973 @@
+﻿
+[1m[30m[46m RUN [49m[39m[22m [36mv4.1.9 [39m[90mE:/easyclaw/伏羲-v1.44/repo/frontend/vue3-migration[39m
+
+ [31m×[39m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m创建实例[2m > [22m应使用正确的配置创建 axios 实例[32m 27[2mms[22m[39m
+[31m   → Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+ [31m×[39m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m请求拦截器[2m > [22m存在 token 时应添加 Authorization 头[32m 12[2mms[22m[39m
+[31m   → Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+ [31m×[39m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m请求拦截器[2m > [22m无 token 时不应添加 Authorization 头[32m 31[2mms[22m[39m
+[31m   → Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+ [31m×[39m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m请求拦截器[2m > [22m应返回原始 config 对象[32m 47[2mms[22m[39m
+[31m   → Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+ [31m×[39m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m请求拦截器[2m > [22m请求拦截器错误应 reject[32m 5[2mms[22m[39m
+[31m   → Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+ [31m×[39m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m响应拦截器 - 成功[2m > [22m成功响应应返回 response.data[32m 4[2mms[22m[39m
+[31m   → Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+ [31m×[39m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m响应拦截器 - 错误[2m > [22m401 错误应清除 token 并重定向到 /login[32m 4[2mms[22m[39m
+[31m   → Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+ [31m×[39m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m响应拦截器 - 错误[2m > [22m非 401 错误应直接 reject[32m 5[2mms[22m[39m
+[31m   → Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+ [31m×[39m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m响应拦截器 - 错误[2m > [22m无 response 对象的错误应直接 reject[32m 5[2mms[22m[39m
+[31m   → Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+ [31m×[39m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m响应拦截器 - 错误[2m > [22m应返回 Promise.reject[32m 8[2mms[22m[39m
+[31m   → Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+ [31m×[39m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m默认导出[2m > [22m应导出默认的 apiClient[32m 4[2mms[22m[39m
+[31m   → Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mformatSize[2m > [22m应正确格式化 0 字节[32m 3[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mformatSize[2m > [22m应正确格式化 B 级别[32m 0[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mformatSize[2m > [22m应正确格式化为 KB[32m 0[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mformatSize[2m > [22m应正确格式化为 MB[32m 0[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mformatSize[2m > [22m应正确格式化为 GB[32m 0[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mformatSize[2m > [22mnull 或 undefined 应返回 "0 B"[32m 0[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mformatSize[2m > [22mNaN 应返回 "0 B"[32m 0[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mformatSize[2m > [22m字符串数字应正确处理[32m 0[2mms[22m[39m
+ [31m×[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mformatSize[2m > [22m负数应正确格式化[32m 12[2mms[22m[39m
+[31m   → expected '-1024.0 B' to be '-1.0 KB' // Object.is equality[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mformatDate[2m > [22m应返回中文本地化日期字符串[32m 29[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mformatDate[2m > [22m空值应返回空字符串[32m 5[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mformatDate[2m > [22mDate 对象应正确格式化[32m 0[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mformatDate[2m > [22m时间戳数字应正确格式化[32m 0[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mformatDateOnly[2m > [22m应返回仅包含日期的格式化字符串[32m 1[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mformatDateOnly[2m > [22m空值应返回空字符串[32m 0[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mgetPercentScoreType[2m > [22m分数 >= 80 应返回 "success"[32m 0[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mgetPercentScoreType[2m > [22m分数 60-79 应返回 "warning"[32m 0[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mgetPercentScoreType[2m > [22m分数 < 60 应返回 "danger"[32m 0[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mgetScoreType[2m > [22m分数 >= 0.8 应返回 "success"[32m 0[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mgetScoreType[2m > [22m分数 0.6-0.79 应返回 "warning"[32m 0[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mgetScoreType[2m > [22m分数 < 0.6 应返回 "info"[32m 0[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mgetScoreType[2m > [22m浮点数边界应正确处理[32m 0[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mformatTime[2m > [22m应返回 HH:MM 格式的时间[32m 0[2mms[22m[39m
+ [32m✓[39m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mformatTime[2m > [22m空值应返回空字符串[32m 0[2mms[22m[39m
+ [31m×[39m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22m初始状态[2m > [22m初始 files 为空数组[32m 10[2mms[22m[39m
+[31m   → Cannot find module '@/stores/files'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\filesStore.test.js[39m
+ [31m×[39m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22m初始状态[2m > [22m初始 loading 为 false[32m 3[2mms[22m[39m
+[31m   → Cannot find module '@/stores/files'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\filesStore.test.js[39m
+ [31m×[39m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22m初始状态[2m > [22m初始 error 为 null[32m 3[2mms[22m[39m
+[31m   → Cannot find module '@/stores/files'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\filesStore.test.js[39m
+ [31m×[39m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22mfetchFiles[2m > [22m应获取并设置文件列表[32m 3[2mms[22m[39m
+[31m   → Cannot find module '@/stores/files'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\filesStore.test.js[39m
+ [31m×[39m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22mfetchFiles[2m > [22m应调用正确的 API[32m 3[2mms[22m[39m
+[31m   → Cannot find module '@/stores/files'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\filesStore.test.js[39m
+ [31m×[39m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22mfetchFiles[2m > [22m响应无 files 字段时应设为空数组[32m 2[2mms[22m[39m
+[31m   → Cannot find module '@/stores/files'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\filesStore.test.js[39m
+ [31m×[39m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22mfetchFiles[2m > [22mAPI 失败时应抛出错误[32m 2[2mms[22m[39m
+[31m   → Cannot find module '@/stores/files'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\filesStore.test.js[39m
+ [31m×[39m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22mfetchFiles[2m > [22mfetchFiles 后 loading 应恢复 false[32m 2[2mms[22m[39m
+[31m   → Cannot find module '@/stores/files'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\filesStore.test.js[39m
+ [31m×[39m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22muploadFile[2m > [22m应创建 FormData 并上传[32m 2[2mms[22m[39m
+[31m   → Cannot find module '@/stores/files'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\filesStore.test.js[39m
+ [31m×[39m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22muploadFile[2m > [22m上传成功后应刷新文件列表[32m 3[2mms[22m[39m
+[31m   → Cannot find module '@/stores/files'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\filesStore.test.js[39m
+ [31m×[39m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22muploadFile[2m > [22m上传失败时应设置 error[32m 3[2mms[22m[39m
+[31m   → Cannot find module '@/stores/files'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\filesStore.test.js[39m
+ [31m×[39m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22mdeleteFile[2m > [22m应调用删除 API[32m 2[2mms[22m[39m
+[31m   → Cannot find module '@/stores/files'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\filesStore.test.js[39m
+ [31m×[39m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22mdeleteFile[2m > [22m删除后应刷新文件列表[32m 2[2mms[22m[39m
+[31m   → Cannot find module '@/stores/files'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\filesStore.test.js[39m
+ [31m×[39m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22mdeleteFile[2m > [22m删除失败时应设置 error[32m 3[2mms[22m[39m
+[31m   → Cannot find module '@/stores/files'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\filesStore.test.js[39m
+ [31m×[39m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22m初始状态[2m > [22m初始 messages 为空数组[32m 15[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\chatStore.test.js[39m
+ [31m×[39m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22m初始状态[2m > [22m初始 loading 为 false[32m 7[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\chatStore.test.js[39m
+ [31m×[39m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22m初始状态[2m > [22m初始 error 为 null[32m 7[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\chatStore.test.js[39m
+ [31m×[39m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22msendMessage[2m > [22m成功发送消息应添加用户消息和 AI 回复[32m 6[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\chatStore.test.js[39m
+ [31m×[39m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22msendMessage[2m > [22m用户消息应包含时间戳[32m 7[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\chatStore.test.js[39m
+ [31m×[39m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22msendMessage[2m > [22m应调用正确的 API[32m 7[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\chatStore.test.js[39m
+ [31m×[39m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22msendMessage[2m > [22m返回结果应包含 API 响应数据[32m 5[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\chatStore.test.js[39m
+ [31m×[39m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22msendMessage[2m > [22m失败时应设置 error 消息[32m 5[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\chatStore.test.js[39m
+ [31m×[39m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22msendMessage[2m > [22m失败时应移除已添加的用户消息[32m 6[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\chatStore.test.js[39m
+ [31m×[39m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22msendMessage[2m > [22m失败时应抛出原始错误[32m 5[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\chatStore.test.js[39m
+ [31m×[39m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22msendMessage[2m > [22m发送前应清除之前的 error[32m 7[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\chatStore.test.js[39m
+ [31m×[39m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22msendMessage[2m > [22m无论成功失败，loading 应恢复 false[32m 7[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\chatStore.test.js[39m
+ [31m×[39m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22msendMessage[2m > [22m失败时 error 不包含 undefined[32m 7[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\chatStore.test.js[39m
+ [31m×[39m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m组件渲染[2m > [22m应该渲染搜索容器[32m 20[2mms[22m[39m
+[31m   → Cannot find module '@/api'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Search.test.js[39m
+ [31m×[39m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m组件渲染[2m > [22m应该渲染搜索输入框[32m 7[2mms[22m[39m
+[31m   → Cannot find module '@/api'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Search.test.js[39m
+ [31m×[39m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m组件渲染[2m > [22m应该渲染搜索按钮[32m 8[2mms[22m[39m
+[31m   → Cannot find module '@/api'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Search.test.js[39m
+ [31m×[39m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m搜索状态初始化[2m > [22m初始查询字符串为空[32m 5[2mms[22m[39m
+[31m   → Cannot find module '@/api'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Search.test.js[39m
+ [31m×[39m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m搜索状态初始化[2m > [22m初始结果列表为空[32m 10[2mms[22m[39m
+[31m   → Cannot find module '@/api'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Search.test.js[39m
+ [31m×[39m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m搜索状态初始化[2m > [22m初始 loading 为 false[32m 5[2mms[22m[39m
+[31m   → Cannot find module '@/api'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Search.test.js[39m
+ [31m×[39m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m搜索状态初始化[2m > [22m初始 searched 为 false[32m 7[2mms[22m[39m
+[31m   → Cannot find module '@/api'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Search.test.js[39m
+ [31m×[39m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m搜索输入[2m > [22m应更新查询字符串[32m 5[2mms[22m[39m
+[31m   → Cannot find module '@/api'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Search.test.js[39m
+ [31m×[39m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m搜索输入[2m > [22m空输入时不应搜索[32m 5[2mms[22m[39m
+[31m   → Cannot find module '@/api'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Search.test.js[39m
+ [31m×[39m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m搜索结果[2m > [22m成功响应时应设置结果[32m 8[2mms[22m[39m
+[31m   → Cannot find module '@/api'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Search.test.js[39m
+ [31m×[39m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m搜索结果[2m > [22m响应无结果时应设为空数组[32m 6[2mms[22m[39m
+[31m   → Cannot find module '@/api'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Search.test.js[39m
+ [31m×[39m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m搜索结果[2m > [22mAPI 错误时应设为空数组[32m 6[2mms[22m[39m
+[31m   → Cannot find module '@/api'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Search.test.js[39m
+ [31m×[39m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22m初始状态[2m > [22m初始 token 为空字符串[32m 19[2mms[22m[39m
+[31m   → Cannot find module '@/stores/auth'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\authStore.test.js[39m
+ [31m×[39m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22m初始状态[2m > [22m初始 user 为 null[32m 6[2mms[22m[39m
+[31m   → Cannot find module '@/stores/auth'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\authStore.test.js[39m
+ [31m×[39m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22m初始状态[2m > [22m初始 loading 为 false[32m 7[2mms[22m[39m
+[31m   → Cannot find module '@/stores/auth'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\authStore.test.js[39m
+ [31m×[39m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22m初始状态[2m > [22m初始 isAuthenticated 为 false[32m 5[2mms[22m[39m
+[31m   → Cannot find module '@/stores/auth'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\authStore.test.js[39m
+ [31m×[39m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22m初始状态[2m > [22m初始 isAdmin 为 false[32m 9[2mms[22m[39m
+[31m   → Cannot find module '@/stores/auth'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\authStore.test.js[39m
+ [31m×[39m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mlogin[2m > [22m成功登录应设置 token 和 user[32m 5[2mms[22m[39m
+[31m   → Cannot find module '@/stores/auth'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\authStore.test.js[39m
+ [31m×[39m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mlogin[2m > [22m登录时应保存 token 到 localStorage[32m 4[2mms[22m[39m
+[31m   → Cannot find module '@/stores/auth'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\authStore.test.js[39m
+ [31m×[39m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mlogin[2m > [22m登录时应调用正确的 API[32m 7[2mms[22m[39m
+[31m   → Cannot find module '@/stores/auth'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\authStore.test.js[39m
+ [31m×[39m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mlogin[2m > [22m非管理员用户 isAdmin 为 false[32m 6[2mms[22m[39m
+[31m   → Cannot find module '@/stores/auth'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\authStore.test.js[39m
+ [31m×[39m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mlogin[2m > [22m登录失败时应抛出错误[32m 8[2mms[22m[39m
+[31m   → Cannot find module '@/stores/auth'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\authStore.test.js[39m
+ [31m×[39m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mlogin[2m > [22m无论登录成功与否，loading 应恢复 false[32m 6[2mms[22m[39m
+[31m   → Cannot find module '@/stores/auth'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\authStore.test.js[39m
+ [31m×[39m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mlogout[2m > [22m登出应清除 token 和 user[32m 5[2mms[22m[39m
+[31m   → Cannot find module '@/stores/auth'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\authStore.test.js[39m
+ [31m×[39m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mlogout[2m > [22m登出应移除 localStorage 中的 token[32m 9[2mms[22m[39m
+[31m   → Cannot find module '@/stores/auth'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\authStore.test.js[39m
+ [31m×[39m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m组件渲染[2m > [22m应该渲染聊天容器[32m 16[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Chat.test.js[39m
+ [31m×[39m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m组件渲染[2m > [22m应该渲染消息列表区域[32m 8[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Chat.test.js[39m
+ [31m×[39m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m组件渲染[2m > [22m应该渲染 ChatMessage 组件[32m 8[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Chat.test.js[39m
+ [31m×[39m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m组件渲染[2m > [22m应该渲染 ChatInput 组件[32m 6[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Chat.test.js[39m
+ [31m×[39m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m消息显示[2m > [22m应该显示 store 中的消息[32m 8[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Chat.test.js[39m
+ [31m×[39m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m消息显示[2m > [22m每条消息都应渲染为 ChatMessage 组件[32m 6[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Chat.test.js[39m
+ [31m×[39m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m加载状态[2m > [22mloading 为 true 时应显示打字指示器[32m 5[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Chat.test.js[39m
+ [31m×[39m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m加载状态[2m > [22mloading 为 false 时应隐藏打字指示器[32m 7[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Chat.test.js[39m
+ [31m×[39m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m错误处理[2m > [22m有错误时应显示错误信息[32m 5[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Chat.test.js[39m
+ [31m×[39m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m错误处理[2m > [22m应显示重试按钮[32m 5[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Chat.test.js[39m
+ [31m×[39m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m消息发送[2m > [22mhandleSend 应调用 store.sendMessage[32m 7[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Chat.test.js[39m
+ [31m×[39m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m重试最后一条消息[2m > [22mretryLastMessage 应在有足够消息时重试[32m 6[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Chat.test.js[39m
+ [31m×[39m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m重试最后一条消息[2m > [22m消息少于 2 条时不重试[32m 8[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Chat.test.js[39m
+ [31m×[39m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m搜索结果[2m > [22m搜索后 loading 应恢复为 false[32m 8[2mms[22m[39m
+[31m   → Cannot find module '@/api'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Search.test.js[39m
+ [31m×[39m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m清空搜索[2m > [22m查询清空时应重置结果和 searched[32m 5[2mms[22m[39m
+[31m   → Cannot find module '@/api'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Search.test.js[39m
+ [31m×[39m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22msearched 状态[2m > [22m执行搜索后 searched 应为 true[32m 5[2mms[22m[39m
+[31m   → Cannot find module '@/api'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Search.test.js[39m
+ [31m×[39m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mfetchUser[2m > [22m成功获取用户信息应设置 user[32m 6[2mms[22m[39m
+[31m   → Cannot find module '@/stores/auth'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\authStore.test.js[39m
+ [31m×[39m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mfetchUser[2m > [22m获取用户信息时应调用正确的 API[32m 5[2mms[22m[39m
+[31m   → Cannot find module '@/stores/auth'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\authStore.test.js[39m
+ [31m×[39m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mfetchUser[2m > [22m获取失败时应登出并抛出错误[32m 5[2mms[22m[39m
+[31m   → Cannot find module '@/stores/auth'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\authStore.test.js[39m
+ [31m×[39m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mlocalStorage token 持久化[2m > [22m如果 localStorage 中有 token，初始化时应加载[32m 4[2mms[22m[39m
+[31m   → Cannot find module '@/stores/auth'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\authStore.test.js[39m
+ [31m×[39m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22m消息数量限制[2m > [22m超过最大消息数时应裁剪[32m 7[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\chatStore.test.js[39m
+ [31m×[39m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22mclearMessages[2m > [22m应清空所有消息[32m 6[2mms[22m[39m
+[31m   → Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\chatStore.test.js[39m
+ [31m×[39m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m组件渲染[2m > [22m应该渲染登录表单[32m 31[2mms[22m[39m
+[31m   → _ctx.$t is not a function[39m
+ [31m×[39m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m组件渲染[2m > [22m应该显示标题"伏羲·内世界"[32m 3[2mms[22m[39m
+[31m   → _ctx.$t is not a function[39m
+ [31m×[39m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m组件渲染[2m > [22m应该显示副标题"企业知识认知系统"[32m 2[2mms[22m[39m
+[31m   → _ctx.$t is not a function[39m
+ [31m×[39m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m组件渲染[2m > [22m应该渲染用户名输入框[32m 2[2mms[22m[39m
+[31m   → _ctx.$t is not a function[39m
+ [31m×[39m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m组件渲染[2m > [22m应该渲染登录按钮[32m 4[2mms[22m[39m
+[31m   → _ctx.$t is not a function[39m
+ [31m×[39m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m表单验证[2m > [22m用户名规则：必填[32m 3[2mms[22m[39m
+[31m   → _ctx.$t is not a function[39m
+ [31m×[39m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m表单验证[2m > [22m用户名规则：长度范围 2-50[32m 2[2mms[22m[39m
+[31m   → _ctx.$t is not a function[39m
+ [31m×[39m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m表单验证[2m > [22m密码规则：必填[32m 2[2mms[22m[39m
+[31m   → _ctx.$t is not a function[39m
+ [31m×[39m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m表单验证[2m > [22m密码规则：最小长度 6[32m 2[2mms[22m[39m
+[31m   → _ctx.$t is not a function[39m
+ [31m×[39m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m表单验证[2m > [22m初始状态用户名应为空[32m 2[2mms[22m[39m
+[31m   → _ctx.$t is not a function[39m
+ [31m×[39m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m表单验证[2m > [22m初始状态密码应为空[32m 2[2mms[22m[39m
+[31m   → _ctx.$t is not a function[39m
+ [31m×[39m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m表单验证[2m > [22m初始状态 loading 应为 false[32m 2[2mms[22m[39m
+[31m   → _ctx.$t is not a function[39m
+ [31m×[39m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m表单验证[2m > [22m初始状态 error 应为空字符串[32m 2[2mms[22m[39m
+[31m   → _ctx.$t is not a function[39m
+ [31m×[39m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m登录交互[2m > [22m应设置用户名到 form 数据[32m 3[2mms[22m[39m
+[31m   → _ctx.$t is not a function[39m
+ [31m×[39m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m登录交互[2m > [22m应设置密码到 form 数据[32m 1[2mms[22m[39m
+[31m   → _ctx.$t is not a function[39m
+ [31m×[39m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m登录交互[2m > [22mformRef 未初始化时 handleLogin 应安全返回[32m 1[2mms[22m[39m
+[31m   → _ctx.$t is not a function[39m
+ [31m×[39m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m组件渲染[2m > [22m应该渲染文件管理容器[33m 42043[2mms[22m[39m
+[31m   → ElMessageBox.confirm.mockReset is not a function[39m
+ [31m×[39m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m组件渲染[2m > [22m应该显示"文件管理"标题[32m 1[2mms[22m[39m
+[31m   → ElMessageBox.confirm.mockReset is not a function[39m
+ [31m×[39m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m组件渲染[2m > [22m应该显示上传按钮[32m 1[2mms[22m[39m
+[31m   → ElMessageBox.confirm.mockReset is not a function[39m
+ [31m×[39m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m组件渲染[2m > [22m挂载时应自动获取文件列表[32m 1[2mms[22m[39m
+[31m   → ElMessageBox.confirm.mockReset is not a function[39m
+ [31m×[39m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m文件列表[2m > [22m应使用 store 中的文件数据[32m 0[2mms[22m[39m
+[31m   → ElMessageBox.confirm.mockReset is not a function[39m
+ [31m×[39m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m文件列表[2m > [22m文件为空时表格应为空[32m 0[2mms[22m[39m
+[31m   → ElMessageBox.confirm.mockReset is not a function[39m
+ [31m×[39m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m文件删除[2m > [22mconfirm 确认后应调用 deleteFile[32m 0[2mms[22m[39m
+[31m   → ElMessageBox.confirm.mockReset is not a function[39m
+ [31m×[39m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m文件删除[2m > [22m用户取消不应报错[32m 0[2mms[22m[39m
+[31m   → ElMessageBox.confirm.mockReset is not a function[39m
+ [31m×[39m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m文件下载[2m > [22mhandleDownload 应创建下载链接[32m 0[2mms[22m[39m
+[31m   → ElMessageBox.confirm.mockReset is not a function[39m
+ [31m×[39m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m上传对话框[2m > [22m点击上传按钮应显示对话框[32m 1[2mms[22m[39m
+[31m   → ElMessageBox.confirm.mockReset is not a function[39m
+ [31m×[39m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m上传成功回调[2m > [22m应关闭对话框并刷新文件列表[32m 0[2mms[22m[39m
+[31m   → ElMessageBox.confirm.mockReset is not a function[39m
+node.exe : 
+所在位置 行:1 字符: 1
++ & "C:\Users\Feng Shaoxuan\AppData\Local\easyclaw\ai\tool_cache\resour ...
++ ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : NotSpecified: (:String) [], RemoteException
+    + FullyQualifiedErrorId : NativeCommandError
+ 
+[31m⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 113 [49m[22m[31m⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m创建实例[2m > [22m应使用正确的配置创建 axi
+os 实例
+[31m[1mError[22m: Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+[36m [2m❯[22m tests/unit/api/apiClient.test.js:[2m63:7[22m[39m
+    [90m 61|[39m   [34mdescribe[39m([32m'创建实例'[39m[33m,[39m () [33m=>[39m {
+    [90m 62|[39m     [34mit[39m([32m'应使用正确的配置创建 axios 实例'[39m[33m,[39m () [33m=>[39m {
+    [90m 63|[39m       [34mrequire[39m([32m'@/api/index.js'[39m)[33m;[39m
+    [90m   |[39m       [31m^[39m
+    [90m 64|[39m
+    [90m 65|[39m       [34mexpect[39m(axios[33m.[39mcreate)[33m.[39m[34mtoHaveBeenCalledWith[39m({
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22m[39m
+[31m[1mSerialized Error:[22m[39m [90m{ code: 'MODULE_NOT_FOUND', requireStack: [ 'E:\easyclaw\伏羲-v1.44\repo\fronte
+nd\vue3-migration\tests\unit\api\apiClient.test.js' ] }[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/113]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m请求拦截器[2m > [22m存在 token 时应添加
+ Authorization 头
+[31m[1mError[22m: Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+[36m [2m❯[22m tests/unit/api/apiClient.test.js:[2m77:7[22m[39m
+    [90m 75|[39m   [34mdescribe[39m([32m'请求拦截器'[39m[33m,[39m () [33m=>[39m {
+    [90m 76|[39m     [34mit[39m([32m'存在 token 时应添加 Authorization 头'[39m[33m,[39m () [33m=>[39m {
+    [90m 77|[39m       [34mrequire[39m([32m'@/api/index.js'[39m)[33m;[39m
+    [90m   |[39m       [31m^[39m
+    [90m 78|[39m       localStorage[33m.[39m[34msetItem[39m([32m'token'[39m[33m,[39m [32m'test-token-123'[3
+9m)[33m;[39m
+    [90m 79|[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22m[39m
+[31m[1mSerialized Error:[22m[39m [90m{ code: 'MODULE_NOT_FOUND', requireStack: [ 'E:\easyclaw\伏羲-v1.44\repo\fronte
+nd\vue3-migration\tests\unit\api\apiClient.test.js' ] }[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[2/113]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m请求拦截器[2m > [22m无 token 时不应添加
+ Authorization 头
+[31m[1mError[22m: Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+[36m [2m❯[22m tests/unit/api/apiClient.test.js:[2m87:7[22m[39m
+    [90m 85|[39m
+    [90m 86|[39m     [34mit[39m([32m'无 token 时不应添加 Authorization 头'[39m[33m,[39m () [33m=>[39m {
+    [90m 87|[39m       [34mrequire[39m([32m'@/api/index.js'[39m)[33m;[39m
+    [90m   |[39m       [31m^[39m
+    [90m 88|[39m
+    [90m 89|[39m       [35mconst[39m config [33m=[39m { headers[33m:[39m {} }[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22m[39m
+[31m[1mSerialized Error:[22m[39m [90m{ code: 'MODULE_NOT_FOUND', requireStack: [ 'E:\easyclaw\伏羲-v1.44\repo\fronte
+nd\vue3-migration\tests\unit\api\apiClient.test.js' ] }[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[3/113]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m请求拦截器[2m > [22m应返回原始 config 
+对象
+[31m[1mError[22m: Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+[36m [2m❯[22m tests/unit/api/apiClient.test.js:[2m96:7[22m[39m
+    [90m 94|[39m
+    [90m 95|[39m     [34mit[39m([32m'应返回原始 config 对象'[39m[33m,[39m () [33m=>[39m {
+    [90m 96|[39m       [34mrequire[39m([32m'@/api/index.js'[39m)[33m;[39m
+    [90m   |[39m       [31m^[39m
+    [90m 97|[39m
+    [90m 98|[39m       [35mconst[39m config [33m=[39m { headers[33m:[39m {}[33m,[39m customProp[33m:[39m [
+32m'value'[39m }[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22m[39m
+[31m[1mSerialized Error:[22m[39m [90m{ code: 'MODULE_NOT_FOUND', requireStack: [ 'E:\easyclaw\伏羲-v1.44\repo\fronte
+nd\vue3-migration\tests\unit\api\apiClient.test.js' ] }[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[4/113]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m请求拦截器[2m > [22m请求拦截器错误应 reje
+ct
+[31m[1mError[22m: Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+[36m [2m❯[22m tests/unit/api/apiClient.test.js:[2m105:7[22m[39m
+    [90m103|[39m
+    [90m104|[39m     [34mit[39m([32m'请求拦截器错误应 reject'[39m[33m,[39m [35masync[39m () [33m=>[39m {
+    [90m105|[39m       [34mrequire[39m([32m'@/api/index.js'[39m)[33m;[39m
+    [90m   |[39m       [31m^[39m
+    [90m106|[39m
+    [90m107|[39m       [90m// 获取 error 处理器（第二个参数）[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22m[39m
+[31m[1mSerialized Error:[22m[39m [90m{ code: 'MODULE_NOT_FOUND', requireStack: [ 'E:\easyclaw\伏羲-v1.44\repo\fronte
+nd\vue3-migration\tests\unit\api\apiClient.test.js' ] }[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[5/113]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m响应拦截器 - 成功[2m > [22m成功响应应返回 
+response.data
+[31m[1mError[22m: Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+[36m [2m❯[22m tests/unit/api/apiClient.test.js:[2m121:7[22m[39m
+    [90m119|[39m   [34mdescribe[39m([32m'响应拦截器 - 成功'[39m[33m,[39m () [33m=>[39m {
+    [90m120|[39m     [34mit[39m([32m'成功响应应返回 response.data'[39m[33m,[39m () [33m=>[39m {
+    [90m121|[39m       [34mrequire[39m([32m'@/api/index.js'[39m)[33m;[39m
+    [90m   |[39m       [31m^[39m
+    [90m122|[39m
+    [90m123|[39m       [35mconst[39m response [33m=[39m {
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22m[39m
+[31m[1mSerialized Error:[22m[39m [90m{ code: 'MODULE_NOT_FOUND', requireStack: [ 'E:\easyclaw\伏羲-v1.44\repo\fronte
+nd\vue3-migration\tests\unit\api\apiClient.test.js' ] }[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[6/113]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m响应拦截器 - 错误[2m > [22m401 错误应清
+除 token 并重定向到 /login
+[31m[1mError[22m: Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+[36m [2m❯[22m tests/unit/api/apiClient.test.js:[2m135:7[22m[39m
+    [90m133|[39m   [34mdescribe[39m([32m'响应拦截器 - 错误'[39m[33m,[39m () [33m=>[39m {
+    [90m134|[39m     [34mit[39m([32m'401 错误应清除 token 并重定向到 /login'[39m[33m,[39m [35masync[39m () [33m=>[39m
+ {
+    [90m135|[39m       [34mrequire[39m([32m'@/api/index.js'[39m)[33m;[39m
+    [90m   |[39m       [31m^[39m
+    [90m136|[39m       localStorage[33m.[39m[34msetItem[39m([32m'token'[39m[33m,[39m [32m'old-token'[39m)[
+33m;[39m
+    [90m137|[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22m[39m
+[31m[1mSerialized Error:[22m[39m [90m{ code: 'MODULE_NOT_FOUND', requireStack: [ 'E:\easyclaw\伏羲-v1.44\repo\fronte
+nd\vue3-migration\tests\unit\api\apiClient.test.js' ] }[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[7/113]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m响应拦截器 - 错误[2m > [22m非 401 错误
+应直接 reject
+[31m[1mError[22m: Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+[36m [2m❯[22m tests/unit/api/apiClient.test.js:[2m155:7[22m[39m
+    [90m153|[39m
+    [90m154|[39m     [34mit[39m([32m'非 401 错误应直接 reject'[39m[33m,[39m [35masync[39m () [33m=>[39m {
+    [90m155|[39m       [34mrequire[39m([32m'@/api/index.js'[39m)[33m;[39m
+    [90m   |[39m       [31m^[39m
+    [90m156|[39m
+    [90m157|[39m       [35mconst[39m error [33m=[39m {
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22m[39m
+[31m[1mSerialized Error:[22m[39m [90m{ code: 'MODULE_NOT_FOUND', requireStack: [ 'E:\easyclaw\伏羲-v1.44\repo\fronte
+nd\vue3-migration\tests\unit\api\apiClient.test.js' ] }[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[8/113]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m响应拦截器 - 错误[2m > [22m无 respon
+se 对象的错误应直接 reject
+[31m[1mError[22m: Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+[36m [2m❯[22m tests/unit/api/apiClient.test.js:[2m173:7[22m[39m
+    [90m171|[39m
+    [90m172|[39m     [34mit[39m([32m'无 response 对象的错误应直接 reject'[39m[33m,[39m [35masync[39m () [33m=>[39m {
+    [90m173|[39m       [34mrequire[39m([32m'@/api/index.js'[39m)[33m;[39m
+    [90m   |[39m       [31m^[39m
+    [90m174|[39m
+    [90m175|[39m       [35mconst[39m error [33m=[39m [35mnew[39m [33mError[39m([32m'网络错误'[39m)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22m[39m
+[31m[1mSerialized Error:[22m[39m [90m{ code: 'MODULE_NOT_FOUND', requireStack: [ 'E:\easyclaw\伏羲-v1.44\repo\fronte
+nd\vue3-migration\tests\unit\api\apiClient.test.js' ] }[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[9/113]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m响应拦截器 - 错误[2m > [22m应返回 Prom
+ise.reject
+[31m[1mError[22m: Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+[36m [2m❯[22m tests/unit/api/apiClient.test.js:[2m185:7[22m[39m
+    [90m183|[39m
+    [90m184|[39m     [34mit[39m([32m'应返回 Promise.reject'[39m[33m,[39m [35masync[39m () [33m=>[39m {
+    [90m185|[39m       [34mrequire[39m([32m'@/api/index.js'[39m)[33m;[39m
+    [90m   |[39m       [31m^[39m
+    [90m186|[39m
+    [90m187|[39m       [35mconst[39m error [33m=[39m { response[33m:[39m { status[33m:[39m [34m403[39m } }
+[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22m[39m
+[31m[1mSerialized Error:[22m[39m [90m{ code: 'MODULE_NOT_FOUND', requireStack: [ 'E:\easyclaw\伏羲-v1.44\repo\fronte
+nd\vue3-migration\tests\unit\api\apiClient.test.js' ] }[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[10/113]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/api/apiClient.test.js[2m > [22mAPI 客户端[2m > [22m默认导出[2m > [22m应导出默认的 apiClie
+nt
+[31m[1mError[22m: Cannot find module '@/api/index.js'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\api\apiClient.test.js[39m
+[36m [2m❯[22m tests/unit/api/apiClient.test.js:[2m194:25[22m[39m
+    [90m192|[39m   [34mdescribe[39m([32m'默认导出'[39m[33m,[39m () [33m=>[39m {
+    [90m193|[39m     [34mit[39m([32m'应导出默认的 apiClient'[39m[33m,[39m () [33m=>[39m {
+    [90m194|[39m       [35mconst[39m apiClient [33m=[39m [34mrequire[39m([32m'@/api/index.js'[39m)[33m.[39m
+[35mdefault[39m[33m;[39m
+    [90m   |[39m                         [31m^[39m
+    [90m195|[39m
+    [90m196|[39m       [34mexpect[39m(apiClient)[33m.[39m[34mtoBe[39m(mockAxiosInstance)[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22m[39m
+[31m[1mSerialized Error:[22m[39m [90m{ code: 'MODULE_NOT_FOUND', requireStack: [ 'E:\easyclaw\伏羲-v1.44\repo\fronte
+nd\vue3-migration\tests\unit\api\apiClient.test.js' ] }[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[11/113]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m组件渲染[2m > [22m应该渲染聊天容器
+[41m[1m FAIL [22m[49m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m组件渲染[2m > [22m应该渲染消息列表区域
+[41m[1m FAIL [22m[49m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m组件渲染[2m > [22m应该渲染 ChatMe
+ssage 组件
+[41m[1m FAIL [22m[49m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m组件渲染[2m > [22m应该渲染 ChatIn
+put 组件
+[41m[1m FAIL [22m[49m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m消息显示[2m > [22m应该显示 store 
+中的消息
+[41m[1m FAIL [22m[49m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m消息显示[2m > [22m每条消息都应渲染为 C
+hatMessage 组件
+[41m[1m FAIL [22m[49m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m加载状态[2m > [22mloading 为 t
+rue 时应显示打字指示器
+[41m[1m FAIL [22m[49m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m加载状态[2m > [22mloading 为 f
+alse 时应隐藏打字指示器
+[41m[1m FAIL [22m[49m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m错误处理[2m > [22m有错误时应显示错误信息
+[41m[1m FAIL [22m[49m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m错误处理[2m > [22m应显示重试按钮
+[41m[1m FAIL [22m[49m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m消息发送[2m > [22mhandleSend 
+应调用 store.sendMessage
+[41m[1m FAIL [22m[49m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m重试最后一条消息[2m > [22mretryLa
+stMessage 应在有足够消息时重试
+[41m[1m FAIL [22m[49m tests/unit/components/Chat.test.js[2m > [22mChat.vue[2m > [22m重试最后一条消息[2m > [22m消息少于 2 
+条时不重试
+[31m[1mError[22m: Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Chat.test.js[39m
+[36m [2m❯[22m tests/unit/components/Chat.test.js:[2m55:30[22m[39m
+    [90m 53|[39m     }[33m;[39m
+    [90m 54|[39m
+    [90m 55|[39m     [35mconst[39m { useChatStore } [33m=[39m [34mrequire[39m([32m'@/stores/chat'[39m)[33m;
+[39m
+    [90m   |[39m                              [31m^[39m
+    [90m 56|[39m     useChatStore[33m.[39m[34mmockReturnValue[39m(chatStoreMock)[33m;[39m
+    [90m 57|[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22m[39m
+[31m[1mSerialized Error:[22m[39m [90m{ code: 'MODULE_NOT_FOUND', requireStack: [ 'E:\easyclaw\伏羲-v1.44\repo\fronte
+nd\vue3-migration\tests\unit\components\Chat.test.js' ] }[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[12/113]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m组件渲染[2m > [22m应该渲染
+文件管理容器
+[41m[1m FAIL [22m[49m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m组件渲染[2m > [22m应该显示
+"文件管理"标题
+[41m[1m FAIL [22m[49m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m组件渲染[2m > [22m应该显示
+上传按钮
+[41m[1m FAIL [22m[49m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m组件渲染[2m > [22m挂载时应
+自动获取文件列表
+[41m[1m FAIL [22m[49m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m文件列表[2m > [22m应使用 
+store 中的文件数据
+[41m[1m FAIL [22m[49m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m文件列表[2m > [22m文件为空
+时表格应为空
+[41m[1m FAIL [22m[49m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m文件删除[2m > [22mconf
+irm 确认后应调用 deleteFile
+[41m[1m FAIL [22m[49m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m文件删除[2m > [22m用户取消
+不应报错
+[41m[1m FAIL [22m[49m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m文件下载[2m > [22mhand
+leDownload 应创建下载链接
+[41m[1m FAIL [22m[49m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m上传对话框[2m > [22m点击上
+传按钮应显示对话框
+[41m[1m FAIL [22m[49m tests/unit/components/FileUpload.test.js[2m > [22mFiles.vue[2m > [22m上传成功回调[2m > [22m应关
+闭对话框并刷新文件列表
+[31m[1mTypeError[22m: ElMessageBox.confirm.mockReset is not a function[39m
+[36m [2m❯[22m tests/unit/components/FileUpload.test.js:[2m73:26[22m[39m
+    [90m 71|[39m     [33mElMessageBox[39m [33m=[39m [34mrequire[39m([32m'element-plus'[39m)[33m.[39m[33mEl
+MessageBox[39m[33m;[39m
+    [90m 72|[39m     [33mElMessage[39m [33m=[39m [34mrequire[39m([32m'element-plus'[39m)[33m.[39m[33mElMes
+sage[39m[33m;[39m
+    [90m 73|[39m     [33mElMessageBox[39m[33m.[39mconfirm[33m.[39m[34mmockReset[39m()[33m;[39m
+    [90m   |[39m                          [31m^[39m
+    [90m 74|[39m     [33mElMessage[39m[33m.[39msuccess[33m.[39m[34mmockReset[39m()[33m;[39m
+    [90m 75|[39m     [33mElMessage[39m[33m.[39merror[33m.[39m[34mmockReset[39m()[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[13/113]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m组件渲染[2m > [22m应该渲染登录表单
+[41m[1m FAIL [22m[49m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m组件渲染[2m > [22m应该显示标题"伏羲
+·内世界"
+[41m[1m FAIL [22m[49m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m组件渲染[2m > [22m应该显示副标题"企
+业知识认知系统"
+[41m[1m FAIL [22m[49m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m组件渲染[2m > [22m应该渲染用户名输入
+框
+[41m[1m FAIL [22m[49m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m组件渲染[2m > [22m应该渲染登录按钮
+[41m[1m FAIL [22m[49m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m表单验证[2m > [22m用户名规则：必填
+[41m[1m FAIL [22m[49m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m表单验证[2m > [22m用户名规则：长度范
+围 2-50
+[41m[1m FAIL [22m[49m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m表单验证[2m > [22m密码规则：必填
+[41m[1m FAIL [22m[49m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m表单验证[2m > [22m密码规则：最小长度
+ 6
+[41m[1m FAIL [22m[49m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m表单验证[2m > [22m初始状态用户名应为
+空
+[41m[1m FAIL [22m[49m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m表单验证[2m > [22m初始状态密码应为空
+[41m[1m FAIL [22m[49m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m表单验证[2m > [22m初始状态 load
+ing 应为 false
+[41m[1m FAIL [22m[49m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m表单验证[2m > [22m初始状态 erro
+r 应为空字符串
+[41m[1m FAIL [22m[49m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m登录交互[2m > [22m应设置用户名到 f
+orm 数据
+[41m[1m FAIL [22m[49m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m登录交互[2m > [22m应设置密码到 fo
+rm 数据
+[41m[1m FAIL [22m[49m tests/unit/components/Login.test.js[2m > [22mLogin.vue[2m > [22m登录交互[2m > [22mformRef 未
+初始化时 handleLogin 应安全返回
+[31m[1mTypeError[22m: _ctx.$t is not a function[39m
+[36m [2m❯[22m Proxy._sfc_render src/views/Login.vue:[2m11:16[22m[39m
+    [90m  9|[39m           </svg>
+    [90m 10|[39m         </div>
+    [90m 11|[39m         <h1>{{ $t('login.title') }}</h1>
+    [90m   |[39m                [31m^[39m
+    [90m 12|[39m         <p>{{ $t('login.subtitle') }}</p>
+    [90m 13|[39m       </div>
+[90m [2m❯[22m renderComponentRoot node_modules/@vue/runtime-core/dist/runtime-core.cjs.prod.js:[2m3527:16[22m[39m
+[90m [2m❯[22m ReactiveEffect.componentUpdateFn [as fn] node_modules/@vue/runtime-core/dist/runtime-core.cjs.prod.js:
+[2m4714:46[22m[39m
+[90m [2m❯[22m ReactiveEffect.run node_modules/@vue/reactivity/dist/reactivity.cjs.prod.js:[2m254:19[22m[39m
+[90m [2m❯[22m setupRenderEffect node_modules/@vue/runtime-core/dist/runtime-core.cjs.prod.js:[2m4812:5[22m[39m
+[90m [2m❯[22m mountComponent node_modules/@vue/runtime-core/dist/runtime-core.cjs.prod.js:[2m4646:7[22m[39m
+[90m [2m❯[22m processComponent node_modules/@vue/runtime-core/dist/runtime-core.cjs.prod.js:[2m4612:9[22m[39m
+[90m [2m❯[22m patch node_modules/@vue/runtime-core/dist/runtime-core.cjs.prod.js:[2m4149:11[22m[39m
+[90m [2m❯[22m ReactiveEffect.componentUpdateFn [as fn] node_modules/@vue/runtime-core/dist/runtime-core.cjs.prod.js:
+[2m4715:11[22m[39m
+[90m [2m❯[22m ReactiveEffect.run node_modules/@vue/reactivity/dist/reactivity.cjs.prod.js:[2m254:19[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[14/113]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m组件渲染[2m > [22m应该渲染搜索容
+器
+[41m[1m FAIL [22m[49m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m组件渲染[2m > [22m应该渲染搜索输
+入框
+[41m[1m FAIL [22m[49m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m组件渲染[2m > [22m应该渲染搜索按
+钮
+[41m[1m FAIL [22m[49m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m搜索状态初始化[2m > [22m初始查询
+字符串为空
+[41m[1m FAIL [22m[49m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m搜索状态初始化[2m > [22m初始结果
+列表为空
+[41m[1m FAIL [22m[49m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m搜索状态初始化[2m > [22m初始 l
+oading 为 false
+[41m[1m FAIL [22m[49m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m搜索状态初始化[2m > [22m初始 s
+earched 为 false
+[41m[1m FAIL [22m[49m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m搜索输入[2m > [22m应更新查询字符
+串
+[41m[1m FAIL [22m[49m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m搜索输入[2m > [22m空输入时不应搜
+索
+[41m[1m FAIL [22m[49m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m搜索结果[2m > [22m成功响应时应设
+置结果
+[41m[1m FAIL [22m[49m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m搜索结果[2m > [22m响应无结果时应
+设为空数组
+[41m[1m FAIL [22m[49m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m搜索结果[2m > [22mAPI 错误时
+应设为空数组
+[41m[1m FAIL [22m[49m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m搜索结果[2m > [22m搜索后 loa
+ding 应恢复为 false
+[41m[1m FAIL [22m[49m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22m清空搜索[2m > [22m查询清空时应重
+置结果和 searched
+[41m[1m FAIL [22m[49m tests/unit/components/Search.test.js[2m > [22mSearch.vue[2m > [22msearched 状态[2m > [22m
+执行搜索后 searched 应为 true
+[31m[1mError[22m: Cannot find module '@/api'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\components\Search.test.js[39m
+[36m [2m❯[22m tests/unit/components/Search.test.js:[2m37:17[22m[39m
+    [90m 35|[39m     [34msetActivePinia[39m([34mcreatePinia[39m())[33m;[39m
+    [90m 36|[39m
+    [90m 37|[39m     apiClient [33m=[39m [34mrequire[39m([32m'@/api'[39m)[33m.[39m[35mdefault[39m[33m;[39
+m
+    [90m   |[39m                 [31m^[39m
+    [90m 38|[39m
+    [90m 39|[39m     [35mconst[39m [33mSearch[39m [33m=[39m [34mrequire[39m([32m'@/views/Search.vue'[39m)[
+33m.[39m[35mdefault[39m[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22m[39m
+[31m[1mSerialized Error:[22m[39m [90m{ code: 'MODULE_NOT_FOUND', requireStack: [ 'E:\easyclaw\伏羲-v1.44\repo\fronte
+nd\vue3-migration\tests\unit\components\Search.test.js' ] }[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[15/113]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22m初始状态[2m > [22m初始 token 
+为空字符串
+[41m[1m FAIL [22m[49m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22m初始状态[2m > [22m初始 user 为
+ null
+[41m[1m FAIL [22m[49m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22m初始状态[2m > [22m初始 loadin
+g 为 false
+[41m[1m FAIL [22m[49m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22m初始状态[2m > [22m初始 isAuth
+enticated 为 false
+[41m[1m FAIL [22m[49m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22m初始状态[2m > [22m初始 isAdmi
+n 为 false
+[41m[1m FAIL [22m[49m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mlogin[2m > [22m成功登录应设置 
+token 和 user
+[41m[1m FAIL [22m[49m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mlogin[2m > [22m登录时应保存 t
+oken 到 localStorage
+[41m[1m FAIL [22m[49m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mlogin[2m > [22m登录时应调用正确
+的 API
+[41m[1m FAIL [22m[49m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mlogin[2m > [22m非管理员用户 i
+sAdmin 为 false
+[41m[1m FAIL [22m[49m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mlogin[2m > [22m登录失败时应抛出
+错误
+[41m[1m FAIL [22m[49m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mlogin[2m > [22m无论登录成功与否
+，loading 应恢复 false
+[41m[1m FAIL [22m[49m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mlogout[2m > [22m登出应清除 t
+oken 和 user
+[41m[1m FAIL [22m[49m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mlogout[2m > [22m登出应移除 l
+ocalStorage 中的 token
+[41m[1m FAIL [22m[49m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mfetchUser[2m > [22m成功获取
+用户信息应设置 user
+[41m[1m FAIL [22m[49m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mfetchUser[2m > [22m获取用户
+信息时应调用正确的 API
+[41m[1m FAIL [22m[49m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mfetchUser[2m > [22m获取失败
+时应登出并抛出错误
+[41m[1m FAIL [22m[49m tests/unit/stores/authStore.test.js[2m > [22mauthStore[2m > [22mlocalStorage token 持久化[2
+m > [22m如果 localStorage 中有 token，初始化时应加载
+[31m[1mError[22m: Cannot find module '@/stores/auth'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\authStore.test.js[39m
+[36m [2m❯[22m tests/unit/stores/authStore.test.js:[2m28:30[22m[39m
+    [90m 26|[39m
+    [90m 27|[39m     [90m// 动态导入以每次获取新的 store 实例[39m
+    [90m 28|[39m     [35mconst[39m { useAuthStore } [33m=[39m [34mrequire[39m([32m'@/stores/auth'[39m)[33m;
+[39m
+    [90m   |[39m                              [31m^[39m
+    [90m 29|[39m     authStore [33m=[39m [34museAuthStore[39m()[33m;[39m
+    [90m 30|[39m   })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22m[39m
+[31m[1mSerialized Error:[22m[39m [90m{ code: 'MODULE_NOT_FOUND', requireStack: [ 'E:\easyclaw\伏羲-v1.44\repo\fronte
+nd\vue3-migration\tests\unit\stores\authStore.test.js' ] }[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[16/113]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22m初始状态[2m > [22m初始 messag
+es 为空数组
+[41m[1m FAIL [22m[49m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22m初始状态[2m > [22m初始 loadin
+g 为 false
+[41m[1m FAIL [22m[49m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22m初始状态[2m > [22m初始 error 
+为 null
+[41m[1m FAIL [22m[49m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22msendMessage[2m > [22m成功
+发送消息应添加用户消息和 AI 回复
+[41m[1m FAIL [22m[49m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22msendMessage[2m > [22m用户
+消息应包含时间戳
+[41m[1m FAIL [22m[49m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22msendMessage[2m > [22m应调
+用正确的 API
+[41m[1m FAIL [22m[49m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22msendMessage[2m > [22m返回
+结果应包含 API 响应数据
+[41m[1m FAIL [22m[49m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22msendMessage[2m > [22m失败
+时应设置 error 消息
+[41m[1m FAIL [22m[49m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22msendMessage[2m > [22m失败
+时应移除已添加的用户消息
+[41m[1m FAIL [22m[49m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22msendMessage[2m > [22m失败
+时应抛出原始错误
+[41m[1m FAIL [22m[49m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22msendMessage[2m > [22m发送
+前应清除之前的 error
+[41m[1m FAIL [22m[49m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22msendMessage[2m > [22m无论
+成功失败，loading 应恢复 false
+[41m[1m FAIL [22m[49m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22msendMessage[2m > [22m失败
+时 error 不包含 undefined
+[41m[1m FAIL [22m[49m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22m消息数量限制[2m > [22m超过最大消息数
+时应裁剪
+[41m[1m FAIL [22m[49m tests/unit/stores/chatStore.test.js[2m > [22mchatStore[2m > [22mclearMessages[2m > [22m
+应清空所有消息
+[31m[1mError[22m: Cannot find module '@/stores/chat'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\chatStore.test.js[39m
+[36m [2m❯[22m tests/unit/stores/chatStore.test.js:[2m30:30[22m[39m
+    [90m 28|[39m     vi.stubGlobal('import', { meta: { env: { VITE_CHAT_MAX_MESSAGES: '…
+    [90m 29|[39m
+    [90m 30|[39m     [35mconst[39m { useChatStore } [33m=[39m [34mrequire[39m([32m'@/stores/chat'[39m)[33m;
+[39m
+    [90m   |[39m                              [31m^[39m
+    [90m 31|[39m     chatStore [33m=[39m [34museChatStore[39m()[33m;[39m
+    [90m 32|[39m   })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22m[39m
+[31m[1mSerialized Error:[22m[39m [90m{ code: 'MODULE_NOT_FOUND', requireStack: [ 'E:\easyclaw\伏羲-v1.44\repo\fronte
+nd\vue3-migration\tests\unit\stores\chatStore.test.js' ] }[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[17/113]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22m初始状态[2m > [22m初始 file
+s 为空数组
+[41m[1m FAIL [22m[49m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22m初始状态[2m > [22m初始 load
+ing 为 false
+[41m[1m FAIL [22m[49m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22m初始状态[2m > [22m初始 erro
+r 为 null
+[41m[1m FAIL [22m[49m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22mfetchFiles[2m > [22m应
+获取并设置文件列表
+[41m[1m FAIL [22m[49m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22mfetchFiles[2m > [22m应
+调用正确的 API
+[41m[1m FAIL [22m[49m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22mfetchFiles[2m > [22m响
+应无 files 字段时应设为空数组
+[41m[1m FAIL [22m[49m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22mfetchFiles[2m > [22mA
+PI 失败时应抛出错误
+[41m[1m FAIL [22m[49m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22mfetchFiles[2m > [22mf
+etchFiles 后 loading 应恢复 false
+[41m[1m FAIL [22m[49m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22muploadFile[2m > [22m应
+创建 FormData 并上传
+[41m[1m FAIL [22m[49m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22muploadFile[2m > [22m上
+传成功后应刷新文件列表
+[41m[1m FAIL [22m[49m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22muploadFile[2m > [22m上
+传失败时应设置 error
+[41m[1m FAIL [22m[49m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22mdeleteFile[2m > [22m应
+调用删除 API
+[41m[1m FAIL [22m[49m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22mdeleteFile[2m > [22m删
+除后应刷新文件列表
+[41m[1m FAIL [22m[49m tests/unit/stores/filesStore.test.js[2m > [22mfilesStore[2m > [22mdeleteFile[2m > [22m删
+除失败时应设置 error
+[31m[1mError[22m: Cannot find module '@/stores/files'
+Require stack:
+- E:\easyclaw\伏羲-v1.44\repo\frontend\vue3-migration\tests\unit\stores\filesStore.test.js[39m
+[36m [2m❯[22m tests/unit/stores/filesStore.test.js:[2m28:30[22m[39m
+    [90m 26|[39m     mockApiClient[33m.[39m[35mdelete[39m[33m.[39m[34mmockReset[39m()[33m;[39m
+    [90m 27|[39m
+    [90m 28|[39m     [35mconst[39m { useFileStore } [33m=[39m [34mrequire[39m([32m'@/stores/files'[39m)[33m;
+[39m
+    [90m   |[39m                              [31m^[39m
+    [90m 29|[39m     filesStore [33m=[39m [34museFileStore[39m()[33m;[39m
+    [90m 30|[39m   })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[22m[39m
+[31m[1mSerialized Error:[22m[39m [90m{ code: 'MODULE_NOT_FOUND', requireStack: [ 'E:\easyclaw\伏羲-v1.44\repo\fronte
+nd\vue3-migration\tests\unit\stores\filesStore.test.js' ] }[39m
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[18/113]⎯[22m[39m
+
+[41m[1m FAIL [22m[49m tests/unit/utils/helpers.test.js[2m > [22mhelpers 工具函数[2m > [22mformatSize[2m > [22m负数应
+正确格式化
+[31m[1mAssertionError[22m: expected '-1024.0 B' to be '-1.0 KB' // Object.is equality[39m
+
+Expected: [32m"-1.0 [7mK[27mB"[39m
+Received: [31m"-1[7m024[27m.0 B"[39m
+
+[36m [2m❯[22m tests/unit/utils/helpers.test.js:[2m55:33[22m[39m
+    [90m 53|[39m
+    [90m 54|[39m     [34mit[39m([32m'负数应正确格式化'[39m[33m,[39m () [33m=>[39m {
+    [90m 55|[39m       [34mexpect[39m([34mformatSize[39m([33m-[39m[34m1024[39m))[33m.[39m[34mtoBe[39m([3
+2m'-1.0 KB'[39m)[33m;[39m
+    [90m   |[39m                                 [31m^[39m
+    [90m 56|[39m     })[33m;[39m
+    [90m 57|[39m   })[33m;[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[19/113]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m9 failed[39m[22m[90m (9)[39m
+[2m      Tests [22m [1m[31m113 failed[39m[22m[2m | [22m[1m[32m23 passed[39m[22m[90m (136)[39m
+[2m   Start at [22m 18:23:18
+[2m   Duration [22m 85.81s[2m (transform 79.11s, setup 104.53s, import 31.49s, tests 42.83s, environment 248.58s)[22m
+

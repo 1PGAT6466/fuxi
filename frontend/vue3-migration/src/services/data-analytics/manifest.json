@@ -1,0 +1,29 @@
+{
+  "id": "data-analytics",
+  "name": "数据分析",
+  "icon": "DataAnalysis",
+  "description": "数据看板与分析工具，提供统计概览、趋势分析、报表生成和数据导出",
+  "version": "2.1.0",
+  "category": "analytics",
+  "guaAffinity": {
+    "primary": "li",
+    "secondary": "kun"
+  },
+  "route": "/workspace/analytics",
+  "apiBase": "/api/analytics",
+  "endpoints": [
+    { "method": "GET",  "path": "/health",    "description": "健康检查" },
+    { "method": "GET",  "path": "/stats",     "description": "统计数据概览" },
+    { "method": "POST", "path": "/stats",     "description": "按条件查询统计" },
+    { "method": "GET",  "path": "/trends",    "description": "趋势分析数据" },
+    { "method": "GET",  "path": "/report",    "description": "生成分析报告" },
+    { "method": "GET",  "path": "/storage",   "description": "存储分布分析" },
+    { "method": "POST", "path": "/export",    "description": "数据导出" }
+  ],
+  "requiredRole": "user",
+  "featureFlag": "analytics-enabled",
+  "windowMode": "tab",
+  "defaultSize": { "width": 1200, "height": 800 },
+  "singleton": true,
+  "tags": ["数据", "分析", "看板", "报表", "可视化"]
+}

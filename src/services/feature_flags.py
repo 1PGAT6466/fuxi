@@ -77,13 +77,36 @@ def is_enabled(feature: str) -> bool:
 
 def set_flag(feature: str, enabled: bool) -> bool:
     flags = load_flags()
+    old_value = flags.get(feature, None)
     flags[feature] = enabled
     save_flags(flags)
     global _flags
     _flags = flags
     _last_load = time.time()
     logger.info(f"[FeatureFlag] {feature} = {enabled}")
+
+    # v2.1: 通过 WebSocket 广播变更事件
+    _broadcast_change(feature, old_value, enabled)
+
     return True
+
+
+def _broadcast_change(flag_name: str, old_value, new_value: bool):
+    """广播 flag 变更到 WebSocket 客户端"""
+    try:
+        from src.api.feature_flags_ws import broadcast_flag_change
+        import asyncio
+        # 尝试在现有事件循环中运行
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(broadcast_flag_change(flag_name, old_value, new_value))
+        except RuntimeError:
+            # 没有运行中的事件循环（同步调用时）
+            pass
+    except ImportError:
+        pass
+    except Exception as e:
+        logger.debug(f"[FeatureFlag] WebSocket 广播失败: {e}")
 
 def get_all_flags() -> Dict[str, Any]:
     flags = load_flags()

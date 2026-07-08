@@ -1,0 +1,27 @@
+{
+  "id": "dxf-viewer",
+  "name": "DXF 工程浏览器",
+  "icon": "Grid",
+  "description": "专业 DXF 工程图纸浏览器，支持图层管理、尺寸测量、标注和导出",
+  "version": "2.1.0",
+  "category": "engineering",
+  "guaAffinity": {
+    "primary": "xun",
+    "secondary": "li"
+  },
+  "route": "/dxf-viewer",
+  "apiBase": "/api/dxf",
+  "endpoints": [
+    { "method": "GET",  "path": "/health",         "description": "健康检查" },
+    { "method": "POST", "path": "/upload",          "description": "上传 DXF 文件" },
+    { "method": "GET",  "path": "/files",           "description": "获取文件列表" },
+    { "method": "GET",  "path": "/view/{hash}",     "description": "获取渲染数据" },
+    { "method": "GET",  "path": "/download/{hash}", "description": "下载文件" }
+  ],
+  "requiredRole": "user",
+  "featureFlag": "dxf-viewer-enabled",
+  "windowMode": "fullscreen",
+  "defaultSize": { "width": 1400, "height": 900 },
+  "singleton": true,
+  "tags": ["工程", "DXF", "CAD", "图纸", "浏览"]
+}

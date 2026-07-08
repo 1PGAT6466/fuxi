@@ -1,0 +1,210 @@
+@use './variables.scss' as *;
+@use './responsive.scss';
+
+// ════════════════════════════════════════════
+// 伏羲 v2.1 全局样式
+// 阴阳双主题 · 小米暖橙色系 · 8px网格
+// ════════════════════════════════════════════
+
+// 全局样式重置
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+  font-family: var(--fuxi-font-family, 'MiSans', 'Inter', system-ui, sans-serif);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--fuxi-text-primary);
+  background-color: var(--fuxi-bg);
+  transition:
+    color var(--fuxi-duration-normal, 300ms) ease,
+    background-color var(--fuxi-duration-normal, 300ms) ease;
+}
+
+#app {
+  height: 100%;
+}
+
+// ════════════════════════════════════════════
+// 滚动条样式
+// ════════════════════════════════════════════
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--fuxi-scrollbar-track);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--fuxi-scrollbar-thumb);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--fuxi-scrollbar-thumb-hover);
+}
+
+// ════════════════════════════════════════════
+// 链接样式
+// ════════════════════════════════════════════
+a {
+  color: var(--fuxi-primary);
+  text-decoration: none;
+
+  &:hover {
+    color: var(--fuxi-primary-light);
+  }
+}
+
+// ════════════════════════════════════════════
+// Element Plus 全局组件覆盖
+// ════════════════════════════════════════════
+
+// 按钮
+.el-button {
+  border-radius: var(--fuxi-radius-input, 8px);
+  font-weight: 500;
+  transition: all var(--fuxi-duration-fast, 150ms) ease;
+}
+
+// 卡片 — 圆角12px + 柔光阴影
+.el-card {
+  border-radius: var(--fuxi-radius-card, 12px);
+  box-shadow: var(--fuxi-shadow-card, 0 2px 16px rgba(255, 103, 0, 0.06));
+  border: 1px solid var(--fuxi-border, #E8E4D9);
+  background-color: var(--fuxi-component-bg, #FFFFFF);
+  color: var(--fuxi-text-primary);
+}
+
+// 表格
+.el-table {
+  border-radius: var(--fuxi-radius-card, 12px);
+  overflow: hidden;
+
+  th {
+    background-color: var(--fuxi-bg-tertiary, #F5F2ED) !important;
+    color: var(--fuxi-text-primary);
+    font-weight: 600;
+  }
+}
+
+// 表单
+.el-form-item__label {
+  font-weight: 500;
+  color: var(--fuxi-text-primary);
+}
+
+// 对话框 — 圆角12px
+.el-dialog {
+  border-radius: var(--fuxi-radius-card, 12px);
+  box-shadow: var(--fuxi-shadow-popup, 0 4px 24px rgba(0, 0, 0, 0.12));
+
+  .el-dialog__header {
+    border-bottom: 1px solid var(--fuxi-border-light);
+    padding-bottom: var(--fuxi-spacing-lg, 16px);
+  }
+
+  .el-dialog__footer {
+    border-top: 1px solid var(--fuxi-border-light);
+    padding-top: var(--fuxi-spacing-lg, 16px);
+  }
+}
+
+// 标签 — 圆角4px
+.el-tag {
+  border-radius: var(--fuxi-radius-tag, 4px);
+}
+
+// 输入框 — 圆角8px
+.el-input__inner {
+  border-radius: var(--fuxi-radius-input, 8px);
+}
+
+.el-textarea__inner {
+  border-radius: var(--fuxi-radius-input, 8px);
+}
+
+// 工具提示 — 圆角4px
+.el-tooltip__popper {
+  border-radius: var(--fuxi-radius-tag, 4px);
+}
+
+// 加载遮罩
+.el-loading-mask {
+  background-color: rgba(255, 255, 255, 0.7);
+}
+
+// 空状态
+.el-empty {
+  padding: var(--fuxi-spacing-2xl, 32px) 0;
+}
+
+// 分页
+.el-pagination {
+  margin-top: var(--fuxi-spacing-lg, 16px);
+  justify-content: center;
+}
+
+// 消息框
+.el-message-box {
+  border-radius: var(--fuxi-radius-card, 12px);
+}
+
+// 通知
+.el-notification {
+  border-radius: var(--fuxi-radius-input, 8px);
+}
+
+// 弹出面板 — 专用阴影
+.el-popper,
+.el-dropdown-menu {
+  border-radius: var(--fuxi-radius-input, 8px);
+  box-shadow: var(--fuxi-shadow-popup, 0 4px 24px rgba(0, 0, 0, 0.12));
+}
+
+// ════════════════════════════════════════════
+// 标题字体层级
+// ════════════════════════════════════════════
+h1, .fuxi-h1 { font-size: var(--fuxi-font-3xl, 32px); font-weight: 600; }
+h2, .fuxi-h2 { font-size: var(--fuxi-font-2xl, 24px); font-weight: 600; }
+h3, .fuxi-h3 { font-size: var(--fuxi-font-xl, 20px); font-weight: 600; }
+h4, .fuxi-h4 { font-size: var(--fuxi-font-lg, 18px); font-weight: 500; }
+
+// ════════════════════════════════════════════
+// 聚焦可见性 — 无障碍 WCAG AA
+// ════════════════════════════════════════════
+:focus-visible {
+  outline: 2px solid var(--fuxi-primary, #FF6700);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+// ════════════════════════════════════════════
+// 暗色模式下的 Element Plus 微调（阴模式）
+// ════════════════════════════════════════════
+[data-theme='dark'] {
+  .el-loading-mask {
+    background-color: rgba(26, 26, 46, 0.8);
+  }
+
+  .el-table {
+    th.el-table__cell {
+      background-color: var(--fuxi-bg-tertiary, #2A2A42);
+    }
+  }
+
+  .el-card {
+    border-color: var(--fuxi-border, #333355);
+  }
+}

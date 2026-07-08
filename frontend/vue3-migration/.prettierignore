@@ -1,0 +1,7 @@
+dist
+node_modules
+*.log
+pnpm-lock.yaml
+package-lock.json
+yarn.lock
+CHANGELOG.md

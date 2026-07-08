@@ -1,0 +1,68 @@
+{
+  "name": "fuxi-frontend-vue3",
+  "version": "1.50.0",
+  "description": "伏羲体系企业知识认知平台前端 Vue 3 迁移版本",
+  "author": "伏羲团队",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/1PGAT6466/fuxi.git"
+  },
+  "bugs": {
+    "url": "https://github.com/1PGAT6466/fuxi/issues"
+  },
+  "homepage": "https://github.com/1PGAT6466/fuxi#readme",
+  "keywords": [
+    "fuxi",
+    "knowledge",
+    "rag",
+    "vue3",
+    "vite",
+    "element-plus"
+  ],
+  "engines": {
+    "node": ">=16.0.0",
+    "npm": ">=8.0.0"
+  },
+  "browserslist": [
+    "> 1%",
+    "last 2 versions",
+    "not dead"
+  ],
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "node test-migration.js",
+    "lint": "eslint src --ext .js,.vue",
+    "format": "prettier --write src/"
+  },
+  "dependencies": {
+    "vue": "^3.4.0",
+    "vue-router": "^4.3.0",
+    "pinia": "^2.1.0",
+    "element-plus": "^2.7.0",
+    "@element-plus/icons-vue": "^2.3.0",
+    "axios": "^1.7.0",
+    "dompurify": "^3.1.0",
+    "lodash-es": "^4.17.0",
+    "marked": "^12.0.0"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^5.0.0",
+    "vite": "^5.4.0",
+    "sass": "^1.77.0",
+    "eslint": "^8.57.0",
+    "prettier": "^3.3.0",
+    "@vue/eslint-config-prettier": "^9.0.0",
+    "@vue/eslint-config-typescript": "^13.0.0",
+    "typescript": "^5.4.0"
+  },
+  "config": {
+    "apiBaseUrl": "http://localhost:8080",
+    "devServerPort": 3000,
+    "buildOutputDir": "dist",
+    "sourcemap": false,
+    "minify": "terser"
+  }
+}
