@@ -8,7 +8,7 @@
  * - 超时控制（默认 15s）+ 自动重试（默认 2 次，仅 5xx）
  */
 
-var __TK = '***', __UK = '***';
+var __TK = 'fuxi_token', __UK = 'fuxi_user';
 var __STORE = sessionStorage;
 
 // API 缓存（GET 请求 30 秒有效）
