@@ -13,7 +13,7 @@ llm.py — LLM 调用服务（v1.43 MiMo 2.5 Pro + Fallback 链）
   届时删除本文件，创建同名包目录替代。
 """
 import os, json, logging, asyncio
-from typing import Optional, AsyncGenerator
+from typing import Optional, AsyncGenerator, Dict, Any
 
 logger = logging.getLogger(__name__)
 
