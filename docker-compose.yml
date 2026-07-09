@@ -48,6 +48,13 @@ services:
       - MAX_FILE_MB=${MAX_FILE_MB:-200}
       # 缓存
       - REDIS_URL=${REDIS_URL:-redis://redis:6379/0}
+      # 任务队列（v1.44 Phase1）
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=0
+      - REDIS_PASSWORD=${REDIS_PASSWORD:-}
+      - REDIS_STREAM_NAME=${REDIS_STREAM_NAME:-fuxi:tasks}
+      - REDIS_GROUP_NAME=${REDIS_GROUP_NAME:-fuxi:workers}
       # 搜索
       - BRAVE_API_KEY=${BRAVE_API_KEY:-}
       # 代理
