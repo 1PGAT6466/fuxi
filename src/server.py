@@ -236,6 +236,44 @@ async def _stop_fuxi():
 async def startup():
     await _start_fuxi()
 
+    # ── 初始化 Redis 和任务队列（v1.44 Phase1）──
+    try:
+        import redis.asyncio as redis
+        from src.config import REDIS_HOST, REDIS_PORT, REDIS_DB, REDIS_PASSWORD, REDIS_STREAM_NAME, REDIS_GROUP_NAME
+        from src.infra.task_queue import initialize_task_queue
+        from src.infra.task_handlers import handle_file_process, handle_eval_run, handle_kb_update
+        from src.infra.task_queue import TASK_FILE_PROCESS, TASK_EVAL_RUN, TASK_KB_UPDATE
+        
+        # 创建 Redis 连接
+        redis_client = redis.Redis(
+            host=REDIS_HOST,
+            port=REDIS_PORT,
+            db=REDIS_DB,
+            password=REDIS_PASSWORD if REDIS_PASSWORD else None,
+            decode_responses=True
+        )
+        
+        # 测试 Redis 连接
+        await redis_client.ping()
+        logger.info("[Startup] Redis 连接成功")
+        
+        # 初始化任务队列
+        task_queue = await initialize_task_queue(redis_client)
+        
+        # 注册任务处理器
+        task_queue.register_handler(TASK_FILE_PROCESS, handle_file_process)
+        task_queue.register_handler(TASK_EVAL_RUN, handle_eval_run)
+        task_queue.register_handler(TASK_KB_UPDATE, handle_kb_update)
+        
+        # 启动任务消费者（后台任务）
+        import asyncio
+        asyncio.create_task(task_queue.start_consuming())
+        logger.info("[Startup] 任务队列初始化完成，消费者已启动")
+        
+    except Exception as e:
+        logger.error(f"[Startup] Redis/任务队列初始化失败: {e}", exc_info=True)
+        logger.warning("[Startup] 任务队列功能将不可用，文件上传和评测将使用同步处理")
+
     # ── 启动烟雾测试（由 FUXI_EVAL_AUTO_RUN 控制）──
     from src.config import EVAL_AUTO_RUN
     if EVAL_AUTO_RUN:
@@ -264,6 +302,15 @@ async def shutdown():
     则由 bagua.shutdown 的 GracefulShutdown 处理。
     此处作为兜底：直接调用 _fuxi.sleep()。
     """
+    # 停止任务队列消费者
+    try:
+        from src.infra.task_queue import get_task_queue
+        task_queue = await get_task_queue()
+        await task_queue.stop_consuming()
+        logger.info("[Shutdown] 任务队列消费者已停止")
+    except Exception as e:
+        logger.warning(f"[Shutdown] 停止任务队列消费者失败: {e}")
+    
     # 兜底：如果 shutdown handler 未被注册，直接休眠
     try:
         from src.bagua.shutdown import get_shutdown_handler

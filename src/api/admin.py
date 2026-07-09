@@ -212,9 +212,12 @@ async def admin_create_user(request: Request):
             )
 
         from src.api.auth_routes import _hash_password
+        # v1.44 Phase 1: 多租户 — 管理员创建用户时可指定 tenant_id
+        tenant_id = body.get("tenant_id", "default")
         users[username] = {
-            "password": _hash_password(password),  # 鍒涘缓鏃跺嵆浣跨敤 bcrypt 鍝堝笇瀛樺偍
+            "password": _hash_password(password),
             "role": role,
+            "tenant_id": tenant_id,
             "display_name": display_name,
             "created_at": time.time(),
         }
