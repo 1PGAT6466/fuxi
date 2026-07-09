@@ -82,7 +82,8 @@ class MemoryStore:
                 chunk_index INTEGER DEFAULT 0,
                 status TEXT DEFAULT 'active',
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                loader_path TEXT
+                loader_path TEXT,
+                tenant_id TEXT DEFAULT 'default'
             )
         """)
         self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_chunks_hash ON chunks(file_hash)")
@@ -90,6 +91,10 @@ class MemoryStore:
         self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_chunks_status ON chunks(status)")
         self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_chunks_category ON chunks(category)")
         self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_chunks_index ON chunks(file_hash, chunk_index)")
+
+        # v1.44 Phase 1: 多租户迁移 — 为旧表添加 tenant_id 列（必须在创建索引之前）
+        self._migrate_add_tenant_id()
+        self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_chunks_tenant ON chunks(tenant_id)")
 
         # Phase A: 迁移旧 events/entities 表（若存在不兼容 schema 则重建）
         self._migrate_events_entities()
@@ -115,7 +120,8 @@ class MemoryStore:
                 file_name TEXT DEFAULT '',
                 embedding BLOB,
                 status TEXT DEFAULT 'active',
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                tenant_id TEXT DEFAULT 'default'
             )
         """)
         self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_events_event_id ON events(event_id)")
@@ -124,6 +130,7 @@ class MemoryStore:
         self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_events_file_hash ON events(file_hash)")
         self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_events_entity_names ON events(entity_names_json)")
         self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_events_title_search ON events(title)")
+        self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_events_tenant ON events(tenant_id)")
 
         # Phase A: entities 表（SAG 实体索引）
         self._db_conn.execute("""
@@ -142,13 +149,15 @@ class MemoryStore:
                 embedding BLOB,
                 mentions INTEGER DEFAULT 1,
                 status TEXT DEFAULT 'active',
-                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP
+                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP,
+                tenant_id TEXT DEFAULT 'default'
             )
         """)
         self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_entities_entity_id ON entities(entity_id)")
         self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_entities_name ON entities(name)")
         self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_entities_type ON entities(entity_type)")
         self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_entities_status ON entities(status)")
+        self._db_conn.execute("CREATE INDEX IF NOT EXISTS idx_entities_tenant ON entities(tenant_id)")
 
         self._db_conn.commit()
         # Migrate from JSON if needed
@@ -204,6 +213,36 @@ class MemoryStore:
             self._db_conn.commit()
         except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[MemoryStore] 迁移 events/entities 表失败: {e}")
+
+    def _migrate_add_tenant_id(self):
+        """v1.44 Phase 1: 为现有表添加 tenant_id 列（如果不存在）"""
+        try:
+            tables = ['chunks', 'events', 'entities']
+            for table_name in tables:
+                # 检查表是否存在
+                exists = self._db_conn.execute(
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
+                    (table_name,)
+                ).fetchone()
+                if not exists:
+                    continue
+
+                # 检查 tenant_id 列是否存在
+                cols = self._db_conn.execute(f"PRAGMA table_info('{table_name}')").fetchall()
+                col_names = [c[1] for c in cols]
+                if 'tenant_id' not in col_names:
+                    logger.info(f"[MemoryStore] 为 {table_name} 表添加 tenant_id 列")
+                    self._db_conn.execute(
+                        f"ALTER TABLE {table_name} ADD COLUMN tenant_id TEXT DEFAULT 'default'"
+                    )
+                    # 创建索引
+                    idx_name = f"idx_{table_name}_tenant"
+                    self._db_conn.execute(
+                        f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table_name}(tenant_id)"
+                    )
+            self._db_conn.commit()
+        except Exception as e:
+            logger.warning(f"[MemoryStore] tenant_id 迁移失败: {e}")
 
     def _maybe_migrate_json(self):
         """从旧 JSON 文件迁移数据"""
@@ -361,17 +400,20 @@ class MemoryStore:
             logger.warning(f"[MemoryStore] keyword_search failed: {e}")
             return []
 
-    def get_all(self, limit: int = None, offset: int = 0) -> List[Dict]:
-        """返回 chunk 列表（直接走 SQLite，不加载到内存）"""
+    def get_all(self, limit: int = None, offset: int = 0, tenant_id: str = "default") -> List[Dict]:
+        """返回 chunk 列表（直接走 SQLite，不加载到内存）
+        v1.44 Phase 1: 多租户 — 按 tenant_id 过滤
+        """
         self._check_connection()
         if limit is not None:
             rows = self._db_conn.execute(
-                "SELECT id, doc FROM chunks WHERE status='active' ORDER BY id LIMIT ? OFFSET ?",
-                (limit, offset)
+                "SELECT id, doc FROM chunks WHERE status='active' AND tenant_id=? ORDER BY id LIMIT ? OFFSET ?",
+                (tenant_id, limit, offset)
             ).fetchall()
         else:
             rows = self._db_conn.execute(
-                "SELECT id, doc FROM chunks WHERE status='active' ORDER BY id"
+                "SELECT id, doc FROM chunks WHERE status='active' AND tenant_id=? ORDER BY id",
+                (tenant_id,)
             ).fetchall()
         return [self._row_to_chunk(r) for r in rows]
 
@@ -381,10 +423,24 @@ class MemoryStore:
             "SELECT COUNT(*) FROM chunks WHERE status='active'"
         ).fetchone()[0]
 
+    def total_chunks_by_tenant(self, tenant_id: str = "default") -> int:
+        """v1.44 Phase 1: 按租户统计 chunk 总数"""
+        return self._db_conn.execute(
+            "SELECT COUNT(*) FROM chunks WHERE status='active' AND tenant_id=?",
+            (tenant_id,)
+        ).fetchone()[0]
+
     @property
     def total_files(self) -> int:
         return self._db_conn.execute(
             "SELECT COUNT(DISTINCT file_hash) FROM chunks WHERE status='active'"
+        ).fetchone()[0]
+
+    def total_files_by_tenant(self, tenant_id: str = "default") -> int:
+        """v1.44 Phase 1: 按租户统计文件总数"""
+        return self._db_conn.execute(
+            "SELECT COUNT(DISTINCT file_hash) FROM chunks WHERE status='active' AND tenant_id=?",
+            (tenant_id,)
         ).fetchone()[0]
 
     def get_by_hash(self, file_hash: str) -> List[Dict]:
@@ -453,10 +509,13 @@ class MemoryStore:
         return invalidated
 
     def add(self, chunk: dict) -> int:
-        """添加单个 chunk"""
+        """添加单个 chunk
+        v1.44 Phase 1: 多租户 — 自动附加 tenant_id
+        """
+        tenant_id = chunk.get("tenant_id", "default")
         with self._db_conn:
             cur = self._db_conn.execute(
-                "INSERT INTO chunks (doc, file_hash, file_name, category, chunk_index, status, created_at, loader_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO chunks (doc, file_hash, file_name, category, chunk_index, status, created_at, loader_path, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 (
                     json.dumps(chunk, ensure_ascii=False),
                     chunk.get("file_hash", ""),
@@ -466,14 +525,18 @@ class MemoryStore:
                     "active",
                     chunk.get("created_at", ""),
                     chunk.get("loader_path", ""),
+                    tenant_id,
                 )
             )
             return cur.lastrowid
 
     def add_batch(self, chunks: list) -> int:
-        """批量添加 chunks"""
+        """批量添加 chunks
+        v1.44 Phase 1: 多租户 — 自动附加 tenant_id
+        """
         rows = []
         for c in chunks:
+            tenant_id = c.get("tenant_id", "default")
             rows.append((
                 json.dumps(c, ensure_ascii=False),
                 c.get("file_hash", ""),
@@ -483,10 +546,11 @@ class MemoryStore:
                 "active",
                 c.get("created_at", ""),
                 c.get("loader_path", ""),
+                tenant_id,
             ))
         with self._db_conn:
             self._db_conn.executemany(
-                "INSERT INTO chunks (doc, file_hash, file_name, category, chunk_index, status, created_at, loader_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                "INSERT INTO chunks (doc, file_hash, file_name, category, chunk_index, status, created_at, loader_path, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 rows
             )
         return len(rows)
@@ -500,19 +564,31 @@ class MemoryStore:
         """兼容别名 → add()"""
         return self.add(doc)
 
-    def get_files_summary(self) -> List[Dict]:
-        """获取文件摘要（带缓存）"""
-        if self._files_cache is not None:
+    def get_files_summary(self, tenant_id: str = None) -> List[Dict]:
+        """获取文件摘要（带缓存）
+        v1.44 Phase 1: 多租户 — 按 tenant_id 过滤
+        """
+        if tenant_id is None and self._files_cache is not None:
             return self._files_cache
 
-        rows = self._db_conn.execute("""
-            SELECT file_hash, file_name, category,
-                   COUNT(*) as chunk_count,
-                   MIN(created_at) as created_at
-            FROM chunks WHERE status='active'
-            GROUP BY file_hash
-            ORDER BY created_at DESC
-        """).fetchall()
+        if tenant_id:
+            rows = self._db_conn.execute("""
+                SELECT file_hash, file_name, category,
+                       COUNT(*) as chunk_count,
+                       MIN(created_at) as created_at
+                FROM chunks WHERE status='active' AND tenant_id=?
+                GROUP BY file_hash
+                ORDER BY created_at DESC
+            """, (tenant_id,)).fetchall()
+        else:
+            rows = self._db_conn.execute("""
+                SELECT file_hash, file_name, category,
+                       COUNT(*) as chunk_count,
+                       MIN(created_at) as created_at
+                FROM chunks WHERE status='active'
+                GROUP BY file_hash
+                ORDER BY created_at DESC
+            """).fetchall()
 
         result = []
         for r in rows:
@@ -529,7 +605,9 @@ class MemoryStore:
     # ===== Phase A: Events & Entities CRUD =====
 
     def add_event(self, event_data: dict) -> int:
-        """添加单个 event"""
+        """添加单个 event
+        v1.44 Phase 1: 多租户 — 自动附加 tenant_id
+        """
         import json as _json
         # 将 embedding (List[float]) 序列化为 BLOB
         embedding_blob = None
@@ -542,13 +620,15 @@ class MemoryStore:
                 except Exception:  # TODO: Narrow exception type
                     embedding_blob = _json.dumps(emb).encode('utf-8')
 
+        tenant_id = event_data.get("tenant_id", "default")
+
         with self._db_conn:
             cur = self._db_conn.execute(
                 """INSERT OR REPLACE INTO events
                    (event_id, chunk_id, title, summary, content, entities_json, event_type,
                     keywords_json, priority, level, chunk_ids_json, entity_names_json,
-                    parent_event_id, file_hash, file_name, embedding, status, timestamp)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
+                    parent_event_id, file_hash, file_name, embedding, status, timestamp, tenant_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)""",
                 (
                     event_data.get("event_id", f"evt_{int(__import__('time').time()*1000)}_{id(event_data)}"),
                     event_data.get("chunk_id", ""),
@@ -567,19 +647,23 @@ class MemoryStore:
                     event_data.get("file_name", ""),
                     embedding_blob,
                     event_data.get("status", "active"),
+                    tenant_id,
                 )
             )
             return cur.lastrowid
 
     def add_entity(self, entity_data: dict) -> int:
-        """添加单个 entity"""
+        """添加单个 entity
+        v1.44 Phase 1: 多租户 — 自动附加 tenant_id
+        """
         import json as _json
+        tenant_id = entity_data.get("tenant_id", "default")
         with self._db_conn:
             cur = self._db_conn.execute(
                 """INSERT OR REPLACE INTO entities
                    (entity_id, name, entity_type, description, aliases_json, chunk_ids_json,
-                    event_ids_json, source, file_hash, file_name, embedding, mentions, status, timestamp)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP)""",
+                    event_ids_json, source, file_hash, file_name, embedding, mentions, status, timestamp, tenant_id)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?)""",
                 (
                     entity_data.get("entity_id", f"ent_{int(__import__('time').time()*1000)}_{id(entity_data)}"),
                     entity_data.get("name", ""),
@@ -594,6 +678,7 @@ class MemoryStore:
                     None,  # embedding placeholder for Phase A task 3
                     entity_data.get("mentions", 1),
                     entity_data.get("status", "active"),
+                    tenant_id,
                 )
             )
             return cur.lastrowid
@@ -707,40 +792,46 @@ class MemoryStore:
         self._json_cache[key] = value
         self._json_cache.move_to_end(key)
 
-    def get_all_events(self, limit: int = None, offset: int = 0) -> list:
-        """获取 event 列表"""
+    def get_all_events(self, limit: int = None, offset: int = 0, tenant_id: str = "default") -> list:
+        """获取 event 列表
+        v1.44 Phase 1: 多租户 — 按 tenant_id 过滤
+        """
         try:
             cols = [desc[0] for desc in self._db_conn.execute(
                 "SELECT * FROM events LIMIT 0"
             ).description]
             if limit is not None:
                 rows = self._db_conn.execute(
-                    "SELECT * FROM events WHERE status='active' ORDER BY id LIMIT ? OFFSET ?",
-                    (limit, offset)
+                    "SELECT * FROM events WHERE status='active' AND tenant_id=? ORDER BY id LIMIT ? OFFSET ?",
+                    (tenant_id, limit, offset)
                 ).fetchall()
             else:
                 rows = self._db_conn.execute(
-                    "SELECT * FROM events WHERE status='active' ORDER BY id"
+                    "SELECT * FROM events WHERE status='active' AND tenant_id=? ORDER BY id",
+                    (tenant_id,)
                 ).fetchall()
             return [dict(zip(cols, row)) for row in rows]
         except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[MemoryStore] get_all_events failed: {e}")
             return []
 
-    def get_all_entities(self, limit: int = None, offset: int = 0) -> list:
-        """获取 entity 列表"""
+    def get_all_entities(self, limit: int = None, offset: int = 0, tenant_id: str = "default") -> list:
+        """获取 entity 列表
+        v1.44 Phase 1: 多租户 — 按 tenant_id 过滤
+        """
         try:
             cols = [desc[0] for desc in self._db_conn.execute(
                 "SELECT * FROM entities LIMIT 0"
             ).description]
             if limit is not None:
                 rows = self._db_conn.execute(
-                    "SELECT * FROM entities WHERE status='active' ORDER BY id LIMIT ? OFFSET ?",
-                    (limit, offset)
+                    "SELECT * FROM entities WHERE status='active' AND tenant_id=? ORDER BY id LIMIT ? OFFSET ?",
+                    (tenant_id, limit, offset)
                 ).fetchall()
             else:
                 rows = self._db_conn.execute(
-                    "SELECT * FROM entities WHERE status='active' ORDER BY id"
+                    "SELECT * FROM entities WHERE status='active' AND tenant_id=? ORDER BY id",
+                    (tenant_id,)
                 ).fetchall()
             return [dict(zip(cols, row)) for row in rows]
         except Exception as e:  # TODO: Narrow exception type

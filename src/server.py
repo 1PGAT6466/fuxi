@@ -1003,6 +1003,11 @@ app.include_router(rag_router)
 from src.api.kb import router as kb_router
 app.include_router(kb_router)
 
+# ============ v1.44 Phase 1: 租户管理 API ============
+# tenant_routes.py 在 _SKIP_FILES 中，手动注册正确
+from src.api.tenant_routes import router as tenant_router
+app.include_router(tenant_router)
+
 # ============ v1.50 Phase A: API 路径别名兼容层 ============
 # path_aliases.py 已由 auto_discover_routers 自动注册，无需手动 include
 

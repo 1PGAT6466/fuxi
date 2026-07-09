@@ -46,10 +46,11 @@ def count_worldtree() -> dict:
         }
 
 # ===== Wiki 操作 =====
-def get_wiki_tree() -> list:
+def get_wiki_tree(tenant_id: str = "default") -> list:
     with connect("worldtree") as db:
         rows = db.execute(
-            "SELECT category_path, COUNT(*) as cnt FROM wiki_pages GROUP BY category_path ORDER BY cnt DESC"
+            "SELECT category_path, COUNT(*) as cnt FROM wiki_pages WHERE tenant_id=? GROUP BY category_path ORDER BY cnt DESC",
+            (tenant_id,)
         ).fetchall()
     tree = {}
     for row in rows:
