@@ -124,10 +124,18 @@ class WikiEngine:
                 sources TEXT DEFAULT '[]',
                 version INTEGER DEFAULT 1,
                 quality_score REAL DEFAULT 0.5,
+                author TEXT DEFAULT '',
                 created_at TEXT DEFAULT '',
                 updated_at TEXT DEFAULT ''
             )
         """)
+        # v1.50 R3 Blue: 兼容旧表结构 — 如果 author 列不存在则添加
+        try:
+            conn.execute("SELECT author FROM wiki_pages LIMIT 0")
+        except sqlite3.OperationalError:
+            logger.info("[Wiki] 添加 author 列到 wiki_pages 表")
+            conn.execute("ALTER TABLE wiki_pages ADD COLUMN author TEXT DEFAULT ''")
+            conn.commit()
         conn.execute("""
             CREATE TABLE IF NOT EXISTS wiki_cross_links (
                 from_id TEXT,
@@ -140,8 +148,9 @@ class WikiEngine:
         conn.close()
     
     def create_page(self, title: str, content: str, category: str = "", 
-                    tags: list = None, sources: list = None, summary: str = "") -> str:
-        """创建 Wiki 页面"""
+                    tags: list = None, sources: list = None, summary: str = "",
+                    author: str = "") -> str:
+        """创建 Wiki 页面 — v1.50 R3: 支持作者字段"""
         page_id = f"wiki_{int(time.time()*1000)}"
         now = time.strftime("%Y-%m-%d %H:%M")
         
@@ -153,11 +162,11 @@ class WikiEngine:
         conn.execute("PRAGMA busy_timeout=5000")
         conn.execute(
             """INSERT OR REPLACE INTO wiki_pages 
-               (id, title, category, tags, summary, content, sources, version, quality_score, created_at, updated_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+               (id, title, category, tags, summary, content, sources, version, quality_score, author, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
             (page_id, title, category, json.dumps(tags or []), 
              summary, content, json.dumps(sources or []), 
-             1, 0.7, now, now)
+             1, 0.7, author, now, now)
         )
         conn.commit()
         conn.close()
@@ -445,7 +454,7 @@ class WikiEngine:
     def _row_to_dict(self, row) -> dict:
         """SQLite row → dict"""
         columns = ["id", "title", "category", "tags", "summary", "content",
-                    "sources", "version", "quality_score", "created_at", "updated_at"]
+                    "sources", "version", "quality_score", "author", "created_at", "updated_at"]
         d = dict(zip(columns, row))
         d["tags"] = _safe_json_parse(d.get("tags") or "[]" or "[]", default=[])
         d["sources"] = _safe_json_parse(d.get("sources") or "[]" or "[]", default=[])

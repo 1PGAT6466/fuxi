@@ -18,7 +18,7 @@ if not _JWT_SECRET:
     )
 
 JWT_ALGORITHM = "HS256"
-JWT_EXPIRE_HOURS = int(os.environ.get("FUXI_JWT_EXPIRE_HOURS", "24"))
+JWT_EXPIRE_HOURS = int(os.environ.get("FUXI_JWT_EXPIRE_HOURS", "2"))
 
 
 def create_jwt_token(username: str, role: str) -> str:
@@ -158,9 +158,10 @@ class InputLimitMiddleware(BaseHTTPMiddleware):
     """
     
     # 特殊端点的更严格限制
+    # v1.50 R3 Blue: 注册限流调整为 10次/10分钟，避免已存在用户被用于DoS
     STRICT_ENDPOINTS = {
-        "/api/auth/login": {"max": 5, "window": 60},
-        "/api/auth/register": {"max": 3, "window": 3600},
+        "/api/auth/login": {"max": 10, "window": 300},
+        "/api/auth/register": {"max": 10, "window": 600},
     }
     
     def __init__(self, app, **kwargs):

@@ -97,16 +97,18 @@ async function sendChatSSE(query) {
     }
   }, 2000);
 
-  var token = getToken ? getToken() : '';
+  var token = (typeof getTokenAsync === 'function') ? await getTokenAsync() : (getToken ? getToken() : '');
+  var csrfToken = (typeof getCSRFToken === 'function') ? getCSRFToken() : '';
   var fetchTimeoutMs = 60000; // SSE 流式超时 60 秒
 
   try {
+    var headers = { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' };
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    // CRITICAL-4: CSRF Token header
+    if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
     var resp = await __fetchWithTimeout('/api/chat/send', {
       method: 'POST',
-      headers: Object.assign(
-        { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
-        token ? { 'Authorization': 'Bearer ' + token } : {}
-      ),
+      headers: headers,
       body: JSON.stringify({ query: query, history: chatHistory.slice(-6), stream: true }),
       signal: abortController.signal
     }, fetchTimeoutMs);

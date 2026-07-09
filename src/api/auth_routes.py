@@ -21,6 +21,28 @@ _BLOCKED_USERNAMES = {
     "webmaster", "sysadmin", "audit", "backup", "guest",
 }
 
+# v1.50 R3 Blue: 密码复杂度校验 — 至少8字符，包含大写、小写、数字
+import re as _re
+
+def _validate_password_strength(password: str) -> tuple[bool, str]:
+    """验证密码强度。返回 (是否通过, 错误消息)。
+    
+    要求:
+    - 至少 8 个字符
+    - 至少包含 1 个大写字母
+    - 至少包含 1 个小写字母
+    - 至少包含 1 个数字
+    """
+    if len(password) < 8:
+        return False, "密码长度至少需要 8 个字符"
+    if not _re.search(r'[A-Z]', password):
+        return False, "密码必须包含至少一个大写字母"
+    if not _re.search(r'[a-z]', password):
+        return False, "密码必须包含至少一个小写字母"
+    if not _re.search(r'[0-9]', password):
+        return False, "密码必须包含至少一个数字"
+    return True, ""
+
 def _is_username_blocked(username: str) -> bool:
     """检查用户名是否在黑名单中（不区分大小写）"""
     lower = username.lower().strip()
@@ -32,8 +54,9 @@ def _is_username_blocked(username: str) -> bool:
     return False
 
 # v2.1: 登录频率限制（SQLite 持久化，重启不丢失）
-_MAX_LOGIN_ATTEMPTS = 5
-_LOGIN_WINDOW_SEC = 60
+# v1.50 R3 Blue: 调整登录频率限制为更严格的值（10次/5分钟）
+_MAX_LOGIN_ATTEMPTS = 10
+_LOGIN_WINDOW_SEC = 300
 _login_attempts: dict = defaultdict(list)  # 内存缓存，用于快速检查
 
 
@@ -134,14 +157,37 @@ class LoginRequest(BaseModel):
     @field_validator("password")
     @classmethod
     def validate_password(cls, v: str) -> str:
+        # v1.50 R3 Blue: 登录时仅校验长度（不影响已有弱密码用户登录）
         if not v or len(v) < 6 or len(v) > 128:
             raise ValueError("密码长度必须在6-128字符之间")
         return v
 
 
-class RegisterRequest(LoginRequest):
-    """v1.50 R2: 注册需要邮箱字段"""
+class RegisterRequest(BaseModel):
+    """v1.50 R2: 注册需要邮箱字段；v1.50 R3: 使用独立的密码复杂度验证"""
+    username: str
+    password: str
     email: Optional[str] = None
+
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        if not v or len(v.strip()) < 1 or len(v.strip()) > 64:
+            raise ValueError("用户名长度必须在1-64字符之间")
+        if _is_username_blocked(v.strip()):
+            raise ValueError("该用户名不可用，请选择其他用户名")
+        return v.strip()
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        # v1.50 R3 Blue: 注册时严格校验密码复杂度
+        if not v or len(v) < 8 or len(v) > 128:
+            raise ValueError("密码长度必须在8-128字符之间")
+        valid, msg = _validate_password_strength(v)
+        if not valid:
+            raise ValueError(msg)
+        return v
 
 @router.post("/login")
 def login(body: LoginRequest, request: Request = None):

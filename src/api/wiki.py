@@ -1,11 +1,73 @@
 # v1.50 P0 修复 — Wiki路由，从 WikiEngine 实际查询数据
 # v1.44 Phase 1 Fix: 新增 POST/PUT/DELETE 端点
-from fastapi import APIRouter, Query, Request
+# v1.50 R3 Blue Fix: 添加 XSS 输入过滤 + 越权所有权检查
+from fastapi import APIRouter, Query, Request, HTTPException
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import logging
+import html
+import re
 
 logger = logging.getLogger(__name__)
+
+# ── v1.50 R3 Blue: XSS 输入过滤 ──
+def _sanitize_html(text: str) -> str:
+    """对用户输入进行 HTML 实体编码，防止存储型 XSS。
+    
+    策略：
+    1. 先对 HTML 特殊字符进行实体编码（< > & " '）
+    2. 移除潜在的 event handler 属性（onerror/onload 等）
+    3. 移除 javascript: 协议链接
+    
+    注意：
+    - Markdown 内容中的代码块使用 ``` 或 ` 包裹，这些符号不会被编码
+    - 用户提交的原始 HTML 标签会被转义为无害的文本
+    """
+    if not text:
+        return text
+    # 1. HTML 实体编码
+    sanitized = html.escape(text, quote=True)
+    # 2. 移除潜在的事件处理器属性（防御深层注入）
+    sanitized = re.sub(r'\bon\w+\s*=', ' data-blocked=', sanitized, flags=re.IGNORECASE)
+    # 3. 移除 javascript: 协议
+    sanitized = re.sub(r'javascript\s*:', 'blocked:', sanitized, flags=re.IGNORECASE)
+    return sanitized
+
+
+def _get_current_user(request: Request) -> str:
+    """从请求中获取当前用户名"""
+    return getattr(request.state, 'user', 'anonymous')
+
+
+def _get_current_role(request: Request) -> str:
+    """从请求中获取当前用户角色"""
+    return getattr(request.state, 'role', 'user')
+
+
+def _check_wiki_ownership(page_id: str, request: Request) -> bool:
+    """检查当前用户是否有权限操作指定的 Wiki 页面。
+    
+    规则：
+    - admin 角色：可以操作任意页面
+    - 普通用户：只能操作自己创建的页面
+    - 页面不存在时：允许创建操作通过（由调用方处理）
+    """
+    role = _get_current_role(request)
+    if role == 'admin':
+        return True
+    # 普通用户需要检查所有权
+    engine = _get_wiki_engine()
+    page = engine.get_page(page_id)
+    if page is None:
+        # 页面不存在，放行（后续操作会返回 404）
+        return True
+    current_user = _get_current_user(request)
+    owner = page.get('author', page.get('created_by', ''))
+    if not owner:
+        # 旧数据没有 author 字段，拒绝非 admin 操作
+        logger.warning(f"[Wiki] 页面 {page_id} 无作者信息，拒绝用户 {current_user} 的操作")
+        return False
+    return owner == current_user
 
 router = APIRouter(tags=["Wiki"])
 
@@ -148,16 +210,26 @@ class WikiCreateRequest(BaseModel):
 
 @router.post("/api/wiki")
 async def wiki_create(body: WikiCreateRequest, request: Request = None):
-    """创建 Wiki 页面"""
+    """创建 Wiki 页面 — v1.50 R3: XSS 输入过滤 + 记录作者"""
     try:
         engine = _get_wiki_engine()
+        # v1.50 R3 Blue: 对用户输入进行 XSS 过滤
+        sanitized_title = _sanitize_html(body.title)
+        sanitized_content = _sanitize_html(body.content)
+        sanitized_summary = _sanitize_html(body.summary) if body.summary else ""
+        sanitized_tags = [_sanitize_html(t) for t in body.tags] if body.tags else []
+        
+        # v1.50 R3 Blue: 记录当前用户为页面作者
+        author = _get_current_user(request) if request else "anonymous"
+        
         page_id = engine.create_page(
-            title=body.title,
-            content=body.content,
+            title=sanitized_title,
+            content=sanitized_content,
             category=body.category,
-            tags=body.tags,
+            tags=sanitized_tags,
             sources=body.sources,
-            summary=body.summary,
+            summary=sanitized_summary,
+            author=author,
         )
         page = engine.get_page(page_id)
 
@@ -176,15 +248,28 @@ async def wiki_create(body: WikiCreateRequest, request: Request = None):
 
 @router.put("/api/wiki/{page_id}")
 async def wiki_update(page_id: str, request: Request):
-    """更新 Wiki 页面"""
+    """更新 Wiki 页面 — v1.50 R3: XSS 输入过滤 + 所有权检查"""
     try:
+        # v1.50 R3 Blue: 越权检查 — 验证所有权
+        if not _check_wiki_ownership(page_id, request):
+            return JSONResponse(
+                status_code=403,
+                content={"error": "权限不足", "detail": "您只能编辑自己创建的 Wiki 页面"}
+            )
+        
         body = await request.json()
         engine = _get_wiki_engine()
+        
+        # v1.50 R3 Blue: 对用户输入进行 XSS 过滤
+        raw_content = body.get("content")
+        sanitized_content = _sanitize_html(raw_content) if raw_content else None
+        raw_summary = body.get("summary")
+        sanitized_summary = _sanitize_html(raw_summary) if raw_summary else None
 
         success_flag = engine.update_page(
             page_id=page_id,
-            content=body.get("content"),
-            summary=body.get("summary"),
+            content=sanitized_content,
+            summary=sanitized_summary,
             quality_score=body.get("quality_score"),
         )
 
@@ -209,8 +294,15 @@ async def wiki_update(page_id: str, request: Request):
 @router.delete("/api/wiki/{page_id}")
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def wiki_delete(page_id: str, request: Request = None):
-    """删除 Wiki 页面"""
+    """删除 Wiki 页面 — v1.50 R3: 所有权检查"""
     try:
+        # v1.50 R3 Blue: 越权检查 — 验证所有权
+        if not _check_wiki_ownership(page_id, request):
+            return JSONResponse(
+                status_code=403,
+                content={"error": "权限不足", "detail": "您只能删除自己创建的 Wiki 页面"}
+            )
+        
         engine = _get_wiki_engine()
         deleted = engine.delete_page(page_id)
 

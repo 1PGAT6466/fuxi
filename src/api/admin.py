@@ -189,6 +189,15 @@ async def admin_create_user(request: Request):
                 content={"error": "参数错误", "detail": "用户名和密码不能为空"}
             )
 
+        # v1.50 R3 Blue: 管理员创建用户时也需校验密码复杂度
+        from src.api.auth_routes import _validate_password_strength
+        valid_pw, pw_msg = _validate_password_strength(password)
+        if not valid_pw:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "密码强度不足", "detail": pw_msg}
+            )
+
         from pathlib import Path
         import time
         from src.config import DATA_DIR as CONFIG_DATA_DIR
@@ -242,8 +251,17 @@ async def admin_update_user(user_id: str, request: Request):
             if key in body:
                 users[user_id][key] = body[key]
         if "password" in body:
+            # v1.50 R3 Blue: 管理员更新密码时也需校验复杂度
+            from src.api.auth_routes import _validate_password_strength
+            new_pw = body["password"]
+            valid_pw, pw_msg = _validate_password_strength(new_pw)
+            if not valid_pw:
+                return JSONResponse(
+                    status_code=400,
+                    content={"error": "密码强度不足", "detail": pw_msg}
+                )
             from src.api.auth_routes import _hash_password
-            users[user_id]["password"] = _hash_password(body["password"])
+            users[user_id]["password"] = _hash_password(new_pw)
 
         users_file.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8")
 

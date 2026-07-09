@@ -52,8 +52,14 @@ function renderSearchResults() {
     var text = (r.text || '').substring(0, 250);
     var fileName = (r.file_name || '未知文件').replace(/-/g, ' ');
     var keywords = q.split(/\s+/).filter(function(k) { return k; });
+    // CRITICAL-5 fix: 使用 escapeRegex() 对搜索词进行正则安全转义
     var hl = esc(text);
-    keywords.forEach(function(k) { hl = hl.replace(new RegExp('(' + k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + ')', 'gi'), '<mark>$1</mark>'); });
+    keywords.forEach(function(k) {
+      var safePattern = escapeRegex(k);
+      if (safePattern) {
+        hl = hl.replace(new RegExp('(' + safePattern + ')', 'gi'), '<mark>$1</mark>');
+      }
+    });
     return '<div class="result" onclick="this.querySelector(\'.result-text\').style.maxHeight=this.querySelector(\'.result-text\').style.maxHeight===\'none\'?\'80px\':\'none\'">' +
       '<div class="result-title"><span style="background:' + tagColor + ';color:#fff;padding:2px 8px;border-radius:4px;font-size:10px;font-weight:600">' + tagLabel + '</span> ' + esc(fileName) + '</div>' +
       '<div class="result-text" style="max-height:80px;overflow:hidden;transition:max-height .3s">' + hl + '</div>' +

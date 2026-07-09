@@ -230,23 +230,43 @@ function traverseEntry(entry, files) {
 
 async function uploadFiles(files) {
   if (!files || !files.length) return;
-  var total = files.length;
+
+  // CRITICAL-6 fix: 前端文件类型/大小校验
+  var validation = validateFiles(files);
+  if (validation.errors.length) {
+    var errMsg = validation.errors.slice(0, 3).join('; ');
+    if (validation.errors.length > 3) errMsg += '; ...共 ' + validation.errors.length + ' 个错误';
+    toast('文件校验失败: ' + errMsg, 'error');
+  }
+  if (!validation.valid.length) return;
+
+  var validFiles = validation.valid;
+  var total = validFiles.length;
   var success = 0;
   var failed = 0;
   toast('开始上传 ' + total + ' 个文件', 'info');
-  for (var i = 0; i < files.length; i++) {
-    var f = files[i];
+  for (var i = 0; i < validFiles.length; i++) {
+    var f = validFiles[i];
     var fd = new FormData();
-    fd.append('file', f);
+    // CRITICAL-7 fix: 文件名清洗后上传
+    var safeName = sanitizeFilename(f.name);
+    var cleanedFile = f;
+    if (safeName !== f.name) {
+      try {
+        cleanedFile = new File([f], safeName, { type: f.type, lastModified: f.lastModified });
+      } catch(e) {
+        // 某些环境不支持 File 构造函数，使用原始文件（后端会再次校验）
+      }
+    }
+    fd.append('file', cleanedFile);
     if (f._fullPath) fd.append('relative_path', f._fullPath);
     try {
-      // P1-7: 使用 api() 封装以获取 token 刷新和 401 处理等
       var r2 = await api('/api/upload', { method: 'POST', body: fd });
       if (!r2 || r2.error) throw new Error('Upload failed');
       success++;
     } catch (e) {
       failed++;
-      toast('上传失败: ' + f.name + ': ' + e.message, 'error');
+      toast('上传失败: ' + safeName + ': ' + e.message, 'error');
     }
   }
   if (failed === 0) {

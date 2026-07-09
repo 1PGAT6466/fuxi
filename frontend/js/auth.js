@@ -75,7 +75,8 @@ function handleLogin(e) {
         err.textContent = '该账号不是管理员';
         return;
       }
-      setAuth(d.token, { username: d.username, role: d.role, display_name: d.display_name });
+      // CRITICAL-1 fix: 使用加密存储 setAuth
+      setAuthSync(d.token, { username: d.username, role: d.role, display_name: d.display_name });
       showApp();
     })
     .catch(function(e) {

@@ -302,8 +302,19 @@ function _showNodeDetail(node) {
     });
   }
   html += '</div>';
-  // 二次清洗
-  if (typeof DOMPurify !== 'undefined') html = DOMPurify.sanitize(html);
+  // CRITICAL-3 fix: DOMPurify 二次清洗 + 降级日志
+  if (typeof DOMPurify !== 'undefined') {
+    html = DOMPurify.sanitize(html);
+  } else {
+    console.warn('[Graph] DOMPurify CDN 加载失败，_showNodeDetail 安全防护降级');
+    // 回退为纯 textContent，避免直接 innerHTML
+    panel.textContent = '';
+    var fallbackDiv = document.createElement('div');
+    fallbackDiv.textContent = node.id + ' (' + node.type + ') - 安全模式，请刷新页面启用完整渲染';
+    fallbackDiv.style.cssText = 'padding:12px;font-size:13px;color:var(--text2)';
+    panel.appendChild(fallbackDiv);
+    return;
+  }
   panel.innerHTML = html;
   // 绑定节点详情内的返回按钮和邻居点击
   var backBtn = panel.querySelector('.graph-back-btn');

@@ -104,6 +104,8 @@ async def _get_bagua_health(request: Request) -> dict:
 @router.get("/api/health")
 async def health_check(request: Request):
     """健康检查 — v2.1 扩展响应格式
+    
+    v1.50 R3 Blue 安全修复: 未认证用户仅返回基本状态，已认证管理员才返回完整诊断信息
 
     支持格式参数：
       - format=legacy (默认): 旧格式 {status, checks, timestamp}
@@ -120,27 +122,46 @@ async def health_check(request: Request):
     if not fmt:
         fmt = request.headers.get("X-API-Format", "legacy").lower()
 
+    # v1.50 R3 Blue: 判断用户是否已认证
+    is_authenticated = hasattr(request.state, 'user') and request.state.user != 'anonymous'
+    is_admin = hasattr(request.state, 'role') and request.state.role == 'admin'
+
     try:
         from src.infra.health_check import get_health_checker
         checker = get_health_checker()
 
         if fmt == "extended":
-            # v2.1 扩展格式：八卦 + 基础设施
+            # v2.1 扩展格式：仅管理员可查看完整信息
+            if not is_admin:
+                return error("需要管理员权限查看扩展健康信息", status_code=403)
             result = await checker.check_extended()
             return success(data=result, message="扩展健康检查完成")
 
         # 核心检查
         result = await checker.check_all()
 
-        # v2.1: 总是尝试附加八卦健康状态
-        try:
-            bagua_status = await _get_bagua_health(request)
-            if bagua_status:
-                result["bagua"] = bagua_status
-                result["engine"] = getattr(request.app.state, "engine", "v2")
-                result["intent_mode"] = getattr(request.app.state, "intent_mode", "rule_based")
-        except Exception:  # TODO: Narrow exception type
-            pass
+        # v1.50 R3 Blue: 仅对已认证用户附加详细八卦健康状态和系统信息
+        # 未认证用户仅能看到基础的 healthy/degraded 状态
+        if is_authenticated:
+            try:
+                bagua_status = await _get_bagua_health(request)
+                if bagua_status:
+                    result["bagua"] = bagua_status
+                    result["engine"] = getattr(request.app.state, "engine", "v2")
+                    result["intent_mode"] = getattr(request.app.state, "intent_mode", "rule_based")
+            except Exception:  # TODO: Narrow exception type
+                pass
+        else:
+            # v1.50 R3 Blue: 未认证用户 — 移除敏感信息，仅保留基本状态
+            # 保留顶层 status，移除 database/vector_store/llm/intent_bus/bagua 等内部架构细节
+            sensitive_keys = ["database", "vector_store", "llm", "intent_bus", "bagua", "engine", "intent_mode"]
+            for key in sensitive_keys:
+                result.pop(key, None)
+            # 也移除 checks 中的子组件细节
+            checks = result.get("checks", {})
+            if isinstance(checks, dict):
+                for sk in sensitive_keys:
+                    checks.pop(sk, None)
 
         if fmt == "v2":
             return success(
