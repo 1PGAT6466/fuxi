@@ -152,7 +152,7 @@ def _register_inline_routes(app: FastAPI) -> None:
     # ── 评测自动化 ──
     from src.services.eval_automation import get_eval_automation
 
-    @app.post("/api/eval/run")
+    @app.post("/api/eval/run", dependencies=[Depends(require_admin)])
     async def eval_run():
         automation = get_eval_automation()
         return await automation.run_daily_eval()

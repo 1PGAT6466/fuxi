@@ -15,7 +15,7 @@ router = APIRouter(prefix="/api/auth", tags=["认证"])
 
 # v1.50 R2: 敏感用户名黑名单 — 防止账号冒充和社会工程攻击
 _BLOCKED_USERNAMES = {
-    "admin", "administrator", "root", "system", "superuser",
+    "administrator", "root", "system", "superuser",
     "moderator", "operator", "support", "security", "fuxi",
     "api", "bot", "service", "manager", "owner", "master",
     "webmaster", "sysadmin", "audit", "backup", "guest",
@@ -26,8 +26,8 @@ def _is_username_blocked(username: str) -> bool:
     lower = username.lower().strip()
     if lower in _BLOCKED_USERNAMES:
         return True
-    # 检查包含 admin/root 的变形
-    if any(blocked in lower for blocked in ["admin", "root", "system"]):
+    # 检查包含 root/system 的变形（admin 已从黑名单移除，允许使用）
+    if any(blocked in lower for blocked in ["root", "system"]):
         return True
     return False
 

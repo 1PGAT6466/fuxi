@@ -686,7 +686,7 @@ async def mcp_call(request: Request):
 # ============ 评测自动化 API ============
 from src.services.eval_automation import get_eval_automation
 
-@app.post("/api/eval/run")
+@app.post("/api/eval/run", dependencies=[Depends(require_admin)])
 async def eval_run():
     """运行每日评测"""
     automation = get_eval_automation()

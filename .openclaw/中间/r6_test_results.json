@@ -1,0 +1,541 @@
+{
+  "round": 6,
+  "date": "2026-07-09 15:17:14",
+  "server": "http://172.25.30.200:8080",
+  "total": 54,
+  "passed": 35,
+  "failed": 7,
+  "skipped": 12,
+  "warned": 0,
+  "effective": 42,
+  "pass_rate": 83.3,
+  "admin_login_regression": true,
+  "verdict": "🔴 BLOCKED — CRITICAL: admin login regression",
+  "critical_issues": [
+    "POST /api/auth/login",
+    "POST /api/auth/login (admin)",
+    "GET /api/documents/export",
+    "POST /api/mcp/sag_status",
+    "GET /api/search?q=t",
+    "GET /api/search?q=t",
+    "POST /api/eval/run"
+  ],
+  "results": [
+    {
+      "endpoint": "GET /api/health",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "healthy, 8 gua"
+      ]
+    },
+    {
+      "endpoint": "GET /",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "HTML"
+      ]
+    },
+    {
+      "endpoint": "GET /login",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "HTML"
+      ]
+    },
+    {
+      "endpoint": "POST /api/auth/login",
+      "expected_code": 401,
+      "actual_code": 422,
+      "status": "FAIL",
+      "reasons": [
+        "Expected 401, got 422",
+        "OLD {detail:...} — should be v2 error"
+      ]
+    },
+    {
+      "endpoint": "GET /docs",
+      "expected_code": 200,
+      "actual_code": 401,
+      "status": "SKIP",
+      "reasons": [
+        "Auth (401)"
+      ]
+    },
+    {
+      "endpoint": "GET /openapi.json",
+      "expected_code": 200,
+      "actual_code": 401,
+      "status": "SKIP",
+      "reasons": [
+        "Auth (401)"
+      ]
+    },
+    {
+      "endpoint": "POST /api/auth/login (r6 user)",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "role=user"
+      ]
+    },
+    {
+      "endpoint": "POST /api/auth/login (admin)",
+      "expected_code": 200,
+      "actual_code": 422,
+      "status": "FAIL",
+      "reasons": [
+        "ADMIN LOGIN BROKEN: 422"
+      ]
+    },
+    {
+      "endpoint": "GET /api/auth/me",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "keys:['username', 'role']",
+        "keys:['username', 'role']"
+      ]
+    },
+    {
+      "endpoint": "GET /api/search?q=%E9%85%8D%E7%BD%AE&top_k=3",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "'results' (2c)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/search-history",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON"
+      ]
+    },
+    {
+      "endpoint": "GET /api/unified-search?q=%E6%B5%8B%E8%AF%95&limit=3",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "keys:['query', 'matches', 'total', 'took_ms', 'sources']"
+      ]
+    },
+    {
+      "endpoint": "POST /api/chat",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "'answer' (83c)"
+      ]
+    },
+    {
+      "endpoint": "POST /api/chat?format=v2",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "v2 format OK"
+      ]
+    },
+    {
+      "endpoint": "POST /api/chat/agent",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "'answer' (110c)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/chat/sessions",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON"
+      ]
+    },
+    {
+      "endpoint": "POST /api/chat/send",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "SSE OK"
+      ]
+    },
+    {
+      "endpoint": "POST /api/rag/search",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "'results' (2c)"
+      ]
+    },
+    {
+      "endpoint": "POST /api/rag/sag-search",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "'results' (2c)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/documents",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "'files' (2c)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/documents/export",
+      "expected_code": 200,
+      "actual_code": 405,
+      "status": "FAIL",
+      "reasons": [
+        "Expected 200, got 405",
+        "CT:"
+      ]
+    },
+    {
+      "endpoint": "GET /api/wiki/pages",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "'pages' (49786c)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/wiki/search?q=%E6%B5%8B%E8%AF%95",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON"
+      ]
+    },
+    {
+      "endpoint": "GET /api/graph",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "'nodes' (2322c)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/symbols/status",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "'symbols' (679c)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/growth/overview",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "'symbols' (344c)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/notifications",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "'data' (243c)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/user/preferences",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "'data' (140c)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/eval/report",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "'metrics' (311c)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/eval/history",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "'history' (228c)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/admin/stats",
+      "expected_code": 200,
+      "actual_code": 403,
+      "status": "SKIP",
+      "reasons": [
+        "Auth (403)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/admin/server-status",
+      "expected_code": 200,
+      "actual_code": 403,
+      "status": "SKIP",
+      "reasons": [
+        "Auth (403)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/admin/metrics-summary",
+      "expected_code": 200,
+      "actual_code": 403,
+      "status": "SKIP",
+      "reasons": [
+        "Auth (403)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/feature-flags",
+      "expected_code": 200,
+      "actual_code": 403,
+      "status": "SKIP",
+      "reasons": [
+        "Auth (403)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/feedback/weekly",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON"
+      ]
+    },
+    {
+      "endpoint": "POST /api/feedback",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON"
+      ]
+    },
+    {
+      "endpoint": "GET /api/system/stats",
+      "expected_code": 200,
+      "actual_code": 403,
+      "status": "SKIP",
+      "reasons": [
+        "Auth (403)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/cache/stats",
+      "expected_code": 200,
+      "actual_code": 403,
+      "status": "SKIP",
+      "reasons": [
+        "Auth (403)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/errors/stats",
+      "expected_code": 200,
+      "actual_code": 403,
+      "status": "SKIP",
+      "reasons": [
+        "Auth (403)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/mcp/tools",
+      "expected_code": 200,
+      "actual_code": 403,
+      "status": "SKIP",
+      "reasons": [
+        "Auth (403)"
+      ]
+    },
+    {
+      "endpoint": "POST /api/mcp/sag_status",
+      "expected_code": 200,
+      "actual_code": 405,
+      "status": "FAIL",
+      "reasons": [
+        "Expected 200, got 405",
+        "CT:",
+        "keys:['status', 'message', 'status_code']"
+      ]
+    },
+    {
+      "endpoint": "POST /api/mcp/sag_search",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "'results' (2c)"
+      ]
+    },
+    {
+      "endpoint": "POST /api/mcp/call",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "keys:['ok', 'tool', 'result']"
+      ]
+    },
+    {
+      "endpoint": "POST /api/mcp/call",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "keys:['ok', 'tool', 'result']"
+      ]
+    },
+    {
+      "endpoint": "POST /api/mcp/call",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "keys:['ok', 'tool', 'result']"
+      ]
+    },
+    {
+      "endpoint": "POST /api/mcp/call",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "keys:['ok', 'tool', 'result']"
+      ]
+    },
+    {
+      "endpoint": "POST /api/mcp/call",
+      "expected_code": 200,
+      "actual_code": 200,
+      "status": "PASS",
+      "reasons": [
+        "JSON",
+        "keys:['ok', 'tool', 'result']"
+      ]
+    },
+    {
+      "endpoint": "GET /api/services/",
+      "expected_code": 200,
+      "actual_code": 403,
+      "status": "SKIP",
+      "reasons": [
+        "Auth (403)"
+      ]
+    },
+    {
+      "endpoint": "GET /api/nonexist-r6",
+      "expected_code": 404,
+      "actual_code": 404,
+      "status": "PASS",
+      "reasons": [
+        "v2 error format"
+      ]
+    },
+    {
+      "endpoint": "GET /api/search?q=t",
+      "expected_code": 401,
+      "actual_code": 401,
+      "status": "FAIL",
+      "reasons": [
+        "OLD {detail:...} — should be v2 error"
+      ]
+    },
+    {
+      "endpoint": "GET /api/search?q=t",
+      "expected_code": 401,
+      "actual_code": 401,
+      "status": "FAIL",
+      "reasons": [
+        "OLD {detail:...} — should be v2 error"
+      ]
+    },
+    {
+      "endpoint": "PUT /api/feature-flags/shaoyang_sag_extract",
+      "expected_code": 403,
+      "actual_code": 403,
+      "status": "PASS",
+      "reasons": [
+        "v2 error format"
+      ]
+    },
+    {
+      "endpoint": "POST /api/eval/run",
+      "expected_code": 403,
+      "actual_code": 200,
+      "status": "FAIL",
+      "reasons": [
+        "Expected 403, got 200",
+        "Allowed? 200"
+      ]
+    },
+    {
+      "endpoint": "GET /metrics",
+      "expected_code": 200,
+      "actual_code": 403,
+      "status": "SKIP",
+      "reasons": [
+        "Auth (403)"
+      ]
+    }
+  ]
+}
