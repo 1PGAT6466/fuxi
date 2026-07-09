@@ -84,6 +84,27 @@ class KanGua(GuaBase):
     # GuaBase 要求实现的方法
     # ========================================================================
 
+    def _setup_dependencies(self) -> None:
+        """注册坎卦外部依赖断路器"""
+        self.register_dependency(
+            "data_store",
+            failure_threshold=3,
+            recovery_timeout=30.0,
+            half_open_max_calls=3,
+        )
+        self.register_dependency(
+            "llm",
+            failure_threshold=5,
+            recovery_timeout=60.0,
+            half_open_max_calls=2,
+        )
+        self.register_dependency(
+            "vector_store",
+            failure_threshold=3,
+            recovery_timeout=60.0,
+            half_open_max_calls=2,
+        )
+
     def _setup_degradation_rules(self) -> None:
         """定义降级规则"""
         from src.bagua.base_gua import DegradationRule, FallbackAction
@@ -98,6 +119,45 @@ class KanGua(GuaBase):
                 description="数据存储不可用，返回缓存统计",
             ),
             priority=1,
+        ))
+
+        # 规则 2: data_store 断路器断开 → 返回缓存统计
+        def _data_store_cb_open() -> bool:
+            cb = self.get_dependency("data_store")
+            return cb is not None and not cb.is_healthy
+
+        self.add_rule(DegradationRule(
+            name="data_store_cb_open",
+            condition_fn=_data_store_cb_open,
+            fallback=FallbackAction(
+                name="return_cached_stats_cb",
+                handler=self._degraded_data_handler,
+                description="data_store 断路器断开，返回缓存统计",
+            ),
+            priority=2,
+        ))
+
+        # 规则 3: vector_store 断路器断开 → 跳过向量相关操作
+        def _vector_store_cb_open() -> bool:
+            cb = self.get_dependency("vector_store")
+            return cb is not None and not cb.is_healthy
+
+        def _skip_vector_ops(params: Dict[str, Any]) -> Dict[str, Any]:
+            return {
+                "degraded": True,
+                "message": "向量存储不可用，跳过向量操作",
+                "action": params.get("action", ""),
+            }
+
+        self.add_rule(DegradationRule(
+            name="vector_store_cb_open",
+            condition_fn=_vector_store_cb_open,
+            fallback=FallbackAction(
+                name="skip_vector_ops",
+                handler=_skip_vector_ops,
+                description="vector_store 断路时跳过向量操作",
+            ),
+            priority=5,
         ))
 
     def _execute_core(self, params: Dict[str, Any]) -> Any:

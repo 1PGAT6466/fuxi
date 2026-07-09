@@ -64,10 +64,42 @@ class ZhenGua(GuaBase):
     # GuaBase 抽象方法实现
     # ========================================================================
 
+    def _setup_dependencies(self) -> None:
+        """注册震卦外部依赖断路器"""
+        self.register_dependency(
+            "file_io",
+            failure_threshold=5,
+            recovery_timeout=30.0,
+            half_open_max_calls=3,
+        )
+        self.register_dependency(
+            "vector_store",
+            failure_threshold=3,
+            recovery_timeout=60.0,
+            half_open_max_calls=2,
+        )
+        self.register_dependency(
+            "embedder_server",
+            failure_threshold=3,
+            recovery_timeout=60.0,
+            half_open_max_calls=2,
+        )
+        self.register_dependency(
+            "kun_store",
+            failure_threshold=3,
+            recovery_timeout=30.0,
+            half_open_max_calls=2,
+        )
+
+    # ========================================================================
+    # GuaBase 抽象方法实现
+    # ========================================================================
+
     def _setup_degradation_rules(self) -> None:
-        """震卦降级规则：文件 I/O 失败时降级为空指纹"""
+        """震卦降级规则：文件 I/O / 向量存储 / embedder / kun 故障时降级"""
         from src.bagua.base_gua import DegradationRule, FallbackAction
 
+        # 规则 1: 文件 I/O 持续失败 → 返回空指纹
         def _empty_fingerprint_fallback(params: Dict[str, Any]) -> str:
             return ""
 
@@ -80,6 +112,74 @@ class ZhenGua(GuaBase):
                 description="文件读取持续失败时返回空指纹",
             ),
             priority=10,
+        ))
+
+        # 规则 2: 向量存储断路器断开 → 跳过向量化，仅存文本
+        def _vector_store_unavailable() -> bool:
+            cb = self.get_dependency("vector_store")
+            return cb is not None and not cb.is_healthy
+
+        def _skip_vectorization_fallback(params: Dict[str, Any]) -> Dict[str, Any]:
+            file_path = params.get("file_path", "")
+            return {
+                "ok": True,
+                "file_path": file_path,
+                "digested": True,
+                "degraded": True,
+                "message": "向量存储不可用，仅存文本块",
+            }
+
+        self.add_rule(DegradationRule(
+            name="vector_store_degraded",
+            condition_fn=_vector_store_unavailable,
+            fallback=FallbackAction(
+                name="skip_vectorization",
+                handler=_skip_vectorization_fallback,
+                description="向量存储断路时跳过向量化",
+            ),
+            priority=20,
+        ))
+
+        # 规则 3: embedder_server 断路 → 跳过向量化
+        def _embedder_unavailable() -> bool:
+            cb = self.get_dependency("embedder_server")
+            return cb is not None and not cb.is_healthy
+
+        self.add_rule(DegradationRule(
+            name="embedder_degraded",
+            condition_fn=_embedder_unavailable,
+            fallback=FallbackAction(
+                name="skip_embedding",
+                handler=_skip_vectorization_fallback,
+                description="embedder 断路时跳过向量化",
+            ),
+            priority=25,
+        ))
+
+        # 规则 4: kun_store 断路 → 跳过坤卦存储
+        def _kun_store_unavailable() -> bool:
+            cb = self.get_dependency("kun_store")
+            return cb is not None and not cb.is_healthy
+
+        def _skip_kun_fallback(params: Dict[str, Any]) -> Dict[str, Any]:
+            file_path = params.get("file_path", "")
+            return {
+                "ok": True,
+                "file_path": file_path,
+                "digested": True,
+                "degraded": True,
+                "message": "坤卦存储不可用，跳过知识库存储",
+            }
+
+        self.add_rule(DegradationRule(
+            name="kun_store_degraded",
+            condition_fn=_kun_store_unavailable,
+            fallback=FallbackAction(
+                name="skip_kun_store",
+                handler=_skip_kun_fallback,
+                description="坤卦断路时跳过知识库存储",
+            ),
+            priority=30,
         ))
 
     def _execute_core(self, params: Dict[str, Any]) -> Any:
