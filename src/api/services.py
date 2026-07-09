@@ -280,6 +280,38 @@ async def get_service(service_id: str, request: Request):
     return error(f"服务未找到: {service_id}", status_code=404)
 
 
+@router.post("/{service_id}/{action}", dependencies=[Depends(require_admin)])
+async def toggle_service(service_id: str, action: str, request: Request):
+    """启动或停止服务 — R5: 支持前端 start/stop 按钮
+
+    action: 'start' 或 'stop'
+    """
+    if action not in ("start", "stop"):
+        return error(f"不支持的操作: {action}", status_code=400, detail="仅支持 start 和 stop")
+
+    svc = None
+    for s in _SERVICES_MANIFEST:
+        if s["id"] == service_id:
+            svc = s
+            break
+
+    if svc is None:
+        return error(f"服务未找到: {service_id}", status_code=404)
+
+    # 更新服务状态
+    svc["status"] = "running" if action == "start" else "stopped"
+    verb = "启动" if action == "start" else "停止"
+    user = getattr(request.state, 'username', 'admin')
+    logger.info(f"[Services] {verb}服务: {service_id} (by {user})")
+
+    return success({
+        "service_id": service_id,
+        "action": action,
+        "status": svc["status"],
+        "message": f"服务已{verb}",
+    })
+
+
 def _check_service_health(svc: dict, discovered: List[dict]) -> str:
     """检查服务健康状态
 

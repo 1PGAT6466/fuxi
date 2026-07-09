@@ -78,14 +78,8 @@ async def get_user_preferences(request: Request = None):
         username = getattr(request.state, "user", "anonymous") if request else "anonymous"
         prefs = _load_preferences(username)
 
-        _wants_v2 = request and (
-            request.query_params.get("format") == "v2"
-            or request.headers.get("X-API-Format", "").lower() == "v2"
-        )
-        if _wants_v2:
-            from src.api.response import success
-            return success(data={"preferences": prefs}, message="用户偏好")
-        return {"preferences": prefs}
+        # v1.50 R5: 统一返回格式 {status: "ok", data: {...}}
+        return {"status": "ok", "data": {"preferences": prefs}}
     except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"get_user_preferences 失败: {e}")
         return JSONResponse(

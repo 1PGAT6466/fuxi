@@ -124,13 +124,28 @@ async function api(url, opt) {
         throw new Error('Not logged in');
       }
       if (r.status === 403) { toast('没有权限', 'error'); throw new Error('Forbidden'); }
-      if (!r.ok) throw new Error('请求失败: ' + r.status);
+      if (!r.ok) {
+        // 先尝试解析响应体，提取错误信息（FastAPI 默认 {detail: "..."} 格式）
+        var errData = null;
+        try { errData = await r.json(); } catch(_) { errData = null; }
+        if (errData && errData.detail) {
+          throw new Error(errData.detail);
+        }
+        if (errData && errData.status === 'error' && errData.message) {
+          throw new Error(errData.message);
+        }
+        throw new Error('请求失败: ' + r.status);
+      }
 
       var data = await r.json();
 
-      // P2-7 fix + v1.50 unified: 处理后端 {status: 'success'|'error', data: {...}} 统一格式
+      // P2-7 fix + v1.50 unified + R5: 处理后端 {status: 'success'|'error', data: {...}} 统一格式
       if (data && data.status === 'error' && data.message) {
         throw new Error(data.message);
+      }
+      // R5: FastAPI 默认错误格式 {detail: "..."} 兜底（非 success 响应才处理）
+      if (data && data.detail && typeof data.detail === 'string' && data.status !== 'success') {
+        throw new Error(data.detail);
       }
 
       // v1.50: 统一格式自动解包 data 字段，同时保留顶层字段用于兼容

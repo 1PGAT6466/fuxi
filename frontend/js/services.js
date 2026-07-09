@@ -15,10 +15,14 @@ async function loadServices() {
   grid.innerHTML = '';
 
   try {
-    var list = await api('/api/services');
-    if (!Array.isArray(list)) list = [];
+    var raw = await api('/api/services');
+    // R5: api-client 统一解包后，services 在顶层；兼容直接数组
+    var list = Array.isArray(raw) ? raw : (raw.services || raw.data && raw.data.services || []);
 
-    var running = list.filter(function(s) { return s.status === 'running'; }).length;
+    // R5: 后端状态值 'up' / 'running' / 'degraded' / 'unknown' / 'stopped' 统一处理
+    var running = list.filter(function(s) {
+      return s.status === 'running' || s.status === 'up';
+    }).length;
     var stopped = list.length - running;
 
     stats.innerHTML =
@@ -39,9 +43,11 @@ async function loadServices() {
 }
 
 function renderServiceCard(s) {
-  var isRunning = s.status === 'running';
-  var statusColor = isRunning ? '#34c759' : '#ff3b30';
-  var statusText = isRunning ? '运行中' : '已停止';
+  // R5: 统一处理后端 'up'/'running'/'degraded'/'unknown'/'stopped' 状态
+  var isRunning = s.status === 'running' || s.status === 'up';
+  var isStopped = s.status === 'stopped';
+  var statusColor = isRunning ? '#34c759' : (isStopped ? '#ff3b30' : '#ff9500');
+  var statusText = isRunning ? '运行中' : (isStopped ? '已停止' : (s.status || '未知'));
   var btnLabel = isRunning ? '停止' : '启动';
   var btnClass = isRunning ? 'btn-ghost' : 'btn-orange';
   var icon = '⚙️';
@@ -79,8 +85,10 @@ async function toggleService(serviceId, action) {
 async function showServiceDetail(serviceId) {
   try {
     var d = await api('/api/services/' + serviceId);
-    var isRunning = d.status === 'running';
-    var statusColor = isRunning ? '#34c759' : '#ff3b30';
+    // R5: 统一处理后端 'up'/'running'/'stopped'/'degraded'/'unknown' 状态
+    var isRunning = d.status === 'running' || d.status === 'up';
+    var isStopped = d.status === 'stopped';
+    var statusColor = isRunning ? '#34c759' : (isStopped ? '#ff3b30' : '#ff9500');
 
     var html = '<div style="padding:8px 0;font-size:13px;color:var(--text2);line-height:2.2">' +
       '<div><strong style="color:var(--text)">服务ID:</strong> ' + esc(d.id) + '</div>' +

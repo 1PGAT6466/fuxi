@@ -188,14 +188,8 @@ async def list_notifications(
             "page_size": page_size,
         }
 
-        _wants_v2 = request and (
-            request.query_params.get("format") == "v2"
-            or request.headers.get("X-API-Format", "").lower() == "v2"
-        )
-        if _wants_v2:
-            from src.api.response import success
-            return success(data=data, message="通知列表")
-        return data
+        # v1.50 R5: 统一返回格式 {status: "ok", data: {...}}
+        return {"status": "ok", "data": data}
     except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"list_notifications 失败: {e}")
         return JSONResponse(

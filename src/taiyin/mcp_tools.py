@@ -63,7 +63,7 @@ async def sag_explain(query: str) -> Dict:
         return {"error": str(e)}
 
 
-async def sag_status() -> Dict:
+async def sag_status(args: dict = None) -> Dict:
     """MCP 工具：获取系统状态"""
     from src.infra.meridian_monitor import get_monitor
     try:
@@ -109,7 +109,7 @@ async def kb_search(query: str, top_k: int = 5, mode: str = "semantic") -> Dict:
 
 
 # ── 6. kb_list_documents ──
-async def kb_list_documents() -> Dict:
+async def kb_list_documents(args: dict = None) -> Dict:
     """列出知识库文档"""
     try:
         from src.db.data_store import load_chunks
@@ -210,7 +210,7 @@ async def graph_query(entity: str = "", source: str = "", target: str = "",
 
 
 # ── 9. graph_stats ──
-async def graph_stats() -> Dict:
+async def graph_stats(args: dict = None) -> Dict:
     """图谱统计"""
     try:
         from src.config import GRAPH_PATH
@@ -256,17 +256,27 @@ async def graph_stats() -> Dict:
 
 
 # ── 10. wiki_search ──
-async def wiki_search(q: str = "", category: str = "", limit: int = 20) -> Dict:
+async def wiki_search(args: dict = None) -> Dict:
     """Wiki 页面搜索"""
     try:
+        # args 从 /api/mcp/call 传入的是 dict
+        if isinstance(args, dict):
+            q = args.get("q", args.get("query", ""))
+            category = args.get("category", "")
+            limit = args.get("limit", 20)
+        else:
+            q = str(args).strip() if args else ""
+            category = ""
+            limit = 20
+
         from src.taiyang.wiki import get_wiki_engine
         engine = get_wiki_engine()
-        if not q.strip():
+        if not q or not str(q).strip():
             pages = engine.list_pages(category=category, limit=limit)
         else:
-            pages = engine.search_content(q, limit=limit)
+            pages = engine.search_content(str(q).strip(), limit=limit)
             if not pages:
-                pages = engine.search_by_title(q, limit=limit)
+                pages = engine.search_by_title(str(q).strip(), limit=limit)
         return {"pages": pages, "total": len(pages)}
     except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] wiki_search 失败: {e}")
@@ -291,7 +301,7 @@ async def wiki_get(page_id: str) -> Dict:
 
 
 # ── 12. dream_cycle_run ──
-async def dream_cycle_run() -> Dict:
+async def dream_cycle_run(args: dict = None) -> Dict:
     """触发夜间消化循环"""
     try:
         from src.evolution.dream_cycle import DreamCycle
@@ -307,7 +317,7 @@ async def dream_cycle_run() -> Dict:
 
 
 # ── 13. dream_cycle_report ──
-async def dream_cycle_report() -> Dict:
+async def dream_cycle_report(args: dict = None) -> Dict:
     """获取最新日报"""
     try:
         _report_dir = Path(os.environ.get(
@@ -571,7 +581,7 @@ async def notifications_list(page: int = 1, page_size: int = 20,
 
 
 # ── 22. feature_flags_list ──
-async def feature_flags_list() -> Dict:
+async def feature_flags_list(args: dict = None) -> Dict:
     """列出功能开关"""
     try:
         from src.services.feature_flags import load_flags, DEFAULT_FLAGS
@@ -583,7 +593,7 @@ async def feature_flags_list() -> Dict:
 
 
 # ── 23. health_check ──
-async def health_check() -> Dict:
+async def health_check(args: dict = None) -> Dict:
     """系统健康检查"""
     try:
         from src.infra.health_check import get_health_checker

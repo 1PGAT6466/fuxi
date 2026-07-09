@@ -337,6 +337,42 @@ except ImportError:
     limiter = None
     logger.warning("[RateLimit] slowapi 未安装，限流禁用")
 
+# ============ v1.50 R5: 全局异常处理器 ============
+# 将 FastAPI 默认的 {detail: "..."} 格式统一转换为 {status: "error", message: "..."}
+from fastapi import HTTPException
+from fastapi.responses import JSONResponse as _JSONResponse
+from starlette.exceptions import HTTPException as StarletteHTTPException
+
+
+@app.exception_handler(StarletteHTTPException)
+async def global_http_exception_handler(request: Request, exc: StarletteHTTPException):
+    """全局 HTTP 异常处理器 — 统一错误格式
+    
+    将 FastAPI/Starlette 默认的 {"detail": "..."} 转换为:
+      {"status": "error", "message": "...", "status_code": 4xx/5xx}
+    """
+    body = {
+        "status": "error",
+        "message": str(exc.detail),
+        "status_code": exc.status_code,
+    }
+    return _JSONResponse(content=body, status_code=exc.status_code)
+
+
+@app.exception_handler(HTTPException)
+async def global_fastapi_exception_handler(request: Request, exc: HTTPException):
+    """FastAPI HTTPException 处理器 — 统一错误格式"""
+    # 提取 headers（如果有额外头信息，如 CORS）
+    headers = getattr(exc, "headers", None)
+    body = {
+        "status": "error",
+        "message": str(exc.detail),
+        "status_code": exc.status_code,
+    }
+    return _JSONResponse(content=body, status_code=exc.status_code, headers=headers)
+
+logger.info("[ErrorHandler] 全局异常处理器已注册 — {detail} → {status, message}")
+
 # ============ v2.1 引擎路由中间件 ============
 @app.middleware("http")
 async def engine_middleware(request: Request, call_next):
