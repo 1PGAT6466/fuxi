@@ -1,36 +1,109 @@
 // ===== Wiki — 分类树形目录 + 美观内容展示 =====
 var _wikiPages = [];
-var _wikiCategories = {
-  "模具设计": ["模具","连接器","端子","注塑","成型","型腔","分模","滑块"],
-  "机械设计": ["机械","材料","标准件","公差","轴承","齿轮","紧固件","联轴器","丝杆","导轨"],
-  "电气自动化": ["电气","PLC","传感器","伺服","电机","变频","HMI","SCADA","继电器"],
-  "自动化产线": ["自动化","产线","装配线","流水线","机器人","AGV","机械手","视觉"],
-  "网络建设": ["网络","VLAN","路由","交换","DHCP","DNS","防火墙","AP","拓扑","子网"],
-  "工程技术规范": ["规范","标准","ISO","GB","工艺","SOP","技术要求","验收","品质","SPC","FMEA"],
-  "公司制度": ["制度","人事","财务","行政","培训","安全","采购","项目管理","会议","合同"],
-  "IT系统": ["IT系统","操作手册","泛微","E-cology","SAP","OA","ERP","MES","PLM","WMS","流程引擎","门户引擎"],
-  "AI": ["RAG","AI","LLM","机器学习","NLP","检索","分块","Embedding","Agent","评测","召回","Rerank"]
+// 分类数据从后端 /api/wiki/categories 获取，不再硬编码
+var _wikiCategories = null;
+var _catIcons = null;
+var _catColors = null;
+
+// 默认分类图标/颜色
+var _DEFAULT_CAT_ICON = '📁';
+var _DEFAULT_CAT_COLOR = '#95a5a6';
+
+// 内置图标/颜色自动映射（可根据后端分类名匹配）
+var _CAT_ICON_MAP = {
+  '模具设计':'🔧','机械设计':'⚙️','电气自动化':'⚡','自动化产线':'🏭','网络建设':'🌐',
+  '工程技术规范':'📋','公司制度':'📜','IT系统':'💻','AI':'🧠','文档':'📄','知识库':'📚',
+  '系统':'💻','开发':'🛠','测试':'🧪','运维':'🔧','安全':'🛡','数据':'📊'
+};
+var _CAT_COLOR_MAP = {
+  '模具设计':'#e74c3c','机械设计':'#3498db','电气自动化':'#f39c12','自动化产线':'#27ae60',
+  '网络建设':'#9b59b6','工程技术规范':'#1abc9c','公司制度':'#e67e22','IT系统':'#2980b9',
+  'AI':'#8e44ad','文档':'#2980b9','知识库':'#8e44ad','系统':'#27ae60','开发':'#e74c3c',
+  '测试':'#f39c12','运维':'#1abc9c','安全':'#e74c3c','数据':'#9b59b6'
 };
 
+function _getCatIcon(cat) {
+  if (_catIcons && _catIcons[cat]) return _catIcons[cat];
+  return _CAT_ICON_MAP[cat] || _DEFAULT_CAT_ICON;
+}
+function _getCatColor(cat) {
+  if (_catColors && _catColors[cat]) return _catColors[cat];
+  return _CAT_COLOR_MAP[cat] || _DEFAULT_CAT_COLOR;
+}
+
+/**
+ * 从后端获取分类列表 → GET /api/wiki (返回 categories 字段)
+ * 支持格式:
+ *   {pages, categories:['cat1','cat2']}
+ *   {pages, categories:[{name, keywords[]}]}
+ *   {cat1:[kw1], cat2:[kw2]}
+ */
+async function _loadWikiCategories() {
+  if (_wikiCategories !== null) return _wikiCategories;
+  try {
+    var d = await api('/api/wiki');
+    if (d.categories && Array.isArray(d.categories) && d.categories.length > 0 && typeof d.categories[0] !== 'string') {
+      _wikiCategories = {};
+      d.categories.forEach(function(cat) {
+        _wikiCategories[cat.name || cat.title || '未分类'] = cat.keywords || [];
+      });
+      _catIcons = d.icons || null;
+      _catColors = d.colors || null;
+      return _wikiCategories;
+    }
+    if (d.categories && Array.isArray(d.categories) && d.categories.length > 0) {
+      _wikiCategories = {};
+      d.categories.forEach(function(cat) { _wikiCategories[cat] = [cat.toLowerCase()]; });
+      return _wikiCategories;
+    }
+    if (typeof d === 'object' && Object.keys(d).length > 0) {
+      _wikiCategories = d;
+      return _wikiCategories;
+    }
+    console.warn('[Wiki] 后端 /api/wiki 返回空 categories');
+    _wikiCategories = {}; _catIcons = {}; _catColors = {};
+    return _wikiCategories;
+  } catch(e) {
+    console.warn('[Wiki] 无法获取分类列表:', e.message);
+    _wikiCategories = {}; _catIcons = {}; _catColors = {};
+    return _wikiCategories;
+  }
+}
+
+/**
+ * 将 Wiki 页面归类（基于后端返回的分类关键词）
+ * 无匹配时归入「未分类」
+ */
 function _classifyWikiPage(title, content) {
+  if (!_wikiCategories) return '未分类';
+  var cats = Object.keys(_wikiCategories);
+  if (cats.length === 0) return '未分类';
   var text = (title + ' ' + (content||'')).toLowerCase();
-  for (var cat in _wikiCategories) {
+  for (var ci = 0; ci < cats.length; ci++) {
+    var cat = cats[ci];
     var keywords = _wikiCategories[cat];
     for (var i = 0; i < keywords.length; i++) {
       if (text.indexOf(keywords[i].toLowerCase()) >= 0) return cat;
     }
   }
-  return '其他';
+  return '未分类';
 }
-
-var _catIcons = {'模具设计':'🔧','机械设计':'⚙️','电气自动化':'⚡','自动化产线':'🏭','网络建设':'🌐','工程技术规范':'📋','公司制度':'📜','IT系统':'💻','AI':'🧠','其他':'📁'};
-var _catColors = {'模具设计':'#e74c3c','机械设计':'#3498db','电气自动化':'#f39c12','自动化产线':'#27ae60','网络建设':'#9b59b6','工程技术规范':'#1abc9c','公司制度':'#e67e22','IT系统':'#2980b9','AI':'#8e44ad','其他':'#95a5a6'};
 
 async function loadWikiTree() {
   var tree = document.getElementById('wikiTree');
   tree.innerHTML = '<div style="text-align:center;padding:20px"><div class="loading-dots">加载中<span>.</span><span>.</span><span>.</span></div></div>';
   try {
-    var d = await api('/api/wiki/pages');
+    // 并行加载分类和页面列表 — 分别捕获错误避免 Promise.all 过早 reject
+    var catPromise = _loadWikiCategories().catch(function(e) {
+      console.warn('[Wiki] 分类加载失败，使用默认分类:', e.message);
+      return {};
+    });
+    var pagesPromise = api('/api/wiki/pages').catch(function(e) {
+      console.warn('[Wiki] 页面列表加载失败:', e.message);
+      return { pages: [] };
+    });
+    var results = await Promise.all([catPromise, pagesPromise]);
+    var d = results[1];
     var pages = d.pages || d || [];
     _wikiPages = pages;
     if (!pages.length) {
@@ -39,7 +112,7 @@ async function loadWikiTree() {
     }
     _renderWikiTree('');
   } catch(e) {
-    tree.innerHTML = '<div style="padding:16px"><div style="font-size:13px;font-weight:600;margin-bottom:12px">📚 目录</div><div class="empty"><div class="empty-icon">⚠️</div><h3>加载失败</h3><p>'+esc(e.message)+'</p></div></div>';
+    tree.innerHTML = '<div style="padding:16px"><div style="font-size:13px;font-weight:600;margin-bottom:12px">📚 目录</div><div class="empty"><div class="empty-icon">⚠️</div><h3>加载失败</h3><p>'+esc(e.message)+'</p><button class="btn btn-ghost btn-sm" onclick="loadWikiTree()" style="margin-top:8px">重试</button></div></div>';
   }
 }
 
@@ -54,16 +127,28 @@ function _renderWikiTree(filter) {
     groups[cat].push(p);
   });
 
-  var catOrder = ['模具设计','机械设计','电气自动化','自动化产线','网络建设','工程技术规范','公司制度','IT系统','AI','其他'];
+  var catOrder = Object.keys(groups);
+  catOrder.sort(function(a, b) {
+    if (a === '未分类') return 1;
+    if (b === '未分类') return -1;
+    return a.localeCompare(b);
+  });
+  // P1-9: 如果所有页面都在「未分类」中，显示提示
+  var allUnclassified = catOrder.length === 1 && catOrder[0] === '未分类';
   var html = '<div style="padding:0 4px">';
   html += '<div style="font-size:13px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px">📚 目录 <span style="font-size:11px;color:var(--text3);font-weight:400">('+_wikiPages.length+')</span></div>';
   html += '<div style="display:flex;align-items:center;gap:6px;background:var(--bg);border-radius:8px;padding:6px 10px;margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="color:var(--text3);flex-shrink:0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" placeholder="搜索页面..." value="'+esc(filter)+'" oninput="_renderWikiTree(this.value)" style="flex:1;border:none;background:transparent;font-size:12px;outline:none;font-family:var(--font)"></div>';
 
+  // P1-9: 无分类时显示提示
+  if (allUnclassified) {
+    html += '<div style="font-size:11px;color:var(--text3);padding:4px 8px;margin-bottom:8px;background:var(--bg);border-radius:6px;line-height:1.5">💡 分类关键词尚未配置，所有页面归入「未分类」。可在后端 /api/wiki 接口返回 categories 字段来启用自动分类。</div>';
+  }
+
   catOrder.forEach(function(cat) {
     var pages = groups[cat];
     if (!pages || !pages.length) return;
-    var icon = _catIcons[cat] || '📁';
-    var color = _catColors[cat] || '#999';
+    var icon = _getCatIcon(cat);
+    var color = _getCatColor(cat);
     html += '<div class="wiki-cat" style="margin-bottom:8px">';
     html += '<div onclick="this.parentElement.querySelector(\'.wiki-cat-items\').classList.toggle(\'hidden\')" style="display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;border-radius:6px;font-size:12px;font-weight:600;color:var(--text2);transition:all .15s" onmouseenter="this.style.background=\'var(--bg)\'" onmouseleave="this.style.background=\'transparent\'">';
     html += '<span style="font-size:14px">'+icon+'</span>';
@@ -99,51 +184,73 @@ function _extractToc(content) {
 }
 
 // 给渲染后的 HTML 中的标题加 id（用于目录跳转）
+// P0-5 fix: 使用 counter 逐个匹配，避免 replaced 标志位匹配错位
 function _addHeadingIds(html, content) {
   if (!content) return html;
   var lines = content.split('\n');
-  var headingIdx = 0;
+  // 收集所有需要加 id 的标题信息
+  var headingMap = {};
+  var headingCounter = {};
   for (var i = 0; i < lines.length; i++) {
     var m = lines[i].match(/^(#{1,3})\s+(.+)/);
     if (m) {
       var level = m[1].length;
+      var text = m[2].replace(/\*\*/g, '').replace(/\*/g, '').trim();
       var tag = 'h' + level;
       var id = 'heading-' + i;
-      // 替换第一个匹配的 <hN> 为 <hN id="...">
-      var re = new RegExp('<' + tag + '>([\\s\\S]*?)</' + tag + '>');
-      var replaced = false;
-      html = html.replace(re, function(match) {
-        if (replaced) return match;
-        replaced = true;
-        return '<' + tag + ' id="' + id + '">' + match.slice(tag.length + 2, -(tag.length + 3)) + '</' + tag + '>';
-      });
+      if (!headingMap[tag]) headingMap[tag] = [];
+      headingMap[tag].push({ id: id, text: text });
     }
+  }
+  // 对每个 heading 级别，按顺序替换 <hN> 标签
+  for (var tag in headingMap) {
+    if (!headingMap.hasOwnProperty(tag)) continue;
+    var headings = headingMap[tag];
+    var idx = 0;
+    // 使用全局匹配，逐个替换
+    var re = new RegExp('<' + tag + '([^>]*)>', 'gi');
+    html = html.replace(re, function(match, attrs) {
+      if (idx >= headings.length) return match;
+      var h = headings[idx++];
+      // 如果已有 id 属性，跳过
+      if (attrs && /\bid\s*=/i.test(attrs)) return match;
+      return '<' + tag + ' id="' + h.id + '"' + (attrs ? ' ' + attrs.trim() : '') + '>';
+    });
   }
   return html;
 }
 
 
 // 智能结构化：将【xxx】：描述 和 **key**：value 模式转为卡片/表格
+// P2-14: 先快速检查是否包含模式特征，避免对纯文本页面运行 4 次全量正则替换
 function _structureContent(html) {
-  // 模式1: 【操作名】：描述 — 转为操作卡片表格
-  var actionPattern = /(<p>【[^】]+】[：:][^<]*<\/p>\s*){2,}/g;
-  html = html.replace(actionPattern, function(match) {
-    var items = [];
-    var re = /<p>【([^】]+)】[：:]\s*([^<]*)<\/p>/g;
-    var m;
-    while ((m = re.exec(match)) !== null) {
-      items.push({ action: m[1], desc: m[2].trim() });
-    }
-    if (items.length < 2) return match;
-    var table = '<div style="margin:16px 0"><table style="width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:13px"><thead><tr><th style="background:var(--bg);padding:10px 14px;text-align:left;font-weight:600;color:var(--text3);font-size:12px;width:120px">操作</th><th style="background:var(--bg);padding:10px 14px;text-align:left;font-weight:600;color:var(--text3);font-size:12px">说明</th></tr></thead><tbody>';
-    items.forEach(function(it, i) {
-      var bg = i % 2 === 0 ? '' : ' style="background:rgba(0,0,0,0.01)"';
-      table += '<tr' + bg + '><td style="padding:10px 14px;border-bottom:1px solid var(--border);font-weight:600;color:var(--mi-orange)">【' + esc(it.action) + '】</td><td style="padding:10px 14px;border-bottom:1px solid var(--border);color:var(--text2)">' + esc(it.desc) + '</td></tr>';
-    });
-    table += '</tbody></table></div>';
-    return table;
-  });
+  var hasAction = html.indexOf('【') >= 0;
+  var hasKeyValue = html.indexOf('<strong>') >= 0;
+  if (!hasAction && !hasKeyValue) return html;  // 跳过无特征内容
 
+  // 模式1: 【操作名】：描述 — 转为操作卡片表格
+  if (hasAction) {
+    var actionPattern = /(<p>【[^】]+】[：:][^<]*<\/p>\s*){2,}/g;
+    html = html.replace(actionPattern, function(match) {
+      var items = [];
+      var re = /<p>【([^】]+)】[：:]\s*([^<]*)<\/p>/g;
+      var m;
+      while ((m = re.exec(match)) !== null) {
+        items.push({ action: m[1], desc: m[2].trim() });
+      }
+      if (items.length < 2) return match;
+      var table = '<div style="margin:16px 0"><table style="width:100%;border-collapse:separate;border-spacing:0;border:1px solid var(--border);border-radius:8px;overflow:hidden;font-size:13px"><thead><tr><th style="background:var(--bg);padding:10px 14px;text-align:left;font-weight:600;color:var(--text3);font-size:12px;width:120px">操作</th><th style="background:var(--bg);padding:10px 14px;text-align:left;font-weight:600;color:var(--text3);font-size:12px">说明</th></tr></thead><tbody>';
+      items.forEach(function(it, i) {
+        var bg = i % 2 === 0 ? '' : ' style="background:rgba(0,0,0,0.01)"';
+        table += '<tr' + bg + '><td style="padding:10px 14px;border-bottom:1px solid var(--border);font-weight:600;color:var(--mi-orange)">【' + esc(it.action) + '】</td><td style="padding:10px 14px;border-bottom:1px solid var(--border);color:var(--text2)">' + esc(it.desc) + '</td></tr>';
+      });
+      table += '</tbody></table></div>';
+      return table;
+    });
+  }
+
+  // 模式2-4 仅当有 <strong> 标签时才执行
+  if (hasKeyValue) {
   // 模式2: li 中 **key**：value — 转为定义卡片
   // 匹配 <li><strong>key</strong>：value</li> 或 <li><strong>key</strong>：<br>
   html = html.replace(/<li>\s*<strong>([^<]+)<\/strong>[：:]\s*([^<]*(?:<br>\s*<\/li>|<\/li>))/g, function(match, key, value) {
@@ -177,6 +284,7 @@ function _structureContent(html) {
   html = html.replace(/<li>\s*<strong>([^<]+)<\/strong>[：:]\s*<\/li>/g, function(match, key) {
     return '<li style="list-style:none;padding:0;margin-bottom:8px"><div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px"><span style="font-weight:600;color:var(--mi-orange);font-size:13px">' + key.trim() + '</span></div></li>';
   });
+  }  // end if (hasKeyValue)
 
   return html;
 }
@@ -185,10 +293,14 @@ function _structureContent(html) {
 
 async function loadWikiPage(id) {
   try {
+    // 确保分类数据已加载
+    if (_wikiCategories === null) await _loadWikiCategories();
     var c = document.getElementById('wikiContent');
     c.innerHTML = '<div style="text-align:center;padding:60px"><div class="loading-dots">加载中<span>.</span><span>.</span><span>.</span></div></div>';
     var d = await api('/api/wiki/page/' + id);
     var content = d.content || '';
+    if (typeof marked === 'undefined') console.warn('[Wiki] marked.js CDN 加载失败，将回退为纯文本');
+    if (typeof DOMPurify === 'undefined') console.warn('[Wiki] DOMPurify CDN 加载失败，安全防护降级');
     var rendered = typeof marked !== 'undefined' ? marked.parse(content) : esc(content);
     if (typeof DOMPurify !== 'undefined') rendered = DOMPurify.sanitize(rendered);
 
@@ -198,8 +310,8 @@ async function loadWikiPage(id) {
 
     // 分类
     var cat = _classifyWikiPage(d.title, content);
-    var catIcon = _catIcons[cat] || '📁';
-    var catColor = _catColors[cat] || '#999';
+    var catIcon = _getCatIcon(cat);
+    var catColor = _getCatColor(cat);
 
     // 提取目录
     var toc = _extractToc(content);

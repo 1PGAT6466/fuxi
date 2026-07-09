@@ -8,23 +8,46 @@ import {
   fetchFiles as apiFetchFiles,
   uploadFile as apiUploadFile,
   deleteFile as apiDeleteFile,
+  type BackendFileInfo,
 } from '@/api/files';
-import type { FileInfo } from '@/types';
+
+export interface DisplayFileInfo {
+  id: string;
+  filename: string;
+  size: number;
+  type: string;
+  uploadedAt: string;
+  hash: string;
+  status: 'ready' | 'processing' | 'uploaded';
+  chunkCount: number;
+}
+
+function backendToDisplay(f: BackendFileInfo): DisplayFileInfo {
+  const ext = f.file_name.split('.').pop() || 'unknown';
+  return {
+    id: f.file_hash,
+    filename: f.file_name,
+    size: 0, // 后端暂不返回 size
+    type: ext,
+    uploadedAt: new Date().toISOString(), // 后端暂不返回时间
+    hash: f.file_hash,
+    status: 'ready',
+    chunkCount: f.chunk_count,
+  };
+}
 
 export const useFileStore = defineStore('files', () => {
-  // P0-4: 大数组改用 shallowRef
-  const files = shallowRef<FileInfo[]>([]);
+  const files = shallowRef<DisplayFileInfo[]>([]);
   const loading = ref<boolean>(false);
   const error = ref<string | null>(null);
   const total = ref<number>(0);
 
-  // 搜索和筛选
   const searchQuery = ref<string>('');
   const typeFilter = ref<string>('');
   const currentPage = ref<number>(1);
   const pageSize = ref<number>(20);
 
-  async function fetchFiles(): Promise<FileInfo[]> {
+  async function fetchFiles(): Promise<DisplayFileInfo[]> {
     loading.value = true;
     error.value = null;
 
@@ -34,13 +57,9 @@ export const useFileStore = defineStore('files', () => {
         page_size: pageSize.value,
       };
       if (searchQuery.value) params.q = searchQuery.value;
-      if (typeFilter.value) params.type = typeFilter.value;
 
-      const data = (await apiFetchFiles(params)) as {
-        files: FileInfo[];
-        total: number;
-      };
-      files.value = data.files || [];
+      const data = await apiFetchFiles(params);
+      files.value = (data.files || []).map(backendToDisplay);
       total.value = data.total || 0;
       return files.value;
     } catch (err) {
@@ -63,14 +82,12 @@ export const useFileStore = defineStore('files', () => {
     files.value = files.value.filter((f) => f.id !== fileId);
   }
 
-  function getPreviewUrl(file: FileInfo): string {
-    const hash = file.hash || file.id;
-    return `/api/view/${hash}`;
+  function getPreviewUrl(file: DisplayFileInfo): string {
+    return `/api/view/${file.hash}`;
   }
 
-  function getDownloadUrl(file: FileInfo): string {
-    const hash = file.hash || file.id;
-    return `/api/download/${hash}`;
+  function getDownloadUrl(file: DisplayFileInfo): string {
+    return `/api/download/${file.hash}`;
   }
 
   function setSearch(query: string): void {
@@ -85,87 +102,6 @@ export const useFileStore = defineStore('files', () => {
 
   function setPage(page: number): void {
     currentPage.value = page;
-  }
-
-  // ============================
-  // Mock 数据
-  // ============================
-
-  const MOCK_FILES: FileInfo[] = [
-    {
-      id: 'f-1',
-      filename: '伏羲系统技术白皮书_v2.0.pdf',
-      size: 2458624,
-      uploadedAt: new Date(Date.now() - 86400000 * 2).toISOString(),
-      type: 'pdf',
-      hash: 'a1b2c3',
-      status: 'ready',
-    },
-    {
-      id: 'f-2',
-      filename: 'RAG检索增强生成综述.docx',
-      size: 1572864,
-      uploadedAt: new Date(Date.now() - 86400000 * 5).toISOString(),
-      type: 'docx',
-      hash: 'd4e5f6',
-      status: 'ready',
-    },
-    {
-      id: 'f-3',
-      filename: '2024年Q3数据报表.xlsx',
-      size: 3145728,
-      uploadedAt: new Date(Date.now() - 86400000 * 1).toISOString(),
-      type: 'xlsx',
-      hash: 'g7h8i9',
-      status: 'processing',
-    },
-    {
-      id: 'f-4',
-      filename: '系统架构设计图.png',
-      size: 524288,
-      uploadedAt: new Date(Date.now() - 86400000 * 10).toISOString(),
-      type: 'png',
-      hash: 'j0k1l2',
-      status: 'ready',
-    },
-    {
-      id: 'f-5',
-      filename: 'API接口文档.md',
-      size: 128000,
-      uploadedAt: new Date(Date.now() - 86400000 * 3).toISOString(),
-      type: 'md',
-      hash: 'm3n4o5',
-      status: 'ready',
-    },
-    {
-      id: 'f-6',
-      filename: '用户手册v1.3.pdf',
-      size: 5242880,
-      uploadedAt: new Date(Date.now() - 86400000 * 15).toISOString(),
-      type: 'pdf',
-      hash: 'p6q7r8',
-      status: 'uploaded',
-    },
-  ];
-
-  function loadMockData(): FileInfo[] {
-    let result = [...MOCK_FILES];
-
-    // 搜索筛选
-    if (searchQuery.value) {
-      const q = searchQuery.value.toLowerCase();
-      result = result.filter((f) => f.filename.toLowerCase().includes(q));
-    }
-
-    // 类型筛选
-    if (typeFilter.value) {
-      result = result.filter((f) => f.filename.endsWith(`.${typeFilter.value}`));
-    }
-
-    total.value = result.length;
-    const start = (currentPage.value - 1) * pageSize.value;
-    files.value = result.slice(start, start + pageSize.value);
-    return files.value;
   }
 
   return {
@@ -185,6 +121,5 @@ export const useFileStore = defineStore('files', () => {
     setSearch,
     setTypeFilter,
     setPage,
-    loadMockData,
   };
 });

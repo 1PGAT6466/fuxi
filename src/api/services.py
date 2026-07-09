@@ -283,8 +283,8 @@ async def get_service(service_id: str, request: Request):
 def _check_service_health(svc: dict, discovered: List[dict]) -> str:
     """检查服务健康状态
 
-    简单判断：服务路由是否在自动发现列表中。
-    若有对应路由注册则标记为 up。
+    通过自动发现列表验证服务路由是否已注册。
+    若有对应路由注册则标记为 up，否则标记为 unknown。
     """
     route = svc.get("route", "")
     # 对于已发现的路由，检查是否有匹配的前缀
@@ -292,5 +292,8 @@ def _check_service_health(svc: dict, discovered: List[dict]) -> str:
         d_prefix = d.get("prefix", "")
         if route.startswith(d_prefix) or d_prefix.startswith(route):
             return "up"
-    # 如果没有自动发现数据，也标记为 up（保守乐观）
-    return "up"
+    # 如果没有自动发现数据，标记为 unknown 而非盲目假设 up
+    if not discovered:
+        return "unknown"
+    # 路由未在发现列表中注册
+    return "degraded"

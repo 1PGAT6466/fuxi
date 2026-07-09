@@ -33,6 +33,7 @@ export default defineConfig(({ mode }) => {
       chunkSizeWarningLimit: 500,
     },
     server: {
+      host: '0.0.0.0',
       port: 3000,
       headers: {
         'X-Content-Type-Options': 'nosniff',

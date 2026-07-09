@@ -278,8 +278,50 @@ function getMockDashboard(): DashboardData {
 // ─── API 请求 ───
 async function fetchDashboard(): Promise<void> {
   try {
-    const data = await apiClient.get('/api/admin/dashboard');
-    dashboard.value = data as DashboardData;
+    // 并行请求多个 API
+    const [healthData, usersData, growthData] = await Promise.all([
+      apiClient.get('/api/health').catch(() => null),
+      apiClient.get('/api/admin/users').catch(() => null),
+      apiClient.get('/api/growth/overview').catch(() => null),
+    ]);
+
+    // 合并数据到仪表板
+    const merged: DashboardData = getMockDashboard(); // 先填充基础 mock 结构
+
+    if (healthData) {
+      const h = healthData as Record<string, unknown>;
+      merged.services = (h.services as ServiceInfo[]) || [];
+      if (h.bagua) {
+        // 从八卦状态构建服务列表
+        const bagua = h.bagua as Record<string, string>;
+        const guaMap: Record<string, string> = {
+          qian: '乾·大脑 / AI 对话', kun: '坤·脾 / 知识库', zhen: '震·肝 / 文档消化',
+          xun: '巽·肺 / 知识检索', kan: '坎·肾 / 数据精炼', li: '离·心 / 决策引擎',
+          gen: '艮·皮肤 / 系统守卫', dui: '兑·鼻 / 响应呈现',
+        };
+        merged.services = Object.entries(bagua).map(([key, status]) => ({
+          name: guaMap[key] || key,
+          status: status === 'healthy' ? 'online' : status === 'warning' ? 'degraded' : 'offline',
+          uptime: status === 'healthy' ? '正常' : status,
+        }));
+      }
+    }
+
+    if (usersData) {
+      const u = usersData as { total?: number; users?: unknown[] };
+      merged.total_users = u.total || (u.users || []).length || 0;
+    }
+
+    if (growthData) {
+      const g = growthData as { summary?: { total_queries?: number } };
+      if (g.summary?.total_queries !== undefined) {
+        merged.api_calls = g.summary.total_queries;
+      }
+    }
+
+    dashboard.value = merged;
+    await nextTick();
+    initChart();
   } catch (err) {
     console.warn('[Dashboard] API 不可用，使用 mock 数据', err);
     dashboard.value = getMockDashboard();

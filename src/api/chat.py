@@ -2,7 +2,7 @@
 # v1.44 Phase 1 Fix: 新增会话管理 + SSE流式 + 历史消息端点
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, StreamingResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import List, Optional
 import uuid
 import json
@@ -13,10 +13,135 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["AI 对话"])
 
-# ============ 内存会话存储 ============
-# 用于临时存储会话和消息（生产环境应替换为持久化存储）
+# ============ 持久化会话存储（SQLite）============
+# v2.1: 使用 SQLite 持久化，重启不丢失会话和消息
+
+from pathlib import Path as _Path
+
+
+def _get_chat_db_path():
+    """获取会话持久化 SQLite 数据库路径"""
+    from src.config import DATA_DIR
+    db_dir = _Path(DATA_DIR)
+    db_dir.mkdir(parents=True, exist_ok=True)
+    return str(db_dir / "chat_sessions.db")
+
+
+def _ensure_chat_tables():
+    """确保会话和消息表存在"""
+    import sqlite3
+    db_path = _get_chat_db_path()
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS sessions (
+                id TEXT PRIMARY KEY,
+                title TEXT,
+                user_id TEXT,
+                last_message TEXT,
+                created_at REAL,
+                updated_at REAL,
+                message_count INTEGER DEFAULT 0
+            )
+        """)
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS messages (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                session_id TEXT,
+                role TEXT,
+                content TEXT,
+                sources TEXT,
+                timestamp REAL,
+                FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id)")
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)")
+        conn.commit()
+
+
+# 内存缓存层（加速热点访问）
 _sessions_store: dict = {}
 _messages_store: dict = {}
+
+
+def _load_sessions_from_db():
+    """从 SQLite 加载所有会话到内存缓存"""
+    import sqlite3
+    _ensure_chat_tables()
+    try:
+        with sqlite3.connect(_get_chat_db_path()) as conn:
+            conn.row_factory = sqlite3.Row
+            rows = conn.execute("SELECT * FROM sessions").fetchall()
+            for row in rows:
+                row_dict = dict(row)
+                _sessions_store[row_dict["id"]] = row_dict
+            msg_rows = conn.execute("SELECT * FROM messages ORDER BY timestamp").fetchall()
+            for row in msg_rows:
+                row_dict = dict(row)
+                sid = row_dict["session_id"]
+                if sid not in _messages_store:
+                    _messages_store[sid] = []
+                _messages_store[sid].append({
+                    "role": row_dict["role"],
+                    "content": row_dict["content"],
+                    "sources": json.loads(row_dict["sources"]) if row_dict.get("sources") else [],
+                    "timestamp": row_dict["timestamp"],
+                })
+        logger.info(f"已从 SQLite 加载 {len(_sessions_store)} 个会话")
+    except Exception as e:
+        logger.warning(f"加载持久化会话失败: {e}")
+
+
+def _save_session_to_db(session: dict):
+    """持久化单个会话到 SQLite"""
+    import sqlite3
+    _ensure_chat_tables()
+    try:
+        with sqlite3.connect(_get_chat_db_path()) as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO sessions (id, title, user_id, last_message, created_at, updated_at, message_count)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                session["id"], session.get("title", ""), session.get("user_id", ""),
+                session.get("last_message", ""), session.get("created_at", 0),
+                session.get("updated_at", 0), session.get("message_count", 0)
+            ))
+            conn.commit()
+    except Exception as e:
+        logger.warning(f"持久化会话失败: {e}")
+
+
+def _save_message_to_db(session_id: str, msg: dict):
+    """持久化单条消息到 SQLite"""
+    import sqlite3
+    _ensure_chat_tables()
+    try:
+        with sqlite3.connect(_get_chat_db_path()) as conn:
+            sources_json = json.dumps(msg.get("sources", []), ensure_ascii=False)
+            conn.execute("""
+                INSERT INTO messages (session_id, role, content, sources, timestamp)
+                VALUES (?, ?, ?, ?, ?)
+            """, (session_id, msg.get("role", ""), msg.get("content", ""), sources_json, msg.get("timestamp", 0)))
+            conn.commit()
+    except Exception as e:
+        logger.warning(f"持久化消息失败: {e}")
+
+
+def _delete_session_from_db(session_id: str):
+    """从 SQLite 删除会话及其消息"""
+    import sqlite3
+    _ensure_chat_tables()
+    try:
+        with sqlite3.connect(_get_chat_db_path()) as conn:
+            conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
+            conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
+            conn.commit()
+    except Exception as e:
+        logger.warning(f"删除持久化会话失败: {e}")
+
+
+# 启动时加载持久化数据
+_load_sessions_from_db()
 
 
 class ChatRequest(BaseModel):
@@ -24,6 +149,22 @@ class ChatRequest(BaseModel):
     history: List[dict] = []
     stream: bool = False
     granularity: Optional[str] = "chunk"  # 任务 4: chunk/event/auto
+
+    @field_validator("history")
+    @classmethod
+    def validate_history(cls, v: List[dict]) -> List[dict]:
+        if len(v) > 50:
+            raise ValueError("对话历史条目数不能超过50条")
+        return v
+
+    @field_validator("query")
+    @classmethod
+    def validate_query(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("查询内容不能为空")
+        if len(v) > 4000:
+            raise ValueError("查询内容长度不能超过4000字符")
+        return v
 
 
 @router.post("/api/chat")
@@ -159,6 +300,22 @@ class ChatSendRequest(BaseModel):
     stream: bool = False
     granularity: Optional[str] = "chunk"
 
+    @field_validator("query")
+    @classmethod
+    def validate_query(cls, v: str) -> str:
+        if not v or not v.strip():
+            raise ValueError("查询内容不能为空")
+        if len(v) > 4000:
+            raise ValueError("查询内容长度不能超过4000字符")
+        return v
+
+    @field_validator("history")
+    @classmethod
+    def validate_history(cls, v: List[dict]) -> List[dict]:
+        if len(v) > 50:
+            raise ValueError("对话历史条目数不能超过50条")
+        return v
+
 
 def _get_user_id(request: Request) -> str:
     """从请求中获取当前用户ID"""
@@ -206,6 +363,7 @@ async def create_session(body: CreateSessionRequest, request: Request):
         }
         _sessions_store[session_id] = session
         _messages_store[session_id] = []
+        _save_session_to_db(session)  # v2.1: 持久化
         return {
             "id": session_id,
             "title": session["title"],
@@ -241,6 +399,7 @@ async def delete_session(session_id: str, request: Request):
             )
         del _sessions_store[session_id]
         _messages_store.pop(session_id, None)
+        _delete_session_from_db(session_id)  # v2.1: 持久化删除
         return {"ok": True, "message": f"会话 {session_id} 已删除"}
     except Exception as e:
         logger.exception(f"delete_session 失败: {e}")
@@ -280,18 +439,25 @@ async def chat_send(body: ChatSendRequest, request: Request):
                 }
                 _sessions_store[session_id] = session
                 _messages_store[session_id] = []
+                _save_session_to_db(session)  # v2.1: 持久化
             else:
                 session["last_message"] = body.query[:100]
                 session["updated_at"] = time.time()
+                _save_session_to_db(session)  # v2.1: 持久化更新
                 session["message_count"] = session.get("message_count", 0) + 1
 
         # 保存用户消息
         if session_id:
-            _messages_store.setdefault(session_id, []).append({
+            user_msg = {
                 "role": "user",
                 "content": body.query,
                 "timestamp": time.time(),
-            })
+            }
+            _messages_store.setdefault(session_id, []).append(user_msg)
+            _save_message_to_db(session_id, user_msg)  # v2.1: 持久化
+            # 持久化会话更新
+            if session_id in _sessions_store:
+                _save_session_to_db(_sessions_store[session_id])
 
         # 如果请求流式响应
         if body.stream:
@@ -330,12 +496,14 @@ async def chat_send(body: ChatSendRequest, request: Request):
 
                     # 保存助手回复
                     if session_id:
-                        _messages_store.setdefault(session_id, []).append({
+                        asst_msg = {
                             "role": "assistant",
                             "content": answer,
                             "sources": sources,
                             "timestamp": time.time(),
-                        })
+                        }
+                        _messages_store.setdefault(session_id, []).append(asst_msg)
+                        _save_message_to_db(session_id, asst_msg)  # v2.1: 持久化
 
                 except Exception as e:
                     logger.exception(f"SSE 生成失败: {e}")
@@ -362,12 +530,14 @@ async def chat_send(body: ChatSendRequest, request: Request):
 
             # 保存助手回复
             if session_id:
-                _messages_store.setdefault(session_id, []).append({
+                asst_msg = {
                     "role": "assistant",
                     "content": result.get("answer", ""),
                     "sources": result.get("sources", []),
                     "timestamp": time.time(),
-                })
+                }
+                _messages_store.setdefault(session_id, []).append(asst_msg)
+                _save_message_to_db(session_id, asst_msg)  # v2.1: 持久化
 
             return result
 

@@ -63,17 +63,44 @@ watch(query, (val) => {
 async function handleSearch() {
   if (!query.value.trim()) return;
 
-  // 防抖搜索
   if (searchTimer) clearTimeout(searchTimer);
 
   loading.value = true;
   searched.value = true;
 
   try {
-    const data = await apiClient.get('/api/search', {
+    const data = (await apiClient.get('/api/search', {
       params: { q: query.value.trim(), top_k: 10 },
-    });
-    results.value = data.results || [];
+    })) as { results?: unknown[]; wiki_results?: unknown[]; chunk_results?: unknown[] };
+
+    // 后端返回 {results, wiki_results, chunk_results} — 合并为统一结果
+    const allResults: Array<{
+      id: string;
+      title: string;
+      excerpt: string;
+      score: number;
+      source?: string;
+      date?: string;
+    }> = [];
+
+    const mergeResults = (list: unknown[], sourceType: string) => {
+      for (let i = 0; i < list.length; i++) {
+        const item = list[i] as Record<string, unknown>;
+        allResults.push({
+          id: (item.id as string) || (item.chunk_id as string) || `${sourceType}-${i}`,
+          title: (item.title as string) || (item.source_doc as string) || `${sourceType} 结果 ${i + 1}`,
+          excerpt: (item.content as string) || (item.snippet as string) || '',
+          score: (item.score as number) || 0,
+          source: sourceType,
+        });
+      }
+    };
+
+    if (Array.isArray(data.results)) mergeResults(data.results, 'document');
+    if (Array.isArray(data.wiki_results)) mergeResults(data.wiki_results, 'wiki');
+    if (Array.isArray(data.chunk_results)) mergeResults(data.chunk_results, 'chunk');
+
+    results.value = allResults;
   } catch (error) {
     console.error('搜索失败:', error);
     results.value = [];

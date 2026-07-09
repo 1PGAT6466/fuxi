@@ -101,18 +101,32 @@ class HealthChecker:
     # ---- 核心检查 ----
 
     async def check_all(self) -> Dict:
-        """执行所有检查（保持向后兼容的旧格式）"""
+        """执行所有检查（保持向后兼容的旧格式）
+
+        v1.50 增强：extended 检查函数返回 dict 而非 bool，
+        check_all 自动在旧格式中兼容，同时返回详细信息。
+        """
         results = {}
         all_healthy = True
 
         for name, check_func in self._checks.items():
             try:
                 result = await check_func()
-                results[name] = {
-                    "status": "healthy" if result else "unhealthy",
-                    "timestamp": time.time(),
-                }
-                if not result:
+                # v1.50: 兼容 extended（返回 dict）和旧格式（返回 bool）
+                if isinstance(result, dict):
+                    is_healthy = result.get("healthy", False)
+                    results[name] = {
+                        "status": "healthy" if is_healthy else "unhealthy",
+                        "timestamp": time.time(),
+                        **result,  # 展开详细数据（chunk_count, vector_count 等）
+                    }
+                else:
+                    is_healthy = bool(result)
+                    results[name] = {
+                        "status": "healthy" if is_healthy else "unhealthy",
+                        "timestamp": time.time(),
+                    }
+                if not is_healthy:
                     all_healthy = False
             except Exception as e:
                 results[name] = {
@@ -431,25 +445,75 @@ async def _check_conn_pool_usage_alert(threshold: float) -> tuple:
 
 
 async def check_database() -> bool:
-    """检查数据库"""
+    """检查数据库（保留旧接口兼容）"""
+    return await check_database_extended()
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+
+
+async def check_database_extended() -> dict:
+    """检查数据库 — v1.50 增强版：返回真实数据量
+
+    Returns:
+        dict with {"healthy": bool, "chunk_count": int, "unique_files": int,
+                     "seed_chunks": int, "status": str}
+    """
     try:
         from src.db.memory_store import get_store
+        from src.db.data_store import load_chunks
         store = get_store()
         store._db_conn.execute("SELECT 1")
-        return True
-    except Exception:
-        return False
+
+        chunks = load_chunks() or []
+        unique_files = len(set(c.get("file_name", "") for c in chunks if c.get("file_name")))
+        seed_count = sum(
+            1 for c in chunks
+            if "test_knowledge" in (c.get("file_name", "") or "").lower()
+            or "malware" in (c.get("file_name", "") or "").lower()
+        )
+
+        return {
+            "healthy": True,
+            "chunk_count": len(chunks),
+            "unique_files": unique_files,
+            "seed_chunks": seed_count,
+            "real_chunks": len(chunks) - seed_count,
+            "status": "connected",
+            "has_seed_data": seed_count > 0,
+        }
+    except Exception as e:
+        return {"healthy": False, "error": str(e), "status": "error"}
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 
 async def check_vector_store() -> bool:
-    """检查向量存储"""
+    """检查向量存储（保留旧接口兼容）"""
+    result = await check_vector_store_extended()
+    return result.get("healthy", False)
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+
+
+async def check_vector_store_extended() -> dict:
+    """检查向量存储 — v1.50 增强版：返回真实向量数
+
+    Returns:
+        dict with {"healthy": bool, "vector_count": int, "collection": str, "status": str}
+    """
     try:
         from src.db.vector_store import get_vector_store
         vs = get_vector_store()
-        return vs is not None
-    except Exception:
-        return False
+        if vs is None:
+            return {"healthy": False, "vector_count": 0, "status": "unavailable"}
+
+        count = vs.count
+        healthy = count >= 0
+        return {
+            "healthy": healthy,
+            "vector_count": count if count >= 0 else 0,
+            "collection": getattr(vs, "collection_name", "unknown"),
+            "status": "connected" if healthy else "error",
+        }
+    except Exception as e:
+        return {"healthy": False, "vector_count": 0, "error": str(e), "status": "error"}
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 
@@ -679,9 +743,9 @@ def get_health_checker() -> HealthChecker:
     global _health_checker
     if _health_checker is None:
         _health_checker = HealthChecker()
-        # -- 核心检查 --
-        _health_checker.register_check("database", check_database)
-        _health_checker.register_check("vector_store", check_vector_store)
+        # -- 核心检查（v1.50 增强：返回真实数量） --
+        _health_checker.register_check("database", check_database_extended)
+        _health_checker.register_check("vector_store", check_vector_store_extended)
         _health_checker.register_check("llm", check_llm)
         _health_checker.register_check("intent_bus", check_intent_bus)
         # -- 八卦级检查 --

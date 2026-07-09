@@ -11,14 +11,6 @@ function esc(s) {
   return div.innerHTML;
 }
 
-// 时间格式化
-function formatTime(ts) {
-  if (!ts) return '';
-  var d = new Date(typeof ts === 'number' ? ts * 1000 : ts);
-  var pad = function(n) { return n < 10 ? '0' + n : n; };
-  return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) + ' ' + pad(d.getHours()) + ':' + pad(d.getMinutes());
-}
-
 // 输入清理（防注入）
 function sanitizeInput(s) {
   if (!s) return '';
@@ -34,6 +26,12 @@ function debounce(fn, delay) {
     clearTimeout(timer);
     timer = setTimeout(function() { fn.apply(ctx, args); }, delay || 300);
   };
+}
+
+// 管理面板错误显示（跨 admin.js / services.js 共用）
+function _adminError(containerId, msg) {
+  var el = document.getElementById(containerId);
+  if (el) el.innerHTML = '<div class="empty"><div class="empty-icon">⚠️</div><h3>加载失败</h3><p>' + esc(msg || '未知错误') + '</p></div>';
 }
 
 // 节流函数

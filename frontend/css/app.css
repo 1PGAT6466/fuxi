@@ -329,6 +329,11 @@ table.data tr:hover td{background:rgba(0,0,0,0.01)}
   .stats{grid-template-columns:repeat(2,1fr)}
   .toast{left:20px;right:20px}
 }
+/* P1-11: 移动端快捷按钮适配 */
+@media(max-width:420px){
+  .quick-actions{flex-direction:column;align-items:stretch;gap:8px}
+  .quick-action{min-width:auto;justify-content:center;text-align:center}
+}
 .quick-q{padding:8px 16px;background:var(--card);border:1px solid var(--border);border-radius:20px;font-size:13px;color:var(--text2);cursor:pointer;transition:all .15s;white-space:nowrap}
 .quick-q:hover{background:var(--pri-light);color:var(--pri);border-color:var(--pri);transform:translateY(-1px)}
 .btn-web-active{background:var(--info);color:#fff;border-color:var(--info)}

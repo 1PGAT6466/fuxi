@@ -360,7 +360,7 @@ async def metrics_middleware(request: Request, call_next):
             from src.infra.request_metrics import get_request_metrics
             get_request_metrics().record_request(duration_ms, response.status_code < 500)
         except Exception as e:
-            logger.warning("Exception 失败: %s", e, exc_info=True)
+            logger.warning("请求指标记录失败（正常响应）: %s", e, exc_info=True)
         return response
     except Exception as e:
         duration_ms = (time.time() - start) * 1000
@@ -368,7 +368,7 @@ async def metrics_middleware(request: Request, call_next):
             from src.infra.request_metrics import get_request_metrics
             get_request_metrics().record_request(duration_ms, False)
         except Exception as e:
-            logger.warning("Exception 失败: %s", e, exc_info=True)
+            logger.warning("请求指标记录失败（异常响应）: %s", e, exc_info=True)
         raise
 
 # ============ v2.1 服务路由自动发现 ============
@@ -474,54 +474,63 @@ async def mcp_sag_status():
 
 # ============ v1.50 Phase F: MCP 通用工具调用端点 ============
 
-# MCP 工具处理器注册表 — 直接 map tool_name → handler
-MCP_TOOL_HANDLERS = {
-    "sag_search": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["sag_search"]).sag_search(
-        query=args.get("query", ""), top_k=args.get("top_k", 10)),
-    "sag_ingest": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["sag_ingest"]).sag_ingest(
-        file_path=args.get("file_path", ""), category=args.get("category", "")),
-    "sag_explain": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["sag_explain"]).sag_explain(
-        query=args.get("query", "")),
-    "sag_status": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["sag_status"]).sag_status(),
-    "kb_search": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["kb_search"]).kb_search(
-        query=args.get("query", ""), top_k=args.get("top_k", 5), mode=args.get("mode", "semantic")),
-    "kb_list_documents": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["kb_list_documents"]).kb_list_documents(),
-    "kb_get_document": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["kb_get_document"]).kb_get_document(
-        doc_id=args.get("doc_id", "")),
-    "graph_query": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["graph_query"]).graph_query(
-        entity=args.get("entity", ""), source=args.get("source", ""),
-        target=args.get("target", ""), edge_type=args.get("edge_type", ""),
-        min_confidence=float(args.get("min_confidence", 0.0)), limit=int(args.get("limit", 100))),
-    "graph_stats": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["graph_stats"]).graph_stats(),
-    "wiki_search": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["wiki_search"]).wiki_search(
-        q=args.get("q", ""), category=args.get("category", ""), limit=int(args.get("limit", 20))),
-    "wiki_get": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["wiki_get"]).wiki_get(
-        page_id=args.get("page_id", "")),
-    "dream_cycle_run": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["dream_cycle_run"]).dream_cycle_run(),
-    "dream_cycle_report": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["dream_cycle_report"]).dream_cycle_report(),
-    "gap_analyze": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["gap_analyze"]).gap_analyze(
-        query=args.get("query", ""), topic=args.get("topic", "")),
-    "entity_expand": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["entity_expand"]).entity_expand(
-        entity_name=args.get("entity_name", ""), top_k=int(args.get("top_k", 10))),
-    "cross_entity_synthesize": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["cross_entity_synthesize"]).cross_entity_synthesize(
-        entity_a=args.get("entity_a", ""), entity_b=args.get("entity_b", "")),
-    "file_upload": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["file_upload"]).file_upload(
-        file_path=args.get("file_path", ""), category=args.get("category", "")),
-    "file_list": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["file_list"]).file_list(
-        page=int(args.get("page", 1)), page_size=int(args.get("page_size", 50))),
-    "chat_query": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["chat_query"]).chat_query(
-        query=args.get("query", ""), history=args.get("history", [])),
-    "eval_run": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["eval_run"]).eval_run(
-        dataset=args.get("dataset", ""), test_name=args.get("test_name", "")),
-    "notifications_list": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["notifications_list"]).notifications_list(
-        page=int(args.get("page", 1)), page_size=int(args.get("page_size", 20)),
-        unread_only=bool(args.get("unread_only", False))),
-    "feature_flags_list": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["feature_flags_list"]).feature_flags_list(),
-    "health_check": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["health_check"]).health_check(),
-    "audit_logs": lambda args: __import__("src.taiyin.mcp_tools", fromlist=["audit_logs"]).audit_logs(
-        user=args.get("user", ""), action=args.get("action", ""),
-        days=int(args.get("days", 1)), limit=int(args.get("limit", 100))),
-}
+# v2.1: 在模块加载时预导入所有 MCP 工具 handler，避免每次调用时 __import__ 的性能开销
+# 预加载失败的工具记为 None，调用时返回友好错误
+_MCP_TOOLS_MODULE = None
+_MCP_TOOL_HANDLERS: dict = {}
+
+def _init_mcp_handlers():
+    """初始化 MCP 工具处理器注册表（模块加载时调用一次）"""
+    global _MCP_TOOLS_MODULE, _MCP_TOOL_HANDLERS
+    try:
+        _MCP_TOOLS_MODULE = __import__("src.taiyin.mcp_tools", fromlist=["*"])
+    except ImportError as e:
+        logger.warning(f"MCP 工具模块加载失败: {e}")
+        _MCP_TOOLS_MODULE = None
+        return
+    
+    # 定义工具名 → 模块属性映射
+    _tool_map = {
+        "sag_search": "sag_search",
+        "sag_ingest": "sag_ingest",
+        "sag_explain": "sag_explain",
+        "sag_status": "sag_status",
+        "kb_search": "kb_search",
+        "kb_list_documents": "kb_list_documents",
+        "kb_get_document": "kb_get_document",
+        "graph_query": "graph_query",
+        "graph_stats": "graph_stats",
+        "wiki_search": "wiki_search",
+        "wiki_get": "wiki_get",
+        "dream_cycle_run": "dream_cycle_run",
+        "dream_cycle_report": "dream_cycle_report",
+        "gap_analyze": "gap_analyze",
+        "entity_expand": "entity_expand",
+        "cross_entity_synthesize": "cross_entity_synthesize",
+        "file_upload": "file_upload",
+        "file_list": "file_list",
+        "chat_query": "chat_query",
+        "eval_run": "eval_run",
+        "notifications_list": "notifications_list",
+        "feature_flags_list": "feature_flags_list",
+        "health_check": "health_check",
+        "audit_logs": "audit_logs",
+    }
+    
+    for tool_name, attr_name in _tool_map.items():
+        handler = getattr(_MCP_TOOLS_MODULE, attr_name, None)
+        if handler is not None:
+            _MCP_TOOL_HANDLERS[tool_name] = handler
+        else:
+            logger.warning(f"MCP 工具 '{tool_name}' 在 mcp_tools 模块中未找到")
+    
+    logger.info(f"MCP 工具注册完成: {len(_MCP_TOOL_HANDLERS)}/{len(_tool_map)} 个可用")
+
+# 启动时初始化
+_init_mcp_handlers()
+
+# 向后兼容别名
+MCP_TOOL_HANDLERS = _MCP_TOOL_HANDLERS
 
 
 @app.post("/api/mcp/call")
@@ -544,9 +553,12 @@ async def mcp_call(request: Request):
     if not tool_name:
         return {"error": "缺少 tool 参数", "available_tools": list(MCP_TOOL_HANDLERS.keys())}
 
-    handler = MCP_TOOL_HANDLERS.get(tool_name)
+    handler = _MCP_TOOL_HANDLERS.get(tool_name)
     if handler is None:
-        return {"error": f"未知工具: {tool_name}", "available_tools": list(MCP_TOOL_HANDLERS.keys())}
+        available = list(_MCP_TOOL_HANDLERS.keys())
+        if _MCP_TOOLS_MODULE is None:
+            return {"error": f"未知工具: {tool_name}（MCP 工具模块未加载）", "available_tools": available}
+        return {"error": f"未知工具: {tool_name}", "available_tools": available}
 
     try:
         result = handler(args)
@@ -600,16 +612,6 @@ async def growth_overview():
 # /api/health, /api/system/stats, /api/cache/stats, /api/errors/stats, /api/audit/logs, /api/audit/stats
 from src.api.system_routes import router as system_router
 app.include_router(system_router)
-
-# ============ v2.1 新增：通知中心 + 统一搜索 + 用户偏好 ============
-from src.api.notifications import router as notifications_router
-app.include_router(notifications_router)
-
-from src.api.unified_search import router as unified_search_router
-app.include_router(unified_search_router)
-
-from src.api.user_preferences import router as user_prefs_router
-app.include_router(user_prefs_router)
 
 # ============ Feature Flag API ============
 from src.services.feature_flags import load_flags, set_flag, DEFAULT_FLAGS
@@ -668,8 +670,35 @@ async def admin_page():
     f = STATIC_DIR / "index.html"
     return HTMLResponse(f.read_text(encoding="utf-8") if f.exists() else "<h1>index.html not found</h1>")
 
-# 静态资源挂载
-app.mount("/static", StaticFiles(directory=str(STATIC_DIR)), name="static")
+# 静态资源挂载 — v2.1: 优先使用 dist 构建产物，回退到 frontend 根目录
+# 为静态文件添加安全过滤，防止暴露源代码文件
+_static_dist = STATIC_DIR / "dist"
+if _static_dist.exists():
+    app.mount("/static", StaticFiles(directory=str(_static_dist)), name="static")
+    logger.info(f"静态资源挂载: {_static_dist}")
+else:
+    # 回退到 frontend 根目录，但排除敏感源代码文件
+    from starlette.staticfiles import StaticFiles as _StaticFiles
+    class _SafeStaticFiles(_StaticFiles):
+        """安全静态文件服务：阻止访问源代码和配置文件"""
+        _BLOCKED_EXTS = {".vue", ".ts", ".tsx", ".jsx", 
+                          ".json", ".lock", ".md"}
+        _BLOCKED_NAMES = {"package.json", "package-lock.json", 
+                           "vite.config.js", "vite.config.ts", 
+                           "yarn.lock", "pnpm-lock.yaml"}
+        
+        def lookup_path(self, path: str):
+            # 阻止敏感文件扩展名
+            ext = _Path(path).suffix.lower()
+            if ext in self._BLOCKED_EXTS:
+                return None
+            # 阻止敏感文件名
+            name = _Path(path).name
+            if name in self._BLOCKED_NAMES:
+                return None
+            return super().lookup_path(path)
+    app.mount("/static", _SafeStaticFiles(directory=str(STATIC_DIR)), name="static")
+    logger.info(f"静态资源挂载（安全模式）: {STATIC_DIR}")
 
 # ============ v1.50 僵尸服务注册 ============
 # 注册 AI 工具服务 — 6 端点 (POST /api/ai/summarize, /translate, /keywords, /entities, /classify, GET /api/ai/health)
@@ -698,6 +727,12 @@ app.include_router(rag_router)
 
 from src.api.kb import router as kb_router
 app.include_router(kb_router)
+
+# ============ v1.50 Phase A: API 路径别名兼容层 ============
+# 为 Legacy 和 Vue3 前端之间的路径差异提供别名路由
+# 所有 /api/wiki/pages → /api/wiki、/api/documents → /api/files 等映射
+from src.api.path_aliases import router as path_alias_router
+app.include_router(path_alias_router)
 
 # ============ v1.50 Phase D: Synthesis 跨实体合成 ============
 from src.api.synthesis import router as synthesis_router

@@ -1,6 +1,7 @@
 # v1.50 统一响应格式 — 文档路由
 # v1.50 Phase E: 新增文档可见性修改 API（Company Brain 权限隔离）
 from fastapi import APIRouter, HTTPException, Request, UploadFile, File
+from fastapi.responses import JSONResponse
 from pathlib import Path
 
 router = APIRouter(tags=["文档管理"])
@@ -196,18 +197,22 @@ async def update_document_visibility(doc_id: str, request: Request):
 
         # 检查写权限：需要是文档 owner 或 admin
         # 先找到文档的当前 owner
-        doc_owner_id = None
+        doc_owner_id = ""  # 默认为空字符串（无所有者）
         try:
             from src.db.data_store import load_chunks
             chunks = load_chunks()
             for c in chunks:
                 if c.get("file_hash", "") == doc_id:
-                    doc_owner_id = c.get("owner_id", "")
+                    doc_owner_id = c.get("owner_id") or ""
                     break
         except Exception:
             pass
 
-        if not pm.check_write(user_id, doc_owner_id):
+        # v2.1: 确保 doc_owner_id 为 str 类型（避免 None）
+        if not isinstance(doc_owner_id, str):
+            doc_owner_id = ""
+
+        if not pm.check_write(user_id, doc_owner_id or ""):
             return unauthorized("无权修改此文档的可见性", "仅文档所有者和管理员可执行此操作")
 
         # 更新 chunks.db 中文档的 metadata
@@ -235,7 +240,7 @@ async def update_document_visibility(doc_id: str, request: Request):
             if vs:
                 vs.update_metadata_by_file(doc_id, {
                     "visibility": visibility,
-                    "team_id": team_id or "public",
+                    "team_id": team_id or "",
                 })
         except Exception as e:
             _logger.warning(f"向量库 metadata 更新失败（非致命）: {e}")
@@ -243,7 +248,7 @@ async def update_document_visibility(doc_id: str, request: Request):
         result_data = {
             "doc_id": doc_id,
             "visibility": visibility,
-            "team_id": team_id or "public",
+            "team_id": team_id or "",
             "chunks_updated": updated_count,
         }
 

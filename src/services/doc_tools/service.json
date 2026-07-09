@@ -7,5 +7,9 @@
   "api_prefix": "/api/tools",
   "health_endpoint": "/health",
   "capabilities": ["pdf", "image", "convert", "ocr", "merge", "compress"],
-  "config": {}
+  "config": {
+    "port": 8012,
+    "host": "127.0.0.1",
+    "standalone": false
+  }
 }

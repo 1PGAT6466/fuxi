@@ -20,7 +20,9 @@ declare module 'axios' {
 const MAX_RETRY = 1;
 
 const apiClient = axios.create({
-  // baseURL 保持空字符串，利用 vite.config.ts 中的 proxy 进行 API 转发
+  // P2-6: baseURL 保持空字符串，利用 vite.config.ts 中的 proxy 进行 API 转发
+  // 注意：生产环境部署时需要配置环境变量 VITE_API_BASE_URL，
+  // 因为 vite proxy 仅在开发服务器中有效。建议用法：baseURL: import.meta.env.VITE_API_BASE_URL || '',
   baseURL: '',
   timeout: 30000,
   headers: {

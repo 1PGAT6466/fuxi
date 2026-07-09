@@ -175,21 +175,7 @@
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* 滚动条美化 */
-::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: rgba(0,0,0,0.08);
-  border-radius: 3px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: rgba(0,0,0,0.15);
-}
+/* 滚动条样式见 app.css（避免重复定义） */
 
 /* --- 打字指示器 --- */
 .typing-indicator {

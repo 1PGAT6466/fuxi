@@ -11,7 +11,8 @@ function exportCSV() {
   const rows = files.map(f => {
     const fn = (f.file_name || '').replace(/"/g, '""');
     const cat = (typeof f.category === 'object' ? (f.category.category || f.category.sub_cat || '') : (f.category || '')).replace(/"/g, '""');
-    const dt = f.created_at || f.upload_time || '';
+    // P1-15: 统一时间字段，兼容多种后端返回格式
+    const dt = f.created_at || f.upload_time || f.uploaded_at || f.created || f.date || '未知';
     return `"${fn}","${cat}","${dt}"`;
   }).join('\n');
   const blob = new Blob(['\uFEFF' + header + rows], { type: 'text/csv;charset=utf-8' });
@@ -46,19 +47,37 @@ function toggleBatchSelect(hash) {
   if (window._renderFiles) window._renderFiles(window._activeCat || '全部');
 }
 
-// 批量删除
+// P0-3 fix: 单个文件删除 — 携带 Authorization header
+async function deleteFile(hash) {
+  if (!hash) return;
+  if (!confirm('确认删除该文件？')) return;
+  try {
+    const token = getToken();
+    const headers = {};
+    if (token) headers['Authorization'] = 'Bearer ' + token;
+    const r = await fetch('/api/documents/' + hash, { method: 'DELETE', headers: headers });
+    if (r.ok) { invalidateCache('/api/documents'); toast('已删除', 'success'); loadFiles(); }
+    else { toast('删除失败: ' + r.status, 'error'); }
+  } catch (e) { toast('删除失败', 'error'); }
+}
+
+// P0-3 fix: 批量删除 — 携带 Authorization header
 async function batchDelete() {
   const hashes = [...window._batchSelected];
   if (!hashes.length) { toast('请先选择文件', 'error'); return; }
   if (!confirm(`确认删除选中的 ${hashes.length} 个文件？`)) return;
   let ok = 0, fail = 0;
+  const token = getToken();
+  const headers = {};
+  if (token) headers['Authorization'] = 'Bearer ' + token;
   for (const h of hashes) {
     try {
-      const r = await fetch('/api/documents/' + h, { method: 'DELETE' });
+      const r = await fetch('/api/documents/' + h, { method: 'DELETE', headers: headers });
       if (r.ok) ok++; else fail++;
     } catch (e) { fail++; }
   }
   window._batchSelected.clear();
+  invalidateCache('/api/documents');
   toast(`删除完成：成功 ${ok}，失败 ${fail}`, fail ? 'error' : 'success');
   loadFiles();
 }
@@ -78,37 +97,51 @@ async function loadFiles() {
     function catLabel(c) { if (typeof c === 'object') return c.category || c.sub_cat || ''; return c || '' }
     const catSet = new Set(); files.forEach(f => { const cl = catLabel(f.category); if (cl) catSet.add(cl) });
     const cats = ['全部', ...[...catSet].sort()];
-    let activeCat = '全部';
+
+    // P0-6 fix: store reference to stable file data and avoid stale closure references
     window._filesData = files;
+    var _cats = cats;  // capture locally but accessible via closure
+
     window._renderFiles = function (cat) {
-      activeCat = cat;
+      var activeCat = cat;
       window._activeCat = cat;
-      let filtered = cat === '全部' ? files : files.filter(f => catLabel(f.category) === cat);
-      if (window._fileFilter) filtered = filtered.filter(f => (f.file_name || '').toLowerCase().includes(window._fileFilter));
-      const catBtns = cats.map(c => `<button class="btn btn-sm ${c === cat ? 'btn-primary' : 'btn-ghost'}" onclick="window._renderFiles('${c}')" style="margin:0 4px 4px 0">${c}</button>`).join('');
+      // P0-6 fix: always read from window._filesData to avoid stale closure
+      var fileList = window._filesData || files;
+      var fileFilterVal = window._fileFilter;
+
+      var filtered = cat === '全部' ? fileList : fileList.filter(function(f) { return catLabel(f.category) === cat; });
+      if (fileFilterVal) filtered = filtered.filter(function(f) { return (f.file_name || '').toLowerCase().includes(fileFilterVal); });
+
+      var catBtns = _cats.map(function(c) {
+        return '<button class="btn btn-sm ' + (c === activeCat ? 'btn-primary' : 'btn-ghost') + '" data-cat="' + esc(c) + '" onclick="window._renderFiles(this.dataset.cat)" style="margin:0 4px 4px 0">' + esc(c) + '</button>';
+      }).join('');
+
       if (!filtered.length) {
-        grid.innerHTML = (cats.length > 1 ? `<div style="margin-bottom:12px">${catBtns}</div>` : '') + '<div class="empty"><div class="empty-icon">🔍</div><h3>没有匹配的文件</h3><p>换个搜索词试试</p></div>';
+        grid.innerHTML = (_cats.length > 1 ? '<div style="margin-bottom:12px">' + catBtns + '</div>' : '') + '<div class="empty"><div class="empty-icon">🔍</div><h3>没有匹配的文件</h3><p>换个搜索词试试</p></div>';
         return;
       }
-      const allSelected = filtered.every(f => f.file_hash && window._batchSelected.has(f.file_hash));
-      const batchBar = `<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">
-        <label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:13px;color:var(--text2)">
-          <input type="checkbox" ${allSelected ? 'checked' : ''} onchange="toggleSelectAll()" style="cursor:pointer"> 全选
-        </label>
-        ${window._batchSelected.size ? `<button class="btn btn-sm btn-ghost" style="color:var(--error);font-size:12px" onclick="batchDelete()">🗑 批量删除 (${window._batchSelected.size})</button>` : ''}
-        <button class="btn btn-sm btn-ghost" style="font-size:12px" onclick="exportCSV()">📊 导出CSV</button>
-      </div>`;
+      var allSelected = filtered.every(function(f) { return f.file_hash && window._batchSelected.has(f.file_hash); });
+      var batchBar = '<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;flex-wrap:wrap">' +
+        '<label style="display:flex;align-items:center;gap:4px;cursor:pointer;font-size:13px;color:var(--text2)">' +
+        '<input type="checkbox" ' + (allSelected ? 'checked' : '') + ' onchange="toggleSelectAll()" style="cursor:pointer"> 全选' +
+        '</label>' +
+        (window._batchSelected.size ? '<button class="btn btn-sm btn-ghost" style="color:var(--error);font-size:12px" onclick="batchDelete()">🗑 批量删除 (' + window._batchSelected.size + ')</button>' : '') +
+        '<button class="btn btn-sm btn-ghost" style="font-size:12px" onclick="exportCSV()">📊 导出CSV</button>' +
+        '</div>';
       grid.innerHTML =
-        (cats.length > 1 ? `<div style="margin-bottom:12px">${catBtns}</div>` : '') +
+        (_cats.length > 1 ? '<div style="margin-bottom:12px">' + catBtns + '</div>' : '') +
         batchBar +
         '<div class="file-grid">' +
-        filtered.map(f => {
+        filtered.map(function(f) {
           var fh = f.file_hash || '';
           var fn = esc(f.file_name || '?');
-          const checked = fh && window._batchSelected.has(fh) ? 'checked' : '';
+          var checked = fh && window._batchSelected.has(fh) ? 'checked' : '';
+          // P0-3 fix: use deleteFile() helper instead of inline bare fetch
           return '<div class="file-card" style="position:relative">' +
-            (fh ? `<div style="position:absolute;top:8px;left:8px"><input type="checkbox" ${checked} onchange="toggleBatchSelect('${fh}')" style="cursor:pointer"></div>` : '') +
-            '<div class="file-icon">' + fileIcon(f.file_name) + '</div><div class="file-name">' + fn + '</div><div class="file-meta">' + esc(catLabel(f.category) || '未分类') + '</div><div style="display:flex;gap:8px;margin-top:10px">' + (fh ? '<a href="/api/view/' + encodeURIComponent(fh) + '" target="_blank" class="btn btn-sm btn-ghost" style="font-size:11px;padding:4px 8px">👁 查看</a><a href="/api/download/' + encodeURIComponent(fh) + '" class="btn btn-sm btn-ghost" style="font-size:11px;padding:4px 8px">⬇ 下载</a>' : '') + '<button class="btn btn-sm btn-ghost" style="font-size:11px;padding:4px 8px;color:var(--error)" onclick="event.stopPropagation();if(confirm(\'确认删除 ' + fn.replace(/'/g, "\\'") + '？\')){fetch(\'/api/documents/' + fh + '\',{method:\'DELETE\'}).then(r=>r.json()).then(d=>{toast(\'已删除\',\'success\');loadFiles()}).catch(e=>toast(\'删除失败\',\'error\'))}">🗑 删除</button></div></div>'
+            (fh ? '<div style="position:absolute;top:8px;left:8px"><input type="checkbox" ' + checked + ' onchange="toggleBatchSelect(\'' + fh.replace(/'/g, "\\'") + '\')" style="cursor:pointer"></div>' : '') +
+            '<div class="file-icon">' + fileIcon(f.file_name) + '</div><div class="file-name">' + fn + '</div><div class="file-meta">' + esc(catLabel(f.category) || '未分类') + '</div><div style="display:flex;gap:8px;margin-top:10px">' +
+            (fh ? '<a href="/api/view/' + encodeURIComponent(fh) + '" target="_blank" class="btn btn-sm btn-ghost" style="font-size:11px;padding:4px 8px">👁 查看</a><a href="/api/download/' + encodeURIComponent(fh) + '" class="btn btn-sm btn-ghost" style="font-size:11px;padding:4px 8px">⬇ 下载</a>' : '') +
+            '<button class="btn btn-sm btn-ghost" style="font-size:11px;padding:4px 8px;color:var(--error)" onclick="event.stopPropagation();deleteFile(\'' + fh.replace(/'/g, "\\'") + '\')">🗑 删除</button></div></div>';
         }).join('') +
         '</div>';
     };
@@ -135,13 +168,19 @@ async function loadFiles() {
 }
 
 // 遍历拖拽的文件/文件夹
+// P1-12: webkitGetAsEntry 是 Chrome-specific API，Firefox 中不可用，回退到普通文件列表
 async function traverseDropItems(items) {
   var files = [];
   var entries = [];
+  var hasEntryApi = false;
   for (var i = 0; i < items.length; i++) {
-    var entry = items[i].webkitGetAsEntry ? items[i].webkitGetAsEntry() : null;
-    if (entry) entries.push(entry);
+    if (items[i].webkitGetAsEntry) {
+      var entry = items[i].webkitGetAsEntry();
+      if (entry) { entries.push(entry); hasEntryApi = true; }
+    }
   }
+  // Firefox fallback: 如果 webkitGetAsEntry 不可用，直接使用 e.dataTransfer.files
+  if (!hasEntryApi) return [];
   for (var j = 0; j < entries.length; j++) {
     await traverseEntry(entries[j], files);
   }
@@ -180,8 +219,9 @@ async function uploadFiles(files) {
     fd.append('file', f);
     if (f._fullPath) fd.append('relative_path', f._fullPath);
     try {
-      var r2 = await fetch('/api/upload', { method: 'POST', headers: { 'Authorization': 'Bearer ' + getToken() }, body: fd });
-      if (!r2.ok) throw new Error('Upload failed: ' + r2.status);
+      // P1-7: 使用 api() 封装以获取 token 刷新和 401 处理等
+      var r2 = await api('/api/upload', { method: 'POST', body: fd });
+      if (!r2 || r2.error) throw new Error('Upload failed');
       success++;
     } catch (e) {
       failed++;
@@ -189,8 +229,10 @@ async function uploadFiles(files) {
     }
   }
   if (failed === 0) {
+    invalidateCache('/api/documents');
     toast('上传完成: ' + success + ' 个文件', 'success');
   } else {
+    invalidateCache('/api/documents');
     toast('上传完成: ' + success + ' 成功, ' + failed + ' 失败', 'warning');
   }
   loadFiles();

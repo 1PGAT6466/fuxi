@@ -4,6 +4,7 @@ from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
 from pathlib import Path
 import os
 import logging
+import urllib.parse
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +39,7 @@ def view_document(file_hash: str, request: Request):
                         if computed_hash == file_hash[:16] or file_hash in str(fpath):
                             return FileResponse(str(fpath))
                     except Exception as e:
-                        logger.warning("Exception 失败: %s", e, exc_info=True)
+                        logger.warning("文件哈希计算失败: %s", e, exc_info=True)
         # Fallback: check kb-images
         if KB_IMAGES_DIR.exists():
             for root, dirs, files in os.walk(KB_IMAGES_DIR):
@@ -82,7 +83,7 @@ def download_document(file_hash: str, request: Request):
                                 media_type="application/octet-stream"
                             )
                     except Exception as e:
-                        logger.warning("Exception 失败: %s", e, exc_info=True)
+                        logger.warning("文件下载哈希计算失败: %s", e, exc_info=True)
         raise HTTPException(404, detail="文档未找到")
     except HTTPException:
         raise
@@ -93,11 +94,86 @@ def download_document(file_hash: str, request: Request):
 
 @router.get("/api/antenna/search")
 @router.post("/api/antenna/search")
-def antenna_search(request: Request, q: str = ""):
-    """天线搜索 — Web搜索代理"""
+async def antenna_search(request: Request, q: str = ""):
+    """天线搜索 — 混合检索：知识库语义搜索 + 联网搜索降级
+    
+    优先使用本地知识库（ChromaDB + SQLite 混合检索），
+    如果本地无结果或外部 API 可用，再尝试联网搜索。
+    """
+    if not q or not q.strip():
+        return JSONResponse(
+            status_code=400,
+            content={"error": "缺少 q 参数", "detail": "搜索关键词不能为空"}
+        )
+
+    query = q.strip()
+    results = []
+    source = "knowledge_base"
+    message = ""
+
+    # 1) 优先尝试本地知识库混合检索
+    try:
+        from src.taiyang.retrieval import hybrid_search
+        kb_results = await hybrid_search(query, top_k=5)
+        if kb_results:
+            results = [
+                {
+                    "title": r.get("title", r.get("source", r.get("file_name", ""))),
+                    "snippet": (r.get("text", "") or r.get("snippet", "") or r.get("doc", ""))[:200],
+                    "url": r.get("url", r.get("file_hash", "")),
+                    "score": r.get("score", 0),
+                    "source": "knowledge_base",
+                }
+                for r in kb_results
+            ]
+            source = "knowledge_base"
+            message = f"找到 {len(results)} 条相关结果"
+    except (ImportError, ModuleNotFoundError) as e:
+        logger.warning(f"知识库检索不可用: {e}")
+    except Exception as e:
+        logger.warning(f"知识库检索失败: {e}")
+
+    # 2) 如果本地无结果，尝试联网搜索（如果配置了 Brave API）
+    if not results:
+        try:
+            brave_key = os.getenv("BRAVE_API_KEY", "")
+            if brave_key:
+                import urllib.request
+                import json as _json
+                req = urllib.request.Request(
+                    f"https://api.search.brave.com/res/v1/web/search?q={urllib.parse.quote(query)}&count=5",
+                    headers={
+                        "Accept": "application/json",
+                        "Accept-Encoding": "gzip",
+                        "X-Subscription-Token": brave_key,
+                    }
+                )
+                with urllib.request.urlopen(req, timeout=10) as resp:
+                    data = _json.loads(resp.read().decode("utf-8"))
+                    web_results = data.get("web", {}).get("results", [])
+                    results = [
+                        {
+                            "title": wr.get("title", ""),
+                            "snippet": wr.get("description", "")[:200],
+                            "url": wr.get("url", ""),
+                            "score": 1.0,
+                            "source": "web_brave",
+                        }
+                        for wr in web_results
+                    ]
+                    source = "web_brave"
+                    message = f"联网搜索找到 {len(results)} 条结果"
+        except ImportError:
+            logger.debug("urllib 不可用，跳过联网搜索")
+        except Exception as e:
+            logger.warning(f"联网搜索失败: {e}")
+
+    if not results:
+        message = "未找到相关结果，请尝试其他关键词"
+
     return {
-        "results": [],
-        "query": q,
-        "source": "antenna",
-        "message": "Antenna search requires external API configuration"
+        "results": results,
+        "query": query,
+        "source": source,
+        "message": message,
     }

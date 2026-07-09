@@ -10,7 +10,7 @@
   style-src 'self' 'unsafe-inline';
   img-src 'self' data: https:;
   font-src 'self' data:;
-  connect-src 'self' http://localhost:8080;
+  connect-src 'self' http://localhost:8080 http://172.25.30.200:8080;
 ">
 <link rel="stylesheet" href="/static/css/login.css">
 </head>
@@ -42,7 +42,12 @@
 <script>
 let isLogin=true;
 function toggleMode(){isLogin=!isLogin;document.getElementById('submitBtn').textContent=isLogin?'登 录':'注 册';document.getElementById('toggleText').textContent=isLogin?'没有账号？':'已有账号？';document.getElementById('toggleLink').textContent=isLogin?'注册新账号':'去登录';document.getElementById('error').textContent=''}
-document.getElementById('loginForm').addEventListener('submit',async function(e){e.preventDefault();const u=document.getElementById('username').value.trim(),p=document.getElementById('password').value,el=document.getElementById('error'),btn=document.getElementById('submitBtn');if(!u||!p){el.textContent='请填写用户名和密码';return}btn.disabled=true;btn.textContent=isLogin?'登录中...':'注册中...';el.textContent='';try{const ep=isLogin?'/api/auth/login':'/api/auth/register';const r=await fetch(ep,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});const d=await r.json();if(!r.ok){el.textContent=d.detail||d.error||'操作失败';return}if(isLogin){sessionStorage.setItem('fuxi_token',d.token);sessionStorage.setItem('fuxi_user',JSON.stringify({username:d.username,role:d.role,display_name:d.display_name}));window.location.href='/'}else{el.style.color='#2ecc71';el.textContent='注册成功，请登录';isLogin=true;document.getElementById('submitBtn').textContent='登 录';setTimeout(()=>{el.style.color=''},3000)}}catch(err){el.textContent='网络错误，请重试'}finally{btn.disabled=false;btn.textContent=isLogin?'登 录':'注 册'}});
+// P0-8 fix: 添加重试和健壮的 token 传递
+document.getElementById('loginForm').addEventListener('submit',async function(e){e.preventDefault();const u=document.getElementById('username').value.trim(),p=document.getElementById('password').value,el=document.getElementById('error'),btn=document.getElementById('submitBtn');if(!u||!p){el.textContent='请填写用户名和密码';return}btn.disabled=true;btn.textContent=isLogin?'登录中...':'注册中...';el.textContent='';
+var maxRetries=2;
+for(var attempt=0;attempt<=maxRetries;attempt++){
+try{const ep=isLogin?'/api/auth/login':'/api/auth/register';const r=await fetch(ep,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({username:u,password:p})});const d=await r.json();if(!r.ok){el.textContent=d.detail||d.error||(r.status===401?'用户名或密码错误':'操作失败 ('+r.status+')');break}if(isLogin){if(!d.token){el.textContent='登录异常：未获取到 Token';break}try{sessionStorage.setItem('fuxi_token',d.token);sessionStorage.setItem('fuxi_user',JSON.stringify({username:d.username,role:d.role,display_name:d.display_name}));}catch(storageErr){el.textContent='浏览器存储不可用，请检查隐私设置';break}window.location.href='/'}else{el.style.color='#2ecc71';el.textContent='注册成功，请登录';isLogin=true;document.getElementById('submitBtn').textContent='登 录';setTimeout(function(){el.style.color=''},3000)}break}catch(err){if(attempt<maxRetries){await new Promise(function(resolve){setTimeout(resolve,1000*(attempt+1))});continue}el.textContent='网络错误，请检查连接后重试'}}
+btn.disabled=false;if(btn.textContent.indexOf('中')>=0)btn.textContent=isLogin?'登 录':'注 册'});
 if(sessionStorage.getItem('fuxi_token'))window.location.href='/';
 </script>
 </body>

@@ -10,7 +10,6 @@ import {
   createSession,
   deleteSession,
   sendMessageStream,
-  mockSendMessageStream,
 } from '@/api/chat';
 import { ElMessage } from 'element-plus';
 import { createLogger } from '@/utils/logger';
@@ -150,8 +149,7 @@ export const useChatStore = defineStore('chat', () => {
 
     streamController = new AbortController();
 
-    // 尝试流式 API
-    let useMock = false;
+    // 调用流式 API（后端 JSON 或 SSE）
     streaming.value = true;
     loading.value = false;
 
@@ -163,28 +161,17 @@ export const useChatStore = defineStore('chat', () => {
         },
         streamController.signal,
       );
-    } catch {
-      // API 不可用，使用 Mock
-      useMock = true;
-      streaming.value = true;
-      // 【修复 HIGH-1】shallowRef 不追踪深层属性变更，需创建新对象触发响应
-      messages.value[aiIndex] = { ...messages.value[aiIndex], content: '' };
-
-      try {
-        streamController = new AbortController();
-        await mockSendMessageStream((chunk: ChatStreamChunk) => {
-          handleStreamChunk(chunk, aiIndex);
-        }, streamController.signal);
-      } catch (err) {
-        logger.error('Mock 流式输出异常', err);
-      }
+    } catch (err: unknown) {
+      const errMsg = err instanceof Error ? err.message : String(err);
+      logger.error('发送消息失败', errMsg);
+      error.value = errMsg || '发送消息失败';
+      streaming.value = false;
     }
 
     streaming.value = false;
     streamController = null;
 
     // 更新会话最后消息
-    // 【修复 MEDIUM-4】shallowRef 不追踪深层属性变更，需替换整个 session 对象
     if (activeSessionId.value) {
       const idx = sessions.value.findIndex((s) => s.id === activeSessionId.value);
       if (idx !== -1) {
@@ -195,13 +182,12 @@ export const useChatStore = defineStore('chat', () => {
           updatedAt: Date.now(),
           messageCount: (session.messageCount || 0) + 2,
         };
-        // 触发 shallowRef 响应式更新
         sessions.value = [...sessions.value];
       }
     }
 
-    // 如果 AI 消息为空且有错误，标记错误
-    if (!useMock && !messages.value[aiIndex].content) {
+    // 如果 AI 消息为空，标记错误
+    if (!error.value && !messages.value[aiIndex].content) {
       error.value = '未收到有效的 AI 回复';
     }
   }

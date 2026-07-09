@@ -41,6 +41,11 @@ function handleLogin(e) {
 
   api('/api/auth/login', { method: 'POST', body: { username: u, password: p } })
     .then(function(d) {
+      // P2-5: 验证 token 格式
+      if (!d.token || !/^[A-Za-z0-9._~+\/=-]+$/.test(d.token)) {
+        err.textContent = '服务器返回的 token 格式异常';
+        return;
+      }
       if (_loginRole === 'admin' && d.role !== 'admin') {
         err.textContent = '该账号不是管理员';
         return;

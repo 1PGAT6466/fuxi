@@ -1,7 +1,5 @@
 // ===== 管理面板 =====
-function _adminError(containerId, msg){
-  document.getElementById(containerId).innerHTML='<div class="empty"><div class="empty-icon">⚠️</div><h3>加载失败</h3><p>'+esc(msg||'未知错误')+'</p></div>';
-}
+// _adminError 已迁移到 utils.js 作为全局工具函数
 
 async function loadOverview(){
   var s=document.getElementById('overviewStats');

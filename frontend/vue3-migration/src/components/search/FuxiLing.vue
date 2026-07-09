@@ -79,7 +79,7 @@
 <script setup lang="ts">
 import { ref, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
-import { unifiedSearch, getMockUnifiedSearch } from '@/api/symbols';
+import { unifiedSearch } from '@/api/symbols';
 import type { UnifiedSearchResult } from '@/api/symbols';
 import { BAGUA_GRID } from '@/constants/bagua';
 
@@ -199,9 +199,8 @@ async function handleInput(): void {
       results.value = res.data.matches;
       activeIndex.value = 0;
     } catch {
-      // 后端不可用时使用 mock 数据
-      const mock = getMockUnifiedSearch(q);
-      results.value = mock.data.matches;
+      // 后端 API 不可用，显示空结果
+      results.value = [];
     } finally {
       loading.value = false;
     }

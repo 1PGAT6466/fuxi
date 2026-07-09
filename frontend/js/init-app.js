@@ -20,16 +20,17 @@ function switchPage(name) {
   if (nav) nav.classList.add('active');
   document.getElementById('pageTitle').textContent = TITLES[name] || name;
 
-  if (name === 'graph') loadGraph();
-  if (name === 'wiki') loadWikiTree();
-  if (name === 'files') { if (typeof loadFiles === 'function') loadFiles(); }
-  if (name === 'admin-overview') loadOverview();
-  if (name === 'admin-symbols') loadSymbols();
-  if (name === 'admin-growth') loadGrowth();
-  if (name === 'admin-eval') loadEval();
-  if (name === 'admin-flags') loadFlags();
-  if (name === 'admin-feedback') loadFeedback();
-  if (name === 'admin-services') loadServices();
+  // P0-7 fix: 所有延迟加载的函数增加存在性检查
+  if (name === 'graph' && typeof loadGraph === 'function') loadGraph();
+  if (name === 'wiki' && typeof loadWikiTree === 'function') loadWikiTree();
+  if (name === 'files' && typeof loadFiles === 'function') loadFiles();
+  if (name === 'admin-overview' && typeof loadOverview === 'function') loadOverview();
+  if (name === 'admin-symbols' && typeof loadSymbols === 'function') loadSymbols();
+  if (name === 'admin-growth' && typeof loadGrowth === 'function') loadGrowth();
+  if (name === 'admin-eval' && typeof loadEval === 'function') loadEval();
+  if (name === 'admin-flags' && typeof loadFlags === 'function') loadFlags();
+  if (name === 'admin-feedback' && typeof loadFeedback === 'function') loadFeedback();
+  if (name === 'admin-services' && typeof loadServices === 'function') loadServices();
 }
 
 function initApp() {

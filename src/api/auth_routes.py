@@ -3,8 +3,7 @@
 from typing import Optional
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
-import hashlib
+from pydantic import BaseModel, field_validator
 import bcrypt
 import logging
 import time
@@ -14,23 +13,78 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["认证"])
 
-# v2.1: 登录频率限制
+# v2.1: 登录频率限制（SQLite 持久化，重启不丢失）
 _MAX_LOGIN_ATTEMPTS = 5
 _LOGIN_WINDOW_SEC = 60
-_login_attempts: dict = defaultdict(list)
+_login_attempts: dict = defaultdict(list)  # 内存缓存，用于快速检查
+
+
+def _get_login_rate_db_path():
+    """获取登录限流 SQLite 数据库路径"""
+    from pathlib import Path
+    from src.config import DATA_DIR
+    db_dir = Path(DATA_DIR)
+    db_dir.mkdir(parents=True, exist_ok=True)
+    return str(db_dir / "login_rate.db")
+
+
+def _ensure_login_rate_table():
+    """确保登录限流表存在"""
+    import sqlite3
+    db_path = _get_login_rate_db_path()
+    with sqlite3.connect(db_path) as conn:
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS login_attempts (
+                ip TEXT NOT NULL,
+                timestamp REAL NOT NULL
+            )
+        """)
+        conn.execute("CREATE INDEX IF NOT EXISTS idx_login_ip ON login_attempts(ip)")
+        conn.commit()
 
 
 def _check_login_rate(ip: str) -> bool:
-    """检查登录频率是否在限制内，返回 True 表示允许"""
+    """检查登录频率是否在限制内，返回 True 表示允许
+    
+    使用 SQLite 持久化存储，重启不丢失限制记录。
+    """
+    import sqlite3
+    _ensure_login_rate_table()
     now = time.time()
-    attempts = _login_attempts[ip]
-    # 清理过期记录
-    attempts = [t for t in attempts if now - t < _LOGIN_WINDOW_SEC]
-    _login_attempts[ip] = attempts
-    if len(attempts) >= _MAX_LOGIN_ATTEMPTS:
-        return False
-    attempts.append(now)
-    return True
+    cutoff = now - _LOGIN_WINDOW_SEC
+    db_path = _get_login_rate_db_path()
+    
+    try:
+        with sqlite3.connect(db_path) as conn:
+            # 清理过期记录
+            conn.execute("DELETE FROM login_attempts WHERE timestamp < ?", (cutoff,))
+            # 统计当前窗口内的尝试次数
+            cursor = conn.execute(
+                "SELECT COUNT(*) FROM login_attempts WHERE ip = ? AND timestamp >= ?",
+                (ip, cutoff)
+            )
+            count = cursor.fetchone()[0]
+            
+            if count >= _MAX_LOGIN_ATTEMPTS:
+                return False
+            
+            # 记录本次尝试
+            conn.execute(
+                "INSERT INTO login_attempts (ip, timestamp) VALUES (?, ?)",
+                (ip, now)
+            )
+            conn.commit()
+            return True
+    except Exception as e:
+        logger.warning(f"登录限流存储异常，回退到内存模式: {e}")
+        # 回退：内存模式
+        attempts = _login_attempts[ip]
+        attempts = [t for t in attempts if now - t < _LOGIN_WINDOW_SEC]
+        _login_attempts[ip] = attempts
+        if len(attempts) >= _MAX_LOGIN_ATTEMPTS:
+            return False
+        attempts.append(now)
+        return True
 
 
 def _hash_password(password: str) -> str:
@@ -38,26 +92,44 @@ def _hash_password(password: str) -> str:
 
 
 def _verify_password(password: str, stored: str) -> bool:
+    """验证密码 — v2.1: 仅支持 bcrypt，旧版 SHA-256 格式已强制迁移"""
     if stored.startswith("$2b$"):
         return bcrypt.checkpw(password.encode(), stored.encode())
-    elif "$" in stored:
-        salt, h = stored.split("$", 1)
-        if hashlib.sha256(f"{salt}:{password}".encode()).hexdigest() == h:
-            return True
+    # v2.1: 旧版 SHA-256 格式不再支持，强制用户通过管理员重置密码
+    logger.warning("检测到旧版密码格式，已拒绝登录。请管理员为该用户重置密码。")
     return False
 
 class LoginRequest(BaseModel):
     username: str
     password: str
 
+    @field_validator("username")
+    @classmethod
+    def validate_username(cls, v: str) -> str:
+        if not v or len(v.strip()) < 1 or len(v.strip()) > 64:
+            raise ValueError("用户名长度必须在1-64字符之间")
+        return v.strip()
+
+    @field_validator("password")
+    @classmethod
+    def validate_password(cls, v: str) -> str:
+        if not v or len(v) < 6 or len(v) > 128:
+            raise ValueError("密码长度必须在6-128字符之间")
+        return v
+
 @router.post("/login")
 def login(body: LoginRequest, request: Request = None):
-    """用户登录 — v1.50 统一响应格式支持"""
+    """用户登录 — v1.50 统一响应格式支持，v2.1 速率限制"""
     from src.api.response import success, error, unauthorized, server_error
     try:
         from src.api.auth import create_jwt_token
         import json
         from pathlib import Path
+        
+        # v2.1: 登录速率限制检查
+        client_ip = request.client.host if request and request.client else "127.0.0.1"
+        if not _check_login_rate(client_ip):
+            return unauthorized("登录尝试过于频繁，请稍后再试", "超过登录频率限制")
         
         from src.config import DATA_DIR as CONFIG_DATA_DIR
         users_file = Path(CONFIG_DATA_DIR) / "users.json"
@@ -68,11 +140,11 @@ def login(body: LoginRequest, request: Request = None):
         
         user = users.get(body.username)
         if not user:
-            raise HTTPException(401, "用户名或密码错误")
+            return unauthorized("用户名或密码错误")
         
         stored = user.get("password", "")
         if not _verify_password(body.password, stored):
-            raise HTTPException(401, "用户名或密码错误")
+            return unauthorized("用户名或密码错误")
         
         if not stored.startswith("$2b$"):
             user["password"] = _hash_password(body.password)

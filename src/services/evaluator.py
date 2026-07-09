@@ -8,7 +8,7 @@ logger = logging.getLogger(__name__)
 
 import os
 MIMO_API_KEY = os.getenv("MIMO_API_KEY", "")
-MIMO_BASE_URL = "https://token-plan-cn.xiaomimimo.com/v1"
+MIMO_BASE_URL = os.getenv("MIMO_BASE_URL", "https://token-plan-cn.xiaomimimo.com/v1")
 
 
 def _llm_judge(prompt: str, max_tokens: int = 500) -> str:

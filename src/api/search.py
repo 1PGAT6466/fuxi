@@ -57,5 +57,37 @@ async def search(q: str = Query(...), top_k: int = 15, page: int = 1, page_size:
 
 @router.get("/api/search-history")
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
-async def search_history():
-    return []
+async def search_history(request: Request = None):
+    """搜索历史 — v1.50 真实数据版
+
+    从审计日志提取搜索操作记录。
+    """
+    try:
+        logs = []
+
+        # 从审计日志提取搜索记录
+        try:
+            from src.infra.audit_log import query_audit
+            audit_results = query_audit(days=7, limit=50)
+            # 过滤搜索相关的路径
+            search_paths = ("/api/search", "/api/rag/search", "/api/unified-search", "/api/kb/search")
+            logs = [
+                {
+                    "query": entry.get("details", {}).get("query", entry.get("path", "")),
+                    "timestamp": entry.get("timestamp", ""),
+                    "user": entry.get("user", ""),
+                    "path": entry.get("path", ""),
+                }
+                for entry in audit_results
+                if entry.get("path", "") in search_paths
+                and entry.get("details", {}).get("query")
+            ]
+        except ImportError:
+            pass
+        except Exception as e:
+            logger.warning(f"审计日志提取搜索历史失败: {e}")
+
+        return logs
+    except Exception as e:
+        logger.exception(f"search_history 失败: {e}")
+        return []

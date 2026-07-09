@@ -7,6 +7,10 @@ window.addEventListener('unhandledrejection', function(e) {
   console.error('[ErrorBoundary] Promise:', e.reason);
 });
 
+// 注意：safeFetch / showLoading / showError 保留为公共工具函数，
+// 供未来扩展使用。当前未被调用，但属于 error-boundary 模块的对外 API。
+// 如需删除死代码，可在确认无外部引用后移除。
+
 // 带超时的 fetch
 function safeFetch(url, options) {
   options = options || {};
@@ -18,6 +22,7 @@ function safeFetch(url, options) {
 }
 
 // 加载状态管理
+// @unused — 保留作为公共 API，供未来页面使用
 function showLoading(containerId) {
   var el = document.getElementById(containerId);
   if (!el) return;
@@ -26,6 +31,7 @@ function showLoading(containerId) {
     '<span style="color:var(--text3);font-size:13px">加载中...</span></div>';
 }
 
+// @unused — 保留作为公共 API，供未来页面使用
 function showError(containerId, message, retryFn) {
   var el = document.getElementById(containerId);
   if (!el) return;

@@ -20,7 +20,21 @@ function filterByTab(results, tab) {
 }
 
 function renderSearchResults() {
-  var c = document.getElementById('searchResults');
+  // P0-2 fix: 使用独立的搜索结果容器，避免与标签页 DOM 冲突
+  var c = document.getElementById('searchResultsList');
+  // 如果 searchResultsList 不存在（初始搜索前），从 searchResults 中找
+  if (!c) {
+    var outer = document.getElementById('searchResults');
+    if (outer) {
+      c = outer.querySelector('#searchResultsList');
+    }
+  }
+  if (!c) {
+    // 回退：直接写入外层容器（没有标签页时）
+    c = document.getElementById('searchResults');
+  }
+  if (!c) return;
+
   var q = document.getElementById('searchInput').value.trim();
   var results = filterByTab(_searchResults, _currentTab);
 

@@ -171,81 +171,38 @@ import apiClient from '@/api';
 import { formatSize, formatDate } from '@/utils/helpers';
 import type { UploadFile, UploadInstance, TableInstance } from 'element-plus';
 
-// ───── Mock 数据 ─────
-interface MockFileItem {
-  id: string;
-  filename: string;
-  name?: string;
-  size: number;
-  type?: string;
-  uploadedAt: string;
-  created?: string;
+// ───── 后端文件类型 ─────
+interface ApiFileItem {
+  file_name: string;
+  file_hash: string;
+  chunk_count: number;
+  category?: { category: string; confidence: number; candidates: string };
 }
 
-function generateMockFiles(): MockFileItem[] {
-  const now = Date.now();
-  return [
-    {
-      id: 'f1',
-      filename: '项目需求文档_v3.pdf',
-      size: 2450000,
-      type: 'pdf',
-      uploadedAt: new Date(now - 3600000).toISOString(),
-    },
-    {
-      id: 'f2',
-      filename: '产品架构图.png',
-      size: 4800000,
-      type: 'image',
-      uploadedAt: new Date(now - 7200000).toISOString(),
-    },
-    {
-      id: 'f3',
-      filename: '用户手册.docx',
-      size: 1200000,
-      type: 'docx',
-      uploadedAt: new Date(now - 86400000).toISOString(),
-    },
-    {
-      id: 'f4',
-      filename: '数据报表_2026Q2.xlsx',
-      size: 890000,
-      type: 'xlsx',
-      uploadedAt: new Date(now - 172800000).toISOString(),
-    },
-    {
-      id: 'f5',
-      filename: '会议纪要.txt',
-      size: 15000,
-      type: 'txt',
-      uploadedAt: new Date(now - 259200000).toISOString(),
-    },
-    {
-      id: 'f6',
-      filename: 'API接口文档.md',
-      size: 45000,
-      type: 'other',
-      uploadedAt: new Date(now - 345600000).toISOString(),
-    },
-    {
-      id: 'f7',
-      filename: '技术方案_v2.pdf',
-      size: 5200000,
-      type: 'pdf',
-      uploadedAt: new Date(now - 432000000).toISOString(),
-    },
-    {
-      id: 'f8',
-      filename: 'logo设计稿.ai',
-      size: 8900000,
-      type: 'other',
-      uploadedAt: new Date(now - 518400000).toISOString(),
-    },
-  ];
+// ───── 前端展示类型 ─────
+interface DisplayFileItem {
+  id: string;
+  filename: string;
+  size: number;
+  type: string;
+  uploadedAt: string;
+  chunkCount: number;
+}
+
+function apiToDisplay(f: ApiFileItem): DisplayFileItem {
+  const ext = (f.file_name || '').split('.').pop() || 'unknown';
+  return {
+    id: f.file_hash,
+    filename: f.file_name,
+    size: 0,
+    type: ext,
+    uploadedAt: '',
+    chunkCount: f.chunk_count || 0,
+  };
 }
 
 // ───── 状态 ─────
-const files = ref<MockFileItem[]>([]);
+const files = ref<DisplayFileItem[]>([]);
 const loading = ref(false);
 const showUpload = ref(false);
 const uploadRef = ref<UploadInstance>();
@@ -279,12 +236,12 @@ const filteredFiles = computed(() => {
 
   if (searchQuery.value) {
     const q = searchQuery.value.toLowerCase();
-    result = result.filter((f) => (f.filename || f.name || '').toLowerCase().includes(q));
+    result = result.filter((f) => (f.filename || '').toLowerCase().includes(q));
   }
 
   if (typeFilter.value) {
     result = result.filter((f) => {
-      const t = (f.type || getFileExt(f.filename || f.name || '')).toLowerCase();
+      const t = (f.type || getFileExt(f.filename || '')).toLowerCase();
       return t === typeFilter.value.toLowerCase();
     });
   }
@@ -302,12 +259,12 @@ function getFileExt(filename: string): string {
 async function fetchFiles(): Promise<void> {
   loading.value = true;
   try {
-    const res = (await apiClient.get('/api/files/list')) as Record<string, unknown>;
-    files.value = res.files ?? res.data ?? [];
-  } catch {
-    // API 不可用，使用 mock 数据
-    console.warn('[FilesView] API 不可用，使用 mock 数据');
-    files.value = generateMockFiles();
+    const res = (await apiClient.get('/api/files')) as { files: ApiFileItem[]; total: number };
+    files.value = (res.files || []).map(apiToDisplay);
+  } catch (err) {
+    console.error('[FilesView] 获取文件列表失败', err);
+    ElMessage.error('获取文件列表失败');
+    files.value = [];
   } finally {
     loading.value = false;
   }
@@ -319,7 +276,7 @@ function handleSearch() {
 }
 
 // ───── 选择 ─────
-function handleSelectionChange(selection: MockFileItem[]) {
+function handleSelectionChange(selection: DisplayFileItem[]) {
   selectedIds.value = selection.map((item) => item.id);
 }
 
@@ -340,17 +297,20 @@ function onUploadSuccess(response: Record<string, unknown>, file: UploadFile): v
     percent: 100,
     status: 'success',
   };
-  // 添加到本地列表
-  const newFile: MockFileItem = {
-    id: response?.fileId || response?.data?.fileId || `f_${Date.now()}`,
-    filename: file.name,
+  // 从后端响应中提取信息
+  const fileHash = (response?.file_hash as string) || (response?.data as Record<string, unknown>)?.file_hash as string || `f_${Date.now()}`;
+  const fileName = (response?.file_name as string) || file.name;
+  const chunkCount = (response?.chunk_count as number) || 0;
+  const newFile: DisplayFileItem = {
+    id: fileHash,
+    filename: fileName,
     size: file.size || 0,
-    type: getFileExt(file.name),
+    type: getFileExt(fileName),
     uploadedAt: new Date().toISOString(),
+    chunkCount,
   };
   files.value.unshift(newFile);
   ElMessage.success('上传成功');
-  // 2秒后自动隐藏进度条
   setTimeout(() => {
     uploadProgress.value.show = false;
   }, 2000);
@@ -380,7 +340,7 @@ function onUploadError(err: Error, file: UploadFile): void {
 }
 
 // ───── 下载 ─────
-function handleDownload(file: MockFileItem): void {
+function handleDownload(file: DisplayFileItem): void {
   const downloadUrl = `/api/files/${file.id}/download`;
   const link = document.createElement('a');
   link.href = downloadUrl;
@@ -391,7 +351,7 @@ function handleDownload(file: MockFileItem): void {
 }
 
 // ───── 删除 ─────
-async function handleDelete(file: MockFileItem): Promise<void> {
+async function handleDelete(file: DisplayFileItem): Promise<void> {
   try {
     await ElMessageBox.confirm(`确定要删除文件「${file.filename || file.name}」吗？`, '确认删除', {
       type: 'warning',

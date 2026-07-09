@@ -63,13 +63,14 @@ def _load_users():
 @router.get("/api/admin/stats")
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def admin_stats(request: Request = None):
-    """管理统计"""
+    """管理统计 — 从数据库查询真实统计数据"""
     try:
+        stats = _get_chunks_stats()
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
             from src.api.response import success
-            return success(data={"ok": True, "chunks": 0, "categories": {}}, message="管理统计")
-        return {"ok": True, "chunks": 0, "categories": {}}
+            return success(data={"ok": True, "chunks": stats["total_chunks"], "categories": stats["categories"], "unique_files": stats["unique_files"]}, message="管理统计")
+        return {"ok": True, "chunks": stats["total_chunks"], "categories": stats["categories"], "unique_files": stats["unique_files"]}
     except Exception as e:
         logger.exception(f"admin_stats 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
@@ -200,8 +201,9 @@ async def admin_create_user(request: Request):
                 content={"error": "参数错误", "detail": "用户名已存在"}
             )
 
+        from src.api.auth_routes import _hash_password
         users[username] = {
-            "password": password,  # 会在下次登录时自动升级为 bcrypt
+            "password": _hash_password(password),  # 创建时即使用 bcrypt 哈希存储
             "role": role,
             "display_name": display_name,
             "created_at": time.time(),
@@ -240,7 +242,8 @@ async def admin_update_user(user_id: str, request: Request):
             if key in body:
                 users[user_id][key] = body[key]
         if "password" in body:
-            users[user_id]["password"] = body["password"]
+            from src.api.auth_routes import _hash_password
+            users[user_id]["password"] = _hash_password(body["password"])
 
         users_file.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8")
 

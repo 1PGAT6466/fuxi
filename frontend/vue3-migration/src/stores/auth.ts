@@ -23,7 +23,7 @@ const logger = createLogger('AuthStore');
 // ────────────────────────────────────────────
 let refreshTimer: ReturnType<typeof setInterval> | null = null;
 
-function startAutoRefresh(refreshFn: () => Promise<void>): void {
+function startAutoRefresh(refreshFn: () => Promise<unknown>): void {
   stopAutoRefresh();
   refreshTimer = setInterval(
     async () => {
@@ -129,6 +129,7 @@ export const useAuthStore = defineStore('auth', () => {
 
   /**
    * 获取当前用户信息
+   * 后端 /api/auth/me 可能不存在，使用已缓存的 user 信息
    */
   async function fetchUser(): Promise<UserInfo> {
     loading.value = true;
@@ -139,15 +140,32 @@ export const useAuthStore = defineStore('auth', () => {
         },
       });
       if (!response.ok) {
+        // 接口可能不存在，使用已缓存信息
+        if (user.value) {
+          return user.value;
+        }
         throw new Error('获取用户信息失败');
       }
       const data = await response.json();
-      if (data.code !== 0 && data.code !== 200) {
+      // 兼容 {code, data} 和 {username, role} 两种格式
+      if (data.username) {
+        user.value = {
+          id: 0,
+          username: data.username,
+          display_name: data.display_name || data.username,
+          role: data.role || 'user',
+        };
+      } else if (data.data) {
+        user.value = data.data;
+      } else if (data.code !== undefined && data.code !== 0 && data.code !== 200) {
         throw new Error(data.message || '获取用户信息失败');
       }
-      user.value = data.data;
-      return data.data;
-    } catch {
+      return user.value!;
+    } catch (err: unknown) {
+      // 如果已经有 user 信息（来自登录），不清除
+      if (user.value) {
+        return user.value;
+      }
       await logout();
       throw new Error('获取用户信息失败');
     } finally {

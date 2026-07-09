@@ -101,7 +101,8 @@
 <script setup lang="ts">
 import { ref, nextTick, watch, onMounted, onUnmounted } from 'vue';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { logger } from '@/utils/logger';
+import { createLogger } from '@/utils/logger';
+const logger = createLogger('ChatView');
 import { Plus, Delete, ArrowLeft, ArrowRight, WarningFilled } from '@element-plus/icons-vue';
 import { useChatStore } from '@/stores/chat';
 import ChatSessionList from '@/components/chat/ChatSessionList.vue';

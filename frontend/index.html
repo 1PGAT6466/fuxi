@@ -9,15 +9,16 @@
 <!-- CSP 策略（安全加固 v1.44）-->
 <meta http-equiv="Content-Security-Policy" content="
   default-src 'self';
-  script-src 'self' https://d3js.org;
+  script-src 'self' 'unsafe-inline' https://d3js.org https://cdn.jsdelivr.net;
   style-src 'self' 'unsafe-inline';
   img-src 'self' data: https:;
   font-src 'self' data:;
-  connect-src 'self' http://localhost:8080 ws://localhost:8080;
+  connect-src 'self' http://172.25.30.200:8080 http://localhost:8080;
 ">
 <link rel="stylesheet" href="/static/css/app.css?v=1">
 <link rel="stylesheet" href="/static/css/chat_redesign.css?v=6">
 <script defer src="https://d3js.org/d3.v7.min.js"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
 </head>
 <body>
 
@@ -47,7 +48,7 @@
       <button type="submit" class="btn-login" id="loginBtn">登 录</button>
       <div class="login-error" id="loginError"></div>
     </form>
-    <p class="login-hint">伏羲体系 · v1.50</p>
+    <p class="login-hint">伏羲体系 · v1.44</p>
   </div>
 </div>
 
@@ -134,6 +135,7 @@
     <div class="topbar">
       <div class="topbar-title" id="pageTitle">智能对话</div>
       <div class="topbar-right">
+        <button id="theme-toggle" class="btn btn-ghost btn-sm" onclick="Theme.toggle()" title="切换主题" style="margin-right:8px;font-size:16px;padding:4px 8px;border-radius:6px">🌙</button>
         <div class="topbar-status"><span class="status-dot"></span> 系统正常</div>
       </div>
     </div>

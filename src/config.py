@@ -78,6 +78,13 @@ AI_TIMEOUT_SECONDS = int(os.getenv("KB_AI_TIMEOUT", "30"))
 
 # ============ MiMo API 配置 ============
 MIMO_API_KEY = os.getenv("MIMO_API_KEY", "")
+if not MIMO_API_KEY:
+    import warnings
+    warnings.warn(
+        "⚠️  MIMO_API_KEY 未设置！LLM 服务将不可用。"
+        "请在 .env 或系统环境变量中设置 MIMO_API_KEY。",
+        RuntimeWarning
+    )
 MIMO_BASE_URL = os.getenv("MIMO_BASE_URL", "https://token-plan-cn.xiaomimimo.com/v1")
 MIMO_MODEL = os.getenv("MIMO_MODEL", "mimo-v2.5")
 MIMO_TIMEOUT = int(os.getenv("MIMO_TIMEOUT", "60"))

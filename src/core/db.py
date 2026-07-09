@@ -109,7 +109,6 @@ def log_search_to_db(query: str, result_count: int, latency_ms: float, mode: str
                 "timestamp": __import__('datetime').datetime.now().isoformat()
             }, ensure_ascii=False) + "\n")
     except Exception:
-        logger.warning(f"[db] suppressed exception", exc_info=True)
-        pass
+        logger.warning(f"[db] 搜索日志写入失败", exc_info=True)
 
 logger.info("lib/db.py 加载完成")

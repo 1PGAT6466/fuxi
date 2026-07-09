@@ -1,3 +1,13 @@
+// P1-16: 统一的 modal 清理函数，避免事件监听泄漏
+function closeServiceModal() {
+  document.removeEventListener('keydown', _serviceModalEscHandler);
+  var modal = document.getElementById('serviceDetailModal');
+  if (modal) modal.style.display = 'none';
+}
+function _serviceModalEscHandler(e) {
+  if (e.key === 'Escape') closeServiceModal();
+}
+
 async function loadServices() {
   var stats = document.getElementById('serviceStats');
   var grid = document.getElementById('serviceGrid');
@@ -99,18 +109,18 @@ async function showServiceDetail(serviceId) {
       modal = document.createElement('div');
       modal.id = 'serviceDetailModal';
       modal.style.cssText = 'display:none;position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,0.4);backdrop-filter:blur(4px);align-items:center;justify-content:center';
-      modal.onclick = function(e) { if (e.target === modal) modal.style.display = 'none'; };
+      modal.onclick = function(e) { if (e.target === modal) closeServiceModal(); };
       document.body.appendChild(modal);
     }
     modal.innerHTML = '<div class="card" style="width:440px;max-height:80vh;overflow-y:auto;padding:24px">' +
       '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">' +
       '<h3 style="font-size:16px;font-weight:600">服务详情</h3>' +
-      '<button class="btn-icon" onclick="document.getElementById(\'serviceDetailModal\').style.display=\'none\'" style="font-size:18px;color:var(--text3)">&times;</button>' +
+      '<button class="btn-icon" onclick="closeServiceModal()" style="font-size:18px;color:var(--text3)">&times;</button>' +
       '</div>' + html + '</div>';
+    // P1-16: 先清理旧 listener，避免多次打开导致事件泄漏
+    document.removeEventListener('keydown', _serviceModalEscHandler);
     modal.style.display = 'flex';
-    document.addEventListener('keydown', function _esc(e) {
-      if (e.key === 'Escape') { modal.style.display = 'none'; document.removeEventListener('keydown', _esc); }
-    });
+    document.addEventListener('keydown', _serviceModalEscHandler);
   } catch(e) {
     toast('获取详情失败: ' + e.message, 'error');
   }

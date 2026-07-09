@@ -7,5 +7,9 @@
   "api_prefix": "/api/analytics",
   "health_endpoint": "/health",
   "capabilities": ["stats", "report", "trend", "export", "dashboard"],
-  "config": {}
+  "config": {
+    "port": 8011,
+    "host": "127.0.0.1",
+    "standalone": false
+  }
 }

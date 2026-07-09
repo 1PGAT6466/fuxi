@@ -4,9 +4,7 @@
  * 提供 login / refreshToken / logout 三个核心接口
  */
 
-import { TOKEN_KEY } from '@/constants/storage-keys';
 import TokenManager from '@/utils/TokenManager';
-import type { LoginResponse, ApiResponse } from '@/types';
 
 // ============================================
 // 类型定义
@@ -59,14 +57,15 @@ export async function login(
     throw new Error(errorData.message || errorData.detail || `登录失败 (${response.status})`);
   }
 
-  const data: ApiResponse<LoginResponse> = await response.json();
+  const data = await response.json();
 
-  if (data.code !== 0 && data.code !== 200) {
-    throw new Error(data.message || '登录失败');
+  // 后端返回 {token, username, role, display_name}
+  if (!data.token) {
+    throw new Error(data.detail || data.message || '登录失败：服务器未返回 token');
   }
 
-  // 验证 role
-  if (data.data.user.role !== role) {
+  const userRole = data.role || 'user';
+  if (userRole !== role) {
     throw new Error(
       role === 'admin'
         ? '该账号不是管理员账号，请切换到普通用户登录'
@@ -75,8 +74,13 @@ export async function login(
   }
 
   return {
-    token: data.data.token,
-    user: data.data.user,
+    token: data.token,
+    user: {
+      id: 0,
+      username: data.username,
+      display_name: data.display_name || data.username,
+      role: userRole,
+    },
   };
 }
 
@@ -99,13 +103,20 @@ export async function refreshToken(): Promise<string> {
     throw new Error('Token 刷新失败，请重新登录');
   }
 
-  const data: ApiResponse<{ token: string }> = await response.json();
+  const data = await response.json();
 
-  if (data.code !== 0 && data.code !== 200) {
+  // 后端返回 {token} 或 {code, data: {token}}
+  if (data.token) {
+    return data.token;
+  }
+  if (data.code !== undefined && data.code !== 0 && data.code !== 200) {
     throw new Error(data.message || 'Token 刷新失败');
   }
+  if (data.data?.token) {
+    return data.data.token;
+  }
 
-  return data.data.token;
+  throw new Error('Token 刷新失败：响应格式异常');
 }
 
 /**

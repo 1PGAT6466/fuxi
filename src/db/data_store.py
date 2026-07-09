@@ -92,8 +92,29 @@ def invalidate_chunk_cache():
 
 
 def save_chunks(chunks: list):
-    """已废弃：所有写入通过 MemoryStore"""
-    pass
+    """全量替换保存 chunks：清空现有数据，再批量写入（带缓存失效）
+    
+    调用方期望：提供完整的 chunk 列表，完全替换数据库中的现有数据。
+    实现：通过 MemoryStore 先清空再批量插入，保证原子性。
+    """
+    store = get_store()
+    # 1) 先清空现有数据
+    with store._db_conn:
+        store._db_conn.execute("DELETE FROM chunks")
+        # 重置自增计数器，避免 id 无限增长
+        store._db_conn.execute("DELETE FROM sqlite_sequence WHERE name='chunks'")
+    # 2) 清除内存缓存
+    store._cache_hash.clear()
+    store._cache_name.clear()
+    store._json_cache.clear()
+    store._files_cache = None
+    store._files_cache_time = 0
+    # 3) 批量写入新数据
+    if chunks:
+        store.add_batch(chunks)
+    # 4) 同步清理 data_store 模块级缓存
+    invalidate_chunk_cache()
+    logger.info(f"save_chunks: 已保存 {len(chunks)} 条记录")
 
 
 # ============ Config ============

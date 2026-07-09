@@ -94,26 +94,34 @@ export function useSymbolsStatus() {
     return { total, healthy, warning, error, offline };
   });
 
-  // ─── API 调用（通过八卦层） ───
+  // ─── API 调用（通过 /api/health 的 bagua 字段） ───
   async function fetchStatus(): Promise<void> {
     loading.value = true;
     error.value = false;
 
     try {
-      const rawData = (await apiClient.get('/api/symbols/status')) as SymbolsStatusResponse;
+      const rawData = (await apiClient.get('/api/health')) as {
+        status: string;
+        bagua?: Record<string, string>;
+        checks?: Record<string, { status: string }>;
+      };
 
       // 通过 BAGUA_BY_ID 进行八卦层映射
-      if (rawData?.statuses) {
+      if (rawData?.bagua) {
         const newMap: Record<string, GuaStatusNormalized> = {};
-        for (const raw of rawData.statuses) {
-          const gua = BAGUA_BY_ID[raw.trigramId];
+        for (const [trigramId, healthStatus] of Object.entries(rawData.bagua)) {
+          const gua = BAGUA_BY_ID[trigramId];
           if (gua) {
-            newMap[raw.trigramId] = {
+            const status: TrigramStatus =
+              healthStatus === 'healthy' ? 'healthy' :
+              healthStatus === 'warning' ? 'warning' :
+              healthStatus === 'error' ? 'error' : 'offline';
+            newMap[trigramId] = {
               gua,
-              status: raw.status || 'offline',
-              activeTaskCount: raw.activeTaskCount || 0,
-              activity: raw.activity || 0,
-              label: raw.label || gua.functionDesc,
+              status,
+              activeTaskCount: status === 'healthy' ? 0 : 1,
+              activity: status === 'healthy' ? 100 : 50,
+              label: gua.functionDesc,
             };
           }
         }
@@ -123,17 +131,20 @@ export function useSymbolsStatus() {
         applyFallback();
       }
 
-      // 中宫数据处理
-      if (rawData?.zhonggong) {
+      // 中宫数据从 checks 中判断
+      if (rawData?.checks) {
+        const totalChecks = Object.keys(rawData.checks).length;
+        const healthyChecks = Object.values(rawData.checks).filter(
+          (c) => c.status === 'healthy',
+        ).length;
         zhonggongData.value = {
-          activeWindowCount: rawData.zhonggong.activeWindowCount || 0,
-          pendingTaskCount: rawData.zhonggong.pendingTaskCount || 0,
+          activeWindowCount: totalChecks,
+          pendingTaskCount: totalChecks - healthyChecks,
         };
       }
     } catch {
       console.warn('[useSymbolsStatus] API 不可用，使用降级数据');
       applyFallback();
-      // 如果降级后仍无数据，标记错误
       if (guaStatusList.value.length === 0) {
         error.value = true;
       }

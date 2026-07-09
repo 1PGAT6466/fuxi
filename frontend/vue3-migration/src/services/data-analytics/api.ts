@@ -1,11 +1,10 @@
 /**
  * 伏羲 v2.1 — 数据分析 API 封装
  * 封装 5 个端点：stats / trends / report / storage-dist / export
- * Mock 兜底：API 不可用时使用内置 mock 数据
+ * 数据来源：后端 API，失败时抛出错误，不返回兜底 mock
  */
 
 import apiClient from '@/api';
-import { mockAnalyticsResponse } from './mock';
 import type {
   StatsResponse,
   TrendsResponse,
@@ -21,72 +20,34 @@ import type {
 
 const API_BASE = '/api/analytics';
 
-/**
- * 带 mock 兜底的通用请求封装
- */
-async function requestWithFallback<T>(
-  endpoint: string,
-  mockData: T,
-  method: 'GET' | 'POST' = 'GET',
-  body?: unknown,
-): Promise<T> {
-  try {
-    if (method === 'GET') {
-      return (await apiClient.get(`${API_BASE}${endpoint}`)) as T;
-    }
-    return (await apiClient.post(`${API_BASE}${endpoint}`, body)) as T;
-  } catch (err) {
-    console.warn(`[Data Analytics] API ${API_BASE}${endpoint} 不可用，使用 mock 数据`, err);
-    return mockData;
-  }
-}
-
 // ───── 端点封装 ─────
 
 /** 健康检查 */
 export async function health() {
-  try {
-    return await apiClient.get(`${API_BASE}/health`);
-  } catch (err) {
-    console.warn(`[Data Analytics] API ${API_BASE}/health 不可用`, err);
-    return { status: 'degraded' };
-  }
+  return apiClient.get(`${API_BASE}/health`);
 }
 
 /** 获取统计概览 */
 export async function getStats(): Promise<StatsResponse> {
-  return requestWithFallback<StatsResponse>('/stats', mockAnalyticsResponse.stats());
+  return apiClient.get(`${API_BASE}/stats`) as Promise<StatsResponse>;
 }
 
 /** 获取趋势数据 */
 export async function getTrends(period: TrendPeriod): Promise<TrendsResponse> {
-  return requestWithFallback<TrendsResponse>(
-    `/trends?period=${period}`,
-    mockAnalyticsResponse.trends(period),
-  );
+  return apiClient.get(`${API_BASE}/trends`, { params: { period } }) as Promise<TrendsResponse>;
 }
 
 /** 生成报表 */
 export async function getReport(params: ReportRequest): Promise<ReportResponse> {
-  return requestWithFallback<ReportResponse>(
-    '/report',
-    mockAnalyticsResponse.report(params),
-    'POST',
-    params,
-  );
+  return apiClient.post(`${API_BASE}/report`, params) as Promise<ReportResponse>;
 }
 
 /** 获取存储分布 */
 export async function getStorageDist(): Promise<StorageDistResponse> {
-  return requestWithFallback<StorageDistResponse>('/storage', mockAnalyticsResponse.storageDist());
+  return apiClient.get(`${API_BASE}/storage`) as Promise<StorageDistResponse>;
 }
 
 /** 导出数据 */
 export async function exportData(config: ExportConfig): Promise<ExportResponse> {
-  return requestWithFallback<ExportResponse>(
-    '/export',
-    mockAnalyticsResponse.exportData(config),
-    'POST',
-    config,
-  );
+  return apiClient.post(`${API_BASE}/export`, config) as Promise<ExportResponse>;
 }

@@ -114,7 +114,15 @@ async function api(url, opt) {
         continue;
       }
 
-      if (r.status === 401) { clearAuth(); showLogin(); throw new Error('Not logged in'); }
+      if (r.status === 401) {
+        clearAuth();
+        // P1-10: 确保登录页可见，主应用隐藏（防御性写法）
+        try { showLogin(); } catch(e) {
+          document.getElementById('loginPage').style.display = 'flex';
+          document.getElementById('mainApp').style.display = 'none';
+        }
+        throw new Error('Not logged in');
+      }
       if (r.status === 403) { toast('没有权限', 'error'); throw new Error('Forbidden'); }
       if (!r.ok) throw new Error('请求失败: ' + r.status);
 

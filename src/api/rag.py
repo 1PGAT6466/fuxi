@@ -1,6 +1,7 @@
 """
 v1.44 Phase 1 Fix — RAG 检索路由
 提供传统 chunk 检索、SAG Event 粒度检索、实体向量扩展端点
+v1.50: 种子数据自动标记 origin=seed
 """
 from fastapi import APIRouter, Request, Query
 from fastapi.responses import JSONResponse
@@ -11,6 +12,39 @@ import logging
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["RAG 检索"])
+
+# ============ 种子数据标记 ============
+# ChromaDB 种子向量内容前缀
+_CHROMA_SEED_PREFIXES = (
+    "伏羲是一个企业知识认知中枢",
+    "ChromaDB 是一个开源的向量数据库",
+    "PostgreSQL 的 pgvector 扩展",
+    "文档分块是 RAG 管线的关键步骤",
+    "HNSW 是一种高效的近似最近邻搜索算法",
+    "坤卦 \u2637 负责伏羲系统的记忆存储",
+)
+# chunks.db 种子文件
+_CHUNKS_SEED_NAMES = frozenset({"test_knowledge.md", "malware.exe"})
+
+
+def _mark_seed_results(results: list) -> list:
+    """为种子数据标记 origin=seed 属性"""
+    for r in results:
+        text = (r.get("text", "") or r.get("content", "") or "").strip()
+
+        # 检查是否为 ChromaDB 种子向量
+        is_chroma_seed = any(text.startswith(p) for p in _CHROMA_SEED_PREFIXES)
+
+        # 检查是否为 chunks.db 种子
+        fname = (r.get("file_name", "") or r.get("metadata", {}).get("file_name", "") or "").lower()
+        is_chunk_seed = fname in _CHUNKS_SEED_NAMES
+
+        if is_chroma_seed or is_chunk_seed:
+            r["origin"] = "seed"
+            if "note" not in r:
+                r["note"] = f"示例数据{'（ChromaDB 种子向量）' if is_chroma_seed else '（chunks.db 测试数据）'}" if is_chroma_seed else f"示例数据（{fname}）"
+
+    return results
 
 
 class SearchRequest(BaseModel):
@@ -70,9 +104,12 @@ async def rag_search(body: SearchRequest, request: Request = None):
                         "metadata": r.get("metadata", {}),
                         "source": r.get("metadata", {}).get("source", ""),
                     })
+                # v1.50: 标记种子数据
+                formatted = _mark_seed_results(formatted)
                 return {
                     "results": formatted,
                     "total": len(formatted),
+                    "seed_count": sum(1 for r in formatted if r.get("origin") == "seed"),
                 }
         except Exception as e2:
             logger.warning(f"vector_store 回退也失败: {e2}")
@@ -118,11 +155,14 @@ async def rag_sag_search(body: EventSearchRequest, request: Request = None):
                     events = sag_results.get("events", sag_results.get("sag_events", []))
                 elif isinstance(sag_results, list):
                     results = sag_results
+                # v1.50: 标记种子数据
+                results = _mark_seed_results(results)
                 return {
                     "results": results,
                     "events": events,
                     "total": len(results),
                     "granularity": granularity,
+                    "seed_count": sum(1 for r in results if r.get("origin") == "seed"),
                 }
         except ImportError:
             pass
@@ -138,11 +178,14 @@ async def rag_sag_search(body: EventSearchRequest, request: Request = None):
                 mode=body.mode,
                 score_threshold=body.score_threshold,
             )
+            # v1.50: 标记种子数据
+            results = _mark_seed_results(results)
             return {
                 "results": results,
                 "events": events,
                 "total": len(results),
                 "granularity": "chunk",
+                "seed_count": sum(1 for r in results if r.get("origin") == "seed"),
             }
         except ImportError:
             pass
@@ -174,8 +217,8 @@ class SAGTraceRequest(BaseModel):
 async def rag_sag_trace(body: SAGTraceRequest, request: Request = None):
     """SAG 检索追踪 — SSE 流式返回三阶段流水线数据
 
-    当前为占位实现：返回一个空追踪流。
-    完整实现需要从 SAG Pipeline 获取实时 trace 数据。
+    v2.1: 尝试从真实 SAG Pipeline 获取 trace 数据，
+    失败时回退到状态说明而非虚假占位数据。
     """
     try:
         import json
@@ -185,12 +228,34 @@ async def rag_sag_trace(body: SAGTraceRequest, request: Request = None):
         async def trace_generator():
             yield f"data: {json.dumps({'type': 'start', 'session_id': body.session_id, 'message': 'SAG 追踪已启动'}, ensure_ascii=False)}\n\n"
             await asyncio.sleep(0.5)
-            yield f"data: {json.dumps({'type': 'stage', 'stage': 'stage1_retrieval', 'message': '阶段1: 检索完成（占位）'}, ensure_ascii=False)}\n\n"
-            await asyncio.sleep(0.3)
-            yield f"data: {json.dumps({'type': 'stage', 'stage': 'stage2_rerank', 'message': '阶段2: 重排序完成（占位）'}, ensure_ascii=False)}\n\n"
-            await asyncio.sleep(0.3)
-            yield f"data: {json.dumps({'type': 'stage', 'stage': 'stage3_generation', 'message': '阶段3: 生成完成（占位）'}, ensure_ascii=False)}\n\n"
-            await asyncio.sleep(0.2)
+            
+            # 尝试从真实 SAG Pipeline 获取追踪数据
+            real_trace = None
+            try:
+                from src.taiyang.sag_pipeline import SagTracer
+                tracer = SagTracer()
+                real_trace = tracer.get_trace(body.session_id)
+            except ImportError:
+                pass
+            except Exception as trace_err:
+                logger.warning(f"SAG 追踪获取失败: {trace_err}")
+            
+            if real_trace and real_trace.get("stages"):
+                # 返回真实追踪数据
+                for stage in real_trace.get("stages", []):
+                    stage_data = {
+                        "type": "stage",
+                        "stage": stage.get("name", ""),
+                        "message": stage.get("message", ""),
+                        "duration_ms": stage.get("duration_ms", 0),
+                        "details": stage.get("details", {}),
+                    }
+                    yield f"data: {json.dumps(stage_data, ensure_ascii=False)}\n\n"
+                    await asyncio.sleep(0.2)
+            else:
+                # 无实时追踪数据：明确告知当前状态而非返回虚假占位
+                yield f"data: {json.dumps({'type': 'notice', 'message': 'SAG 实时追踪数据暂不可用。系统运行正常，但追踪功能需连接活跃的 SAG Pipeline 实例。'}, ensure_ascii=False)}\n\n"
+            
             yield f"data: [DONE]\n\n"
 
         return StreamingResponse(
@@ -220,8 +285,7 @@ async def rag_entity_expand(
 ):
     """实体向量扩展 — 输入实体名，返回向量相似度排序的扩展实体
 
-    当前占位实现：返回空扩展列表。
-    完整实现需要调用嵌入模型 + ChromaDB 查找相似实体。
+    v2.1: 回退时明确告知原因，区分"功能未实现"与"无匹配结果"。
     """
     try:
         if not entity_name or not entity_name.strip():
@@ -238,17 +302,49 @@ async def rag_entity_expand(
                 "entity_name": entity_name,
                 "expanded_entities": expanded,
                 "total": len(expanded),
+                "source": "taiyang.expand",
             }
         except ImportError:
-            pass
+            logger.info("taiyang.expand 模块未安装，实体扩展功能不可用")
         except Exception as e:
-            logger.warning(f"expand_entity 失败: {e}")
+            logger.warning(f"expand_entity 调用失败: {e}")
 
-        # 占位返回
+        # 尝试知识图谱回退
+        try:
+            from src.db.data_store import load_graph
+            graph = load_graph()
+            nodes = graph.get("nodes", {})
+            if entity_name in nodes:
+                related = []
+                for edge in graph.get("edges", []):
+                    if edge.get("from") == entity_name:
+                        related.append({
+                            "name": edge.get("to", ""),
+                            "relation": edge.get("relation", ""),
+                            "source": "knowledge_graph",
+                        })
+                    elif edge.get("to") == entity_name:
+                        related.append({
+                            "name": edge.get("from", ""),
+                            "relation": edge.get("relation", ""),
+                            "source": "knowledge_graph",
+                        })
+                if related:
+                    return {
+                        "entity_name": entity_name,
+                        "expanded_entities": related[:10],
+                        "total": len(related),
+                        "source": "knowledge_graph",
+                    }
+        except Exception as e:
+            logger.warning(f"知识图谱回退失败: {e}")
+
+        # 明确告知调用方：功能未实现 vs 无匹配结果
         return {
             "entity_name": entity_name,
             "expanded_entities": [],
             "total": 0,
+            "notice": "实体扩展功能当前不可用：缺少嵌入模型模块 (taiyang.expand) 且知识图谱中无此实体",
         }
     except Exception as e:
         logger.exception(f"rag_entity_expand 失败: {e}")

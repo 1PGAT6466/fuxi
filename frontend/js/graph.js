@@ -2,12 +2,15 @@
 var _graphSimulation = null;
 var _graphNodes = [];
 var _graphEdges = [];
+// 缓存完整图谱数据，避免 _filterGraphType 每次重新请求 API
+var _graphCache = null;
 
 async function loadGraph() {
   var container = document.getElementById('graphEntities');
   container.innerHTML = '<div style="text-align:center;padding:20px"><div class="loading-dots">加载中<span>.</span><span>.</span><span>.</span></div></div>';
   try {
     var d = await api('/api/graph');
+    _graphCache = d;  // 缓存完整数据供类型过滤复用
     var nodes = d.nodes || {};
     var edges = d.edges || [];
     var entries = Object.entries(nodes);
@@ -226,23 +229,33 @@ function _highlightNode(name) {
 }
 
 function _filterGraphType(type) {
-  // 重新加载并过滤
-  api('/api/graph').then(function(d) {
-    var nodes = d.nodes || {};
-    var edges = d.edges || [];
-    if (type) {
-      var filtered = {};
-      Object.entries(nodes).forEach(function(e) {
-        if ((e[1] && e[1].type) === type) filtered[e[0]] = e[1];
-      });
-      nodes = filtered;
-    }
-    _drawD3Graph(Object.entries(nodes), edges);
-  });
+  // 优先从缓存获取，避免每次过滤都重新请求 API
+  var d = _graphCache;
+  if (d) {
+    _filterAndDraw(d, type);
+  } else {
+    api('/api/graph').then(function(resp) {
+      _graphCache = resp;
+      _filterAndDraw(resp, type);
+    });
+  }
+}
+
+function _filterAndDraw(d, type) {
+  var nodes = d.nodes || {};
+  var edges = d.edges || [];
+  if (type) {
+    var filtered = {};
+    Object.entries(nodes).forEach(function(e) {
+      if ((e[1] && e[1].type) === type) filtered[e[0]] = e[1];
+    });
+    nodes = filtered;
+  }
+  _drawD3Graph(Object.entries(nodes), edges);
 }
 
 function _showNodeDetail(node) {
-  // 在面板中显示详情
+  // 在面板中显示详情（使用 DOMPurify 二次防护）
   var panel = document.getElementById('graphEntities');
   var html = '<div style="padding:12px">';
   html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
@@ -263,12 +276,14 @@ function _showNodeDetail(node) {
   if (neighbors.length) {
     html += '<div style="font-size:12px;font-weight:600;margin:12px 0 6px">关联实体 (' + neighbors.length + ')</div>';
     neighbors.forEach(function(n) {
-      html += '<div style="padding:4px 0;font-size:12px;color:var(--text2);cursor:pointer" onclick="_highlightNode(\'' + esc(n.name).replace(/'/g,"\\'") + '\')">';
+      html += '<div style="padding:4px 0;font-size:12px;color:var(--text2);cursor:pointer" data-neighbor="' + esc(n.name) + '" onclick="_highlightNode(this.dataset.neighbor)">';
       html += n.dir + ' ' + esc(n.name) + ' <span style="color:var(--text3)">(' + esc(n.relation) + ')</span>';
       html += '</div>';
     });
   }
   html += '</div>';
+  // 二次清洗
+  if (typeof DOMPurify !== 'undefined') html = DOMPurify.sanitize(html);
   panel.innerHTML = html;
 }
 

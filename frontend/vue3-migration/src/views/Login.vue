@@ -201,7 +201,7 @@ import { useRouter, useRoute } from 'vue-router';
 import { useAuthStore } from '@/stores/auth';
 import { User, UserFilled, Lock, WarningFilled, InfoFilled, Avatar } from '@element-plus/icons-vue';
 import type { FormInstance, FormRules } from 'element-plus';
-import type { LoginResponse } from '@/types';
+import type { LoginResult } from '@/api/auth';
 
 // ============================================
 // 依赖注入
@@ -290,7 +290,7 @@ async function handleLogin(): Promise<void> {
   errorMsg.value = '';
 
   try {
-    const loginResponse: LoginResponse = await authStore.login(
+    const loginResponse: LoginResult = await authStore.login(
       form.username,
       form.password,
       activeRole.value,

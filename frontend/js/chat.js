@@ -31,17 +31,32 @@ async function sendChat(forceWeb) {
   appendMsg('user', prefix + q);
   chatHistory.push({ role: 'user', content: q });
   var lid = appendMsg('loading', '');
+
+  // P1-5: 非流式模式增加超时提示
+  var progressTimer = setTimeout(function() {
+    var el = document.getElementById(lid);
+    if (el) {
+      var bubble = el.querySelector('.msg-bubble');
+      if (bubble) bubble.innerHTML = '<div class="typing-indicator"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div><div style="font-size:11px;color:var(--text3);margin-top:6px">正在思考，请耐心等待...</div>';
+    }
+  }, 3000);
+
   try {
     var apiPath = useWeb ? '/api/antenna/search' : '/api/chat';
     var body = useWeb ? { query: q } : { query: q, history: chatHistory.slice(-6), stream: false };
-    var d = await api(apiPath, { method: 'POST', body: body });
+    var d = await api(apiPath, { method: 'POST', body: body, timeout: 30000 });
+    clearTimeout(progressTimer);
     removeMsg(lid);
     var answer = d.answer || '未能生成回答';
     appendMsg('ai', answer, d.sources, d.trace);
     chatHistory.push({ role: 'assistant', content: answer });
   } catch (e) {
+    clearTimeout(progressTimer);
     removeMsg(lid);
-    appendMsg('error', '请求失败: ' + e.message);
+    var errMsg = e.message;
+    if (e.message.indexOf('超时') >= 0) errMsg = '请求超时，请稍后重试';
+    else if (errMsg.indexOf('Not logged') >= 0) errMsg = '登录已过期，请重新登录';
+    appendMsg('error', '请求失败: ' + errMsg);
   }
 }
 
@@ -58,6 +73,8 @@ function appendMsg(role, content, sources, trace) {
   } else if (role === 'error') {
     div.innerHTML = '<div class="msg-avatar">!</div><div class="msg-bubble" style="color:var(--error)">' + esc(content) + '</div>';
   } else {
+    if (typeof marked === 'undefined') console.warn('[Chat] marked.js CDN 加载失败，将回退为纯文本');
+    if (typeof DOMPurify === 'undefined') console.warn('[Chat] DOMPurify CDN 加载失败，安全防护降级');
     var rendered = typeof marked !== 'undefined' ? marked.parse(content) : esc(content);
     if (typeof DOMPurify !== 'undefined') rendered = DOMPurify.sanitize(rendered);
     var html = '<div class="msg-avatar">AI</div><div class="msg-bubble">' + rendered;
