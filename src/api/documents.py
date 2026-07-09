@@ -42,11 +42,11 @@ async def documents(page: int = 1, page_size: int = 50, request: Request = None)
 async def upload(file: UploadFile = File(...), request: Request = None):
     """文件上传 — v1.50 统一响应格式支持
     v1.50 R2 Blue: 路径穿越防护 — 规范化文件名并验证在允许目录内
+    v1.44 Phase1: 异步处理 — 发布到任务队列
     """
     import os
-    from src.shaoyang.pipeline import ShaoyangPipeline
-    from src.bagua.intent_bus import IntentBus
     from src.api.response import success, error
+    from src.infra.task_queue import get_task_queue, TASK_FILE_PROCESS
     
     try:
         # 保存临时文件（使用配置的 UPLOAD_DIR）
@@ -68,33 +68,78 @@ async def upload(file: UploadFile = File(...), request: Request = None):
         content = await file.read()
         tmp_path.write_bytes(content)
         
-        # 通过少阳处理
-        intent_bus = IntentBus()
-        pipeline = ShaoyangPipeline(intent_bus)
-        result = await pipeline.digest(str(tmp_path), source="upload")
+        # v1.44 Phase1: 发布到异步任务队列
+        task_queue = await get_task_queue()
+        task_id = await task_queue.publish_task(
+            TASK_FILE_PROCESS,
+            {
+                "file_path": str(tmp_path),
+                "file_name": file.filename,
+                "source": "upload"
+            }
+        )
         
         upload_data = {
             "file_name": file.filename,
-            "chunks": len(result.chunks),
-            "duration_ms": result.duration_ms,
+            "task_id": task_id,
+            "status": "processing",
+            "message": "文件已接收，正在后台处理"
         }
         
-        # 向后兼容: 默认返回旧格式 {status: "ok", file_name, chunks, duration_ms}
+        # 向后兼容: 默认返回旧格式
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
-            return success(data=upload_data, message="上传成功")
-        # 默认旧格式 — 也加上 status 字段方便统一
+            return success(data=upload_data, message="上传成功，正在后台处理")
+        # 默认旧格式
         return {
             "status": "ok",
             "file_name": file.filename,
-            "chunks": len(result.chunks),
-            "duration_ms": result.duration_ms,
+            "task_id": task_id,
+            "message": "文件已接收，正在后台处理"
         }
     except Exception as e:  # TODO: Narrow exception type
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
             return error("上传失败", status_code=500, detail=str(e))
         raise HTTPException(500, f"处理失败: {str(e)}")
+
+
+@router.get("/api/tasks/{task_id}")
+async def get_task_status(task_id: str, request: Request = None):
+    """获取任务状态 — v1.44 Phase1 异步任务队列
+    """
+    from src.infra.task_queue import get_task_queue
+    from src.api.response import success, error
+    
+    try:
+        task_queue = await get_task_queue()
+        task = await task_queue.get_task_status(task_id)
+        
+        if not task:
+            raise HTTPException(404, f"任务 {task_id} 未找到")
+        
+        task_data = {
+            "task_id": task.task_id,
+            "task_type": task.task_type,
+            "status": task.status.value,
+            "created_at": task.created_at,
+            "updated_at": task.updated_at,
+            "result": task.result,
+            "error": task.error
+        }
+        
+        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        if _wants_v2:
+            return success(data=task_data, message="获取任务状态成功")
+        return task_data
+        
+    except HTTPException:
+        raise
+    except Exception as e:  # TODO: Narrow exception type
+        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        if _wants_v2:
+            return error("获取任务状态失败", status_code=500, detail=str(e))
+        raise HTTPException(500, f"获取任务状态失败: {str(e)}")
 
 
 @router.delete("/api/documents/{file_hash}")

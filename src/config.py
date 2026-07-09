@@ -103,6 +103,14 @@ OPENAI_TIMEOUT = int(os.getenv("OPENAI_TIMEOUT", "30"))
 # ============ TokenBudget 会话成本预算（v1.50 方案第13条） ============
 FUXI_SESSION_BUDGET = float(os.getenv("FUXI_SESSION_BUDGET", "0.15"))  # ¥0.15 默认硬上限
 
+# ============ Redis 配置（v1.44 Phase1 消息队列） ============
+REDIS_HOST = os.getenv("REDIS_HOST", "localhost")
+REDIS_PORT = int(os.getenv("REDIS_PORT", "6379"))
+REDIS_DB = int(os.getenv("REDIS_DB", "0"))
+REDIS_PASSWORD = os.getenv("REDIS_PASSWORD", "")
+REDIS_STREAM_NAME = os.getenv("REDIS_STREAM_NAME", "fuxi:tasks")
+REDIS_GROUP_NAME = os.getenv("REDIS_GROUP_NAME", "fuxi:workers")
+
 # ============ SiliconFlow API 配置 ============
 SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY", "")
 SILICONFLOW_BASE_URL = os.getenv("SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1")

@@ -295,18 +295,29 @@ async def evaluation_results(request: Request = None):
 
 @router.post("/api/evaluation")
 async def evaluation_create(request: Request):
-    """创建评测任务 — 触发真实评测执行"""
+    """创建评测任务 — v1.44 Phase1: 发布到异步任务队列
+    """
     try:
         body = await request.json()
         logger.info(f"[evaluation] 创建评测请求: user={getattr(request.state, 'user', 'anonymous')}")
 
-        from src.services.eval_automation import get_eval_automation
-        automation = get_eval_automation()
-        result = await automation.run_daily_eval()
+        from src.infra.task_queue import get_task_queue, TASK_EVAL_RUN
+        
+        # 发布到异步任务队列
+        task_queue = await get_task_queue()
+        task_id = await task_queue.publish_task(
+            TASK_EVAL_RUN,
+            {
+                "trigger": "api",
+                "user": getattr(request.state, 'user', 'anonymous')
+            }
+        )
+        
         return {
             "ok": True,
-            "result": result,
-            "message": "评测已在后台启动，完成后可在评测结果页面查看",
+            "task_id": task_id,
+            "status": "processing",
+            "message": "评测任务已提交，正在后台执行",
         }
     except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"evaluation_create 失败: {e}")

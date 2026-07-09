@@ -71,14 +71,22 @@ JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = int(os.environ.get("FUXI_JWT_EXPIRE_HOURS", "2"))
 
 
-def create_jwt_token(username: str, role: str) -> str:
-    """创建标准JWT token — v1.50 R4: 包含 JTI 和 token_version"""
+def create_jwt_token(username: str, role: str, tenant_id: str = "default") -> str:
+    """创建标准JWT token — v1.50 R4: 包含 JTI 和 token_version
+    v1.44 Phase 1: 新增 roles 字段（RBAC 角色列表）+ tenant_id（多租户）
+    """
     import uuid as _uuid
+    from src.auth.rbac import get_rbac
     now = datetime.now(timezone.utc)
     current_version = get_token_version(username)
+    # RBAC: 获取用户角色列表
+    rbac = get_rbac()
+    roles = rbac.get_roles_for_token(username)
     payload = {
         "sub": username,
-        "role": role,
+        "role": role,  # 向后兼容：保留单角色字段
+        "roles": roles,  # v1.44 Phase 1: RBAC 角色列表
+        "tenant_id": tenant_id,  # v1.44 Phase 1: 多租户 ID
         "exp": now + timedelta(hours=JWT_EXPIRE_HOURS),
         "iat": now,
         "jti": _uuid.uuid4().hex,  # JWT ID，用于黑名单
@@ -213,6 +221,11 @@ class AuthMiddleware(BaseHTTPMiddleware):
         # 将用户信息注入 request.state，供下游路由使用
         request.state.user = payload.get("sub", "unknown")
         request.state.role = payload.get("role", "user")
+        # v1.44 Phase 1: 注入 RBAC 角色列表
+        request.state.roles = payload.get("roles", [payload.get("role", "user")])
+        # v1.44 Phase 1: 注入 tenant_id（多租户）
+        request.state.tenant_id = payload.get("tenant_id", "default")
+        request.state.jwt_payload = payload
 
         return await call_next(request)
 

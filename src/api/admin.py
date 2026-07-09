@@ -1,28 +1,29 @@
-# 兼容层 - 管理路由
-# v1.44 Phase 1 Fix: 移除 require_admin 依赖（尚未实现）, 使用 request.state 判断角色
-# v1.50 Phase E: 新增团队管理 API（Company Brain 权限隔离）
+﻿# 鍏煎灞?- 绠＄悊璺敱
+# v1.44 Phase 1 Fix: 绉婚櫎 require_admin 渚濊禆锛堝皻鏈疄鐜帮級, 浣跨敤 request.state 鍒ゆ柇瑙掕壊
+# v1.50 Phase E: 鏂板鍥㈤槦绠＄悊 API锛圕ompany Brain 鏉冮檺闅旂锛?
 from fastapi import APIRouter, Request, Depends
 from fastapi.responses import JSONResponse
-from src.api.auth import require_admin
+# v1.44 Phase 1: 浣跨敤 RBAC require_role 鏇夸唬鏃х増 require_admin
+from src.auth.rbac import require_role
 import json
 import logging
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["管理"])
+router = APIRouter(tags=["绠＄悊"])
 
 
-# ============ 内部辅助函数 ============
+# ============ 鍐呴儴杈呭姪鍑芥暟 ============
 
 def _get_chunks_stats():
-    """获取文档块统计信息"""
+    """鑾峰彇鏂囨。鍧楃粺璁′俊鎭?""
     try:
         from src.db.data_store import load_chunks
         chunks = load_chunks()
         total_chunks = len(chunks)
         categories = {}
         for c in chunks:
-            cat = c.get("category", "未分类")
+            cat = c.get("category", "鏈垎绫?)
             categories[cat] = categories.get(cat, 0) + 1
         unique_files = len(set(c.get("file_hash", "") for c in chunks))
         return {
@@ -31,12 +32,12 @@ def _get_chunks_stats():
             "categories": categories,
         }
     except Exception as e:  # TODO: Narrow exception type
-        logger.warning(f"_get_chunks_stats 失败: {e}")
+        logger.warning(f"_get_chunks_stats 澶辫触: {e}")
         return {"total_chunks": 0, "unique_files": 0, "categories": {}}
 
 
 def _load_users():
-    """加载用户列表"""
+    """鍔犺浇鐢ㄦ埛鍒楄〃"""
     try:
         from pathlib import Path
         from src.config import DATA_DIR as CONFIG_DATA_DIR
@@ -54,31 +55,31 @@ def _load_users():
             return users
         return []
     except Exception as e:  # TODO: Narrow exception type
-        logger.warning(f"_load_users 失败: {e}")
+        logger.warning(f"_load_users 澶辫触: {e}")
         return []
 
 
-# ============ 路由端点 ============
+# ============ 璺敱绔偣 ============
 
-@router.get("/api/admin/stats", dependencies=[Depends(require_admin)])
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+@router.get("/api/admin/stats", dependencies=[Depends(require_role("admin"))])
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def admin_stats(request: Request = None):
-    """管理统计 — 从数据库查询真实统计数据"""
+    """绠＄悊缁熻 鈥?浠庢暟鎹簱鏌ヨ鐪熷疄缁熻鏁版嵁"""
     try:
         stats = _get_chunks_stats()
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
             from src.api.response import success
-            return success(data={"ok": True, "chunks": stats["total_chunks"], "categories": stats["categories"], "unique_files": stats["unique_files"]}, message="管理统计")
+            return success(data={"ok": True, "chunks": stats["total_chunks"], "categories": stats["categories"], "unique_files": stats["unique_files"]}, message="绠＄悊缁熻")
         return {"ok": True, "chunks": stats["total_chunks"], "categories": stats["categories"], "unique_files": stats["unique_files"]}
     except Exception as e:  # TODO: Narrow exception type
-        logger.exception(f"admin_stats 失败: {e}")
+        logger.exception(f"admin_stats 澶辫触: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
-@router.get("/api/admin/server-status", dependencies=[Depends(require_admin)])
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+@router.get("/api/admin/server-status", dependencies=[Depends(require_role("admin"))])
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def server_status(request: Request = None):
-    """服务器状态"""
+    """鏈嶅姟鍣ㄧ姸鎬?""
     try:
         import time
         from src.config import START_TIME
@@ -86,40 +87,40 @@ async def server_status(request: Request = None):
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
             from src.api.response import success
-            return success(data={"ok": True, "uptime_seconds": round(uptime), "uptime_hours": round(uptime/3600, 1)}, message="服务器状态")
+            return success(data={"ok": True, "uptime_seconds": round(uptime), "uptime_hours": round(uptime/3600, 1)}, message="鏈嶅姟鍣ㄧ姸鎬?)
         return {"ok": True, "uptime_seconds": round(uptime), "uptime_hours": round(uptime/3600, 1)}
     except Exception as e:  # TODO: Narrow exception type
-        logger.exception(f"server_status 失败: {e}")
+        logger.exception(f"server_status 澶辫触: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
-# ── 任务 A.1: /api/admin/status 别名 → /api/admin/server-status ──
-@router.get("/api/admin/status", dependencies=[Depends(require_admin)])
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+# 鈹€鈹€ 浠诲姟 A.1: /api/admin/status 鍒悕 鈫?/api/admin/server-status 鈹€鈹€
+@router.get("/api/admin/status", dependencies=[Depends(require_role("admin"))])
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def admin_status_alias(request: Request = None):
-    """前端调用的 /api/admin/status — 代理到 server-status"""
+    """鍓嶇璋冪敤鐨?/api/admin/status 鈥?浠ｇ悊鍒?server-status"""
     return await server_status(request)
 
-# ── 任务 A.2: /api/admin/documents 文档统计 ──
-@router.get("/api/admin/documents", dependencies=[Depends(require_admin)])
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+# 鈹€鈹€ 浠诲姟 A.2: /api/admin/documents 鏂囨。缁熻 鈹€鈹€
+@router.get("/api/admin/documents", dependencies=[Depends(require_role("admin"))])
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def admin_documents(request: Request = None):
-    """管理面板：文档统计"""
+    """绠＄悊闈㈡澘锛氭枃妗ｇ粺璁?""
     try:
         stats = _get_chunks_stats()
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
             from src.api.response import success
-            return success(data={"ok": True, "documents": stats}, message="文档统计")
+            return success(data={"ok": True, "documents": stats}, message="鏂囨。缁熻")
         return {"ok": True, "documents": stats}
     except Exception as e:  # TODO: Narrow exception type
-        logger.exception(f"admin_documents 失败: {e}")
+        logger.exception(f"admin_documents 澶辫触: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
-# ── 任务 A.3: /api/admin/evaluations 和 /api/admin/evaluations/run ──
-@router.get("/api/admin/evaluations", dependencies=[Depends(require_admin)])
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+# 鈹€鈹€ 浠诲姟 A.3: /api/admin/evaluations 鍜?/api/admin/evaluations/run 鈹€鈹€
+@router.get("/api/admin/evaluations", dependencies=[Depends(require_role("admin"))])
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def admin_evaluations(request: Request = None):
-    """管理面板：评测列表 — 代理到 evaluation API"""
+    """绠＄悊闈㈡澘锛氳瘎娴嬪垪琛?鈥?浠ｇ悊鍒?evaluation API"""
     try:
         from src.services.eval_automation import get_eval_automation
         automation = get_eval_automation()
@@ -131,51 +132,51 @@ async def admin_evaluations(request: Request = None):
             return success(data={
                 "ok": True,
                 "evaluations": history,
-                "latest_report": report or {"message": "暂无评测报告"},
-            }, message="评测列表")
+                "latest_report": report or {"message": "鏆傛棤璇勬祴鎶ュ憡"},
+            }, message="璇勬祴鍒楄〃")
         return {
             "ok": True,
             "evaluations": history,
-            "latest_report": report or {"message": "暂无评测报告"},
+            "latest_report": report or {"message": "鏆傛棤璇勬祴鎶ュ憡"},
         }
     except Exception as e:  # TODO: Narrow exception type
-        logger.exception(f"admin_evaluations 失败: {e}")
+        logger.exception(f"admin_evaluations 澶辫触: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
-@router.post("/api/admin/evaluations/run", dependencies=[Depends(require_admin)])
+@router.post("/api/admin/evaluations/run", dependencies=[Depends(require_role("admin"))])
 async def admin_evaluations_run():
-    """管理面板：触发评测运行"""
+    """绠＄悊闈㈡澘锛氳Е鍙戣瘎娴嬭繍琛?""
     try:
         from src.services.eval_automation import get_eval_automation
         automation = get_eval_automation()
         result = await automation.run_daily_eval()
         return {"ok": True, "result": result}
     except Exception as e:  # TODO: Narrow exception type
-        logger.exception(f"admin_evaluations_run 失败: {e}")
+        logger.exception(f"admin_evaluations_run 澶辫触: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
-# ── 任务 A.4: /api/admin/users 用户列表 ──
-@router.get("/api/admin/users", dependencies=[Depends(require_admin)])
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+# 鈹€鈹€ 浠诲姟 A.4: /api/admin/users 鐢ㄦ埛鍒楄〃 鈹€鈹€
+@router.get("/api/admin/users", dependencies=[Depends(require_role("admin"))])
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def admin_users(request: Request = None):
-    """管理面板：用户列表"""
+    """绠＄悊闈㈡澘锛氱敤鎴峰垪琛?""
     try:
         users = _load_users()
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
             from src.api.response import success
-            return success(data={"ok": True, "users": users, "total": len(users)}, message="用户列表")
+            return success(data={"ok": True, "users": users, "total": len(users)}, message="鐢ㄦ埛鍒楄〃")
         return {"ok": True, "users": users, "total": len(users)}
     except Exception as e:  # TODO: Narrow exception type
-        logger.exception(f"admin_users 失败: {e}")
+        logger.exception(f"admin_users 澶辫触: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
 
-# ── v1.44 Phase 1 Fix: /api/admin/users 用户 CRUD ──
+# 鈹€鈹€ v1.44 Phase 1 Fix: /api/admin/users 鐢ㄦ埛 CRUD 鈹€鈹€
 
-@router.post("/api/admin/users", dependencies=[Depends(require_admin)])
+@router.post("/api/admin/users", dependencies=[Depends(require_role("admin"))])
 async def admin_create_user(request: Request):
-    """管理面板：创建用户"""
+    """绠＄悊闈㈡澘锛氬垱寤虹敤鎴?""
     try:
         body = await request.json()
         username = body.get("username", "").strip()
@@ -186,16 +187,16 @@ async def admin_create_user(request: Request):
         if not username or not password:
             return JSONResponse(
                 status_code=400,
-                content={"error": "参数错误", "detail": "用户名和密码不能为空"}
+                content={"error": "鍙傛暟閿欒", "detail": "鐢ㄦ埛鍚嶅拰瀵嗙爜涓嶈兘涓虹┖"}
             )
 
-        # v1.50 R3 Blue: 管理员创建用户时也需校验密码复杂度
+        # v1.50 R3 Blue: 绠＄悊鍛樺垱寤虹敤鎴锋椂涔熼渶鏍￠獙瀵嗙爜澶嶆潅搴?
         from src.api.auth_routes import _validate_password_strength
         valid_pw, pw_msg = _validate_password_strength(password)
         if not valid_pw:
             return JSONResponse(
                 status_code=400,
-                content={"error": "密码强度不足", "detail": pw_msg}
+                content={"error": "瀵嗙爜寮哄害涓嶈冻", "detail": pw_msg}
             )
 
         from pathlib import Path
@@ -207,12 +208,12 @@ async def admin_create_user(request: Request):
         if username in users:
             return JSONResponse(
                 status_code=400,
-                content={"error": "参数错误", "detail": "用户名已存在"}
+                content={"error": "鍙傛暟閿欒", "detail": "鐢ㄦ埛鍚嶅凡瀛樺湪"}
             )
 
         from src.api.auth_routes import _hash_password
         users[username] = {
-            "password": _hash_password(password),  # 创建时即使用 bcrypt 哈希存储
+            "password": _hash_password(password),  # 鍒涘缓鏃跺嵆浣跨敤 bcrypt 鍝堝笇瀛樺偍
             "role": role,
             "display_name": display_name,
             "created_at": time.time(),
@@ -224,16 +225,16 @@ async def admin_create_user(request: Request):
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
             from src.api.response import success
-            return success(data={"username": username, "role": role, "display_name": display_name}, message="用户创建成功")
+            return success(data={"username": username, "role": role, "display_name": display_name}, message="鐢ㄦ埛鍒涘缓鎴愬姛")
         return {"ok": True, "username": username, "role": role, "display_name": display_name}
     except Exception as e:  # TODO: Narrow exception type
-        logger.exception(f"admin_create_user 失败: {e}")
+        logger.exception(f"admin_create_user 澶辫触: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
 
-@router.put("/api/admin/users/{user_id}", dependencies=[Depends(require_admin)])
+@router.put("/api/admin/users/{user_id}", dependencies=[Depends(require_role("admin"))])
 async def admin_update_user(user_id: str, request: Request):
-    """管理面板：更新用户"""
+    """绠＄悊闈㈡澘锛氭洿鏂扮敤鎴?""
     try:
         body = await request.json()
 
@@ -241,24 +242,24 @@ async def admin_update_user(user_id: str, request: Request):
         from src.config import DATA_DIR as CONFIG_DATA_DIR
         users_file = Path(CONFIG_DATA_DIR) / "users.json"
         if not users_file.exists():
-            return JSONResponse(status_code=404, content={"error": "用户未找到"})
+            return JSONResponse(status_code=404, content={"error": "鐢ㄦ埛鏈壘鍒?})
 
         users = json.loads(users_file.read_text(encoding="utf-8"))
         if user_id not in users:
-            return JSONResponse(status_code=404, content={"error": "用户未找到", "detail": f"用户 {user_id} 不存在"})
+            return JSONResponse(status_code=404, content={"error": "鐢ㄦ埛鏈壘鍒?, "detail": f"鐢ㄦ埛 {user_id} 涓嶅瓨鍦?})
 
         for key in ("display_name", "role"):
             if key in body:
                 users[user_id][key] = body[key]
         if "password" in body:
-            # v1.50 R3 Blue: 管理员更新密码时也需校验复杂度
+            # v1.50 R3 Blue: 绠＄悊鍛樻洿鏂板瘑鐮佹椂涔熼渶鏍￠獙澶嶆潅搴?
             from src.api.auth_routes import _validate_password_strength
             new_pw = body["password"]
             valid_pw, pw_msg = _validate_password_strength(new_pw)
             if not valid_pw:
                 return JSONResponse(
                     status_code=400,
-                    content={"error": "密码强度不足", "detail": pw_msg}
+                    content={"error": "瀵嗙爜寮哄害涓嶈冻", "detail": pw_msg}
                 )
             from src.api.auth_routes import _hash_password
             users[user_id]["password"] = _hash_password(new_pw)
@@ -268,27 +269,27 @@ async def admin_update_user(user_id: str, request: Request):
         _wants_v2 = request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
         if _wants_v2:
             from src.api.response import success
-            return success(data={"username": user_id, **users[user_id]}, message="用户更新成功")
+            return success(data={"username": user_id, **users[user_id]}, message="鐢ㄦ埛鏇存柊鎴愬姛")
         return {"ok": True, "username": user_id}
     except Exception as e:  # TODO: Narrow exception type
-        logger.exception(f"admin_update_user 失败: {e}")
+        logger.exception(f"admin_update_user 澶辫触: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
 
-@router.delete("/api/admin/users/{user_id}", dependencies=[Depends(require_admin)])
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+@router.delete("/api/admin/users/{user_id}", dependencies=[Depends(require_role("admin"))])
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def admin_delete_user(user_id: str, request: Request = None):
-    """管理面板：删除用户"""
+    """绠＄悊闈㈡澘锛氬垹闄ょ敤鎴?""
     try:
         from pathlib import Path
         from src.config import DATA_DIR as CONFIG_DATA_DIR
         users_file = Path(CONFIG_DATA_DIR) / "users.json"
         if not users_file.exists():
-            return JSONResponse(status_code=404, content={"error": "用户未找到"})
+            return JSONResponse(status_code=404, content={"error": "鐢ㄦ埛鏈壘鍒?})
 
         users = json.loads(users_file.read_text(encoding="utf-8"))
         if user_id not in users:
-            return JSONResponse(status_code=404, content={"error": "用户未找到", "detail": f"用户 {user_id} 不存在"})
+            return JSONResponse(status_code=404, content={"error": "鐢ㄦ埛鏈壘鍒?, "detail": f"鐢ㄦ埛 {user_id} 涓嶅瓨鍦?})
 
         del users[user_id]
         users_file.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8")
@@ -296,25 +297,25 @@ async def admin_delete_user(user_id: str, request: Request = None):
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
             from src.api.response import success
-            return success(data=None, message=f"用户 {user_id} 已删除")
-        return {"ok": True, "message": f"用户 {user_id} 已删除"}
+            return success(data=None, message=f"鐢ㄦ埛 {user_id} 宸插垹闄?)
+        return {"ok": True, "message": f"鐢ㄦ埛 {user_id} 宸插垹闄?}
     except Exception as e:  # TODO: Narrow exception type
-        logger.exception(f"admin_delete_user 失败: {e}")
+        logger.exception(f"admin_delete_user 澶辫触: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
 
 # ============================================================================
-# v1.50 Phase E: Company Brain 权限隔离 — 团队管理 API
+# v1.50 Phase E: Company Brain 鏉冮檺闅旂 鈥?鍥㈤槦绠＄悊 API
 # ============================================================================
 
-# ── GET /api/admin/teams — 团队列表 ──
+# 鈹€鈹€ GET /api/admin/teams 鈥?鍥㈤槦鍒楄〃 鈹€鈹€
 
-@router.get("/api/admin/teams", dependencies=[Depends(require_admin)])
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+@router.get("/api/admin/teams", dependencies=[Depends(require_role("admin"))])
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def admin_teams_list(request: Request = None):
-    """管理面板：团队列表
+    """绠＄悊闈㈡澘锛氬洟闃熷垪琛?
 
-    返回所有已注册团队的列表，包括默认 public 团队。
+    杩斿洖鎵€鏈夊凡娉ㄥ唽鍥㈤槦鐨勫垪琛紝鍖呮嫭榛樿 public 鍥㈤槦銆?
     """
     try:
         from src.api.permissions import get_permission_manager
@@ -324,28 +325,28 @@ async def admin_teams_list(request: Request = None):
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
             from src.api.response import success
-            return success(data={"teams": teams, "total": len(teams)}, message="团队列表")
+            return success(data={"teams": teams, "total": len(teams)}, message="鍥㈤槦鍒楄〃")
         return {"ok": True, "teams": teams, "total": len(teams)}
     except Exception as e:  # TODO: Narrow exception type
-        logger.exception(f"admin_teams_list 失败: {e}")
+        logger.exception(f"admin_teams_list 澶辫触: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
 
-# ── POST /api/admin/teams — 创建团队 ──
+# 鈹€鈹€ POST /api/admin/teams 鈥?鍒涘缓鍥㈤槦 鈹€鈹€
 
-@router.post("/api/admin/teams", dependencies=[Depends(require_admin)])
+@router.post("/api/admin/teams", dependencies=[Depends(require_role("admin"))])
 async def admin_create_team(request: Request):
-    """管理面板：创建团队
+    """绠＄悊闈㈡澘锛氬垱寤哄洟闃?
 
-    请求体:
+    璇锋眰浣?
         {
-            "team_id": "team-eng",      // 团队唯一标识（必填）
-            "name": "工程部",            // 团队名称（必填）
-            "description": "工程部团队",  // 团队描述（可选）
-            "member_ids": ["alice", "bob"] // 初始成员列表（可选）
+            "team_id": "team-eng",      // 鍥㈤槦鍞竴鏍囪瘑锛堝繀濉級
+            "name": "宸ョ▼閮?,            // 鍥㈤槦鍚嶇О锛堝繀濉級
+            "description": "宸ョ▼閮ㄥ洟闃?,  // 鍥㈤槦鎻忚堪锛堝彲閫夛級
+            "member_ids": ["alice", "bob"] // 鍒濆鎴愬憳鍒楄〃锛堝彲閫夛級
         }
 
-    创建者自动成为团队 owner 并加入团队。
+    鍒涘缓鑰呰嚜鍔ㄦ垚涓哄洟闃?owner 骞跺姞鍏ュ洟闃熴€?
     """
     try:
         body = await request.json()
@@ -357,10 +358,10 @@ async def admin_create_team(request: Request):
         if not team_id or not name:
             return JSONResponse(
                 status_code=400,
-                content={"error": "参数错误", "detail": "team_id 和 name 不能为空"}
+                content={"error": "鍙傛暟閿欒", "detail": "team_id 鍜?name 涓嶈兘涓虹┖"}
             )
 
-        # 获取当前用户作为 owner
+        # 鑾峰彇褰撳墠鐢ㄦ埛浣滀负 owner
         owner_id = getattr(request.state, "user", "admin") if request else "admin"
 
         from src.api.permissions import get_permission_manager
@@ -377,48 +378,48 @@ async def admin_create_team(request: Request):
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
             from src.api.response import success
-            return success(data=team.to_dict(), message=f"团队 {name} 创建成功")
+            return success(data=team.to_dict(), message=f"鍥㈤槦 {name} 鍒涘缓鎴愬姛")
         return {"ok": True, "team": team.to_dict()}
 
     except ValueError as e:
-        return JSONResponse(status_code=400, content={"error": "参数错误", "detail": str(e)})
+        return JSONResponse(status_code=400, content={"error": "鍙傛暟閿欒", "detail": str(e)})
     except Exception as e:  # TODO: Narrow exception type
-        logger.exception(f"admin_create_team 失败: {e}")
+        logger.exception(f"admin_create_team 澶辫触: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
 
-# ── GET /api/admin/teams/{team_id} — 团队详情 ──
+# 鈹€鈹€ GET /api/admin/teams/{team_id} 鈥?鍥㈤槦璇︽儏 鈹€鈹€
 
-@router.get("/api/admin/teams/{team_id}", dependencies=[Depends(require_admin)])
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+@router.get("/api/admin/teams/{team_id}", dependencies=[Depends(require_role("admin"))])
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def admin_get_team(team_id: str, request: Request = None):
-    """管理面板：团队详情"""
+    """绠＄悊闈㈡澘锛氬洟闃熻鎯?""
     try:
         from src.api.permissions import get_permission_manager
         pm = get_permission_manager()
         team = pm.get_team(team_id)
 
         if not team:
-            return JSONResponse(status_code=404, content={"error": "团队未找到", "detail": f"团队 {team_id} 不存在"})
+            return JSONResponse(status_code=404, content={"error": "鍥㈤槦鏈壘鍒?, "detail": f"鍥㈤槦 {team_id} 涓嶅瓨鍦?})
 
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
             from src.api.response import success
-            return success(data=team.to_dict(), message="团队详情")
+            return success(data=team.to_dict(), message="鍥㈤槦璇︽儏")
         return {"ok": True, "team": team.to_dict()}
     except Exception as e:  # TODO: Narrow exception type
-        logger.exception(f"admin_get_team 失败: {e}")
+        logger.exception(f"admin_get_team 澶辫触: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
 
-# ── DELETE /api/admin/teams/{team_id} — 删除团队 ──
+# 鈹€鈹€ DELETE /api/admin/teams/{team_id} 鈥?鍒犻櫎鍥㈤槦 鈹€鈹€
 
-@router.delete("/api/admin/teams/{team_id}", dependencies=[Depends(require_admin)])
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+@router.delete("/api/admin/teams/{team_id}", dependencies=[Depends(require_role("admin"))])
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def admin_delete_team(team_id: str, request: Request = None):
-    """管理面板：删除团队
+    """绠＄悊闈㈡澘锛氬垹闄ゅ洟闃?
 
-    不允许删除 'public' 默认团队。
+    涓嶅厑璁稿垹闄?'public' 榛樿鍥㈤槦銆?
     """
     try:
         from src.api.permissions import get_permission_manager
@@ -426,27 +427,27 @@ async def admin_delete_team(team_id: str, request: Request = None):
 
         success = pm.delete_team(team_id)
         if not success:
-            return JSONResponse(status_code=400, content={"error": "无法删除团队", "detail": "团队不存在或为 public 默认团队"})
+            return JSONResponse(status_code=400, content={"error": "鏃犳硶鍒犻櫎鍥㈤槦", "detail": "鍥㈤槦涓嶅瓨鍦ㄦ垨涓?public 榛樿鍥㈤槦"})
 
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
             from src.api.response import success as resp_success
-            return resp_success(data=None, message=f"团队 {team_id} 已删除")
-        return {"ok": True, "message": f"团队 {team_id} 已删除"}
+            return resp_success(data=None, message=f"鍥㈤槦 {team_id} 宸插垹闄?)
+        return {"ok": True, "message": f"鍥㈤槦 {team_id} 宸插垹闄?}
     except Exception as e:  # TODO: Narrow exception type
-        logger.exception(f"admin_delete_team 失败: {e}")
+        logger.exception(f"admin_delete_team 澶辫触: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
 
-# ── POST /api/admin/teams/{team_id}/members — 添加团队成员 ──
+# 鈹€鈹€ POST /api/admin/teams/{team_id}/members 鈥?娣诲姞鍥㈤槦鎴愬憳 鈹€鈹€
 
-@router.post("/api/admin/teams/{team_id}/members", dependencies=[Depends(require_admin)])
+@router.post("/api/admin/teams/{team_id}/members", dependencies=[Depends(require_role("admin"))])
 async def admin_add_team_member(team_id: str, request: Request):
-    """管理面板：向团队添加成员
+    """绠＄悊闈㈡澘锛氬悜鍥㈤槦娣诲姞鎴愬憳
 
-    请求体:
+    璇锋眰浣?
         {
-            "user_id": "alice"    // 要添加的用户 ID（必填）
+            "user_id": "alice"    // 瑕佹坊鍔犵殑鐢ㄦ埛 ID锛堝繀濉級
         }
     """
     try:
@@ -454,35 +455,35 @@ async def admin_add_team_member(team_id: str, request: Request):
         user_id = body.get("user_id", "").strip()
 
         if not user_id:
-            return JSONResponse(status_code=400, content={"error": "参数错误", "detail": "user_id 不能为空"})
+            return JSONResponse(status_code=400, content={"error": "鍙傛暟閿欒", "detail": "user_id 涓嶈兘涓虹┖"})
 
         from src.api.permissions import get_permission_manager
         pm = get_permission_manager()
 
         ok = pm.add_member(team_id, user_id)
         if not ok:
-            return JSONResponse(status_code=404, content={"error": "团队未找到", "detail": f"团队 {team_id} 不存在"})
+            return JSONResponse(status_code=404, content={"error": "鍥㈤槦鏈壘鍒?, "detail": f"鍥㈤槦 {team_id} 涓嶅瓨鍦?})
 
         team = pm.get_team(team_id)
 
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
             from src.api.response import success
-            return success(data=team.to_dict() if team else {}, message=f"用户 {user_id} 已加入团队 {team_id}")
-        return {"ok": True, "team": team.to_dict() if team else {}, "message": f"用户 {user_id} 已加入团队"}
+            return success(data=team.to_dict() if team else {}, message=f"鐢ㄦ埛 {user_id} 宸插姞鍏ュ洟闃?{team_id}")
+        return {"ok": True, "team": team.to_dict() if team else {}, "message": f"鐢ㄦ埛 {user_id} 宸插姞鍏ュ洟闃?}
     except Exception as e:  # TODO: Narrow exception type
-        logger.exception(f"admin_add_team_member 失败: {e}")
+        logger.exception(f"admin_add_team_member 澶辫触: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
 
-# ── DELETE /api/admin/teams/{team_id}/members/{user_id} — 移除团队成员 ──
+# 鈹€鈹€ DELETE /api/admin/teams/{team_id}/members/{user_id} 鈥?绉婚櫎鍥㈤槦鎴愬憳 鈹€鈹€
 
-@router.delete("/api/admin/teams/{team_id}/members/{user_id}", dependencies=[Depends(require_admin)])
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+@router.delete("/api/admin/teams/{team_id}/members/{user_id}", dependencies=[Depends(require_role("admin"))])
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def admin_remove_team_member(team_id: str, user_id: str, request: Request = None):
-    """管理面板：从团队移除成员
+    """绠＄悊闈㈡澘锛氫粠鍥㈤槦绉婚櫎鎴愬憳
 
-    不允许移除团队的 owner。
+    涓嶅厑璁哥Щ闄ゅ洟闃熺殑 owner銆?
     """
     try:
         from src.api.permissions import get_permission_manager
@@ -490,26 +491,26 @@ async def admin_remove_team_member(team_id: str, user_id: str, request: Request 
 
         ok = pm.remove_member(team_id, user_id)
         if not ok:
-            return JSONResponse(status_code=400, content={"error": "无法移除成员", "detail": "无法移除团队所有者或成员不存在"})
+            return JSONResponse(status_code=400, content={"error": "鏃犳硶绉婚櫎鎴愬憳", "detail": "鏃犳硶绉婚櫎鍥㈤槦鎵€鏈夎€呮垨鎴愬憳涓嶅瓨鍦?})
 
         team = pm.get_team(team_id)
 
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
             from src.api.response import success
-            return success(data=team.to_dict() if team else {}, message=f"用户 {user_id} 已从团队 {team_id} 移除")
-        return {"ok": True, "team": team.to_dict() if team else {}, "message": f"用户 {user_id} 已从团队移除"}
+            return success(data=team.to_dict() if team else {}, message=f"鐢ㄦ埛 {user_id} 宸蹭粠鍥㈤槦 {team_id} 绉婚櫎")
+        return {"ok": True, "team": team.to_dict() if team else {}, "message": f"鐢ㄦ埛 {user_id} 宸蹭粠鍥㈤槦绉婚櫎"}
     except Exception as e:  # TODO: Narrow exception type
-        logger.exception(f"admin_remove_team_member 失败: {e}")
+        logger.exception(f"admin_remove_team_member 澶辫触: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
 
-# ── GET /api/user/teams — 当前用户所属团队列表 ──
+# 鈹€鈹€ GET /api/user/teams 鈥?褰撳墠鐢ㄦ埛鎵€灞炲洟闃熷垪琛?鈹€鈹€
 
 @router.get("/api/user/teams")
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def user_teams(request: Request = None):
-    """获取当前用户所属的团队列表"""
+    """鑾峰彇褰撳墠鐢ㄦ埛鎵€灞炵殑鍥㈤槦鍒楄〃"""
     try:
         user_id = getattr(request.state, "user", "anonymous") if request else "anonymous"
 
@@ -522,8 +523,9 @@ async def user_teams(request: Request = None):
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
             from src.api.response import success
-            return success(data={"teams": team_list, "user_id": user_id}, message="用户团队列表")
+            return success(data={"teams": team_list, "user_id": user_id}, message="鐢ㄦ埛鍥㈤槦鍒楄〃")
         return {"ok": True, "teams": team_list, "user_id": user_id}
     except Exception as e:  # TODO: Narrow exception type
-        logger.exception(f"user_teams 失败: {e}")
+        logger.exception(f"user_teams 澶辫触: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
+

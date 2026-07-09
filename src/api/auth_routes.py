@@ -203,10 +203,13 @@ class LoginRequest(BaseModel):
 
 
 class RegisterRequest(BaseModel):
-    """v1.50 R2: 注册需要邮箱字段；v1.50 R3: 使用独立的密码复杂度验证"""
+    """v1.50 R2: 注册需要邮箱字段；v1.50 R3: 使用独立的密码复杂度验证
+    v1.44 Phase 1: 新增 tenant_id 字段（多租户）
+    """
     username: str
     password: str
     email: Optional[str] = None
+    tenant_id: Optional[str] = None  # v1.44 Phase 1: 可选，不传则默认 "default"
 
     @field_validator("username")
     @classmethod
@@ -276,20 +279,28 @@ def login(body: LoginRequest, request: Request = None):
             user["password"] = _hash_password(body.password)
             users_file.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8")
         
-        token = create_jwt_token(body.username, user.get("role", "user"))
+        # v1.44 Phase 1: 多租户 — 从用户配置中获取 tenant_id
+        user_tenant_id = user.get("tenant_id", "default")
+        token = create_jwt_token(body.username, user.get("role", "user"), tenant_id=user_tenant_id)
         
-        # 向后兼容: 默认返回旧格式 {token, username, role, display_name}
-        # v2 格式: {status: "success", message: "ok", data: {token, username, role, display_name}}
+        # v1.44 Phase 1: 获取 RBAC 角色列表
+        from src.auth.rbac import get_rbac
+        rbac = get_rbac()
+        roles = rbac.get_roles_for_token(body.username)
+        
+        # 向后兼容: 默认返回旧格式 {token, username, role, display_name, roles}
+        # v2 格式: {status: "success", message: "ok", data: {token, username, role, display_name, roles}}
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
             return success(data={
                 "token": token,
                 "username": body.username,
                 "role": user.get("role", "user"),
+                "roles": roles,
                 "display_name": user.get("display_name", body.username)
             }, message="登录成功")
         # 默认旧格式
-        return {"token": token, "username": body.username, "role": user.get("role", "user"), "display_name": user.get("display_name", body.username)}
+        return {"token": token, "username": body.username, "role": user.get("role", "user"), "roles": roles, "display_name": user.get("display_name", body.username)}
     except HTTPException as e:
         raise
     except Exception as e:  # TODO: Narrow exception type
@@ -323,9 +334,13 @@ def register(body: RegisterRequest, request: Request = None):
         if body.username in users:
             raise HTTPException(400, "用户名已存在")
         
+        # v1.44 Phase 1: 多租户 — 注册时分配默认租户
+        tenant_id = body.tenant_id if hasattr(body, 'tenant_id') and body.tenant_id else "default"
+        
         users[body.username] = {
             "password": _hash_password(body.password),
             "role": "user",
+            "tenant_id": tenant_id,
             "display_name": body.username,
             "email": body.email or "",
             "created_at": time.time()

@@ -19,6 +19,8 @@ requests>=2.34.2,<3.0.0
 slowapi>=0.1.9,<1.0.0
 PyJWT>=2.13.0,<3.0.0
 bcrypt>=4.1.0,<5.0.0
+casbin>=1.43.0,<2.0.0          # RBAC 权限模型
+casbin-sqlalchemy-adapter>=1.4.0,<2.0.0  # Casbin 持久化适配器
 
 # === 鏂囨。瑙ｆ瀽 ===
 Pillow>=12.2.0
