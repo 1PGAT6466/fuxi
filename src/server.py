@@ -487,26 +487,23 @@ from src.api._auto_discovery import auto_discover_routers
 auto_discover_routers(app)
 
 # ============ Auth routes（保留手动注册，特殊中间件依赖）============
+# auth_routes.py 在 _SKIP_FILES 中，不参与自动发现，手动注册正确
 app.include_router(auth_router)
 
 # ============ v2.1 新增路由（手动注册）============
-# /api/services — 服务聚合清单
+# 以下路由在 _SKIP_FILES 中，不参与自动发现，手动注册正确
 from src.api.services import router as services_router
 app.include_router(services_router)
 
-# /api/unified-search — 跨服务统一搜索
 from src.api.unified_search import router as unified_search_router
 app.include_router(unified_search_router)
 
-# /api/notifications — 通知中心
 from src.api.notifications import router as notifications_router
 app.include_router(notifications_router)
 
-# /api/user/preferences — 用户偏好 CRUD
 from src.api.user_preferences import router as user_preferences_router
 app.include_router(user_preferences_router)
 
-# Feature Flags WebSocket 推送
 from src.api.feature_flags_ws import router as ff_ws_router
 app.include_router(ff_ws_router)
 
@@ -531,6 +528,7 @@ async def prometheus_metrics():
     return Response(content=get_metrics_response(), media_type="text/plain")
 
 # ============ v11 评测 + 进化 API ============
+# evaluation.py 和 evolution.py 在 _SKIP_FILES 中，手动注册正确
 from src.api.evaluation import router as evaluation_router
 from src.api.evolution import router as evolution_router
 app.include_router(evaluation_router)
@@ -776,10 +774,8 @@ async def growth_overview():
     """成长概览"""
     return get_growth_overview()
 
-# ============ 系统路由（已迁移至 src/api/system_routes.py）============
-# /api/health, /api/system/stats, /api/cache/stats, /api/errors/stats, /api/audit/logs, /api/audit/stats
-from src.api.system_routes import router as system_router
-app.include_router(system_router)
+# ============ 系统路由 ============
+# system_routes.py 已由 auto_discover_routers 自动注册，无需手动 include
 
 # ============ Feature Flag API ============
 from src.services.feature_flags import load_flags, set_flag, DEFAULT_FLAGS
@@ -911,10 +907,10 @@ from src.services.dxf_viewer.api import router as dxf_viewer_router
 app.include_router(dxf_viewer_router)
 
 # 注册文件查看服务 — 3 端点 (GET /api/view/{file_hash}, /api/download/{file_hash}, /api/antenna/search)
-from src.api.files_view import router as files_view_router
-app.include_router(files_view_router)
+# files_view.py 已由 auto_discover_routers 自动注册，无需手动 include
 
 # ============ v1.44 Phase 1 Fix: RAG & KB 路由注册 ============
+# rag.py 和 kb.py 在 _SKIP_FILES 中，手动注册正确
 from src.api.rag import router as rag_router
 app.include_router(rag_router)
 
@@ -922,20 +918,14 @@ from src.api.kb import router as kb_router
 app.include_router(kb_router)
 
 # ============ v1.50 Phase A: API 路径别名兼容层 ============
-# 为 Legacy 和 Vue3 前端之间的路径差异提供别名路由
-# 所有 /api/wiki/pages → /api/wiki、/api/documents → /api/files 等映射
-from src.api.path_aliases import router as path_alias_router
-app.include_router(path_alias_router)
+# path_aliases.py 已由 auto_discover_routers 自动注册，无需手动 include
 
 # ============ v1.50 Phase D: Synthesis 跨实体合成 ============
-from src.api.synthesis import router as synthesis_router
-app.include_router(synthesis_router)
+# synthesis.py 已由 auto_discover_routers 自动注册，无需手动 include
 
 # 管理面板路由 — /, /admin, /api/health, /api/stats, /api/admin/*
 # v1.41: 八卦体征端点
-from src.api.v2_routes import router as v2_router
-app.include_router(v2_router)
-# admin_router registered earlier (before wiki catch-all routes)
+# v2_routes.py 已由 auto_discover_routers 自动注册，无需手动 include
 
 # ============ D5: Prometheus Metrics ============
 @app.get("/metrics", dependencies=[Depends(require_admin)])
