@@ -80,3 +80,20 @@ def get_rate_limiter(name: str, max_requests: int = 60, window_seconds: int = 60
     if name not in _rate_limiters:
         _rate_limiters[name] = SlidingWindowRateLimiter(max_requests, window_seconds)
     return _rate_limiters[name]
+
+
+def get_global_rate_limiter(name: str, max_requests: int = 60, window_sec: int = 60) -> SlidingWindowRateLimiter:
+    """获取全局限速器 — v1.50 R3 Blue 新增
+    
+    用于健康检查等公共端点的速率限制。
+    基于客户端 IP 进行限流。
+    
+    Args:
+        name: 限速器名称（如 "health_check"）
+        max_requests: 窗口内最大请求数
+        window_sec: 窗口秒数
+    
+    Returns:
+        SlidingWindowRateLimiter 实例
+    """
+    return get_rate_limiter(name, max_requests, window_sec)

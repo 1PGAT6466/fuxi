@@ -105,7 +105,9 @@ async def _get_bagua_health(request: Request) -> dict:
 async def health_check(request: Request):
     """健康检查 — v2.1 扩展响应格式
     
-    v1.50 R3 Blue 安全修复: 未认证用户仅返回基本状态，已认证管理员才返回完整诊断信息
+    v1.50 R3 Blue 安全修复: 
+    - 未认证用户仅返回基本状态，已认证管理员才返回完整诊断信息
+    - 添加速率限制防止滥用
 
     支持格式参数：
       - format=legacy (默认): 旧格式 {status, checks, timestamp}
@@ -116,6 +118,17 @@ async def health_check(request: Request):
       - X-API-Format: legacy | v2 | extended
     """
     from src.api.response import success, error
+    
+    # v1.50 R3 Blue: 健康检查端点速率限制 — 每分钟最多30次请求
+    # 防止健康检查端点被滥用进行 DoS 攻击
+    client_ip = request.client.host if request.client else "127.0.0.1"
+    try:
+        from src.infra.rate_limiter import get_global_rate_limiter
+        limiter = get_global_rate_limiter("health_check", max_requests=30, window_sec=60)
+        if not limiter.acquire(client_ip):
+            return error("健康检查请求过于频繁", status_code=429)
+    except Exception:
+        pass  # 速率限制失败不阻止健康检查
 
     # 确定格式
     fmt = request.query_params.get("format", "")

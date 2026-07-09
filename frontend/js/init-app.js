@@ -12,6 +12,12 @@ const TITLES = {
 };
 
 function switchPage(name) {
+  // R3 蓝队修复：管理员路由保护，非管理员禁止访问管理页面
+  var user = getUser();
+  if (name.indexOf('admin') === 0 && user.role !== 'admin') {
+    name = 'chat';
+  }
+
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   var page = document.getElementById('page-' + name);
@@ -36,6 +42,12 @@ function switchPage(name) {
 function initApp() {
   var user = getUser();
   var isAdmin = user.role === 'admin';
+  // R3 蓝队修复：通过 CSS class 控制管理员页面可见性
+  if (isAdmin) {
+    document.body.classList.add('is-admin');
+  } else {
+    document.body.classList.remove('is-admin');
+  }
   // 根据角色显示/隐藏管理菜单
   var adminSections = document.querySelectorAll('.nav-admin');
   adminSections.forEach(function(el) {

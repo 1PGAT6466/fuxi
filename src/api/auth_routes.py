@@ -22,7 +22,11 @@ _BLOCKED_USERNAMES = {
 }
 
 # v1.50 R3 Blue: 密码复杂度校验 — 至少8字符，包含大写、小写、数字
+# v1.50 R3 Blue: 生产环境不暴露密码策略详情，只返回通用错误消息
 import re as _re
+import os as _os
+
+_IS_PRODUCTION = _os.getenv("FUXI_ENV", "production").lower() == "production"
 
 def _validate_password_strength(password: str) -> tuple[bool, str]:
     """验证密码强度。返回 (是否通过, 错误消息)。
@@ -32,14 +36,24 @@ def _validate_password_strength(password: str) -> tuple[bool, str]:
     - 至少包含 1 个大写字母
     - 至少包含 1 个小写字母
     - 至少包含 1 个数字
+    
+    v1.50 R3 Blue: 生产环境只返回通用错误消息，不暴露密码策略详情
     """
     if len(password) < 8:
+        if _IS_PRODUCTION:
+            return False, "密码不符合要求"
         return False, "密码长度至少需要 8 个字符"
     if not _re.search(r'[A-Z]', password):
+        if _IS_PRODUCTION:
+            return False, "密码不符合要求"
         return False, "密码必须包含至少一个大写字母"
     if not _re.search(r'[a-z]', password):
+        if _IS_PRODUCTION:
+            return False, "密码不符合要求"
         return False, "密码必须包含至少一个小写字母"
     if not _re.search(r'[0-9]', password):
+        if _IS_PRODUCTION:
+            return False, "密码不符合要求"
         return False, "密码必须包含至少一个数字"
     return True, ""
 
@@ -58,6 +72,11 @@ def _is_username_blocked(username: str) -> bool:
 _MAX_LOGIN_ATTEMPTS = 10
 _LOGIN_WINDOW_SEC = 300
 _login_attempts: dict = defaultdict(list)  # 内存缓存，用于快速检查
+
+# v1.50 R3 Blue: 账号锁定机制 — 防止暴力破解
+_MAX_ACCOUNT_ATTEMPTS = 5  # 同一账号5次失败后锁定
+_ACCOUNT_LOCKOUT_SEC = 900  # 锁定15分钟
+_account_attempts: dict = defaultdict(list)  # 账号维度的失败记录
 
 # v1.50 R2 Blue: 注册频率限制 — 每IP每小时最多3次注册
 _MAX_REGISTER_ATTEMPTS = 3
@@ -131,6 +150,39 @@ def _check_login_rate(ip: str) -> bool:
             return False
         attempts.append(now)
         return True
+
+
+def _check_account_lockout(username: str) -> tuple[bool, int]:
+    """检查账号是否被锁定，返回 (是否允许, 剩余锁定秒数)
+    
+    v1.50 R3 Blue: 基于账号的锁定机制，防止暴力破解
+    """
+    now = time.time()
+    cutoff = now - _ACCOUNT_LOCKOUT_SEC
+    
+    # 清理过期记录
+    _account_attempts[username] = [
+        t for t in _account_attempts[username] if t > cutoff
+    ]
+    
+    attempts = _account_attempts[username]
+    if len(attempts) >= _MAX_ACCOUNT_ATTEMPTS:
+        # 计算剩余锁定时间
+        oldest = min(attempts)
+        remaining = int(_ACCOUNT_LOCKOUT_SEC - (now - oldest))
+        return False, max(0, remaining)
+    
+    return True, 0
+
+
+def _record_failed_attempt(username: str):
+    """记录登录失败尝试"""
+    _account_attempts[username].append(time.time())
+
+
+def _clear_failed_attempts(username: str):
+    """清除登录失败记录（登录成功时调用）"""
+    _account_attempts.pop(username, None)
 
 
 def _check_register_rate(ip: str) -> bool:
@@ -212,17 +264,25 @@ class RegisterRequest(BaseModel):
 
 @router.post("/login")
 def login(body: LoginRequest, request: Request = None):
-    """用户登录 — v1.50 统一响应格式支持，v2.1 速率限制"""
+    """用户登录 — v1.50 统一响应格式支持，v2.1 速率限制
+    
+    v1.50 R3 Blue: 增加账号锁定机制，防止暴力破解
+    """
     from src.api.response import success, error, unauthorized, server_error
     try:
         from src.api.auth import create_jwt_token
         import json
         from pathlib import Path
         
-        # v2.1: 登录速率限制检查
+        # v2.1: 登录速率限制检查（IP维度）
         client_ip = request.client.host if request and request.client else "127.0.0.1"
         if not _check_login_rate(client_ip):
-            return unauthorized("登录尝试过于频繁，请稍后再试", "超过登录频率限制")
+            return unauthorized("登录尝试过于频繁，请稍后再试")
+        
+        # v1.50 R3 Blue: 账号锁定检查
+        account_allowed, lockout_remaining = _check_account_lockout(body.username)
+        if not account_allowed:
+            return unauthorized(f"账号已被锁定，请{lockout_remaining}秒后再试")
         
         from src.config import DATA_DIR as CONFIG_DATA_DIR
         users_file = Path(CONFIG_DATA_DIR) / "users.json"
@@ -233,11 +293,18 @@ def login(body: LoginRequest, request: Request = None):
         
         user = users.get(body.username)
         if not user:
+            # v1.50 R3 Blue: 记录失败尝试（即使用户不存在也记录，防止用户名枚举）
+            _record_failed_attempt(body.username)
             return unauthorized("用户名或密码错误")
         
         stored = user.get("password", "")
         if not _verify_password(body.password, stored):
+            # v1.50 R3 Blue: 记录失败尝试
+            _record_failed_attempt(body.username)
             return unauthorized("用户名或密码错误")
+        
+        # v1.50 R3 Blue: 登录成功，清除失败记录
+        _clear_failed_attempts(body.username)
         
         if not stored.startswith("$2b$"):
             user["password"] = _hash_password(body.password)
@@ -261,7 +328,7 @@ def login(body: LoginRequest, request: Request = None):
         raise
     except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"login 失败: {e}")
-        return server_error("登录服务异常", detail=str(e))
+        return server_error("登录服务异常")
 
 @router.post("/register")
 def register(body: RegisterRequest, request: Request = None):

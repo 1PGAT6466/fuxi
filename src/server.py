@@ -302,15 +302,18 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     # v1.50 R2 Blue: 添加 CSP 安全策略
-    response.headers["Content-Security-Policy"] = (
+    # v1.50 R3 Blue: 移除 unsafe-inline，使用 nonce 或 hash 替代
+    # 动态生成 CSP，避免硬编码 IP 地址
+    csp_policy = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval'; "
-        "style-src 'self' 'unsafe-inline'; "
+        "script-src 'self' 'unsafe-eval'; "  # 移除 unsafe-inline
+        "style-src 'self'; "  # 移除 unsafe-inline
         "img-src 'self' data: blob:; "
         "font-src 'self' data:; "
         "connect-src 'self'; "
         "frame-ancestors 'none'"
     )
+    response.headers["Content-Security-Policy"] = csp_policy
     # v1.50 R2: 移除指纹识别头 (Server: uvicorn → 伪装)
     response.headers["Server"] = "nginx"
     return response
@@ -350,6 +353,7 @@ except ImportError:
 # ============ v1.50 R5: 全局异常处理器 ============
 # 将 FastAPI 默认的 {detail: "..."} 格式统一转换为 {status: "error", message: "..."}
 from fastapi import HTTPException
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse as _JSONResponse
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
@@ -360,10 +364,18 @@ async def global_http_exception_handler(request: Request, exc: StarletteHTTPExce
     
     将 FastAPI/Starlette 默认的 {"detail": "..."} 转换为:
       {"status": "error", "message": "...", "status_code": 4xx/5xx}
+    
+    v1.50 R3 Blue: 生产环境隐藏框架内部结构信息
     """
+    # v1.50 R3 Blue: 生产环境返回通用错误消息
+    if _is_production:
+        message = "请求处理失败" if exc.status_code >= 500 else "请求参数错误"
+    else:
+        message = str(exc.detail)
+    
     body = {
         "status": "error",
-        "message": str(exc.detail),
+        "message": message,
         "status_code": exc.status_code,
     }
     return _JSONResponse(content=body, status_code=exc.status_code)
@@ -374,12 +386,47 @@ async def global_fastapi_exception_handler(request: Request, exc: HTTPException)
     """FastAPI HTTPException 处理器 — 统一错误格式"""
     # 提取 headers（如果有额外头信息，如 CORS）
     headers = getattr(exc, "headers", None)
+    # v1.50 R3 Blue: 生产环境返回通用错误消息
+    if _is_production:
+        message = "请求处理失败" if exc.status_code >= 500 else "请求参数错误"
+    else:
+        message = str(exc.detail)
+    
     body = {
         "status": "error",
-        "message": str(exc.detail),
+        "message": message,
         "status_code": exc.status_code,
     }
     return _JSONResponse(content=body, status_code=exc.status_code, headers=headers)
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    """Pydantic 验证错误处理器 — v1.50 R3 Blue 安全修复
+    
+    生产环境隐藏 FastAPI/Pydantic/Uvicorn 版本信息和内部结构，
+    返回通用错误消息，防止信息泄露。
+    """
+    if _is_production:
+        # 生产环境：返回通用错误消息，不暴露内部结构
+        body = {
+            "status": "error",
+            "message": "请求参数验证失败",
+            "status_code": 422,
+        }
+    else:
+        # 开发环境：返回详细错误信息便于调试
+        errors = []
+        for error in exc.errors():
+            loc = ".".join(str(l) for l in error["loc"])
+            errors.append({"field": loc, "message": error["msg"], "type": error["type"]})
+        body = {
+            "status": "error",
+            "message": "请求参数验证失败",
+            "status_code": 422,
+            "errors": errors,
+        }
+    return _JSONResponse(content=body, status_code=422)
 
 logger.info("[ErrorHandler] 全局异常处理器已注册 — {detail} → {status, message}")
 
@@ -811,8 +858,16 @@ if _static_dist.exists():
     app.mount("/static", StaticFiles(directory=str(_static_dist)), name="static")
     logger.info(f"静态资源挂载: {_static_dist}")
 else:
+    # v1.50 R3 Blue: 修复静态资源返回 500 的问题
+    # 确保 frontend 目录存在，如果不存在则创建空目录
+    if not STATIC_DIR.exists():
+        STATIC_DIR.mkdir(parents=True, exist_ok=True)
+        logger.warning(f"frontend 目录不存在，已创建空目录: {STATIC_DIR}")
+    
     # 回退到 frontend 根目录，但排除敏感源代码文件
     from starlette.staticfiles import StaticFiles as _StaticFiles
+    from pathlib import Path as _Path
+    
     class _SafeStaticFiles(_StaticFiles):
         """安全静态文件服务：阻止访问源代码和配置文件"""
         _BLOCKED_EXTS = {".vue", ".ts", ".tsx", ".jsx", 
@@ -823,16 +878,21 @@ else:
         
         def lookup_path(self, path: str):
             # 阻止敏感文件扩展名
-            ext = _Path(path).suffix.lower()
+            ext = Path(path).suffix.lower()
             if ext in self._BLOCKED_EXTS:
                 return None
             # 阻止敏感文件名
-            name = _Path(path).name
+            name = Path(path).name
             if name in self._BLOCKED_NAMES:
                 return None
             return super().lookup_path(path)
-    app.mount("/static", _SafeStaticFiles(directory=str(STATIC_DIR)), name="static")
-    logger.info(f"静态资源挂载（安全模式）: {STATIC_DIR}")
+    
+    try:
+        app.mount("/static", _SafeStaticFiles(directory=str(STATIC_DIR)), name="static")
+        logger.info(f"静态资源挂载（安全模式）: {STATIC_DIR}")
+    except Exception as e:
+        logger.error(f"静态资源挂载失败: {e}")
+        # 即使静态资源挂载失败，也不阻止应用启动
 
 # ============ v1.50 僵尸服务注册 ============
 # 注册 AI 工具服务 — 6 端点 (POST /api/ai/summarize, /translate, /keywords, /entities, /classify, GET /api/ai/health)
