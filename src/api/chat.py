@@ -242,13 +242,12 @@ class ChatSendRequest(BaseModel):
     stream: bool = False
     granularity: Optional[str] = "chunk"
 
+    # 兼容前端发送 sessionId 字段（camelCase）
+    sessionId: Optional[str] = None
+
     class Config:
         # 允许使用 camelCase 字段名（前端使用 sessionId）
         populate_by_name = True
-        alias_generator = None  # 不自动生成别名
-
-    # 手动定义 sessionId 作为 session_id 的别名
-    sessionId: Optional[str] = None
 
     def model_post_init(self, __context):
         # 如果前端发送了 sessionId 但没有 session_id，使用 sessionId 的值
