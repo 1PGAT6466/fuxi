@@ -76,6 +76,8 @@ _SKIP_FILES: set = {
     # v1.44 Phase 1 Fix: 手动注册以避免路径冲突
     "rag.py",
     "kb.py",
+    # v1.44 Phase 1: 租户管理路由 — 已在 server.py 中手动注册
+    "tenant_routes.py",
 }
 
 # ── 已发现的 router 信息 ──
