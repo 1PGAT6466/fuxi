@@ -269,7 +269,7 @@ async def wiki_create(body: WikiCreateRequest, request: Request = None):
 
 @router.put("/api/wiki/{page_id}")
 async def wiki_update(page_id: str, request: Request):
-    """更新 Wiki 页面 — v1.50 R3: XSS 输入过滤 + 所有权检查"""
+    """更新 Wiki 页面 — v1.50 R3: XSS 输入过滤 + 所有权检查, v1.50 R4: 乐观锁"""
     try:
         # v1.50 R3 Blue: 越权检查 — 验证所有权
         if not _check_wiki_ownership(page_id, request):
@@ -289,6 +289,9 @@ async def wiki_update(page_id: str, request: Request):
                 content={"error": "内容过大", "detail": f"内容大小不能超过{MAX_WIKI_CONTENT_LENGTH // 1024 // 1024}MB"}
             )
         
+        # v1.50 R4: 乐观锁 — 检查客户端传来的版本号
+        client_version = body.get("version")
+        
         # v1.50 R3 Blue: 对用户输入进行 XSS 过滤
         sanitized_content = _sanitize_html(raw_content) if raw_content else None
         raw_summary = body.get("summary")
@@ -299,12 +302,25 @@ async def wiki_update(page_id: str, request: Request):
             content=sanitized_content,
             summary=sanitized_summary,
             quality_score=body.get("quality_score"),
+            expected_version=client_version,
         )
 
         if not success_flag:
+            # 区分 404 和 409（版本冲突）
+            page = engine.get_page(page_id)
+            if not page:
+                return JSONResponse(
+                    status_code=404,
+                    content={"error": "页面未找到", "detail": f"Wiki 页面 {page_id} 不存在"}
+                )
+            # 页面存在但版本不匹配 — 并发冲突
             return JSONResponse(
-                status_code=404,
-                content={"error": "页面未找到", "detail": f"Wiki 页面 {page_id} 不存在"}
+                status_code=409,
+                content={
+                    "error": "编辑冲突",
+                    "detail": "页面已被其他人修改，请刷新后重试",
+                    "current_version": page.get("version", 1)
+                }
             )
 
         page = engine.get_page(page_id)

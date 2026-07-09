@@ -81,7 +81,9 @@ async def _call_api(
                 ) as resp:
                     if resp.status != 200:
                         text = await resp.text()
-                        logger.warning(f"API {base_url} {resp.status} (attempt {attempt+1}): {text[:200]}")
+                        # v1.50 R4: 脱敏 API 端点，防止日志泄露敏感 URL
+                        masked_url = base_url.split("//")[0] + "//***" if "//" in base_url else "***"
+                        logger.warning(f"API {masked_url} {resp.status} (attempt {attempt+1}): {text[:200]}")
                         if attempt < 2:
                             import asyncio
                             await asyncio.sleep(1 * (attempt + 1))
@@ -125,7 +127,9 @@ async def _call_api(
                     return content if content else None
 
         except Exception as e:  # TODO: Narrow exception type
-            logger.warning(f"API {base_url} attempt {attempt+1} 异常: {e}")
+            # v1.50 R4: 脱敏 API 端点
+            masked_url = base_url.split("//")[0] + "//***" if "//" in base_url else "***"
+            logger.warning(f"API {masked_url} attempt {attempt+1} 异常: {e}")
             if attempt < 2:
                 import asyncio
                 await asyncio.sleep(2 * (attempt + 1))

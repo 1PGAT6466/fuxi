@@ -2,11 +2,61 @@
 from fastapi import Request, HTTPException
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
-import os, logging
+import os, logging, time
+import threading
 import jwt
 from datetime import datetime, timedelta, timezone
 
 logger = logging.getLogger(__name__)
+
+# ============ JWT Token 黑名单 ============
+# v1.50 R4: 实现 Token 黑名单，支持登出和 Token 刷新后失效旧 Token
+# 使用内存存储 + 过期清理，重启后黑名单重置（可接受：重启后所有 Token 重新生效）
+_token_blacklist: dict = {}  # token_jti → expiry_timestamp
+_blacklist_lock = threading.Lock()
+
+# Token 版本号机制：每次刷新/登出，用户的 token_version 递增
+token_versions: dict = {}  # username → version_number
+_versions_lock = threading.Lock()
+
+def _blacklist_token(token_jti: str, expiry_ts: float) -> None:
+    """将 Token 的 JTI 加入黑名单"""
+    with _blacklist_lock:
+        _token_blacklist[token_jti] = expiry_ts
+    # 清理过期条目（防止内存泄漏）
+    _cleanup_blacklist()
+
+def _is_token_blacklisted(token_jti: str) -> bool:
+    """检查 Token 是否在黑名单中"""
+    with _blacklist_lock:
+        expiry = _token_blacklist.get(token_jti)
+        if expiry is None:
+            return False
+        if time.time() > expiry:
+            # 已过期，清理并放行
+            del _token_blacklist[token_jti]
+            return False
+        return True
+
+def _cleanup_blacklist() -> None:
+    """清理过期的黑名单条目"""
+    now = time.time()
+    with _blacklist_lock:
+        expired = [k for k, v in _token_blacklist.items() if now > v]
+        for k in expired:
+            del _token_blacklist[k]
+
+def get_token_version(username: str) -> int:
+    """获取用户的当前 token 版本号"""
+    with _versions_lock:
+        return token_versions.get(username, 0)
+
+def increment_token_version(username: str) -> int:
+    """递增用户的 token 版本号（登出/刷新时调用）"""
+    with _versions_lock:
+        current = token_versions.get(username, 0)
+        token_versions[username] = current + 1
+        return current + 1
 
 # JWT 密钥 — 生产环境必须设置环境变量 FUXI_JWT_SECRET
 _JWT_SECRET = os.environ.get("FUXI_JWT_SECRET")
@@ -22,21 +72,40 @@ JWT_EXPIRE_HOURS = int(os.environ.get("FUXI_JWT_EXPIRE_HOURS", "2"))
 
 
 def create_jwt_token(username: str, role: str) -> str:
-    """创建标准JWT token"""
+    """创建标准JWT token — v1.50 R4: 包含 JTI 和 token_version"""
+    import uuid as _uuid
     now = datetime.now(timezone.utc)
+    current_version = get_token_version(username)
     payload = {
         "sub": username,
         "role": role,
         "exp": now + timedelta(hours=JWT_EXPIRE_HOURS),
-        "iat": now
+        "iat": now,
+        "jti": _uuid.uuid4().hex,  # JWT ID，用于黑名单
+        "tv": current_version,  # token version，用于版本号校验
     }
     return jwt.encode(payload, _JWT_SECRET, algorithm=JWT_ALGORITHM)
 
 
 def verify_jwt_token(token: str) -> dict:
-    """验证JWT token，成功返回 payload，失败抛出 HTTPException"""
+    """验证JWT token — v1.50 R4: 检查黑名单和 token 版本号"""
     try:
-        return jwt.decode(token, _JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token, _JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        
+        # v1.50 R4: 检查 Token 黑名单
+        jti = payload.get("jti")
+        if jti and _is_token_blacklisted(jti):
+            raise HTTPException(401, "Token 已失效")
+        
+        # v1.50 R4: 检查 token 版本号（登出/刷新后旧 Token 失效）
+        username = payload.get("sub")
+        token_tv = payload.get("tv")
+        if username and token_tv is not None:
+            current_tv = get_token_version(username)
+            if token_tv < current_tv:
+                raise HTTPException(401, "Token 已失效，请重新登录")
+        
+        return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(401, "Token已过期")
     except jwt.InvalidTokenError:

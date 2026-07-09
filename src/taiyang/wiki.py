@@ -42,7 +42,7 @@ Wiki 页面结构：
     "quality_score": 0.85
   }
 """
-import json, time, os, re
+import json, time, os, re, uuid
 from pathlib import Path
 from typing import List, Dict, Optional
 import sqlite3
@@ -150,8 +150,8 @@ class WikiEngine:
     def create_page(self, title: str, content: str, category: str = "", 
                     tags: list = None, sources: list = None, summary: str = "",
                     author: str = "") -> str:
-        """创建 Wiki 页面 — v1.50 R3: 支持作者字段"""
-        page_id = f"wiki_{int(time.time()*1000)}"
+        """创建 Wiki 页面 — v1.50 R3: 支持作者字段, v1.50 R4: 使用UUID v4作为页面ID"""
+        page_id = f"wiki_{uuid.uuid4().hex}"
         now = time.strftime("%Y-%m-%d %H:%M")
         
         if not summary:
@@ -173,14 +173,33 @@ class WikiEngine:
         return page_id
     
     def update_page(self, page_id: str, content: str = None, summary: str = None,
-                    quality_score: float = None) -> bool:
-        """更新 Wiki 页面"""
+                    quality_score: float = None, expected_version: int = None) -> bool:
+        """更新 Wiki 页面 — v1.50 R4: 支持乐观锁（版本号检查）
+        
+        Args:
+            expected_version: 客户端期望的版本号。如果不为 None，
+                             会检查当前页面版本是否匹配，不匹配则拒绝更新。
+                             用于防止并发编辑导致的数据覆盖。
+        
+        Returns:
+            True 更新成功；False 更新失败（页面不存在或版本冲突）
+        """
         conn = sqlite3.connect(self.db_path, timeout=10)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=5000")
         cur = conn.execute("SELECT * FROM wiki_pages WHERE id = ?", (page_id,))
         row = cur.fetchone()
         if not row:
+            conn.close()
+            return False
+        
+        # v1.50 R4: 乐观锁 — 检查版本号
+        current_version = row[7] if len(row) > 7 else 1
+        if expected_version is not None and expected_version != current_version:
+            logger.warning(
+                f"[Wiki] 并发编辑冲突: 页面 {page_id} 期望版本 {expected_version}，"
+                f"当前版本 {current_version}"
+            )
             conn.close()
             return False
         
@@ -194,11 +213,14 @@ class WikiEngine:
         if quality_score is not None:
             updates["quality_score"] = quality_score
         
+        # v1.50 R4: 递增版本号
+        updates["version"] = current_version + 1
+        
         # P2: Record version history before update
         try:
             conn.execute(
                 "INSERT INTO wiki_history (page_id, version, content_snapshot, summary_snapshot, changed_at, source) VALUES (?, ?, ?, ?, ?, ?)",
-                (page_id, row[7] if len(row) > 7 else 1, row[5] if len(row) > 5 else "", row[4] if len(row) > 4 else "", updates.get("updated_at", ""), "manual_update")
+                (page_id, current_version, row[5] if len(row) > 5 else "", row[4] if len(row) > 4 else "", updates.get("updated_at", ""), "manual_update")
             )
         except Exception:  # TODO: Narrow exception type
             logger.warning(f"[wiki] suppressed exception", exc_info=True)

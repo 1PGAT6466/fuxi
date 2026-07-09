@@ -388,14 +388,17 @@ class RefreshRequest(BaseModel):
 
 @router.post("/refresh")
 async def auth_refresh(body: RefreshRequest = None, request: Request = None):
-    """JWT Token 刷新端点
+    """JWT Token 刷新端点 — v1.50 R4: 旧 Token 失效（黑名单机制）
 
     从 Authorization header 或请求体获取当前 token，验证后签发新 token。
-    旧 token 在有效期内仍可使用，但建议客户端切换到新 token。
+    旧 token 被加入黑名单，立即失效。
     """
     from src.api.response import success, unauthorized, server_error
     try:
-        from src.api.auth import create_jwt_token, verify_jwt_token
+        from src.api.auth import (
+            create_jwt_token, verify_jwt_token,
+            _blacklist_token, increment_token_version
+        )
 
         # 获取 token：优先从 Authorization header，其次从请求体
         token = None
@@ -421,7 +424,15 @@ async def auth_refresh(body: RefreshRequest = None, request: Request = None):
         username = payload.get("sub", "unknown")
         role = payload.get("role", "user")
 
-        # 签发新 token
+        # v1.50 R4: 将旧 Token 加入黑名单
+        old_jti = payload.get("jti")
+        old_exp = payload.get("exp")
+        if old_jti and old_exp:
+            _blacklist_token(old_jti, old_exp)
+        # 同时递增 token 版本号，使所有旧版本 Token 失效
+        increment_token_version(username)
+        
+        # 签发新 token（会使用新的版本号）
         new_token = create_jwt_token(username, role)
 
         # v2 格式支持
@@ -441,15 +452,40 @@ async def auth_refresh(body: RefreshRequest = None, request: Request = None):
 @router.post("/logout")
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def auth_logout(request: Request = None):
-    """用户登出端点
+    """用户登出端点 — v1.50 R4: 实现真正的 Token 失效（JWT 黑名单）
 
-    当前为无状态 JWT，登出仅做标记（实际撤销需靠 token 过期自然失效）。
-    后续可集成 token 黑名单机制。
+    将当前 Token 加入黑名单，并递增用户的 token 版本号，
+    使该用户的所有旧 Token 立即失效。
     """
     from src.api.response import success
     try:
-        # 获取用户信息用于日志
+        from src.api.auth import (
+            _blacklist_token, increment_token_version
+        )
+        
+        # 获取用户信息用于日志和黑名单
         username = getattr(request.state, "user", "anonymous") if request else "anonymous"
+        
+        # v1.50 R4: 将当前 Token 加入黑名单
+        if request:
+            auth = request.headers.get("Authorization", "")
+            if auth.startswith("Bearer "):
+                token = auth[7:]
+                try:
+                    import jwt as _jwt
+                    # 解码但不验证签名（因为中间件已验证过）
+                    payload = _jwt.decode(token, options={"verify_signature": False})
+                    jti = payload.get("jti")
+                    exp = payload.get("exp")
+                    if jti and exp:
+                        _blacklist_token(jti, exp)
+                except Exception:
+                    pass  # Token 解析失败不影响登出流程
+        
+        # v1.50 R4: 递增 token 版本号，使所有旧版本 Token 失效
+        if username != "anonymous":
+            increment_token_version(username)
+        
         logger.info(f"用户 {username} 已登出")
 
         _wants_v2 = request and (

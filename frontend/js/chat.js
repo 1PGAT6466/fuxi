@@ -78,40 +78,47 @@ async function sendChat(forceWeb) {
 /**
  * SSE 流式对话核心
  */
+var _SSE_MAX_RETRIES = 3;
+var _SSE_BASE_DELAY = 1000; // 1s base
+
 async function sendChatSSE(query) {
   var loadingId = appendMsg('loading-stream', '');
   var answerId = null;
   var answerText = '';
   var sources = null;
   var trace = null;
-  var abortController = new AbortController();
-  _currentAbortController = abortController;
+  var lastErr = null;
 
-  // 流式进度计时器：2s 后显示"生成中..."
-  var progressEl = null;
-  var progressTimer = setTimeout(function() {
-    var el = document.getElementById(loadingId);
-    if (el) {
-      progressEl = el.querySelector('.stream-progress');
-      if (progressEl) progressEl.style.display = 'block';
-    }
-  }, 2000);
+  // R4: SSE 重连循环（最多 3 次重试 + 指数退避）
+  for (var _attempt = 0; _attempt <= _SSE_MAX_RETRIES; _attempt++) {
+    // 重试时重置状态（保留已累计的 answerText 用于 UI 显示）
+    var abortController = new AbortController();
+    _currentAbortController = abortController;
 
-  var token = (typeof getTokenAsync === 'function') ? await getTokenAsync() : (getToken ? getToken() : '');
-  var csrfToken = (typeof getCSRFToken === 'function') ? getCSRFToken() : '';
-  var fetchTimeoutMs = 60000; // SSE 流式超时 60 秒
+    // 流式进度计时器
+    var progressEl = null;
+    var progressTimer = setTimeout(function() {
+      var el = document.getElementById(loadingId);
+      if (el) {
+        progressEl = el.querySelector('.stream-progress');
+        if (progressEl) progressEl.style.display = 'block';
+      }
+    }, 2000);
 
-  try {
-    var headers = { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' };
-    if (token) headers['Authorization'] = 'Bearer ' + token;
-    // CRITICAL-4: CSRF Token header
-    if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
-    var resp = await __fetchWithTimeout('/api/chat/send', {
-      method: 'POST',
-      headers: headers,
-      body: JSON.stringify({ query: query, history: chatHistory.slice(-6), stream: true }),
-      signal: abortController.signal
-    }, fetchTimeoutMs);
+    var token = (typeof getTokenAsync === 'function') ? await getTokenAsync() : (getToken ? getToken() : '');
+    var csrfToken = (typeof getCSRFToken === 'function') ? getCSRFToken() : '';
+    var fetchTimeoutMs = 60000;
+
+    try {
+      var headers = { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' };
+      if (token) headers['Authorization'] = 'Bearer ' + token;
+      if (csrfToken) headers['X-CSRF-Token'] = csrfToken;
+      var resp = await __fetchWithTimeout('/api/chat/send', {
+        method: 'POST',
+        headers: headers,
+        body: JSON.stringify({ query: query, history: chatHistory.slice(-6), stream: true }),
+        signal: abortController.signal
+      }, fetchTimeoutMs);
 
     // HTTP 状态码检查
     if (resp.status === 401) {

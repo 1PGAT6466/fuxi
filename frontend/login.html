@@ -106,7 +106,7 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
           return;
         }
         try {
-          sessionStorage.setItem('fuxi_token', d.token);
+          sessionStorage.setItem('fuxi_token', _encodeToken(d.token));
           sessionStorage.setItem('fuxi_user', JSON.stringify({
             username: d.username, role: d.role, display_name: d.display_name
           }));
@@ -132,11 +132,30 @@ document.getElementById('loginForm').addEventListener('submit', function(e) {
     });
 });
 
+// XOR+base64 混淆存储 token（与主应用 api-client.js fallback 一致）
+var _STORAGE_SALT = 'fuxi_v1.44_salt_2026';
+function _encodeToken(s) {
+  var key = _STORAGE_SALT;
+  var result = '';
+  for (var i = 0; i < s.length; i++) {
+    result += String.fromCharCode(s.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+  }
+  return btoa(unescape(encodeURIComponent(result)));
+}
+
 // 已登录则直接跳转主应用（也校验 token 格式）
 (function() {
   var savedToken = sessionStorage.getItem('fuxi_token');
   if (savedToken) {
-    if (_isValidToken(savedToken)) {
+    // 尝试解码（token 可能是加密存储的）
+    var decoded = '';
+    try { decoded = decodeURIComponent(escape(atob(savedToken))); } catch(e) {}
+    var plain = decoded ? (function() {
+      var key = _STORAGE_SALT; var r = '';
+      for (var i = 0; i < decoded.length; i++) r += String.fromCharCode(decoded.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+      return r;
+    })() : savedToken;
+    if (_isValidToken(plain)) {
       window.location.href = '/';
     } else {
       sessionStorage.removeItem('fuxi_token');

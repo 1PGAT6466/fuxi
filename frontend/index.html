@@ -6,7 +6,7 @@
 <link rel="shortcut icon" type="image/x-icon" href="/static/favicon.ico">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>伏羲 · 企业知识认知体系</title>
-<!-- CSP 策略（安全加固 v1.44 R3）-->
+<!-- CSP 策略（安全加固 v1.44 R4 统一版）-->
 <meta http-equiv="Content-Security-Policy" content="
   default-src 'self';
   script-src 'self' 'unsafe-hashes' https://d3js.org https://cdn.jsdelivr.net
@@ -33,11 +33,14 @@
   img-src 'self' data: https:;
   font-src 'self' data:;
   connect-src 'self';
+  base-uri 'self';
+  form-action 'self';
+  frame-ancestors 'none';
 ">
 <link rel="stylesheet" href="/static/css/app.css?v=1">
 <link rel="stylesheet" href="/static/css/chat_redesign.css?v=6">
-<script defer src="https://d3js.org/d3.v7.min.js"></script>
-<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+<script defer src="https://d3js.org/d3.v7.min.js" integrity="sha384-CjloA8y00+1SDAUkjs099PVfnY2KmDC2BZnws9kh8D/lX1s46w6EPhpXdqMfjK6i" crossorigin="anonymous"></script>
+<script defer src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js" integrity="sha384-vsrfeLOOY6KuIYKDlmVH5UiBmgIdB1oEf7p01YgWHuqmOHfZr374+odEv96n9tNC" crossorigin="anonymous"></script>
 </head>
 <body>
 

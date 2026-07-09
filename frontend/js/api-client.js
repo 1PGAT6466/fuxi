@@ -288,9 +288,11 @@ function clearAuth() {
   __apiCache.clear();
 }
 
-// 同步设置（用于 login.html 等无法使用 async 的场景）
+// 同步设置（用于登录页等无法使用 async 的场景）
+// R4 fix: 尝试同步加密，Web Crypto 不可用时用 fallback 混淆
 function setAuthSync(token, user) {
-  __STORE.setItem(__TK, token);
+  var encrypted = _fallbackEncode(token);
+  __STORE.setItem(__TK, encrypted);
   __STORE.setItem(__UK, JSON.stringify(user));
   getCSRFToken();
 }

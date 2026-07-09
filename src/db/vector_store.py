@@ -32,6 +32,58 @@ COLLECTION_NAME = "kb_chunks"
 # ============ 自愈阈值 ============
 MAX_CONSECUTIVE_FAILS = 3  # 连续失败超过此数触发重建
 
+# ============ ChromaDB 访问控制 ============
+# v1.50 R4: ChromaDB 文件权限检查 — 防止未授权访问向量数据库
+import stat as _stat
+
+def _check_chromadb_permissions(chroma_dir: str) -> None:
+    """检查 ChromaDB 目录的文件权限。
+    
+    安全规则：
+    1. 目录必须存在
+    2. 目录权限不能对其他用户可写（防止数据篡改）
+    3. SQLite 数据库文件权限不能对其他用户可读写
+    
+    如果权限不安全，记录警告但不阻止启动（避免服务不可用）。
+    """
+    if not os.path.exists(chroma_dir):
+        return  # 目录不存在，后续会创建
+    
+    try:
+        # 检查目录权限
+        dir_stat = os.stat(chroma_dir)
+        dir_mode = dir_stat.st_mode
+        
+        # 检查是否对其他用户可写 (o+w)
+        if dir_mode & _stat.S_IWOTH:
+            logger.warning(
+                f"[ChromaDB] 目录 {chroma_dir} 对其他用户可写 (mode={oct(dir_mode)})，"
+                f"建议执行: chmod o-w {chroma_dir}"
+            )
+        
+        # 检查 SQLite 数据库文件
+        sqlite_path = os.path.join(chroma_dir, "chroma.sqlite3")
+        if os.path.exists(sqlite_path):
+            db_stat = os.stat(sqlite_path)
+            db_mode = db_stat.st_mode
+            
+            # 检查是否对其他用户可读写 (o+rw)
+            if db_mode & (_stat.S_IROTH | _stat.S_IWOTH):
+                logger.warning(
+                    f"[ChromaDB] 数据库文件 {sqlite_path} 对其他用户可读写 "
+                    f"(mode={oct(db_mode)})，建议执行: chmod o-rw {sqlite_path}"
+                )
+            
+            # 检查是否对组用户可写 (g+w)
+            if db_mode & _stat.S_IWGRP:
+                logger.warning(
+                    f"[ChromaDB] 数据库文件 {sqlite_path} 对组用户可写 "
+                    f"(mode={oct(db_mode)})，建议执行: chmod g-w {sqlite_path}"
+                )
+    except (OSError, PermissionError) as e:
+        logger.warning(f"[ChromaDB] 权限检查失败: {e}")
+
+
 # ============ VectorStore ============
 
 class VectorStore:
@@ -43,6 +95,10 @@ class VectorStore:
         self._fail_count = 0
         persist_dir = os.path.join(db_dir, "chromadb")
         os.makedirs(persist_dir, exist_ok=True)
+        
+        # v1.50 R4: ChromaDB 访问控制 — 文件权限检查
+        _check_chromadb_permissions(persist_dir)
+        
         self._client = chromadb.PersistentClient(
             path=persist_dir,
             settings=ChromaSettings(anonymized_telemetry=False),
