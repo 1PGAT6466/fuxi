@@ -155,9 +155,18 @@ async function loadFiles() {
       grid.style.border = ''; grid.style.background = '';
       var items = e.dataTransfer.items;
       if (items && items.length) {
-        traverseDropItems(items).then(function(files) {
-          if (files.length) uploadFiles(files);
-        });
+        // P2-6 fix: 检测 webkitGetAsEntry API，Firefox 回退到普通文件
+        if (!items[0].webkitGetAsEntry) {
+          // Firefox 等不支持 webkitGetAsEntry，直接用文件列表
+          if (e.dataTransfer.files.length) {
+            toast('当前浏览器不支持文件夹上传，仅处理文件', 'info');
+            uploadFiles(e.dataTransfer.files);
+          }
+        } else {
+          traverseDropItems(items).then(function(files) {
+            if (files.length) uploadFiles(files);
+          });
+        }
       } else if (e.dataTransfer.files.length) {
         uploadFiles(e.dataTransfer.files);
       }

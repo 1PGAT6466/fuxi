@@ -48,6 +48,10 @@
       <button type="submit" class="btn-login" id="loginBtn">登 录</button>
       <div class="login-error" id="loginError"></div>
     </form>
+    <div class="login-toggle">
+      <span id="loginToggleText">没有账号？</span>
+      <a id="loginToggleLink" onclick="toggleRegisterMode()" style="cursor:pointer;color:var(--mi-orange);font-size:13px">注册新账号</a>
+    </div>
     <p class="login-hint">伏羲体系 · v1.44</p>
   </div>
 </div>
@@ -169,7 +173,7 @@
           </div>
           <div class="chat-input-area">
             <div class="chat-input-box">
-              <textarea id="chatInput" placeholder="输入你的问题..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}" oninput="autoResizeChat(this)"></textarea>
+              <textarea id="chatInput" placeholder="输入你的问题..." rows="1" onkeydown="if(event.key==='Enter'&&!event.shiftKey){event.preventDefault();sendChat()}"></textarea>
               <button class="btn-web" id="btnWebSearch" onclick="toggleWebSearch()" title="联网搜索">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
               </button>
@@ -328,6 +332,9 @@
 <script src="/static/js/toast.js?v=4"></script>
 <script src="/static/js/utils.js?v=4"></script>
 <script src="/static/js/api-client.js?v=4"></script>
+<script src="/static/js/theme.js?v=1"></script>
+<script src="/static/js/marked.min.js?v=4"></script>
+<script src="/static/js/dompurify.min.js?v=4"></script>
 <script src="/static/js/error-boundary.js?v=4"></script>
 <script src="/static/js/auth.js?v=4"></script>
 <script src="/static/js/init-app.js?v=4"></script>

@@ -60,7 +60,7 @@ def _load_users():
 
 # ============ 路由端点 ============
 
-@router.get("/api/admin/stats")
+@router.get("/api/admin/stats", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def admin_stats(request: Request = None):
     """管理统计 — 从数据库查询真实统计数据"""
@@ -75,7 +75,7 @@ async def admin_stats(request: Request = None):
         logger.exception(f"admin_stats 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
-@router.get("/api/admin/server-status")
+@router.get("/api/admin/server-status", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def server_status(request: Request = None):
     """服务器状态"""
@@ -93,14 +93,14 @@ async def server_status(request: Request = None):
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
 # ── 任务 A.1: /api/admin/status 别名 → /api/admin/server-status ──
-@router.get("/api/admin/status")
+@router.get("/api/admin/status", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def admin_status_alias(request: Request = None):
     """前端调用的 /api/admin/status — 代理到 server-status"""
     return await server_status(request)
 
 # ── 任务 A.2: /api/admin/documents 文档统计 ──
-@router.get("/api/admin/documents")
+@router.get("/api/admin/documents", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def admin_documents(request: Request = None):
     """管理面板：文档统计"""
@@ -116,7 +116,7 @@ async def admin_documents(request: Request = None):
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
 # ── 任务 A.3: /api/admin/evaluations 和 /api/admin/evaluations/run ──
-@router.get("/api/admin/evaluations")
+@router.get("/api/admin/evaluations", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def admin_evaluations(request: Request = None):
     """管理面板：评测列表 — 代理到 evaluation API"""
@@ -142,7 +142,7 @@ async def admin_evaluations(request: Request = None):
         logger.exception(f"admin_evaluations 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
-@router.post("/api/admin/evaluations/run")
+@router.post("/api/admin/evaluations/run", dependencies=[Depends(require_admin)])
 async def admin_evaluations_run():
     """管理面板：触发评测运行"""
     try:
@@ -155,7 +155,7 @@ async def admin_evaluations_run():
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
 # ── 任务 A.4: /api/admin/users 用户列表 ──
-@router.get("/api/admin/users")
+@router.get("/api/admin/users", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def admin_users(request: Request = None):
     """管理面板：用户列表"""
@@ -173,7 +173,7 @@ async def admin_users(request: Request = None):
 
 # ── v1.44 Phase 1 Fix: /api/admin/users 用户 CRUD ──
 
-@router.post("/api/admin/users")
+@router.post("/api/admin/users", dependencies=[Depends(require_admin)])
 async def admin_create_user(request: Request):
     """管理面板：创建用户"""
     try:
@@ -222,7 +222,7 @@ async def admin_create_user(request: Request):
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
 
-@router.put("/api/admin/users/{user_id}")
+@router.put("/api/admin/users/{user_id}", dependencies=[Depends(require_admin)])
 async def admin_update_user(user_id: str, request: Request):
     """管理面板：更新用户"""
     try:
@@ -257,7 +257,7 @@ async def admin_update_user(user_id: str, request: Request):
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
 
-@router.delete("/api/admin/users/{user_id}")
+@router.delete("/api/admin/users/{user_id}", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def admin_delete_user(user_id: str, request: Request = None):
     """管理面板：删除用户"""
@@ -291,7 +291,7 @@ async def admin_delete_user(user_id: str, request: Request = None):
 
 # ── GET /api/admin/teams — 团队列表 ──
 
-@router.get("/api/admin/teams")
+@router.get("/api/admin/teams", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def admin_teams_list(request: Request = None):
     """管理面板：团队列表
@@ -315,7 +315,7 @@ async def admin_teams_list(request: Request = None):
 
 # ── POST /api/admin/teams — 创建团队 ──
 
-@router.post("/api/admin/teams")
+@router.post("/api/admin/teams", dependencies=[Depends(require_admin)])
 async def admin_create_team(request: Request):
     """管理面板：创建团队
 
@@ -371,7 +371,7 @@ async def admin_create_team(request: Request):
 
 # ── GET /api/admin/teams/{team_id} — 团队详情 ──
 
-@router.get("/api/admin/teams/{team_id}")
+@router.get("/api/admin/teams/{team_id}", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def admin_get_team(team_id: str, request: Request = None):
     """管理面板：团队详情"""
@@ -395,7 +395,7 @@ async def admin_get_team(team_id: str, request: Request = None):
 
 # ── DELETE /api/admin/teams/{team_id} — 删除团队 ──
 
-@router.delete("/api/admin/teams/{team_id}")
+@router.delete("/api/admin/teams/{team_id}", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def admin_delete_team(team_id: str, request: Request = None):
     """管理面板：删除团队
@@ -422,7 +422,7 @@ async def admin_delete_team(team_id: str, request: Request = None):
 
 # ── POST /api/admin/teams/{team_id}/members — 添加团队成员 ──
 
-@router.post("/api/admin/teams/{team_id}/members")
+@router.post("/api/admin/teams/{team_id}/members", dependencies=[Depends(require_admin)])
 async def admin_add_team_member(team_id: str, request: Request):
     """管理面板：向团队添加成员
 
@@ -459,7 +459,7 @@ async def admin_add_team_member(team_id: str, request: Request):
 
 # ── DELETE /api/admin/teams/{team_id}/members/{user_id} — 移除团队成员 ──
 
-@router.delete("/api/admin/teams/{team_id}/members/{user_id}")
+@router.delete("/api/admin/teams/{team_id}/members/{user_id}", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def admin_remove_team_member(team_id: str, user_id: str, request: Request = None):
     """管理面板：从团队移除成员

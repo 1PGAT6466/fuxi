@@ -1,18 +1,48 @@
 # v1.50 统一响应格式 — 搜索路由
 from fastapi import APIRouter, Query, Request
+from pydantic import BaseModel
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["搜索"])
 
+
+class SearchBody(BaseModel):
+    q: str
+    top_k: int = 15
+    page: int = 1
+    page_size: int = 8
+    granularity: str = "chunk"
+
+
 @router.get("/api/search")
-async def search(q: str = Query(...), top_k: int = 15, page: int = 1, page_size: int = 8, granularity: str = Query("chunk", description="检索粒度: chunk/event/auto"), request: Request = None):
-    """搜索端点 — v1.50 统一响应格式支持
+async def search_get(
+    q: str = Query(...),
+    top_k: int = 15,
+    page: int = 1,
+    page_size: int = 8,
+    granularity: str = Query("chunk", description="检索粒度: chunk/event/auto"),
+    request: Request = None,
+):
+    return await _search_impl(q, top_k, page, page_size, granularity, request)
+
+
+@router.post("/api/search")
+async def search_post(body: SearchBody, request: Request = None):
+    """搜索端点（POST） — v1.50 安全修复：支持 POST 方法"""
+    return await _search_impl(body.q, body.top_k, body.page, body.page_size, body.granularity, request)
+
+
+async def _search_impl(q: str, top_k: int, page: int, page_size: int, granularity: str, request: Request = None):
+    """搜索实现 — v1.50 统一响应格式支持
     
     新增 granularity 参数（任务 4）：
       - 'chunk': chunk 粒度检索（默认，向后兼容）
       - 'event': event 粒度检索（返回 event→chunk 映射结果）
       - 'auto': 根据查询复杂度自动选择
     """
-    from src.api.response import success, error, server_error
+    from src.api.response import success, error
     try:
         from src.taiyang.retrieval import hybrid_search, event_search
         

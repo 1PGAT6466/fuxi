@@ -317,11 +317,18 @@ try:
     from slowapi import Limiter, _rate_limit_exceeded_handler
     from slowapi.util import get_remote_address
     from slowapi.errors import RateLimitExceeded
-    limiter = Limiter(key_func=get_remote_address, default_limits=["60/minute"])
+    limiter = Limiter(
+        key_func=get_remote_address,
+        default_limits=["60/minute"],
+        headers_enabled=True,
+        strategy="fixed-window",
+    )
     app.state.limiter = limiter
     app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    logger.info("[RateLimit] slowapi 限流已启用: 60 req/min (default)")
 except ImportError:
     limiter = None
+    logger.warning("[RateLimit] slowapi 未安装，限流禁用")
 
 # ============ v2.1 引擎路由中间件 ============
 @app.middleware("http")
@@ -405,7 +412,7 @@ app.include_router(ff_ws_router)
 from fastapi.responses import Response
 from src.services.metrics import get_metrics_response, update_store_stats
 
-@app.get("/api/metrics")
+@app.get("/api/metrics", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def prometheus_metrics():
     """Prometheus 指标端点"""
@@ -616,13 +623,13 @@ app.include_router(system_router)
 # ============ Feature Flag API ============
 from src.services.feature_flags import load_flags, set_flag, DEFAULT_FLAGS
 
-@app.get("/api/feature-flags")
+@app.get("/api/feature-flags", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def list_feature_flags():
     """获取所有 Feature Flag 状态"""
     return {"flags": load_flags(), "defaults": DEFAULT_FLAGS}
 
-@app.get("/api/feature-flags/{name}")
+@app.get("/api/feature-flags/{name}", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def get_feature_flag(name: str):
     """获取单个 Feature Flag 状态"""
@@ -632,7 +639,7 @@ async def get_feature_flag(name: str):
         raise HTTPException(404, f"未知 flag: {name}")
     return {"flag": name, "value": flags.get(name, False), "default": DEFAULT_FLAGS.get(name, False)}
 
-@app.put("/api/feature-flags/{name}")
+@app.put("/api/feature-flags/{name}", dependencies=[Depends(require_admin)])
 async def update_feature_flag(name: str, request: Request):
     """更新 Feature Flag"""
     body = await request.json()
@@ -745,7 +752,7 @@ app.include_router(v2_router)
 # admin_router registered earlier (before wiki catch-all routes)
 
 # ============ D5: Prometheus Metrics ============
-@app.get("/metrics")
+@app.get("/metrics", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def metrics():
     """暴露 Prometheus 格式指标 — 浏览器直开 http://<host>:<port>/metrics"""

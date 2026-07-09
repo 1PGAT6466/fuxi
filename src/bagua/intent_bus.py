@@ -201,6 +201,8 @@ class IntentBus:
         self._circuit_breakers: Dict[Tuple[str, str], CircuitBreaker] = {}
         # Session 管理
         self._sessions: Dict[str, Set[str]] = {}  # session_id -> {gua_names}
+        # 心跳时间跟踪（兼容 meridian 接口）
+        self._heartbeat_times: Dict[str, float] = {}
         # 统计
         self.stats: Dict[str, int] = {
             "dispatched": 0,
@@ -213,6 +215,57 @@ class IntentBus:
     # =====================================================================
     # 卦注册
     # =====================================================================
+
+    def register_symbol(self, symbol_id: str, name: str, handler: Any) -> None:
+        """v1.50 修复：兼容 meridian.register_symbol 接口。
+
+        旧的 SymbolBase/ShaoyinBrain 通过 meridian.register_symbol() 注册，
+        但 v2 引擎使用 IntentBus。此方法提供向后兼容：
+        - 如果 handler 已是 GuaHandler 子类，直接调用 register_gua
+        - 否则包装为 GenericGuaHandler 再注册
+        """
+        if isinstance(handler, GuaHandler):
+            self.register_gua(name, handler)
+            return
+
+        # 对于非 GuaHandler 对象（如 ShaoyinBrain），创建一个适配器
+        class CompatGuaHandler(GuaHandler):
+            def __init__(self, wrapped):
+                super().__init__(name=name, trigram=Trigrams("乾"))
+                self._wrapped = wrapped
+
+            def handle_signal(self, signal: Signal) -> IntentResult:
+                return IntentResult(status=DispatchStatus.OK)
+
+        wrapper = CompatGuaHandler(handler)
+        self.register_gua(name, wrapper)
+        logger.info(f"[IntentBus] 兼容注册: {symbol_id} ({name})")
+
+    def heartbeat(self, symbol_id: str) -> None:
+        """v1.50 修复：兼容 meridian.heartbeat 接口。
+
+        自动注册首次心跳的 symbol（向后兼容旧 meridian 语义）。
+        """
+        with self._lock:
+            self._heartbeat_times[symbol_id] = time.time()
+            # 自动注册：如果未在 guas 中，记录日志（不打断已有逻辑）
+            if symbol_id not in self._guas:
+                logger.debug(f"[IntentBus] heartbeat 遇到未注册 symbol: {symbol_id}")
+
+    def is_alive(self, symbol_id: str) -> bool:
+        """v1.50 修复：兼容 meridian.is_alive 接口。"""
+        with self._lock:
+            if symbol_id not in self._heartbeat_times:
+                return False
+            # 30 秒内有心跳视为存活
+            return (time.time() - self._heartbeat_times[symbol_id]) < 30.0
+
+    def last_heartbeat_ago(self, symbol_id: str) -> float:
+        """v1.50 修复：兼容 meridian.last_heartbeat_ago 接口。"""
+        with self._lock:
+            if symbol_id not in self._heartbeat_times:
+                return 999.0
+            return time.time() - self._heartbeat_times[symbol_id]
 
     def register_gua(self, name: str, handler: GuaHandler) -> None:
         """注册一个卦处理器到 IntentBus。

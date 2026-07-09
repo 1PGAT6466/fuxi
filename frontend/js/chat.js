@@ -13,6 +13,8 @@ function quickChat(text) {
   sendChat();
 }
 
+// P3-6 fix: 高度逻辑已由 init-app.js (addEventListener) 统一处理
+// 保留此函数供外部兼容性调用
 function autoResizeChat(el) {
   el.style.height = '22px';
   el.style.height = Math.min(el.scrollHeight, 120) + 'px';

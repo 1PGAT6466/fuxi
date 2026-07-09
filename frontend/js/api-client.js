@@ -128,6 +128,11 @@ async function api(url, opt) {
 
       var data = await r.json();
 
+      // P2-7 fix: 统一处理后端 {status: 'error', message: '...'} 格式的响应
+      if (data && data.status === 'error' && data.message) {
+        throw new Error(data.message);
+      }
+
       // 缓存 GET 响应
       if (isGet) {
         __apiCache.set(__getCacheKey(url, opt), { data: data, time: Date.now() });

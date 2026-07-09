@@ -12,7 +12,8 @@
 """
 
 import logging
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
+from src.api.auth import require_admin
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ router = APIRouter(tags=["system"])
 
 # ============ 审计日志 API ============
 
-@router.get("/api/audit/logs")
+@router.get("/api/audit/logs", dependencies=[Depends(require_admin)])
 async def audit_logs(
     user: str = None,
     action: str = None,
@@ -35,7 +36,7 @@ async def audit_logs(
     return success(data={"entries": results, "count": len(results)})
 
 
-@router.get("/api/audit/stats")
+@router.get("/api/audit/stats", dependencies=[Depends(require_admin)])
 async def audit_stats(days: int = 7):
     """审计日志统计"""
     from src.infra.audit_log import get_audit_stats
@@ -157,7 +158,7 @@ async def health_check(request: Request):
 
 # ============ 八卦健康检查 ============
 
-@router.get("/api/health/bagua")
+@router.get("/api/health/bagua", dependencies=[Depends(require_admin)])
 async def health_check_bagua(request: Request):
     """八卦级健康检查 — v2.1
 
@@ -173,7 +174,7 @@ async def health_check_bagua(request: Request):
         return error("八卦健康检查失败", status_code=500, detail=str(e))
 
 
-@router.get("/api/health/infra")
+@router.get("/api/health/infra", dependencies=[Depends(require_admin)])
 async def health_check_infra(request: Request):
     """基础设施健康检查 — v2.1
 
@@ -189,7 +190,7 @@ async def health_check_infra(request: Request):
         return error("基础设施健康检查失败", status_code=500, detail=str(e))
 
 
-@router.get("/api/health/alerts")
+@router.get("/api/health/alerts", dependencies=[Depends(require_admin)])
 async def health_check_alerts(request: Request):
     """告警规则评估 — v2.1
 
@@ -205,7 +206,7 @@ async def health_check_alerts(request: Request):
         return error("告警评估失败", status_code=500, detail=str(e))
 
 
-@router.get("/api/health/alert-rules")
+@router.get("/api/health/alert-rules", dependencies=[Depends(require_admin)])
 async def health_check_alert_rules(request: Request):
     """告警规则列表 — v2.1
 
@@ -222,7 +223,7 @@ async def health_check_alert_rules(request: Request):
 
 # ============ 系统资源统计 ============
 
-@router.get("/api/system/stats")
+@router.get("/api/system/stats", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def system_stats(request: Request):
     """系统统计"""
@@ -241,7 +242,7 @@ async def system_stats(request: Request):
 
 # ============ 缓存统计 ============
 
-@router.get("/api/cache/stats")
+@router.get("/api/cache/stats", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def cache_stats(request: Request):
     """缓存统计"""
@@ -260,7 +261,7 @@ async def cache_stats(request: Request):
 
 # ============ 错误追踪统计 ============
 
-@router.get("/api/errors/stats")
+@router.get("/api/errors/stats", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def error_stats(request: Request):
     """错误统计"""

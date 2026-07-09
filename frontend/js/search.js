@@ -80,7 +80,6 @@ async function doSearch(){
       '<span class="search-tab" data-tab="data" onclick="setSearchTab(\'data\')" style="padding:8px 16px;cursor:pointer;border-bottom:2px solid transparent;color:var(--text2)">数据</span>'+
       '</div>';
     c.innerHTML=tabsHtml+'<div id="searchResultsList"></div>';
-    c=document.getElementById('searchResultsList');
 
     renderSearchResults();
   }catch(e){c.innerHTML='<div class="empty"><p style="color:var(--error)">搜索失败</p></div>'}

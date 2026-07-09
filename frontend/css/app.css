@@ -276,6 +276,7 @@ table.data tr:hover td{background:rgba(0,0,0,0.01)}
 .btn-login:disabled{opacity:.5;transform:none}
 .login-error{color:var(--error);font-size:12px;text-align:center;margin-top:10px;min-height:18px}
 .login-hint{text-align:center;margin-top:20px;font-size:13px;color:var(--text3)}
+.login-toggle{text-align:center;margin-top:12px;font-size:13px;color:var(--text2)}
 
 /* ===== 绠＄悊闈㈡澘 ===== */
 .flag-row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--border)}

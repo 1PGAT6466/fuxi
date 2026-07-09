@@ -4,6 +4,7 @@
  */
 
 let _loginRole = 'user';
+let _isRegisterMode = false;
 
 function switchLoginTab(role) {
   _loginRole = role;
@@ -28,6 +29,18 @@ function logout() {
   showLogin();
 }
 
+function toggleRegisterMode() {
+  _isRegisterMode = !_isRegisterMode;
+  var btn = document.getElementById('loginBtn');
+  var toggleEl = document.getElementById('loginToggleText');
+  var toggleLink = document.getElementById('loginToggleLink');
+  if (btn) btn.textContent = _isRegisterMode ? '注 册' : '登 录';
+  if (toggleEl) toggleEl.textContent = _isRegisterMode ? '已有账号？' : '没有账号？';
+  if (toggleLink) toggleLink.textContent = _isRegisterMode ? '去登录' : '注册新账号';
+  var err = document.getElementById('loginError');
+  if (err) err.textContent = '';
+}
+
 function handleLogin(e) {
   e.preventDefault();
   var u = document.getElementById('loginUser').value.trim();
@@ -36,11 +49,23 @@ function handleLogin(e) {
   var btn = document.getElementById('loginBtn');
   var err = document.getElementById('loginError');
   btn.disabled = true;
-  btn.textContent = '登录中...';
+  btn.textContent = _isRegisterMode ? '注册中...' : '登录中...';
   err.textContent = '';
 
-  api('/api/auth/login', { method: 'POST', body: { username: u, password: p } })
+  var endpoint = _isRegisterMode ? '/api/auth/register' : '/api/auth/login';
+
+  api(endpoint, { method: 'POST', body: { username: u, password: p } })
     .then(function(d) {
+      if (_isRegisterMode) {
+        // P2-10 fix: 注册成功后自动切换回登录模式
+        err.style.color = '#2ecc71';
+        err.textContent = '注册成功，请登录';
+        _isRegisterMode = false;
+        toggleRegisterMode();
+        btn.textContent = '登 录';
+        setTimeout(function() { err.style.color = ''; }, 3000);
+        return;
+      }
       // P2-5: 验证 token 格式
       if (!d.token || !/^[A-Za-z0-9._~+\/=-]+$/.test(d.token)) {
         err.textContent = '服务器返回的 token 格式异常';
@@ -54,10 +79,11 @@ function handleLogin(e) {
       showApp();
     })
     .catch(function(e) {
-      err.textContent = e.message || '登录失败';
+      err.textContent = e.message || '操作失败';
     })
     .finally(function() {
       btn.disabled = false;
-      btn.textContent = '登 录';
+      if (!_isRegisterMode) btn.textContent = '登 录';
+      else btn.textContent = '注 册';
     });
 }

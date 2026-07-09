@@ -35,9 +35,9 @@ async function loadGraph() {
 
     // 类型过滤
     html += '<div style="display:flex;flex-wrap:wrap;gap:4px;margin-bottom:12px">';
-    html += '<button class="btn btn-sm btn-primary" onclick="_filterGraphType(\'\')" style="font-size:11px;padding:3px 8px">全部</button>';
+    html += '<button class="btn btn-sm btn-primary graph-filter-btn" data-type="" style="font-size:11px;padding:3px 8px">全部</button>';
     Object.entries(typeCounts).forEach(function(e) {
-      html += '<button class="btn btn-sm btn-ghost" onclick="_filterGraphType(\'' + esc(e[0]) + '\')" style="font-size:11px;padding:3px 8px">' + esc(e[0]) + ' (' + e[1] + ')</button>';
+      html += '<button class="btn btn-sm btn-ghost graph-filter-btn" data-type="' + esc(e[0]) + '" style="font-size:11px;padding:3px 8px">' + esc(e[0]) + ' (' + e[1] + ')</button>';
     });
     html += '</div>';
 
@@ -62,7 +62,7 @@ async function loadGraph() {
       var conn = connCounts[name] || 0;
       var colors = {'人物':'#FF6B6B','组织':'#4ECDC4','概念':'#45B7D1','地点':'#96CEB4','技术':'#FFEAA7','产品':'#DDA0DD'};
       var color = colors[type] || '#999';
-      html += '<div class="graph-entity" style="cursor:pointer;padding:8px 0;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:8px" onclick="_highlightNode(\'' + esc(name).replace(/'/g,"\\'") + '\')">';
+      html += '<div class="graph-entity" style="cursor:pointer;padding:8px 0;border-bottom:1px solid var(--border-light);display:flex;align-items:center;gap:8px" data-node="' + esc(name) + '">';
       html += '<span style="width:8px;height:8px;border-radius:50%;background:' + color + ';flex-shrink:0"></span>';
       html += '<span style="flex:1;font-size:13px;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">' + esc(name) + '</span>';
       html += '<span style="font-size:10px;color:var(--text3)">' + conn + ' 连接</span>';
@@ -70,6 +70,23 @@ async function loadGraph() {
     });
     html += '</div>';
     container.innerHTML = html;
+
+    // P1-5/P1-6 fix: 用事件委托替代内联 onclick，防止 XSS 注入
+    container.querySelectorAll('.graph-filter-btn').forEach(function(btn) {
+      btn.addEventListener('click', function() {
+        _filterGraphType(this.dataset.type || '');
+      });
+    });
+    container.querySelectorAll('.graph-entity[data-node]').forEach(function(el) {
+      el.addEventListener('click', function() {
+        _highlightNode(this.dataset.node);
+      });
+    });
+    container.querySelectorAll('.graph-neighbor[data-neighbor]').forEach(function(el) {
+      el.addEventListener('click', function() {
+        _highlightNode(this.dataset.neighbor);
+      });
+    });
 
     // 绘制 D3 力导向图
     _drawD3Graph(entries, edges);
@@ -98,6 +115,9 @@ function _drawD3Graph(entries, edges) {
   var ctx = canvas.getContext('2d');
 
   if (_graphSimulation) _graphSimulation.stop();
+
+  // P3-5 fix: 清理旧的 D3 事件绑定，防止多次调用 _drawD3Graph 导致事件泄漏
+  d3.select(canvas).on('.drag', null).on('click', null);
 
   // 准备数据
   var nodeMap = {};
@@ -260,7 +280,7 @@ function _showNodeDetail(node) {
   var html = '<div style="padding:12px">';
   html += '<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px">';
   html += '<h4 style="font-size:14px;font-weight:600">' + esc(node.id) + '</h4>';
-  html += '<button class="btn btn-sm btn-ghost" onclick="loadGraph()" style="font-size:11px">← 返回</button>';
+  html += '<button class="btn btn-sm btn-ghost graph-back-btn" style="font-size:11px">← 返回</button>';
   html += '</div>';
   html += '<div style="font-size:12px;color:var(--text3);margin-bottom:8px">类型: <strong>' + esc(node.type) + '</strong></div>';
 
@@ -276,7 +296,7 @@ function _showNodeDetail(node) {
   if (neighbors.length) {
     html += '<div style="font-size:12px;font-weight:600;margin:12px 0 6px">关联实体 (' + neighbors.length + ')</div>';
     neighbors.forEach(function(n) {
-      html += '<div style="padding:4px 0;font-size:12px;color:var(--text2);cursor:pointer" data-neighbor="' + esc(n.name) + '" onclick="_highlightNode(this.dataset.neighbor)">';
+      html += '<div style="padding:4px 0;font-size:12px;color:var(--text2);cursor:pointer" class="graph-neighbor" data-neighbor="' + esc(n.name) + '">';
       html += n.dir + ' ' + esc(n.name) + ' <span style="color:var(--text3)">(' + esc(n.relation) + ')</span>';
       html += '</div>';
     });
@@ -285,6 +305,14 @@ function _showNodeDetail(node) {
   // 二次清洗
   if (typeof DOMPurify !== 'undefined') html = DOMPurify.sanitize(html);
   panel.innerHTML = html;
+  // 绑定节点详情内的返回按钮和邻居点击
+  var backBtn = panel.querySelector('.graph-back-btn');
+  if (backBtn) backBtn.addEventListener('click', function() { loadGraph(); });
+  panel.querySelectorAll('.graph-neighbor[data-neighbor]').forEach(function(el) {
+    el.addEventListener('click', function() {
+      _highlightNode(this.dataset.neighbor);
+    });
+  });
 }
 
 function searchGraph() {
@@ -303,9 +331,15 @@ function searchGraph() {
     // 重绘列表
     var html = '<div style="font-size:12px;color:var(--text3);margin-bottom:8px">搜索结果: ' + entries.length + ' 个实体</div>';
     entries.forEach(function(e) {
-      html += '<div class="graph-entity" style="cursor:pointer;padding:8px 0;border-bottom:1px solid var(--border-light)" onclick="_highlightNode(\'' + esc(e[0]).replace(/'/g,"\\'") + '\')"><span style="font-weight:600">' + esc(e[0]) + '</span><span style="float:right;font-size:11px;color:var(--text3)">' + esc((e[1]&&e[1].type)||'') + '</span></div>';
+      html += '<div class="graph-entity" style="cursor:pointer;padding:8px 0;border-bottom:1px solid var(--border-light)" data-node="' + esc(e[0]) + '"><span style="font-weight:600">' + esc(e[0]) + '</span><span style="float:right;font-size:11px;color:var(--text3)">' + esc((e[1]&&e[1].type)||'') + '</span></div>';
     });
     document.getElementById('graphEntities').innerHTML = html;
+    // 绑定搜索结果的实体点击事件
+    document.getElementById('graphEntities').querySelectorAll('.graph-entity[data-node]').forEach(function(el) {
+      el.addEventListener('click', function() {
+        _highlightNode(this.dataset.node);
+      });
+    });
   }).catch(function(e) {
     toast('图谱搜索失败: ' + e.message, 'error');
   });
