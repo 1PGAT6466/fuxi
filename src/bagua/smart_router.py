@@ -866,6 +866,87 @@ async def route(
 
 
 # ============================================================================
+# 统一桥接：route_to_qian_intent()
+# ============================================================================
+
+# smart_router 意图 → qian 意图映射表
+_INTENT_TO_QIAN_INTENT: Dict[str, str] = {
+    "search": "SEARCH",
+    "knowledge_qa": "SEARCH",
+    "translate": "DECIDE",
+    "writing": "PRESENT",
+    "summarize": "PRESENT",
+    "code_gen": "DECIDE",
+    "code_review": "DECIDE",
+    "analysis": "DECIDE",
+    "explain": "DECIDE",
+    "recommend": "DECIDE",
+    "compare": "DECIDE",
+    "calculate": "DECIDE",
+    "joke": "PRESENT",
+    "naming": "DECIDE",
+    "chat": "PRESENT",
+    "reason": "DECIDE",
+    "plan": "DECIDE",
+    "creative": "PRESENT",
+    "other": "PRESENT",
+}
+
+
+async def route_to_qian_intent(
+    user_input: str,
+    context: Optional[List[Dict[str, str]]] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    统一桥接：smart_router 结果 → qian 八卦意图
+
+    当 smart_router L1-L5 高置信度命中时，直接映射为 qian 意图，
+    跳过乾卦 LLM 决策，降低延迟和成本。
+
+    Args:
+        user_input: 用户输入
+        context: 对话上下文
+
+    Returns:
+        {
+            "intent": "SEARCH|DECIDE|PRESENT|...",
+            "confidence": float,
+            "reasoning": str,
+            "source": "smart_router_bridge",
+            "router_level": int,
+        }
+        或 None（未命中 / 置信度不足，应走 qian 完整循环）
+    """
+    decision = await route(user_input, context)
+
+    # 仅高置信度结果才桥接
+    if decision.should_upgrade or decision.confidence < 0.85:
+        return None
+
+    # 从 result 中提取意图
+    intent = None
+    if isinstance(decision.result, dict):
+        intent = decision.result.get("intent", "")
+    elif isinstance(decision.result, str):
+        # L1 关键词直接回复 → 走 PRESENT
+        intent = "chat"
+
+    if not intent:
+        return None
+
+    qian_intent = _INTENT_TO_QIAN_INTENT.get(intent, "PRESENT")
+
+    return {
+        "intent": qian_intent,
+        "confidence": decision.confidence,
+        "reasoning": f"smart_router L{decision.level} 桥接: {intent}→{qian_intent}",
+        "source": "smart_router_bridge",
+        "router_level": decision.level,
+        "original_intent": intent,
+    }
+
+
+# ============================================================================
 # 同步包装器：方便同步代码调用
 # ============================================================================
 

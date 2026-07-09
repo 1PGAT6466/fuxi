@@ -102,4 +102,28 @@ export async function unifiedSearch(query: string): Promise<UnifiedSearchRespons
   }) as Promise<UnifiedSearchResponse>;
 }
 
+/** 后端不可用时的 mock 数据（供 HomeView 降级使用） */
+export function getMockSymbolStatus(): SymbolStatusResponse {
+  const guaIds = ['qian', 'kun', 'zhen', 'xun', 'kan', 'li', 'gen', 'dui'];
+  const guaLabels: Record<string, string> = {
+    qian: '乾·大脑', kun: '坤·脾', zhen: '震·肝', xun: '巽·肺',
+    kan: '坎·肾', li: '离·心', gen: '艮·皮肤', dui: '兑·鼻',
+  };
+  return {
+    data: {
+      statuses: guaIds.map((id) => ({
+        trigramId: id,
+        status: 'healthy' as const,
+        activeTaskCount: 0,
+        label: guaLabels[id] || id,
+      })),
+      zhonggong: {
+        activeWindowCount: 0,
+        pendingTaskCount: 0,
+        evolutionLevel: 1,
+        evolutionProgress: 0,
+      },
+    },
+  };
+}
 

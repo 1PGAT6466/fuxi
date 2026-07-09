@@ -111,7 +111,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, onBeforeUnmount } from 'vue';
 import { useRouter } from 'vue-router';
 import { fetchSymbolStatus, getMockSymbolStatus } from '@/api/symbols';
 import { BAGUA_GRID, type TrigramStatus } from '@/constants/bagua';
@@ -128,8 +128,11 @@ const zhonggongData = ref({
   evolutionProgress: 0,
 });
 
-// ── 加载器官状态 ──
-onMounted(async () => {
+/** 定时刷新句柄 */
+let refreshTimer: ReturnType<typeof setInterval> | null = null;
+
+/** 拉取并更新器官状态 */
+async function loadStatus(): Promise<void> {
   try {
     const res = await fetchSymbolStatus();
     for (const s of res.data.statuses) {
@@ -143,6 +146,20 @@ onMounted(async () => {
       statusMap.value[s.trigramId] = s;
     }
     zhonggongData.value = mock.data.zhonggong;
+  }
+}
+
+// ── 加载器官状态 + 定时刷新 ──
+onMounted(async () => {
+  await loadStatus();
+  // 每 30 秒自动刷新一次状态
+  refreshTimer = setInterval(loadStatus, 30_000);
+});
+
+onBeforeUnmount(() => {
+  if (refreshTimer) {
+    clearInterval(refreshTimer);
+    refreshTimer = null;
   }
 });
 
@@ -305,8 +322,8 @@ function navigateTo(route: string): void {
   -webkit-tap-highlight-color: transparent;
   min-height: 170px;
 
-  /* 正常呼吸动画 */
-  animation: palace-breathe 4s ease-in-out infinite;
+  /* 活卡片呼吸动画 (2s 周期) */
+  animation: palace-breathe 2s ease-in-out infinite;
 
   transition:
     transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
@@ -314,10 +331,10 @@ function navigateTo(route: string): void {
     border-color 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
 }
 
-/* ── 正常呼吸动画（opacity 0.85-1.0, 4s） ── */
+/* ── 活卡片呼吸动画（opacity 0.85-1.0, 2s） ── */
 @keyframes palace-breathe {
-  0%, 100% { opacity: 0.88; }
-  50% { opacity: 1; }
+  0%, 100% { opacity: 0.85; transform: scale(1); }
+  50% { opacity: 1; transform: scale(1.008); }
 }
 
 /* ── Hover 磁性上浮 ── */

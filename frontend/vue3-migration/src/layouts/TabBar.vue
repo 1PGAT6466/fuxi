@@ -112,6 +112,15 @@
           <el-icon :size="14"><Paperclip /></el-icon>
           <span>{{ isContextTabPinned ? '取消固定' : '固定标签' }}</span>
         </div>
+        <div class="context-menu-divider" />
+        <div class="context-menu-item" @click="handleMenuAction('split-h')">
+          <el-icon :size="14"><Grid /></el-icon>
+          <span>左右分屏</span>
+        </div>
+        <div class="context-menu-item" @click="handleMenuAction('split-v')">
+          <el-icon :size="14"><CopyDocument /></el-icon>
+          <span>上下分屏</span>
+        </div>
       </div>
     </Teleport>
 
@@ -122,7 +131,7 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue';
-import { Close, Remove, DArrowRight, Paperclip } from '@element-plus/icons-vue';
+import { Close, Remove, DArrowRight, Paperclip, Grid, CopyDocument } from '@element-plus/icons-vue';
 
 // ============================
 // Tab 数据结构
@@ -154,6 +163,8 @@ const emit = defineEmits<{
   (e: 'close-right', id: string): void;
   (e: 'pin', id: string, pin: boolean): void;
   (e: 'reorder', fromId: string, toId: string): void;
+  (e: 'split-h'): void;
+  (e: 'split-v'): void;
 }>();
 
 // ============================
@@ -240,6 +251,12 @@ function handleMenuAction(action: string) {
       break;
     case 'pin':
       emit('pin', tabId, !isContextTabPinned.value);
+      break;
+    case 'split-h':
+      emit('split-h');
+      break;
+    case 'split-v':
+      emit('split-v');
       break;
   }
 }

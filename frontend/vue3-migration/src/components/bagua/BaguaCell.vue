@@ -5,6 +5,7 @@
       'bagua-cell--center': isCenter,
       [`bagua-cell--status-${status}`]: true,
       'bagua-cell--clickable': !!item,
+      'animate-breathe': !isCenter && status === 'healthy',
     }"
     :style="cellStyle"
     role="gridcell"
@@ -161,6 +162,10 @@ const accentStyle = computed<Record<string, string>>(() => {
   transform: translateY(-2px) scale(1.01);
   transition: transform 100ms ease;
 }
+
+/* ────── 呼吸动画挂载 ────── */
+/* animate-breathe 类由 animations.scss 全局定义，
+   此处仅作用于健康状态的普通卦格 */
 
 /* ────── 普通卦格 ────── */
 .bagua-cell--status-healthy {
