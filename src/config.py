@@ -59,13 +59,17 @@ CORS_ORIGINS: List[str] = os.getenv("KB_CORS_ORIGINS", _default_cors).split(",")
 
 # ============ 安全 ============
 # JWT 配置 (安全相关)
-# v1.50 安全修复：消除硬编码默认值，启动时必须设置环境变量
+# v1.44 第2轮修复：未设置环境变量时自动生成随机密钥，保留环境变量覆盖
+import secrets as _secrets
 _JWT_SECRET_FROM_ENV = os.getenv("FUXI_JWT_SECRET")
 if not _JWT_SECRET_FROM_ENV:
-    raise RuntimeError(
-        "FUXI_JWT_SECRET 环境变量未设置！"
-        "请在 .env 或系统环境变量中设置安全的 JWT 密钥。"
-        "示例: FUXI_JWT_SECRET=<至少32字符的随机字符串>"
+    _JWT_SECRET_FROM_ENV = _secrets.token_hex(32)
+    import warnings
+    warnings.warn(
+        "[Config] FUXI_JWT_SECRET 未设置，已自动生成随机密钥。"
+        "服务重启后所有已有 Token 将失效。"
+        "生产环境请设置环境变量 FUXI_JWT_SECRET。",
+        RuntimeWarning
     )
 JWT_SECRET = _JWT_SECRET_FROM_ENV
 JWT_EXPIRY_HOURS = int(os.getenv("JWT_EXPIRY_HOURS", "24"))

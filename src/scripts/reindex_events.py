@@ -28,7 +28,8 @@ from pathlib import Path
 # Ensure repo root is on path
 repo_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(repo_root))
-os.environ.setdefault('FUXI_JWT_SECRET', os.environ.get('FUXI_JWT_SECRET', 'reindex_phase_a_default_secret'))
+import secrets as _secrets
+os.environ.setdefault('FUXI_JWT_SECRET', os.environ.get('FUXI_JWT_SECRET') or _secrets.token_hex(32))
 
 from src.db.memory_store import MemoryStore, get_store
 from src.shaoyang.extractor import SAGExtractor

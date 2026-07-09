@@ -16,7 +16,8 @@ if _env_file.exists():
             if line and not line.startswith("#") and "=" in line:
                 key, _, val = line.partition("=")
                 os.environ[key.strip()] = val.strip().strip('"').strip("'")
-    print("Loaded .env")
+    import logging as _early_logging
+    _early_logging.getLogger(__name__).info("Loaded .env")
 
 # 确保项目根目录在 sys.path 中
 _project_root = Path(__file__).parent.parent
