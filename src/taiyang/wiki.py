@@ -454,7 +454,7 @@ class WikiEngine:
     def _row_to_dict(self, row) -> dict:
         """SQLite row → dict"""
         columns = ["id", "title", "category", "tags", "summary", "content",
-                    "sources", "version", "quality_score", "author", "created_at", "updated_at"]
+                    "sources", "version", "quality_score", "created_at", "updated_at", "author"]
         d = dict(zip(columns, row))
         d["tags"] = _safe_json_parse(d.get("tags") or "[]" or "[]", default=[])
         d["sources"] = _safe_json_parse(d.get("sources") or "[]" or "[]", default=[])
