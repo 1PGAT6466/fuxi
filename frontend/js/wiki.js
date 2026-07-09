@@ -226,7 +226,8 @@ function _addHeadingIds(html, content) {
 // P3-R2: 将正则提取为模块常量，避免每次调用重新编译，并限制处理次数防止大内容性能退化
 var _WIKI_ACTION_PATTERN = /(<p>【[^】]+】[：:][^<]*<\/p>\s*){2,}/g;
 var _WIKI_ACTION_ITEM_RE = /<p>【([^】]+)】[：:]\s*([^<]*)<\/p>/g;
-var _WIKI_KV_FULL_RE = /<li>\s*<strong>([^<]+)<\/strong>[：:]\s*([^<]*(?:<br>\s*<\/li>|<\/li>))/g;
+// R3-3 fix: 允许 value 中包含嵌套 HTML（如 <a>/<code>/<em>），仅禁止跨 <li> 匹配
+var _WIKI_KV_FULL_RE = /<li>\s*<strong>([^<]+)<\/strong>[：:]\s*((?:(?!<li[\s>])[\s\S])*?)<\/li>/g;
 var _WIKI_KV_NESTED_RE = /<li>\s*<strong>([^<]+)<\/strong>[：:]\s*<ul>([\s\S]*?)<\/ul>\s*<\/li>/g;
 var _WIKI_LI_RE = /<li>([^<]*(?:<strong>[^<]*<\/strong>[^<]*)?)<\/li>/g;
 var _WIKI_KV_EMPTY_RE = /<li>\s*<strong>([^<]+)<\/strong>[：:]\s*<\/li>/g;

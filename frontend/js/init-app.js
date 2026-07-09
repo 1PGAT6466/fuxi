@@ -78,13 +78,19 @@ function initApp() {
   }).catch(function() { showLogin(); });
 })();
 
-// textarea 自动高度
+// textarea 自动高度 + Enter 发送
 (function() {
   var chatInput = document.getElementById('chatInput');
   if (chatInput) {
     chatInput.addEventListener('input', function() {
       this.style.height = '22px';
       this.style.height = Math.min(this.scrollHeight, 120) + 'px';
+    });
+    chatInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        if (typeof sendChat === 'function') sendChat();
+      }
     });
   }
 })();
