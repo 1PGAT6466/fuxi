@@ -125,9 +125,8 @@ def load_config() -> dict:
     try:
         if CONFIG_FILE.exists():
             return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-    except Exception:  # TODO: Narrow exception type
-        logger.warning(f"[data_store] suppressed exception", exc_info=True)
-        pass
+    except Exception:
+        logger.warning(f"[data_store] load_config 失败", exc_info=True)
     return {"tools": TOOLS_DATA, "faq": FAQ_DATA}
 
 
@@ -164,9 +163,8 @@ def log_search(query: str, results: int, ms: float, top_items: list = None):
         with open(f, "a", encoding="utf-8") as fh:
             json.dump(entry, fh, ensure_ascii=False)
             fh.write("\n")
-    except Exception:  # TODO: Narrow exception type
-        logger.warning(f"[data_store] suppressed exception", exc_info=True)
-        pass
+    except Exception:
+        logger.warning(f"[data_store] log_search 写入失败", exc_info=True)
 
 
 def search_history(days: int = 7) -> list:
@@ -183,13 +181,10 @@ def search_history(days: int = 7) -> list:
                                 ts = datetime.fromisoformat(e["time"]).timestamp()
                                 if ts >= cutoff:
                                     hist.append(e)
-                        except Exception:  # TODO: Narrow exception type
-                            logger.warning(f"[data_store] suppressed exception", exc_info=True)
-                            pass
-    except Exception:  # TODO: Narrow exception type
-        logger.warning(f"[data_store] suppressed exception", exc_info=True)
-        pass
-    return sorted(hist, key=lambda x: x.get("time", ""), reverse=True)[:30]
+                        except Exception:
+                            logger.debug(f"[data_store] 搜索日志行解析失败，跳过", exc_info=True)
+    except Exception:
+        logger.warning(f"[data_store] search_history 读取失败", exc_info=True)(hist, key=lambda x: x.get("time", ""), reverse=True)[:30]
 
 
 # ============ 知识图谱 ============
@@ -257,9 +252,8 @@ def load_graph() -> dict:
                             "relation": d["relation_type"]
                         })
                 return {"nodes": nodes, "edges": edges}
-    except Exception as e:  # TODO: Narrow exception type
-
-        logger.warning("suppressed exception", exc_info=True)
+    except Exception as e:
+        logger.warning(f"[data_store] load_graph worldtree 回退失败: {e}", exc_info=True)
     return {"nodes": {}, "edges": []}
 
 
@@ -282,9 +276,8 @@ def log_behavior(entry: dict):
         with open(f, "a", encoding="utf-8") as fh:
             json.dump(entry, fh, ensure_ascii=False)
             fh.write("\n")
-    except Exception:  # TODO: Narrow exception type
-        logger.warning(f"[data_store] suppressed exception", exc_info=True)
-        pass
+    except Exception:
+        logger.warning(f"[data_store] log_behavior 写入失败", exc_info=True)
 
 
 # ============ 用户偏好 ============
@@ -298,9 +291,8 @@ def get_user_preferences(uid: str) -> dict:
         try:
             all_prefs = json.loads(USER_PREFERENCES_FILE.read_text(encoding="utf-8"))
             prefs = all_prefs.get(uid, {})
-        except Exception:  # TODO: Narrow exception type
-            logger.warning(f"[data_store] suppressed exception", exc_info=True)
-            pass
+        except Exception:
+            logger.warning(f"[data_store] get_user_preferences 读取失败", exc_info=True)
     return prefs
 
 
@@ -309,8 +301,7 @@ def save_user_preferences(uid: str, prefs: dict):
     if USER_PREFERENCES_FILE.exists():
         try:
             all_prefs = json.loads(USER_PREFERENCES_FILE.read_text(encoding="utf-8"))
-        except Exception:  # TODO: Narrow exception type
-            logger.warning(f"[data_store] suppressed exception", exc_info=True)
-            pass
+        except Exception:
+            logger.warning(f"[data_store] save_user_preferences 读取失败", exc_info=True)
     all_prefs[uid] = prefs
     USER_PREFERENCES_FILE.write_text(json.dumps(all_prefs, ensure_ascii=False, indent=2), encoding="utf-8")

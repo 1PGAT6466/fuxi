@@ -15,49 +15,15 @@ router = APIRouter(tags=["AI 对话"])
 
 # ============ 持久化会话存储（SQLite）============
 # v2.1: 使用 SQLite 持久化，重启不丢失会话和消息
+# v1.50 R5: 统一使用 data_service.py 的连接管理，消除散落的 sqlite3.connect
 
-from pathlib import Path as _Path
-
-
-def _get_chat_db_path():
-    """获取会话持久化 SQLite 数据库路径"""
-    from src.config import DATA_DIR
-    db_dir = _Path(DATA_DIR)
-    db_dir.mkdir(parents=True, exist_ok=True)
-    return str(db_dir / "chat_sessions.db")
-
-
-def _ensure_chat_tables():
-    """确保会话和消息表存在"""
-    import sqlite3
-    db_path = _get_chat_db_path()
-    with sqlite3.connect(db_path) as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS sessions (
-                id TEXT PRIMARY KEY,
-                title TEXT,
-                user_id TEXT,
-                last_message TEXT,
-                created_at REAL,
-                updated_at REAL,
-                message_count INTEGER DEFAULT 0
-            )
-        """)
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS messages (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                session_id TEXT,
-                role TEXT,
-                content TEXT,
-                sources TEXT,
-                timestamp REAL,
-                FOREIGN KEY (session_id) REFERENCES sessions(id) ON DELETE CASCADE
-            )
-        """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_messages_session ON messages(session_id)")
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_sessions_user ON sessions(user_id)")
-        conn.commit()
-
+from src.data_service import (
+    ensure_chat_tables as _ensure_chat_tables,
+    load_all_chat_sessions,
+    save_session_to_db as _save_session_to_db_svc,
+    save_message_to_db as _save_message_to_db_svc,
+    delete_session_from_db as _delete_session_from_db_svc,
+)
 
 # 内存缓存层（加速热点访问）
 _sessions_store: dict = {}
@@ -66,78 +32,42 @@ _messages_store: dict = {}
 
 def _load_sessions_from_db():
     """从 SQLite 加载所有会话到内存缓存"""
-    import sqlite3
-    _ensure_chat_tables()
     try:
-        with sqlite3.connect(_get_chat_db_path()) as conn:
-            conn.row_factory = sqlite3.Row
-            rows = conn.execute("SELECT * FROM sessions").fetchall()
-            for row in rows:
-                row_dict = dict(row)
-                _sessions_store[row_dict["id"]] = row_dict
-            msg_rows = conn.execute("SELECT * FROM messages ORDER BY timestamp").fetchall()
-            for row in msg_rows:
-                row_dict = dict(row)
-                sid = row_dict["session_id"]
-                if sid not in _messages_store:
-                    _messages_store[sid] = []
-                _messages_store[sid].append({
-                    "role": row_dict["role"],
-                    "content": row_dict["content"],
-                    "sources": json.loads(row_dict["sources"]) if row_dict.get("sources") else [],
-                    "timestamp": row_dict["timestamp"],
-                })
+        _ensure_chat_tables()
+        sessions, messages = load_all_chat_sessions()
+        _sessions_store.clear()
+        _sessions_store.update(sessions)
+        _messages_store.clear()
+        _messages_store.update(messages)
         logger.info(f"已从 SQLite 加载 {len(_sessions_store)} 个会话")
-    except Exception as e:  # TODO: Narrow exception type
+    except Exception as e:
         logger.warning(f"加载持久化会话失败: {e}")
 
 
 def _save_session_to_db(session: dict):
     """持久化单个会话到 SQLite"""
-    import sqlite3
-    _ensure_chat_tables()
     try:
-        with sqlite3.connect(_get_chat_db_path()) as conn:
-            conn.execute("""
-                INSERT OR REPLACE INTO sessions (id, title, user_id, last_message, created_at, updated_at, message_count)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                session["id"], session.get("title", ""), session.get("user_id", ""),
-                session.get("last_message", ""), session.get("created_at", 0),
-                session.get("updated_at", 0), session.get("message_count", 0)
-            ))
-            conn.commit()
-    except Exception as e:  # TODO: Narrow exception type
+        _save_session_to_db_svc(session)
+    except Exception as e:
         logger.warning(f"持久化会话失败: {e}")
 
 
 def _save_message_to_db(session_id: str, msg: dict):
     """持久化单条消息到 SQLite"""
-    import sqlite3
-    _ensure_chat_tables()
     try:
-        with sqlite3.connect(_get_chat_db_path()) as conn:
-            sources_json = json.dumps(msg.get("sources", []), ensure_ascii=False)
-            conn.execute("""
-                INSERT INTO messages (session_id, role, content, sources, timestamp)
-                VALUES (?, ?, ?, ?, ?)
-            """, (session_id, msg.get("role", ""), msg.get("content", ""), sources_json, msg.get("timestamp", 0)))
-            conn.commit()
-    except Exception as e:  # TODO: Narrow exception type
+        _save_message_to_db_svc(session_id, msg)
+    except Exception as e:
         logger.warning(f"持久化消息失败: {e}")
 
 
 def _delete_session_from_db(session_id: str):
     """从 SQLite 删除会话及其消息"""
-    import sqlite3
-    _ensure_chat_tables()
     try:
-        with sqlite3.connect(_get_chat_db_path()) as conn:
-            conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
-            conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
-            conn.commit()
-    except Exception as e:  # TODO: Narrow exception type
+        _delete_session_from_db_svc(session_id)
+    except Exception as e:
         logger.warning(f"删除持久化会话失败: {e}")
+
+
 
 
 # 启动时加载持久化数据

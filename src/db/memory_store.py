@@ -71,6 +71,7 @@ class MemoryStore:
         self._db_conn.execute("PRAGMA journal_mode=WAL")
         self._db_conn.execute("PRAGMA synchronous=NORMAL")
         self._db_conn.execute("PRAGMA cache_size=-64000")  # 64MB SQLite cache
+        self._db_conn.execute("PRAGMA busy_timeout=5000")  # v1.50 R5: 添加 busy_timeout
         self._db_conn.execute("""
             CREATE TABLE IF NOT EXISTS chunks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -241,6 +242,22 @@ class MemoryStore:
     def _count_rows(self) -> int:
         return self._db_conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
 
+    def _check_connection(self):
+        """v1.50 R5: 检查连接健康状态，必要时重连
+        
+        长生命周期连接可能因 WAL checkpoint、超时等原因失效，
+        此方法在关键操作前调用，确保连接可用。
+        """
+        try:
+            self._db_conn.execute("SELECT 1")
+        except (sqlite3.ProgrammingError, sqlite3.OperationalError):
+            logger.warning("[MemoryStore] 连接已失效，正在重连...")
+            try:
+                self._db_conn.close()
+            except Exception:
+                pass
+            self._ensure_db()
+
     def _row_to_chunk(self, row) -> dict:
         """Convert a DB row (id, doc_json) to chunk dict"""
         row_id, doc_json = row
@@ -346,6 +363,7 @@ class MemoryStore:
 
     def get_all(self, limit: int = None, offset: int = 0) -> List[Dict]:
         """返回 chunk 列表（直接走 SQLite，不加载到内存）"""
+        self._check_connection()
         if limit is not None:
             rows = self._db_conn.execute(
                 "SELECT id, doc FROM chunks WHERE status='active' ORDER BY id LIMIT ? OFFSET ?",
@@ -375,6 +393,7 @@ class MemoryStore:
         if cached is not None:
             return cached
 
+        self._check_connection()
         # Try exact match first
         rows = self._db_conn.execute(
             "SELECT id, doc FROM chunks WHERE file_hash=? AND status='active' ORDER BY chunk_index",
@@ -399,6 +418,7 @@ class MemoryStore:
         if cached is not None:
             return cached
 
+        self._check_connection()
         rows = self._db_conn.execute(
             "SELECT id, doc FROM chunks WHERE file_name=? AND status='active' ORDER BY chunk_index",
             (file_name,)

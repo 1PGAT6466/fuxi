@@ -80,13 +80,14 @@ def setup_middleware(app: FastAPI) -> None:
             except (ImportError, AttributeError, TypeError) as e:
                 logger.warning("请求指标记录失败（正常响应）: %s", e, exc_info=True)
             return response
-except Exception:  # TODO: Narrow exception type
+        except Exception as e:
             duration_ms = (time.time() - start) * 1000
             try:
                 from src.infra.request_metrics import get_request_metrics
                 get_request_metrics().record_request(duration_ms, False)
             except (ImportError, AttributeError, TypeError) as e:
                 logger.warning("请求指标记录失败（异常响应）: %s", e, exc_info=True)
+            raise
             raise
 
     # ── 请求限流 ──

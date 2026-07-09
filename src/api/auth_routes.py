@@ -93,56 +93,22 @@ def _get_login_rate_db_path():
     return str(db_dir / "login_rate.db")
 
 
-def _ensure_login_rate_table():
-    """确保登录限流表存在"""
-    import sqlite3
-    db_path = _get_login_rate_db_path()
-    with sqlite3.connect(db_path) as conn:
-        conn.execute("""
-            CREATE TABLE IF NOT EXISTS login_attempts (
-                ip TEXT NOT NULL,
-                timestamp REAL NOT NULL
-            )
-        """)
-        conn.execute("CREATE INDEX IF NOT EXISTS idx_login_ip ON login_attempts(ip)")
-        conn.commit()
-
-
 def _check_login_rate(ip: str) -> bool:
     """检查登录频率是否在限制内，返回 True 表示允许
     
-    使用 SQLite 持久化存储，重启不丢失限制记录。
+    v1.50 R5: 统一使用 data_service.py 的连接管理，消除散落的 sqlite3.connect
     """
-    import sqlite3
-    _ensure_login_rate_table()
-    now = time.time()
-    cutoff = now - _LOGIN_WINDOW_SEC
-    db_path = _get_login_rate_db_path()
-    
     try:
-        with sqlite3.connect(db_path) as conn:
-            # 清理过期记录
-            conn.execute("DELETE FROM login_attempts WHERE timestamp < ?", (cutoff,))
-            # 统计当前窗口内的尝试次数
-            cursor = conn.execute(
-                "SELECT COUNT(*) FROM login_attempts WHERE ip = ? AND timestamp >= ?",
-                (ip, cutoff)
-            )
-            count = cursor.fetchone()[0]
-            
-            if count >= _MAX_LOGIN_ATTEMPTS:
-                return False
-            
-            # 记录本次尝试
-            conn.execute(
-                "INSERT INTO login_attempts (ip, timestamp) VALUES (?, ?)",
-                (ip, now)
-            )
-            conn.commit()
-            return True
-    except Exception as e:  # TODO: Narrow exception type
+        from src.data_service import check_login_rate
+        return check_login_rate(
+            ip,
+            max_attempts=_MAX_LOGIN_ATTEMPTS,
+            window_sec=_LOGIN_WINDOW_SEC
+        )
+    except Exception as e:
         logger.warning(f"登录限流存储异常，回退到内存模式: {e}")
         # 回退：内存模式
+        now = time.time()
         attempts = _login_attempts[ip]
         attempts = [t for t in attempts if now - t < _LOGIN_WINDOW_SEC]
         _login_attempts[ip] = attempts
@@ -450,7 +416,6 @@ async def auth_refresh(body: RefreshRequest = None, request: Request = None):
 
 
 @router.post("/logout")
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def auth_logout(request: Request = None):
     """用户登出端点 — v1.50 R4: 实现真正的 Token 失效（JWT 黑名单）
 

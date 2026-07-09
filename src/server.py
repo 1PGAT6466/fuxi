@@ -512,18 +512,19 @@ from fastapi.responses import Response
 from src.services.metrics import get_metrics_response, update_store_stats
 
 @app.get("/api/metrics", dependencies=[Depends(require_admin)])
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def prometheus_metrics():
     """Prometheus 指标端点"""
+    import asyncio
     try:
         from src.db.data_store import load_chunks
         from src.db.vector_store import count_chunks
-        chunks = load_chunks()
-        update_store_stats(
+        chunks = await asyncio.to_thread(load_chunks)
+        vector_count = await asyncio.to_thread(count_chunks)
+        await asyncio.to_thread(update_store_stats,
             sqlite_count=len(chunks) if chunks else 0,
-            vector_count=count_chunks()
+            vector_count=vector_count
         )
-    except Exception as e:  # TODO: Narrow exception type
+    except Exception as e:
         logger.warning("Prometheus指标更新失败: %s", e, exc_info=True)
     return Response(content=get_metrics_response(), media_type="text/plain")
 
@@ -545,10 +546,10 @@ async def mcp_handler(request: Request):
     return await server.handle_request(body)
 
 @app.get("/api/mcp/tools", dependencies=[Depends(require_admin)])
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def mcp_list_tools():
     """列出所有MCP工具 — v1.50 R2: 需要管理员权限"""
-    server = get_mcp_server()
+    import asyncio
+    server = await asyncio.to_thread(get_mcp_server)
     return {"tools": [{"name": t.name, "description": t.description} for t in server.tools.values()]}
 
 @app.post("/api/mcp/sag_search")
@@ -763,16 +764,16 @@ async def eval_history():
 from src.taiyin.growth_api import get_growth_overview, get_symbols_status
 
 @app.get("/api/symbols/status")
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def symbols_status():
     """四象状态"""
-    return get_symbols_status()
+    import asyncio
+    return await asyncio.to_thread(get_symbols_status)
 
 @app.get("/api/growth/overview")
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def growth_overview():
     """成长概览"""
-    return get_growth_overview()
+    import asyncio
+    return await asyncio.to_thread(get_growth_overview)
 
 # ============ 系统路由 ============
 # system_routes.py 已由 auto_discover_routers 自动注册，无需手动 include
@@ -781,16 +782,17 @@ async def growth_overview():
 from src.services.feature_flags import load_flags, set_flag, DEFAULT_FLAGS
 
 @app.get("/api/feature-flags", dependencies=[Depends(require_admin)])
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def list_feature_flags():
     """获取所有 Feature Flag 状态"""
-    return {"flags": load_flags(), "defaults": DEFAULT_FLAGS}
+    import asyncio
+    flags = await asyncio.to_thread(load_flags)
+    return {"flags": flags, "defaults": DEFAULT_FLAGS}
 
 @app.get("/api/feature-flags/{name}", dependencies=[Depends(require_admin)])
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def get_feature_flag(name: str):
     """获取单个 Feature Flag 状态"""
-    flags = load_flags()
+    import asyncio
+    flags = await asyncio.to_thread(load_flags)
     if name not in DEFAULT_FLAGS:
         from fastapi import HTTPException
         raise HTTPException(404, f"未知 flag: {name}")
@@ -799,17 +801,17 @@ async def get_feature_flag(name: str):
 @app.put("/api/feature-flags/{name}", dependencies=[Depends(require_admin)])
 async def update_feature_flag(name: str, request: Request):
     """更新 Feature Flag"""
+    import asyncio
     body = await request.json()
     value = body.get("value", False)
     if name not in DEFAULT_FLAGS:
         from fastapi import HTTPException
         raise HTTPException(404, f"未知 flag: {name}")
-    set_flag(name, value)
+    await asyncio.to_thread(set_flag, name, value)
     return {"ok": True, "flag": name, "value": value}
 
 # ============ 认证 API (仅 /api/auth/me, login/register 由 auth_routes.py 提供) ============
 @app.get("/api/auth/me")
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def auth_me(request: Request):
     return {"username": getattr(request.state, "user", "anonymous"), "role": getattr(request.state, "role", "user")}
 
@@ -817,35 +819,33 @@ async def auth_me(request: Request):
 from fastapi.responses import HTMLResponse
 
 @app.get("/login", response_class=HTMLResponse)
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def login_page():
+    import asyncio
     f = STATIC_DIR / "login.html"
-    return HTMLResponse(f.read_text(encoding="utf-8") if f.exists() else "<h1>login.html not found</h1>")
+    content = await asyncio.to_thread(lambda: f.read_text(encoding="utf-8") if f.exists() else "<h1>login.html not found</h1>")
+    return HTMLResponse(content)
 
 @app.get("/", response_class=HTMLResponse)
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def index_page():
+    import asyncio
     f = STATIC_DIR / "index.html"
-    return HTMLResponse(f.read_text(encoding="utf-8") if f.exists() else "<h1>index.html not found</h1>")
+    content = await asyncio.to_thread(lambda: f.read_text(encoding="utf-8") if f.exists() else "<h1>index.html not found</h1>")
+    return HTMLResponse(content)
 
 @app.get("/admin", response_class=HTMLResponse)
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def admin_page(request: Request):
     """管理页面 — v1.50 R2 安全修复: 需要认证才能访问
     
     未登录用户重定向到 /login，非管理员用户返回 403。
     """
-    # v1.50 R2: 检查认证状态
+    import asyncio
     user = getattr(request.state, "user", None)
-    role = getattr(request.state, "role", None)
-    
     if not user or user == "anonymous":
-        # 未登录：重定向到登录页面
         from starlette.responses import RedirectResponse
         return RedirectResponse(url="/login", status_code=302)
-    
     f = STATIC_DIR / "index.html"
-    return HTMLResponse(f.read_text(encoding="utf-8") if f.exists() else "<h1>index.html not found</h1>")
+    content = await asyncio.to_thread(lambda: f.read_text(encoding="utf-8") if f.exists() else "<h1>index.html not found</h1>")
+    return HTMLResponse(content)
 
 # 静态资源挂载 — v2.1: 优先使用 dist 构建产物，回退到 frontend 根目录
 # 为静态文件添加安全过滤，防止暴露源代码文件
@@ -929,19 +929,20 @@ app.include_router(kb_router)
 
 # ============ D5: Prometheus Metrics ============
 @app.get("/metrics", dependencies=[Depends(require_admin)])
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def metrics():
     """暴露 Prometheus 格式指标 — 浏览器直开 http://<host>:<port>/metrics"""
+    import asyncio
     from src.services.metrics import generate_metrics_text
     from fastapi.responses import PlainTextResponse
-    return PlainTextResponse(generate_metrics_text(), media_type="text/plain; charset=utf-8")
+    text = await asyncio.to_thread(generate_metrics_text)
+    return PlainTextResponse(text, media_type="text/plain; charset=utf-8")
 
 @app.get("/api/admin/metrics-summary", dependencies=[Depends(require_admin)])
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def admin_metrics_summary():
     """管理面板：可观测性指标摘要（延迟 P50/P95/P99 + 错误率）"""
+    import asyncio
     from src.services.metrics import generate_health_summary
-    return generate_health_summary()
+    return await asyncio.to_thread(generate_health_summary)
 
 
 
