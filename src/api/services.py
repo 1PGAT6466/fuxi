@@ -6,10 +6,11 @@ GET /api/services — 返回所有已注册服务的清单（JSON 数组），�
 import logging
 from typing import List, Optional
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Request, Depends
 from fastapi.responses import JSONResponse
 
 from src.api.response import success, error
+from src.api.auth import require_admin  # v1.50 R2: 内部端点需要认证
 
 logger = logging.getLogger("api.services")
 
@@ -240,11 +241,11 @@ _SERVICES_MANIFEST: List[dict] = [
 ]
 
 
-@router.get("")
-@router.get("/")
+@router.get("", dependencies=[Depends(require_admin)])
+@router.get("/", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 同步函数标记 async 仅为接口统一
 async def list_services(request: Request):
-    """获取所有已注册服务的清单"""
+    """获取所有已注册服务的清单 — v1.50 R2: 需要管理员权限"""
     try:
         # 从 auto_discovery 模块获取动态发现的路由信息
         try:
@@ -271,9 +272,9 @@ async def list_services(request: Request):
         return error("获取服务清单失败", status_code=500, detail=str(e))
 
 
-@router.get("/{service_id}")
+@router.get("/{service_id}", dependencies=[Depends(require_admin)])
 async def get_service(service_id: str, request: Request):
-    """获取单个服务的详细信息"""
+    """获取单个服务的详细信息 — v1.50 R2: 需要管理员权限"""
     for svc in _SERVICES_MANIFEST:
         if svc["id"] == service_id:
             return success(svc)

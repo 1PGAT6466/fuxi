@@ -1,4 +1,4 @@
-/* 伏羲登录页样式 v1.50 */
+/* 伏羲登录页样式 v1.44 */
 *{margin:0;padding:0;box-sizing:border-box}
 body{font-family:-apple-system,BlinkMacSystemFont,'PingFang SC','Microsoft YaHei',sans-serif;background:linear-gradient(135deg,#1a1a2e 0%,#16213e 50%,#0f3460 100%);min-height:100vh;display:flex;align-items:center;justify-content:center;color:#e0e0e0}
 .login-container{width:400px;background:rgba(255,255,255,0.05);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,0.1);border-radius:20px;padding:48px 40px;box-shadow:0 20px 60px rgba(0,0,0,0.3)}

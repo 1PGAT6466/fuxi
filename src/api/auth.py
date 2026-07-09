@@ -44,7 +44,8 @@ def verify_jwt_token(token: str) -> dict:
 
 
 # 白名单路径 — 无需认证即可访问
-# 安全修复 (CWE-306): 移除了 /api/system/stats（泄露系统信息）
+# v1.50 R2 安全修复: 移除 /openapi.json, /docs, /redoc, /admin 白名单
+# 生产环境下 OpenAPI/Swagger UI 需要认证
 _AUTH_WHITELIST = {
     "/api/health",
     "/api/auth/login",
@@ -52,24 +53,33 @@ _AUTH_WHITELIST = {
     "/api/v2/status",
     "/",
     "/login",
-    "/admin",
-    "/docs",
-    "/redoc",
-    "/openapi.json",
-    "/metrics",
+    "/favicon.ico",
 }
+
+# 生产环境判断
+_IS_PRODUCTION = os.environ.get("FUXI_ENV", "production").lower() == "production"
+
+# 开发环境保留 OpenAPI 文档访问
+if not _IS_PRODUCTION:
+    _AUTH_WHITELIST.update({"/docs", "/redoc", "/openapi.json"})
+    logger.info("[Auth] 开发环境: OpenAPI/Swagger 文档无需认证")
+else:
+    logger.info("[Auth] 生产环境: OpenAPI/Swagger 文档需要认证")
 
 
 def _is_whitelisted(path: str) -> bool:
-    """判断路径是否在白名单中"""
+    """判断路径是否在白名单中
+    
+    v1.50 R2 安全修复: 不再对非 /api/ 路径全部放行，
+    仅对明确列出的白名单路径放行。防止 /openapi.json、/docs、/redoc 等
+    无需认证即可暴露完整 API Schema。
+    """
     if path in _AUTH_WHITELIST:
         return True
     # 静态文件
     if path.startswith("/static/"):
         return True
-    # 非 API 路径（前端页面）
-    if not path.startswith("/api/"):
-        return True
+    # v2.1 R2: 拒绝所有未明确列出的非 API 路径（包括 /admin, /docs, /openapi.json 等）
     return False
 
 
@@ -138,5 +148,84 @@ def require_admin(request: Request):
 
 
 class InputLimitMiddleware(BaseHTTPMiddleware):
+    """请求速率限制中间件 — v1.50 R2 修复
+    
+    使用滑动窗口算法对全局 API 请求进行速率限制。
+    配置:
+      - FUXI_RATE_LIMIT_REQUESTS: 每个窗口最大请求数（默认 60）
+      - FUXI_RATE_LIMIT_WINDOW_SEC: 窗口秒数（默认 60）
+      - FUXI_RATE_LIMIT_ENABLED: 是否启用限流（默认 true）
+    """
+    
+    # 特殊端点的更严格限制
+    STRICT_ENDPOINTS = {
+        "/api/auth/login": {"max": 5, "window": 60},
+        "/api/auth/register": {"max": 3, "window": 3600},
+    }
+    
+    def __init__(self, app, **kwargs):
+        super().__init__(app, **kwargs)
+        self._enabled = os.environ.get("FUXI_RATE_LIMIT_ENABLED", "true").lower() == "true"
+        self._max_requests = int(os.environ.get("FUXI_RATE_LIMIT_REQUESTS", "60"))
+        self._window_sec = int(os.environ.get("FUXI_RATE_LIMIT_WINDOW_SEC", "60"))
+        self._limiters: dict = {}  # key → SlidingWindowRateLimiter
+        import threading
+        self._lock = threading.Lock()
+        if self._enabled:
+            logger.info(
+                f"[RateLimit] 已启用: {self._max_requests} req/{self._window_sec}s (全局), "
+                f"登录 5/min, 注册 3/hour"
+            )
+        else:
+            logger.warning("[RateLimit] 速率限制已禁用（FUXI_RATE_LIMIT_ENABLED=false）")
+    
+    def _get_limiter(self, key: str, max_req: int, window: int):
+        """获取或创建限流器"""
+        if key not in self._limiters:
+            with self._lock:
+                if key not in self._limiters:
+                    from src.infra.rate_limiter import SlidingWindowRateLimiter
+                    self._limiters[key] = SlidingWindowRateLimiter(max_req, window)
+        return self._limiters[key]
+    
     async def dispatch(self, request: Request, call_next):
+        if not self._enabled:
+            return await call_next(request)
+        
+        path = request.url.path
+        
+        # 检查严格端点限制
+        strict_config = self.STRICT_ENDPOINTS.get(path)
+        if strict_config:
+            limiter = self._get_limiter(f"strict:{path}", strict_config["max"], strict_config["window"])
+            if not limiter.acquire():
+                from fastapi.responses import JSONResponse
+                retry_after = strict_config["window"]
+                resp = JSONResponse(
+                    status_code=429,
+                    content={
+                        "detail": "请求过于频繁，请稍后再试",
+                        "retry_after_seconds": retry_after,
+                    }
+                )
+                resp.headers["Retry-After"] = str(retry_after)
+                return resp
+            return await call_next(request)
+        
+        # 仅对 /api/ 路径进行全局限流
+        if path.startswith("/api/"):
+            ip = request.client.host if request.client else "unknown"
+            limiter = self._get_limiter(f"global:{ip}", self._max_requests, self._window_sec)
+            if not limiter.acquire():
+                from fastapi.responses import JSONResponse
+                resp = JSONResponse(
+                    status_code=429,
+                    content={
+                        "detail": "请求过多，请稍后再试",
+                        "retry_after_seconds": self._window_sec,
+                    }
+                )
+                resp.headers["Retry-After"] = str(self._window_sec)
+                return resp
+        
         return await call_next(request)

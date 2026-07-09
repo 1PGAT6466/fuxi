@@ -13,6 +13,24 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/auth", tags=["认证"])
 
+# v1.50 R2: 敏感用户名黑名单 — 防止账号冒充和社会工程攻击
+_BLOCKED_USERNAMES = {
+    "admin", "administrator", "root", "system", "superuser",
+    "moderator", "operator", "support", "security", "fuxi",
+    "api", "bot", "service", "manager", "owner", "master",
+    "webmaster", "sysadmin", "audit", "backup", "guest",
+}
+
+def _is_username_blocked(username: str) -> bool:
+    """检查用户名是否在黑名单中（不区分大小写）"""
+    lower = username.lower().strip()
+    if lower in _BLOCKED_USERNAMES:
+        return True
+    # 检查包含 admin/root 的变形
+    if any(blocked in lower for blocked in ["admin", "root", "system"]):
+        return True
+    return False
+
 # v2.1: 登录频率限制（SQLite 持久化，重启不丢失）
 _MAX_LOGIN_ATTEMPTS = 5
 _LOGIN_WINDOW_SEC = 60
@@ -108,6 +126,9 @@ class LoginRequest(BaseModel):
     def validate_username(cls, v: str) -> str:
         if not v or len(v.strip()) < 1 or len(v.strip()) > 64:
             raise ValueError("用户名长度必须在1-64字符之间")
+        # v1.50 R2: 检查敏感用户名
+        if _is_username_blocked(v.strip()):
+            raise ValueError("该用户名不可用，请选择其他用户名")
         return v.strip()
 
     @field_validator("password")
@@ -116,6 +137,11 @@ class LoginRequest(BaseModel):
         if not v or len(v) < 6 or len(v) > 128:
             raise ValueError("密码长度必须在6-128字符之间")
         return v
+
+
+class RegisterRequest(LoginRequest):
+    """v1.50 R2: 注册需要邮箱字段"""
+    email: Optional[str] = None
 
 @router.post("/login")
 def login(body: LoginRequest, request: Request = None):
@@ -171,8 +197,8 @@ def login(body: LoginRequest, request: Request = None):
         return server_error("登录服务异常", detail=str(e))
 
 @router.post("/register")
-def register(body: LoginRequest, request: Request = None):
-    """用户注册 — v1.50 统一响应格式支持"""
+def register(body: RegisterRequest, request: Request = None):
+    """用户注册 — v1.50 R2: 添加邮箱字段和敏感用户名检查"""
     from src.api.response import success, error, bad_request, server_error
     try:
         import json, time
@@ -185,6 +211,10 @@ def register(body: LoginRequest, request: Request = None):
         else:
             users = {}
         
+        # v1.50 R2: 敏感用户名黑名单检查
+        if _is_username_blocked(body.username):
+            raise HTTPException(400, "该用户名不可用，请选择其他用户名")
+        
         if body.username in users:
             raise HTTPException(400, "用户名已存在")
         
@@ -192,6 +222,7 @@ def register(body: LoginRequest, request: Request = None):
             "password": _hash_password(body.password),
             "role": "user",
             "display_name": body.username,
+            "email": body.email or "",
             "created_at": time.time()
         }
         

@@ -223,6 +223,15 @@ function _addHeadingIds(html, content) {
 
 // 智能结构化：将【xxx】：描述 和 **key**：value 模式转为卡片/表格
 // P2-14: 先快速检查是否包含模式特征，避免对纯文本页面运行 4 次全量正则替换
+// P3-R2: 将正则提取为模块常量，避免每次调用重新编译，并限制处理次数防止大内容性能退化
+var _WIKI_ACTION_PATTERN = /(<p>【[^】]+】[：:][^<]*<\/p>\s*){2,}/g;
+var _WIKI_ACTION_ITEM_RE = /<p>【([^】]+)】[：:]\s*([^<]*)<\/p>/g;
+var _WIKI_KV_FULL_RE = /<li>\s*<strong>([^<]+)<\/strong>[：:]\s*([^<]*(?:<br>\s*<\/li>|<\/li>))/g;
+var _WIKI_KV_NESTED_RE = /<li>\s*<strong>([^<]+)<\/strong>[：:]\s*<ul>([\s\S]*?)<\/ul>\s*<\/li>/g;
+var _WIKI_LI_RE = /<li>([^<]*(?:<strong>[^<]*<\/strong>[^<]*)?)<\/li>/g;
+var _WIKI_KV_EMPTY_RE = /<li>\s*<strong>([^<]+)<\/strong>[：:]\s*<\/li>/g;
+var _WIKI_MAX_REPLACEMENTS = 50;
+
 function _structureContent(html) {
   var hasAction = html.indexOf('【') >= 0;
   var hasKeyValue = html.indexOf('<strong>') >= 0;
@@ -230,12 +239,13 @@ function _structureContent(html) {
 
   // 模式1: 【操作名】：描述 — 转为操作卡片表格
   if (hasAction) {
-    var actionPattern = /(<p>【[^】]+】[：:][^<]*<\/p>\s*){2,}/g;
-    html = html.replace(actionPattern, function(match) {
+    var actionCount = 0;
+    html = html.replace(_WIKI_ACTION_PATTERN, function(match) {
+      if (actionCount++ >= _WIKI_MAX_REPLACEMENTS) return match;
       var items = [];
-      var re = /<p>【([^】]+)】[：:]\s*([^<]*)<\/p>/g;
       var m;
-      while ((m = re.exec(match)) !== null) {
+      _WIKI_ACTION_ITEM_RE.lastIndex = 0;
+      while ((m = _WIKI_ACTION_ITEM_RE.exec(match)) !== null) {
         items.push({ action: m[1], desc: m[2].trim() });
       }
       if (items.length < 2) return match;
@@ -251,20 +261,21 @@ function _structureContent(html) {
 
   // 模式2-4 仅当有 <strong> 标签时才执行
   if (hasKeyValue) {
+  var kvCount = 0;
   // 模式2: li 中 **key**：value — 转为定义卡片
-  // 匹配 <li><strong>key</strong>：value</li> 或 <li><strong>key</strong>：<br>
-  html = html.replace(/<li>\s*<strong>([^<]+)<\/strong>[：:]\s*([^<]*(?:<br>\s*<\/li>|<\/li>))/g, function(match, key, value) {
+  html = html.replace(_WIKI_KV_FULL_RE, function(match, key, value) {
+    if (kvCount++ >= _WIKI_MAX_REPLACEMENTS) return match;
     return '<li style="list-style:none;padding:0;margin-bottom:12px"><div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px"><div style="font-weight:600;color:var(--mi-orange);font-size:13px;margin-bottom:4px">' + key.trim() + '</div><div style="color:var(--text2);font-size:13px;line-height:1.7">' + (value.trim() || '') + '</div></div></li>';
   });
 
   // 模式3: <li>后紧跟 <ul> 的 **key**：嵌套子列表 — 提取为卡片
-  // 匹配 <li><strong>key</strong>：<ul>子项</ul></li>
-  html = html.replace(/<li>\s*<strong>([^<]+)<\/strong>[：:]\s*<ul>([\s\S]*?)<\/ul>\s*<\/li>/g, function(match, key, subList) {
-    // 提取子项
+  kvCount = 0;
+  html = html.replace(_WIKI_KV_NESTED_RE, function(match, key, subList) {
+    if (kvCount++ >= _WIKI_MAX_REPLACEMENTS) return match;
     var subItems = [];
-    var re2 = /<li>([^<]*(?:<strong>[^<]*<\/strong>[^<]*)?)<\/li>/g;
     var m2;
-    while ((m2 = re2.exec(subList)) !== null) {
+    _WIKI_LI_RE.lastIndex = 0;
+    while ((m2 = _WIKI_LI_RE.exec(subList)) !== null) {
       subItems.push(m2[1].trim());
     }
     var card = '<li style="list-style:none;padding:0;margin-bottom:12px"><div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:12px 16px"><div style="font-weight:600;color:var(--mi-orange);font-size:13px;margin-bottom:8px">' + key.trim() + '</div>';
@@ -279,9 +290,10 @@ function _structureContent(html) {
     return card;
   });
 
-  // 模式4: 连续的 <li><strong>key</strong>：value</li> (无嵌套) — 已被模式2处理
-  // 但如果模式2没匹配到（因为 value 在下一行），再试一次
-  html = html.replace(/<li>\s*<strong>([^<]+)<\/strong>[：:]\s*<\/li>/g, function(match, key) {
+  // 模式4: 空值的 key-value（key 后无内容）
+  kvCount = 0;
+  html = html.replace(_WIKI_KV_EMPTY_RE, function(match, key) {
+    if (kvCount++ >= _WIKI_MAX_REPLACEMENTS) return match;
     return '<li style="list-style:none;padding:0;margin-bottom:8px"><div style="background:var(--card);border:1px solid var(--border);border-radius:8px;padding:10px 14px"><span style="font-weight:600;color:var(--mi-orange);font-size:13px">' + key.trim() + '</span></div></li>';
   });
   }  // end if (hasKeyValue)

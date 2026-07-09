@@ -7,22 +7,22 @@ async function loadOverview(){
   try{
     const d=await api('/api/admin/metrics-summary');
     s.innerHTML=
-      '<div class="stat"><div class="stat-icon" style="background:#fff4ed">📄</div><div><div class="stat-value">'+(d.chunks||0)+'</div><div class="stat-label">文档块 Chunks</div></div></div>'+
-      '<div class="stat"><div class="stat-icon" style="background:#e8f5e9">⚡</div><div><div class="stat-value">'+(d.latency_p50_ms||0)+'ms</div><div class="stat-label">P50 延迟</div></div></div>'+
-      '<div class="stat"><div class="stat-icon" style="background:#e3f2fd">✅</div><div><div class="stat-value">'+(d.error_rate!=null?Math.round((1-d.error_rate)*100)+'%':'99%')+'</div><div class="stat-label">可用率</div></div></div>'+
-      '<div class="stat"><div class="stat-icon" style="background:#e8f5e9">⏱</div><div><div class="stat-value">'+(d.uptime_hours||0).toFixed(1)+'h</div><div class="stat-label">运行时间</div></div></div>';
+      '<div class="stat"><div class="stat-icon" style="background:#fff4ed">📄</div><div><div class="stat-value">'+(safeNum(d.chunks,0))+'</div><div class="stat-label">文档块 Chunks</div></div></div>'+
+      '<div class="stat"><div class="stat-icon" style="background:#e8f5e9">⚡</div><div><div class="stat-value">'+safeNum(d.latency_p50_ms,0)+'ms</div><div class="stat-label">P50 延迟</div></div></div>'+
+      '<div class="stat"><div class="stat-icon" style="background:#e3f2fd">✅</div><div><div class="stat-value">'+(d.error_rate!=null?Math.round((1-safeNum(d.error_rate,0))*100)+'%':'99%')+'</div><div class="stat-label">可用率</div></div></div>'+
+      '<div class="stat"><div class="stat-icon" style="background:#e8f5e9">⏱</div><div><div class="stat-value">'+safeNum(d.uptime_hours,0).toFixed(1)+'h</div><div class="stat-label">运行时间</div></div></div>';
     const m=document.getElementById('overviewMetrics');
     m.innerHTML=
       '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'+
       '<div><h4 style="font-size:12px;color:var(--text3);margin-bottom:6px">延迟分布</h4>'+
       '<div style="display:flex;align-items:flex-end;gap:8px;height:80px">'+
-      ['P50','P95','P99'].map((l,i)=>{const v=[d.latency_p50_ms||150,d.latency_p95_ms||450,d.latency_p99_ms||1200][i];const h=Math.min(80,v/15);return '<div style="flex:1;text-align:center"><div style="height:'+(80-h)+'px"></div><div style="background:var(--pri);height:'+h+'px;border-radius:4px 4px 0 0;opacity:'+(0.4+i*0.3)+'"></div><div style="font-size:10px;color:var(--text3);margin-top:4px">'+l+'<br>'+v+'ms</div></div>'}).join('')+
+      ['P50','P95','P99'].map((l,i)=>{const v=[safeNum(d.latency_p50_ms,150),safeNum(d.latency_p95_ms,450),safeNum(d.latency_p99_ms,1200)][i];const h=Math.min(80,v/15);return '<div style="flex:1;text-align:center"><div style="height:'+(80-h)+'px"></div><div style="background:var(--pri);height:'+h+'px;border-radius:4px 4px 0 0;opacity:'+(0.4+i*0.3)+'"></div><div style="font-size:10px;color:var(--text3);margin-top:4px">'+l+'<br>'+v+'ms</div></div>'}).join('')+
       '</div></div>'+
       '<div><h4 style="font-size:12px;color:var(--text3);margin-bottom:6px">运行信息</h4>'+
       '<div style="font-size:12px;color:var(--text2);line-height:2">'+
-      '<div>⏱ 运行时间: '+(d.uptime_hours||0).toFixed(1)+' 小时</div>'+
-      '<div>📊 文档块: '+(d.chunks||0)+'</div>'+
-      '<div>🔍 缓存命中: '+(d.cache_hit_rate?Math.round(d.cache_hit_rate*100):'—')+'%</div>'+
+      '<div>⏱ 运行时间: '+safeNum(d.uptime_hours,0).toFixed(1)+' 小时</div>'+
+      '<div>📊 文档块: '+safeNum(d.chunks,0)+'</div>'+
+      '<div>🔍 缓存命中: '+(d.cache_hit_rate?Math.round(safeNum(d.cache_hit_rate,0)*100):'—')+'%</div>'+
       '</div></div></div>';
   }catch(e){_adminError('overviewStats',e.message)}
 }
@@ -35,15 +35,15 @@ async function loadEval(){
     const ss=d.search_stats||{};
     const re=d.rag_eval||{};
     s.innerHTML=
-      '<div class="stat"><div class="stat-icon" style="background:#e8f5e9">🔍</div><div><div class="stat-value">'+(ss.total_searches||0)+'</div><div class="stat-label">检索次数</div></div></div>'+
-      '<div class="stat"><div class="stat-icon" style="background:#fff3e0">📊</div><div><div class="stat-value">'+(ss.avg_results||0).toFixed(1)+'</div><div class="stat-label">平均结果数</div></div></div>'+
-      '<div class="stat"><div class="stat-icon" style="background:#e3f2fd">⏱</div><div><div class="stat-value">'+(ss.avg_latency_ms||0).toFixed(0)+'</div><div class="stat-label">平均延迟 ms</div></div></div>'+
-      '<div class="stat"><div class="stat-icon" style="background:#fce4ec">📋</div><div><div class="stat-value">'+(d.test_cases_count||0)+'</div><div class="stat-label">测试用例</div></div></div>';
+      '<div class="stat"><div class="stat-icon" style="background:#e8f5e9">🔍</div><div><div class="stat-value">'+safeNum(ss.total_searches,0)+'</div><div class="stat-label">检索次数</div></div></div>'+
+      '<div class="stat"><div class="stat-icon" style="background:#fff3e0">📊</div><div><div class="stat-value">'+safeNum(ss.avg_results,0).toFixed(1)+'</div><div class="stat-label">平均结果数</div></div></div>'+
+      '<div class="stat"><div class="stat-icon" style="background:#e3f2fd">⏱</div><div><div class="stat-value">'+safeNum(ss.avg_latency_ms,0).toFixed(0)+'</div><div class="stat-label">平均延迟 ms</div></div></div>'+
+      '<div class="stat"><div class="stat-icon" style="background:#fce4ec">📋</div><div><div class="stat-value">'+safeNum(d.test_cases_count,0)+'</div><div class="stat-label">测试用例</div></div></div>';
     document.getElementById('evalDetail').innerHTML=
       '<div style="font-size:13px;color:var(--text2);line-height:2">'+
-      '<div>📉 零结果率: '+((ss.zero_result_rate||0)*100).toFixed(1)+'%</div>'+
-      '<div>📊 P50 延迟: '+(ss.p50_latency_ms||0)+'ms</div>'+
-      '<div>🧪 RAGAS 评估: '+(re.available?'✅ 可用 ('+(re.test_cases||0)+' 用例)':'⚠️ '+esc(re.hint||'未配置'))+'</div>'+
+      '<div>📉 零结果率: '+(safeNum(ss.zero_result_rate,0)*100).toFixed(1)+'%</div>'+
+      '<div>📊 P50 延迟: '+safeNum(ss.p50_latency_ms,0)+'ms</div>'+
+      '<div>🧪 RAGAS 评估: '+(re.available?'✅ 可用 ('+safeNum(re.test_cases,0)+' 用例)':'⚠️ '+esc(re.hint||'未配置'))+'</div>'+
       '<div style="color:var(--text3);font-size:11px;margin-top:8px">生成时间: '+esc(d.generated_at||'—')+'</div>'+
       '</div>';
   }catch(e){_adminError('evalStats',e.message)}

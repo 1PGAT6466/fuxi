@@ -47,38 +47,31 @@ function toggleBatchSelect(hash) {
   if (window._renderFiles) window._renderFiles(window._activeCat || '全部');
 }
 
-// P0-3 fix: 单个文件删除 — 携带 Authorization header
+// P0-3 + R2 fix: 单个文件删除 — 使用统一 api() 封装
 async function deleteFile(hash) {
   if (!hash) return;
   if (!confirm('确认删除该文件？')) return;
   try {
-    const token = getToken();
-    const headers = {};
-    if (token) headers['Authorization'] = 'Bearer ' + token;
-    const r = await fetch('/api/documents/' + hash, { method: 'DELETE', headers: headers });
-    if (r.ok) { invalidateCache('/api/documents'); toast('已删除', 'success'); loadFiles(); }
-    else { toast('删除失败: ' + r.status, 'error'); }
-  } catch (e) { toast('删除失败', 'error'); }
+    await api('/api/documents/' + hash, { method: 'DELETE' });
+    invalidateCache('/api/documents'); toast('已删除', 'success'); loadFiles();
+  } catch (e) { toast('删除失败: ' + (e.message || ''), 'error'); }
 }
 
-// P0-3 fix: 批量删除 — 携带 Authorization header
+// P0-3 + R2 fix: 批量删除 — 使用统一 api() 封装
 async function batchDelete() {
   const hashes = [...window._batchSelected];
   if (!hashes.length) { toast('请先选择文件', 'error'); return; }
-  if (!confirm(`确认删除选中的 ${hashes.length} 个文件？`)) return;
+  if (!confirm('确认删除选中的 ' + hashes.length + ' 个文件？')) return;
   let ok = 0, fail = 0;
-  const token = getToken();
-  const headers = {};
-  if (token) headers['Authorization'] = 'Bearer ' + token;
   for (const h of hashes) {
     try {
-      const r = await fetch('/api/documents/' + h, { method: 'DELETE', headers: headers });
-      if (r.ok) ok++; else fail++;
+      await api('/api/documents/' + h, { method: 'DELETE' });
+      ok++;
     } catch (e) { fail++; }
   }
   window._batchSelected.clear();
   invalidateCache('/api/documents');
-  toast(`删除完成：成功 ${ok}，失败 ${fail}`, fail ? 'error' : 'success');
+  toast('删除完成：成功 ' + ok + '，失败 ' + fail, fail ? 'error' : 'success');
   loadFiles();
 }
 
@@ -136,16 +129,35 @@ async function loadFiles() {
           var fh = f.file_hash || '';
           var fn = esc(f.file_name || '?');
           var checked = fh && window._batchSelected.has(fh) ? 'checked' : '';
-          // P0-3 fix: use deleteFile() helper instead of inline bare fetch
+          // R2 fix: data 属性替代内联 onclick，消除 XSS 注入面
           return '<div class="file-card" style="position:relative">' +
-            (fh ? '<div style="position:absolute;top:8px;left:8px"><input type="checkbox" ' + checked + ' onchange="toggleBatchSelect(\'' + fh.replace(/'/g, "\\'") + '\')" style="cursor:pointer"></div>' : '') +
+            (fh ? '<div style="position:absolute;top:8px;left:8px"><input type="checkbox" ' + checked + ' data-file-hash="' + esc(fh) + '" class="batch-checkbox" style="cursor:pointer"></div>' : '') +
             '<div class="file-icon">' + fileIcon(f.file_name) + '</div><div class="file-name">' + fn + '</div><div class="file-meta">' + esc(catLabel(f.category) || '未分类') + '</div><div style="display:flex;gap:8px;margin-top:10px">' +
             (fh ? '<a href="/api/view/' + encodeURIComponent(fh) + '" target="_blank" class="btn btn-sm btn-ghost" style="font-size:11px;padding:4px 8px">👁 查看</a><a href="/api/download/' + encodeURIComponent(fh) + '" class="btn btn-sm btn-ghost" style="font-size:11px;padding:4px 8px">⬇ 下载</a>' : '') +
-            '<button class="btn btn-sm btn-ghost" style="font-size:11px;padding:4px 8px;color:var(--error)" onclick="event.stopPropagation();deleteFile(\'' + fh.replace(/'/g, "\\'") + '\')">🗑 删除</button></div></div>';
+            '<button class="btn btn-sm btn-ghost file-delete-btn" data-file-hash="' + esc(fh) + '" style="font-size:11px;padding:4px 8px;color:var(--error)">🗑 删除</button></div></div>';
         }).join('') +
         '</div>';
     };
     window._renderFiles('全部');
+
+    // R2 fix: 事件委托 — data 属性替代内联 onclick，避免 XSS 注入
+    grid.addEventListener('click', function(e) {
+      // 删除按钮
+      var delBtn = e.target.closest('.file-delete-btn');
+      if (delBtn) {
+        e.stopPropagation();
+        var hash = delBtn.getAttribute('data-file-hash');
+        if (hash) deleteFile(hash);
+        return;
+      }
+    });
+    grid.addEventListener('change', function(e) {
+      // 批量选择 checkbox
+      if (e.target.classList.contains('batch-checkbox')) {
+        var hash = e.target.getAttribute('data-file-hash');
+        if (hash) toggleBatchSelect(hash);
+      }
+    });
 
     // 拖拽上传（支持文件夹）
     grid.addEventListener('dragover', function (e) { e.preventDefault(); e.stopPropagation(); grid.style.border = '2px dashed var(--mi-orange)'; grid.style.background = 'rgba(255,103,0,0.03)'; });

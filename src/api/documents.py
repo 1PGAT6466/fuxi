@@ -87,7 +87,11 @@ async def upload(file: UploadFile = File(...), request: Request = None):
 
 @router.delete("/api/documents/{file_hash}")
 async def delete_document(file_hash: str, request: Request = None):
-    """删除文档 — 按 file_hash 删除 chunks、向量和物理文件"""
+    """删除文档 — 按 file_hash 删除 chunks、向量和物理文件
+    
+    v1.50 R2 安全修复: 添加所有权检查，普通用户只能删除自己上传的文档。
+    管理员可以删除任何文档。
+    """
     from src.db.data_store import load_chunks, save_chunks
     from src.db.vector_store import get_vector_store
     from src.api.response import success, error
@@ -97,6 +101,11 @@ async def delete_document(file_hash: str, request: Request = None):
     _logger = logging.getLogger(__name__)
 
     try:
+        # v1.50 R2: 获取当前用户信息
+        current_user = getattr(request.state, "user", "anonymous") if request else "anonymous"
+        current_role = getattr(request.state, "role", "user") if request else "user"
+        is_admin = current_role == "admin"
+        
         chunks = load_chunks()
         if not chunks:
             raise HTTPException(404, f"无数据，无法删除 {file_hash}")
@@ -108,6 +117,12 @@ async def delete_document(file_hash: str, request: Request = None):
             matching = [c for c in chunks if file_hash in c.get("file_name", "") or file_hash in c.get("file_hash", "")]
         if not matching:
             raise HTTPException(404, f"文档 {file_hash} 未找到")
+        
+        # v1.50 R2: 所有权检查 — 非管理员只能删除自己的文档
+        if not is_admin:
+            doc_owner = matching[0].get("owner_id") or matching[0].get("uploader", "")
+            if doc_owner and doc_owner != current_user and current_user != "anonymous":
+                raise HTTPException(403, "无权删除他人文档")
 
         file_name = matching[0].get("file_name", file_hash)
         kept = [c for c in chunks if c.get("file_hash", "") != file_hash and file_hash not in c.get("file_name", "")]

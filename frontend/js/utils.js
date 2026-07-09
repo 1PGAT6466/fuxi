@@ -3,6 +3,13 @@
  * @module utils
  */
 
+// P3-R2 fix: 安全数值转换，防止 NaN/非数字值导致 toFixed 崩溃
+function safeNum(val, def) {
+  if (def === undefined) def = 0;
+  var n = Number(val);
+  return isNaN(n) || !isFinite(n) ? def : n;
+}
+
 // HTML 转义（防 XSS）
 function esc(s) {
   if (!s) return '';

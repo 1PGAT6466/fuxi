@@ -56,11 +56,16 @@ STATIC_DIR = _project_root / "frontend"
 # ============ 创建 FastAPI 应用 ============
 from fastapi.staticfiles import StaticFiles
 from src.config import VERSION as _VERSION
+
+# v1.50 R2 安全修复: 生产环境禁用 OpenAPI/Swagger 文档
+# 可通过环境变量 FUXI_ENV=development 启用以便于开发调试
+_is_production = os.getenv("FUXI_ENV", "production").lower() == "production"
 app = FastAPI(
     title="伏羲·内世界 — 企业知识认知系统",
     version=_VERSION,
-    docs_url="/docs",
-    redoc_url="/redoc",
+    docs_url=None if _is_production else "/docs",
+    redoc_url=None if _is_production else "/redoc",
+    openapi_url=None if _is_production else "/openapi.json",
     redirect_slashes=False,
 )
 
@@ -296,6 +301,8 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    # v1.50 R2: 移除指纹识别头 (Server: uvicorn → 伪装)
+    response.headers["Server"] = "nginx"
     return response
 
 # ── API 认证中间件 ──
@@ -351,7 +358,9 @@ async def engine_middleware(request: Request, call_next):
     request.state.engine = engine
     request.state.intent_mode = getattr(app.state, "intent_mode", "rule_based")
     response = await call_next(request)
-    response.headers["X-Fuxi-Engine"] = engine
+    # v1.50 R2: 仅开发环境暴露引擎版本
+    if not _is_production:
+        response.headers["X-Fuxi-Engine"] = engine
     return response
 
 # ============ 请求指标中间件 ============
@@ -444,10 +453,10 @@ async def mcp_handler(request: Request):
     server = get_mcp_server()
     return await server.handle_request(body)
 
-@app.get("/api/mcp/tools")
+@app.get("/api/mcp/tools", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def mcp_list_tools():
-    """列出所有MCP工具"""
+    """列出所有MCP工具 — v1.50 R2: 需要管理员权限"""
     server = get_mcp_server()
     return {"tools": [{"name": t.name, "description": t.description} for t in server.tools.values()]}
 
@@ -458,9 +467,9 @@ async def mcp_sag_search(request: Request):
     body = await request.json()
     return await sag_search(body.get("query", ""), body.get("top_k", 10))
 
-@app.post("/api/mcp/sag_ingest")
+@app.post("/api/mcp/sag_ingest", dependencies=[Depends(require_admin)])
 async def mcp_sag_ingest(request: Request):
-    """MCP: 入库文档"""
+    """MCP: 入库文档 — v1.50 R2: 需要管理员权限"""
     from src.taiyin.mcp_tools import sag_ingest
     body = await request.json()
     return await sag_ingest(body.get("file_path", ""), body.get("category", ""))
@@ -539,6 +548,60 @@ _init_mcp_handlers()
 # 向后兼容别名
 MCP_TOOL_HANDLERS = _MCP_TOOL_HANDLERS
 
+# v1.50 R2: MCP 工具权限映射
+# admin_only: 仅管理员可调用
+# user: 任何已认证用户可调用
+# public: 无需认证可调用
+_MCP_TOOL_PERMISSIONS = {
+    "sag_search": "user",
+    "sag_ingest": "admin",
+    "sag_explain": "user",
+    "sag_status": "user",
+    "kb_search": "user",
+    "kb_list_documents": "user",
+    "kb_get_document": "user",
+    "graph_query": "user",
+    "graph_stats": "user",
+    "wiki_search": "user",
+    "wiki_get": "user",
+    "dream_cycle_run": "admin",
+    "dream_cycle_report": "user",
+    "gap_analyze": "user",
+    "entity_expand": "user",
+    "cross_entity_synthesize": "user",
+    "file_upload": "admin",
+    "file_list": "user",
+    "chat_query": "user",
+    "eval_run": "admin",
+    "notifications_list": "user",
+    "feature_flags_list": "user",
+    "health_check": "public",
+    "audit_logs": "admin",
+}
+
+
+def _check_mcp_permission(tool_name: str, request: Request) -> bool:
+    """检查 MCP 工具权限
+    
+    Returns:
+        True 如果有权限，False 如果被拒绝
+    """
+    required = _MCP_TOOL_PERMISSIONS.get(tool_name, "user")
+    if required == "public":
+        return True
+    
+    current_user = getattr(request.state, "user", None)
+    current_role = getattr(request.state, "role", "user")
+    
+    # 未认证用户拒绝所有非 public 工具
+    if not current_user or current_user == "anonymous":
+        return False
+    
+    if required == "admin":
+        return current_role == "admin"
+    
+    return True  # user 级别所有已认证用户可调用
+
 
 @app.post("/api/mcp/call")
 async def mcp_call(request: Request):
@@ -551,6 +614,7 @@ async def mcp_call(request: Request):
       工具执行结果（JSON）
 
     支持所有 24 个 MCP 工具。
+    v1.50 R2: 添加基于角色的工具权限控制。
     """
     import traceback
     body = await request.json()
@@ -559,6 +623,10 @@ async def mcp_call(request: Request):
 
     if not tool_name:
         return {"error": "缺少 tool 参数", "available_tools": list(MCP_TOOL_HANDLERS.keys())}
+    
+    # v1.50 R2: MCP 工具权限检查
+    if not _check_mcp_permission(tool_name, request):
+        return {"error": f"无权调用工具: {tool_name}", "detail": "权限不足"}
 
     handler = _MCP_TOOL_HANDLERS.get(tool_name)
     if handler is None:
@@ -673,7 +741,20 @@ async def index_page():
 
 @app.get("/admin", response_class=HTMLResponse)
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
-async def admin_page():
+async def admin_page(request: Request):
+    """管理页面 — v1.50 R2 安全修复: 需要认证才能访问
+    
+    未登录用户重定向到 /login，非管理员用户返回 403。
+    """
+    # v1.50 R2: 检查认证状态
+    user = getattr(request.state, "user", None)
+    role = getattr(request.state, "role", None)
+    
+    if not user or user == "anonymous":
+        # 未登录：重定向到登录页面
+        from starlette.responses import RedirectResponse
+        return RedirectResponse(url="/login", status_code=302)
+    
     f = STATIC_DIR / "index.html"
     return HTMLResponse(f.read_text(encoding="utf-8") if f.exists() else "<h1>index.html not found</h1>")
 
@@ -813,4 +894,5 @@ if __name__ == "__main__":
         timeout_keep_alive=120,
         h11_max_incomplete_event_size=524288000,
         workers=1,
+        server_header=False,  # v1.50 R2: 隐藏 uvicorn server 头
     )
