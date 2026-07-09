@@ -3,7 +3,7 @@
 # v1.50 R3 Blue Fix: 添加 XSS 输入过滤 + 越权所有权检查
 from fastapi import APIRouter, Query, Request, HTTPException
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 import logging
 import html
 import re
@@ -199,6 +199,10 @@ async def wiki_get_by_id(page_id: str, request: Request = None):
     return await wiki_page(page_id, request)
 
 
+# v1.50 R2 Blue: Wiki 内容大小限制 — 防止超大内容 DoS
+MAX_WIKI_CONTENT_LENGTH = 1 * 1024 * 1024  # 1MB
+MAX_WIKI_TITLE_LENGTH = 200  # 标题最大字符数
+
 class WikiCreateRequest(BaseModel):
     title: str
     content: str
@@ -206,6 +210,23 @@ class WikiCreateRequest(BaseModel):
     tags: list = []
     sources: list = []
     summary: str = ""
+
+    @field_validator("title")
+    @classmethod
+    def validate_title(cls, v: str) -> str:
+        stripped = v.strip()
+        if len(stripped) < 2:
+            raise ValueError("标题至少需要2个字符")
+        if len(stripped) > MAX_WIKI_TITLE_LENGTH:
+            raise ValueError(f"标题长度不能超过{MAX_WIKI_TITLE_LENGTH}个字符")
+        return stripped
+
+    @field_validator("content")
+    @classmethod
+    def validate_content(cls, v: str) -> str:
+        if len(v.encode("utf-8")) > MAX_WIKI_CONTENT_LENGTH:
+            raise ValueError(f"内容大小不能超过{MAX_WIKI_CONTENT_LENGTH // 1024 // 1024}MB")
+        return v
 
 
 @router.post("/api/wiki")
@@ -260,8 +281,15 @@ async def wiki_update(page_id: str, request: Request):
         body = await request.json()
         engine = _get_wiki_engine()
         
-        # v1.50 R3 Blue: 对用户输入进行 XSS 过滤
+        # v1.50 R2 Blue: Wiki 更新内容大小限制
         raw_content = body.get("content")
+        if raw_content and len(raw_content.encode("utf-8")) > MAX_WIKI_CONTENT_LENGTH:
+            return JSONResponse(
+                status_code=400,
+                content={"error": "内容过大", "detail": f"内容大小不能超过{MAX_WIKI_CONTENT_LENGTH // 1024 // 1024}MB"}
+            )
+        
+        # v1.50 R3 Blue: 对用户输入进行 XSS 过滤
         sanitized_content = _sanitize_html(raw_content) if raw_content else None
         raw_summary = body.get("summary")
         sanitized_summary = _sanitize_html(raw_summary) if raw_summary else None

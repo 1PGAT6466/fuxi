@@ -59,6 +59,11 @@ _MAX_LOGIN_ATTEMPTS = 10
 _LOGIN_WINDOW_SEC = 300
 _login_attempts: dict = defaultdict(list)  # 内存缓存，用于快速检查
 
+# v1.50 R2 Blue: 注册频率限制 — 每IP每小时最多3次注册
+_MAX_REGISTER_ATTEMPTS = 3
+_REGISTER_WINDOW_SEC = 3600
+_register_attempts: dict = defaultdict(list)
+
 
 def _get_login_rate_db_path():
     """获取登录限流 SQLite 数据库路径"""
@@ -126,6 +131,22 @@ def _check_login_rate(ip: str) -> bool:
             return False
         attempts.append(now)
         return True
+
+
+def _check_register_rate(ip: str) -> bool:
+    """检查注册频率是否在限制内，返回 True 表示允许
+    
+    限制：每IP每小时最多3次注册。
+    使用内存存储，重启后重置（可接受的行为）。
+    """
+    now = time.time()
+    attempts = _register_attempts[ip]
+    attempts = [t for t in attempts if now - t < _REGISTER_WINDOW_SEC]
+    _register_attempts[ip] = attempts
+    if len(attempts) >= _MAX_REGISTER_ATTEMPTS:
+        return False
+    attempts.append(now)
+    return True
 
 
 def _hash_password(password: str) -> str:
@@ -249,6 +270,11 @@ def register(body: RegisterRequest, request: Request = None):
     try:
         import json, time
         from pathlib import Path
+        
+        # v1.50 R2 Blue: 注册速率限制检查
+        client_ip = request.client.host if request and request.client else "127.0.0.1"
+        if not _check_register_rate(client_ip):
+            raise HTTPException(429, "注册请求过于频繁，请稍后再试（每小时最多3次）")
         
         from src.config import DATA_DIR as CONFIG_DATA_DIR
         users_file = Path(CONFIG_DATA_DIR) / "users.json"

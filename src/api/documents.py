@@ -40,7 +40,10 @@ async def documents(page: int = 1, page_size: int = 50, request: Request = None)
 
 @router.post("/api/upload")
 async def upload(file: UploadFile = File(...), request: Request = None):
-    """文件上传 — v1.50 统一响应格式支持"""
+    """文件上传 — v1.50 统一响应格式支持
+    v1.50 R2 Blue: 路径穿越防护 — 规范化文件名并验证在允许目录内
+    """
+    import os
     from src.shaoyang.pipeline import ShaoyangPipeline
     from src.bagua.intent_bus import IntentBus
     from src.api.response import success, error
@@ -50,7 +53,17 @@ async def upload(file: UploadFile = File(...), request: Request = None):
         from src.config import UPLOAD_DIR as CONFIG_UPLOAD_DIR
         tmp_dir = Path(CONFIG_UPLOAD_DIR)
         tmp_dir.mkdir(parents=True, exist_ok=True)
-        tmp_path = tmp_dir / file.filename
+        
+        # v1.50 R2 Blue: 路径穿越防护
+        # 1. 仅取文件名部分（剥离路径分隔符）
+        safe_name = os.path.basename(file.filename)
+        if not safe_name or safe_name in ('.', '..'):
+            raise HTTPException(400, "无效的文件名")
+        # 2. 规范化路径并验证最终路径在允许目录内
+        tmp_path = (tmp_dir / safe_name).resolve()
+        allowed_base = tmp_dir.resolve()
+        if not str(tmp_path).startswith(str(allowed_base)):
+            raise HTTPException(400, "文件路径非法（路径穿越检测）")
         
         content = await file.read()
         tmp_path.write_bytes(content)
