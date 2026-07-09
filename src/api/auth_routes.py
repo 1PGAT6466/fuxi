@@ -297,10 +297,11 @@ def login(body: LoginRequest, request: Request = None):
                 "username": body.username,
                 "role": user.get("role", "user"),
                 "roles": roles,
+                "tenant_id": user_tenant_id,
                 "display_name": user.get("display_name", body.username)
             }, message="登录成功")
         # 默认旧格式
-        return {"token": token, "username": body.username, "role": user.get("role", "user"), "roles": roles, "display_name": user.get("display_name", body.username)}
+        return {"token": token, "username": body.username, "role": user.get("role", "user"), "roles": roles, "tenant_id": user_tenant_id, "display_name": user.get("display_name", body.username)}
     except HTTPException as e:
         raise
     except Exception as e:  # TODO: Narrow exception type

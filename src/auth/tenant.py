@@ -347,9 +347,25 @@ def reset_tenant_manager() -> None:
     _global_tenant_manager = None
 
 
+def get_current_tenant(request) -> str:
+    """从请求中获取当前租户 ID
+
+    简化的租户获取函数，供路由直接使用。
+    优先级：request.state.tenant_id > JWT payload > X-Tenant-Id header > "default"
+
+    Args:
+        request: FastAPI Request 对象
+
+    Returns:
+        tenant_id 字符串
+    """
+    return TenantManager.get_tenant_from_request(request)
+
+
 __all__ = [
     "Tenant",
     "TenantManager",
     "get_tenant_manager",
     "reset_tenant_manager",
+    "get_current_tenant",
 ]
