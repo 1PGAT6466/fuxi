@@ -86,8 +86,8 @@ async def vector_recall(query: str, n_results: int = 30, category: str = "") -> 
 # ============================================================
 
 
-async def _l_minus_1_qa_match(query: str) -> bool:
-    """L-1: QA对匹配 — 口语化问题桥接，命中时跳过缓存"""
+async def _l_minus_1_qa_match(query: str) -> list:
+    """L-1: QA对匹配 — 口语化问题桥接，返回 source chunks 作为召回结果"""
     try:
         from src.db.memory_store import get_store
         store_inst = get_store()
@@ -100,10 +100,25 @@ async def _l_minus_1_qa_match(query: str) -> bool:
                         logger.info(f"[Retrieval] QA pair match: {len(qa_chunk_ids)} source chunks for '{query[:30]}...'")
                     else:
                         logger.info(f"[Retrieval] QA pair match: {len(qa_chunk_ids)} source chunks, query_len={len(query)}")
-                    return True
+                    # Retrieve actual source chunk content
+                    chunks_map = store_inst.get_chunks_batch(qa_chunk_ids)
+                    qa_chunks = []
+                    for cid in qa_chunk_ids:
+                        chunk = chunks_map.get(cid)
+                        if chunk:
+                            qa_chunks.append({
+                                "file_hash": chunk.get("file_hash", ""),
+                                "text": chunk.get("text", "") or chunk.get("chunk_text", ""),
+                                "file_name": chunk.get("file_name", ""),
+                                "category": chunk.get("category", ""),
+                                "chunk_index": chunk.get("chunk_index", 0),
+                                "score": 20.0,
+                                "_source": "qa_pair",
+                            })
+                    return qa_chunks
     except Exception as e:  # TODO: Narrow exception type
         logger.warning("QA对匹配失败: %s", e, exc_info=True)
-    return False
+    return []
 
 
 async def _l0_cache_check(query: str, category: str, top_k: int, skip_cache: bool) -> list | None:
@@ -160,9 +175,13 @@ async def _l1_2_bm25_search(query: str, rewritten: str, top_k: int,
 
 
 async def _l15_l2_hyde_vector(query: str, top_k: int) -> list:
-    """L1.5+L2: HyDE 扩展 + 向量语义召回"""
+    """L1.5+L2: HyDE 扩展 + 向量语义召回（hyde flag 控制）"""
     async def _hyde_and_vector():
-        hyde_t = await hyde_expand_query(query)
+        from src.services.feature_flags import is_enabled
+        if is_enabled("hyde"):
+            hyde_t = await hyde_expand_query(query)
+        else:
+            hyde_t = ""
         sq = hyde_t if hyde_t else query
         vec_r = await vector_recall(sq, top_k * 2)
         if hyde_t:
@@ -318,8 +337,9 @@ async def hybrid_search(query: str, chunks: list = None, category: str = "",
         检索结果列表，每个结果含 context 和 meta 字段
     """
     # L-1: QA对匹配
-    if not skip_cache:
-        skip_cache = await _l_minus_1_qa_match(query)
+    qa_results = await _l_minus_1_qa_match(query)
+    if qa_results and not skip_cache:
+        skip_cache = True
 
     # L0: 语义缓存
     cached = await _l0_cache_check(query, category, top_k, skip_cache)
@@ -361,6 +381,10 @@ async def hybrid_search(query: str, chunks: list = None, category: str = "",
 
     # L3+L4: RRF 融合 + 精排
     merged = _l3_fusion_and_boost(results, vector_results, query, wiki_hits, table_results, top_k)
+
+    # L-1: Inject QA pair results
+    if qa_results:
+        merged = qa_results + merged
 
     # L5+L6: Rerank + 上下文扩展
     merged = await _l5_l6_postprocess(query, merged, chunks, top_k)
