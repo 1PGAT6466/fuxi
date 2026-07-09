@@ -866,7 +866,6 @@ else:
     
     # 回退到 frontend 根目录，但排除敏感源代码文件
     from starlette.staticfiles import StaticFiles as _StaticFiles
-    from pathlib import Path as _Path
     
     class _SafeStaticFiles(_StaticFiles):
         """安全静态文件服务：阻止访问源代码和配置文件"""

@@ -125,7 +125,7 @@ async def health_check(request: Request):
     try:
         from src.infra.rate_limiter import get_global_rate_limiter
         limiter = get_global_rate_limiter("health_check", max_requests=30, window_sec=60)
-        if not limiter.acquire(client_ip):
+        if not limiter.acquire():
             return error("健康检查请求过于频繁", status_code=429)
     except Exception:
         pass  # 速率限制失败不阻止健康检查
