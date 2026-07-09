@@ -122,6 +122,17 @@ _AUTH_WHITELIST = {
     "/api/v2/status",
     "/",
     "/login",
+    "/login.html",
+    "/favicon.ico",
+    # v1.44 fix: 静态文件路径白名单
+    "/static",
+    "/static/",
+    "/js",
+    "/js/",
+    "/css",
+    "/css/",
+    "/img",
+    "/img/",
     "/favicon.ico",
 }
 
@@ -142,11 +153,17 @@ def _is_whitelisted(path: str) -> bool:
     v1.50 R2 安全修复: 不再对非 /api/ 路径全部放行，
     仅对明确列出的白名单路径放行。防止 /openapi.json、/docs、/redoc 等
     无需认证即可暴露完整 API Schema。
+    
+    v1.44 fix: 增强静态文件白名单检查，支持子路径和文件扩展名
     """
     if path in _AUTH_WHITELIST:
         return True
-    # 静态文件
+    # 静态文件 — v1.44 fix: 增强检查，支持 /static/ 子路径
     if path.startswith("/static/"):
+        return True
+    # v1.44 fix: 支持直接访问静态文件（如 /favicon.ico, /index.html 等）
+    static_exts = {".js", ".css", ".html", ".htm", ".ico", ".png", ".jpg", ".jpeg", ".gif", ".svg", ".woff", ".woff2", ".ttf", ".eot"}
+    if any(path.endswith(ext) for ext in static_exts):
         return True
     # v2.1 R2: 拒绝所有未明确列出的非 API 路径（包括 /admin, /docs, /openapi.json 等）
     return False

@@ -110,3 +110,43 @@ async def kb_documents(request: Request = None):
             status_code=500,
             content={"error": "Internal server error", "detail": str(e)}
         )
+
+
+@router.get("/api/kb/files")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+async def kb_files(request: Request = None):
+    """知识库文件列表 — kb/documents 的别名端点"""
+    return await kb_documents(request)
+
+
+@router.get("/api/kb/stats")
+# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+async def kb_stats(request: Request = None):
+    """知识库统计信息"""
+    try:
+        stats = {"total_chunks": 0, "total_files": 0, "categories": {}}
+        try:
+            from src.db.data_store import load_chunks
+            chunks = load_chunks()
+            if chunks:
+                stats["total_chunks"] = len(chunks)
+                seen_files = set()
+                categories = {}
+                for c in chunks:
+                    fhash = c.get("file_hash", "")
+                    if fhash:
+                        seen_files.add(fhash)
+                    cat = c.get("category", "未分类")
+                    categories[cat] = categories.get(cat, 0) + 1
+                stats["total_files"] = len(seen_files)
+                stats["categories"] = categories
+        except Exception as e:  # TODO: Narrow exception type
+            logger.warning(f"load_chunks 统计失败: {e}")
+
+        return stats
+    except Exception as e:  # TODO: Narrow exception type
+        logger.exception(f"kb_stats 失败: {e}")
+        return JSONResponse(
+            status_code=500,
+            content={"error": "Internal server error", "detail": str(e)}
+        )

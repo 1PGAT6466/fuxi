@@ -75,10 +75,22 @@ _load_sessions_from_db()
 
 
 class ChatRequest(BaseModel):
-    query: str
+    query: str = ""
     history: List[dict] = []
     stream: bool = False
     granularity: Optional[str] = "chunk"  # 任务 4: chunk/event/auto
+
+    # 兼容前端发送 message 字段
+    message: Optional[str] = None
+
+    class Config:
+        # 允许使用额外字段
+        extra = "ignore"
+
+    def model_post_init(self, __context):
+        # 如果前端发送了 message 但没有 query，使用 message 的值
+        if self.message and not self.query:
+            self.query = self.message
 
     @field_validator("history")
     @classmethod
@@ -229,6 +241,19 @@ class ChatSendRequest(BaseModel):
     history: List[dict] = []
     stream: bool = False
     granularity: Optional[str] = "chunk"
+
+    class Config:
+        # 允许使用 camelCase 字段名（前端使用 sessionId）
+        populate_by_name = True
+        alias_generator = None  # 不自动生成别名
+
+    # 手动定义 sessionId 作为 session_id 的别名
+    sessionId: Optional[str] = None
+
+    def model_post_init(self, __context):
+        # 如果前端发送了 sessionId 但没有 session_id，使用 sessionId 的值
+        if self.sessionId is not None and self.session_id is None:
+            self.session_id = self.sessionId
 
     @field_validator("query")
     @classmethod
@@ -404,13 +429,13 @@ async def chat_send(body: ChatSendRequest, request: Request):
                     answer = result.get("answer", "")
                     sources = result.get("sources", [])
 
-                    # 逐字符流式输出
+                    # 逐字符流式输出 (兼容前端 delta/content 两种字段名)
                     for char in answer:
-                        chunk = {"type": "content", "content": char}
+                        chunk = {"type": "content", "delta": char, "content": char}
                         yield f"data: {json.dumps(chunk, ensure_ascii=False)}\n\n"
                         await asyncio_sleep(0.01)
 
-                    # 发送引用
+                    # 发送引用 (兼容前端 references 字段)
                     if sources:
                         ref_chunk = {
                             "type": "references",
@@ -421,8 +446,9 @@ async def chat_send(body: ChatSendRequest, request: Request):
                         }
                         yield f"data: {json.dumps(ref_chunk, ensure_ascii=False)}\n\n"
 
-                    # 完成标记
-                    yield f"data: {json.dumps({'type': 'done'})}\n\n"
+                    # 完成标记 (兼容前端两种格式)
+                    done_chunk = {'type': 'done', 'done': True, 'sources': sources}
+                    yield f"data: {json.dumps(done_chunk, ensure_ascii=False)}\n\n"
 
                     # 保存助手回复
                     if session_id:

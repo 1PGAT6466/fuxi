@@ -213,15 +213,22 @@ async function sendChatSSE(query) {
                 }
               }
 
-              // done 标记: 流结束
-              if (chunk.done) {
+              // done 标记: 流结束 (兼容两种格式)
+              // 格式1: {done: true, sources: [...], trace: {...}}
+              // 格式2: {type: "done"}
+              if (chunk.done || chunk.type === 'done') {
                 sources = chunk.sources || null;
                 trace = chunk.trace || null;
               }
 
-              // 错误帧
+              // 错误帧 (兼容两种格式)
+              // 格式1: {error: "message"}
+              // 格式2: {type: "error", content: "message"}
               if (chunk.error) {
                 throw new Error(chunk.error);
+              }
+              if (chunk.type === 'error') {
+                throw new Error(chunk.content || '未知错误');
               }
 
             } catch (parseErr) {

@@ -302,13 +302,14 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     # v1.50 R2 Blue: 添加 CSP 安全策略
-    # v1.50 R3 Blue: 移除 unsafe-inline，使用 nonce 或 hash 替代
-    # 动态生成 CSP，避免硬编码 IP 地址
+    # v1.50 R4: 兼容前端 inline styles 和外部 CDN (d3.js, chart.js)
+    # 前端 HTML 内有自己的 CSP meta 标签（更严格），
+    # 但 HTTP 头的 CSP 优先级更高，需要包含必要的宽松规则
     csp_policy = (
         "default-src 'self'; "
-        "script-src 'self' 'unsafe-eval'; "  # 移除 unsafe-inline
-        "style-src 'self'; "  # 移除 unsafe-inline
-        "img-src 'self' data: blob:; "
+        "script-src 'self' 'unsafe-eval' 'unsafe-inline' https://d3js.org https://cdn.jsdelivr.net; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: blob: https:; "
         "font-src 'self' data:; "
         "connect-src 'self'; "
         "frame-ancestors 'none'"
@@ -824,6 +825,44 @@ async def login_page():
     f = STATIC_DIR / "login.html"
     content = await asyncio.to_thread(lambda: f.read_text(encoding="utf-8") if f.exists() else "<h1>login.html not found</h1>")
     return HTMLResponse(content)
+
+@app.get("/login.html", response_class=HTMLResponse)
+async def login_html_page():
+    """直接访问 /login.html 时返回登录页"""
+    import asyncio
+    f = STATIC_DIR / "login.html"
+    content = await asyncio.to_thread(lambda: f.read_text(encoding="utf-8") if f.exists() else "<h1>login.html not found</h1>")
+    return HTMLResponse(content)
+
+@app.get("/js/{file_path:path}")
+async def serve_js_file(file_path: str):
+    """直接访问 /js/ 目录下的文件"""
+    from fastapi.responses import FileResponse
+    from fastapi import HTTPException
+    
+    file_path_obj = STATIC_DIR / "js" / file_path
+    if file_path_obj.exists() and file_path_obj.is_file():
+        return FileResponse(
+            path=str(file_path_obj),
+            media_type="application/javascript",
+            filename=file_path_obj.name
+        )
+    raise HTTPException(status_code=404, detail="Not Found")
+
+@app.get("/css/{file_path:path}")
+async def serve_css_file(file_path: str):
+    """直接访问 /css/ 目录下的文件"""
+    from fastapi.responses import FileResponse
+    from fastapi import HTTPException
+    
+    file_path_obj = STATIC_DIR / "css" / file_path
+    if file_path_obj.exists() and file_path_obj.is_file():
+        return FileResponse(
+            path=str(file_path_obj),
+            media_type="text/css",
+            filename=file_path_obj.name
+        )
+    raise HTTPException(status_code=404, detail="Not Found")
 
 @app.get("/", response_class=HTMLResponse)
 async def index_page():
