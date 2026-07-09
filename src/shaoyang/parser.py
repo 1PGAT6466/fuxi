@@ -3,7 +3,7 @@ parser.py — 少阳·文档解析器
 PDF/DOCX/XLSX/TXT/HTML/CSV/PPTX
 """
 import logging
-from typing import Dict, Optional
+from typing import Dict
 from pathlib import Path
 
 logger = logging.getLogger("shaoyang.parser")
@@ -50,7 +50,7 @@ class DocumentParser:
                 return self._parse_xlsx(path)
             elif file_type == "pptx":
                 return self._parse_pptx(path)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error(f"[Parser] 解析失败: {e}")
             return {"error": str(e), "text": ""}
 

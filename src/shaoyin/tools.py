@@ -1,9 +1,7 @@
 """
 tools.py — 少阴·FC工具定义
 """
-import json
 import logging
-from typing import Dict, List, Any
 
 logger = logging.getLogger("shaoyin.tools")
 

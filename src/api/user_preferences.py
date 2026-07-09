@@ -12,11 +12,9 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/user", tags=["用户偏好"])
 
-# 持久化路径
-_PREFS_DIR = os.path.join(
-    os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-    "data", "user_preferences",
-)
+# v1.50 R4: Use config DATA_DIR for consistent path resolution
+from src.config import DATA_DIR as _CFG_DATA_DIR
+_PREFS_DIR = os.path.join(str(_CFG_DATA_DIR), "user_preferences")
 
 
 DEFAULT_PREFERENCES = {
@@ -88,7 +86,7 @@ async def get_user_preferences(request: Request = None):
             from src.api.response import success
             return success(data={"preferences": prefs}, message="用户偏好")
         return {"preferences": prefs}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"get_user_preferences 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -115,7 +113,7 @@ async def update_user_preferences(request: Request):
         logger.info(f"[user_preferences] {username} 更新偏好: {list(body.keys())}")
 
         return {"preferences": current, "ok": True, "message": "偏好已保存"}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"update_user_preferences 失败: {e}")
         return JSONResponse(
             status_code=500,

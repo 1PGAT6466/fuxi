@@ -118,7 +118,7 @@ def _generate_summary(text: str, max_len: int = 200) -> str:
         if jieba:
             import jieba.analyse
             keywords = jieba.analyse.extract_tags(text, topK=5)
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.warning(f"[ingest] suppressed exception", exc_info=True)
         pass
     kw_str = "、".join(keywords[:5]) if keywords else ""
@@ -160,7 +160,7 @@ def _smart_chunk(text: str, size: int = 1200, overlap: int = 100) -> list:
                     tables = extract_tables_from_markdown(chunk)
                     if tables:
                         structured = tables[0]
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 logger.debug("[suppressed] structured = tables[0]")
                 pass
             if structured:
@@ -193,13 +193,13 @@ def _extract_pdf_dual(file_path: str) -> str:
                     text = page.get_text()
                     if text and text.strip():
                         lines.append("[Page %d/%d]\n%s" % (i+1, total, text.strip()))
-                except Exception:
+                except Exception:  # TODO: Narrow exception type
                     logger.warning(f"[ingest] suppressed exception", exc_info=True)
                     pass
             doc.close()
             if lines:
                 return "\n".join(lines)
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             logger.warning(f"[ingest] suppressed exception", exc_info=True)
             pass
     
@@ -217,7 +217,7 @@ def _extract_pdf_dual(file_path: str) -> str:
                     combined = enhance_table_extraction(text, tables)
                     if combined.strip():
                         lines.append(f"[Page {i+1}/{total}]\n{combined.strip()}")
-                except Exception:
+                except Exception:  # TODO: Narrow exception type
                     # 单页失败，回退
                     try:
                         from PyPDF2 import PdfReader
@@ -226,11 +226,11 @@ def _extract_pdf_dual(file_path: str) -> str:
                             txt = reader.pages[i].extract_text() or ""
                             if txt.strip():
                                 lines.append(f"[Page {i+1}/{total}]\n{txt}")
-                    except Exception:
+                    except Exception:  # TODO: Narrow exception type
                         lines.append(f"[Page {i+1}/{total}] skipped")
         if lines:
             return "\n".join(lines)
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.warning(f"[ingest] suppressed exception", exc_info=True)
         pass
     
@@ -244,11 +244,11 @@ def _extract_pdf_dual(file_path: str) -> str:
                 txt = page.extract_text() or ""
                 if txt.strip():
                     lines.append(f"[Page {i+1}/{total}]\n{txt}")
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 lines.append(f"[Page {i+1}/{total}] skipped")
         return "\n".join(lines)
     # DEPRECATED: 未使用，v1.50 标记待删除
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         return f"[PDF 解析失败: {e}]"
     
     return ""
@@ -334,12 +334,12 @@ def _extract_doc(path: Path) -> str:
         )
         if result.returncode == 0 and result.stdout.strip():
             return result.stdout.strip()
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.warning(f"[ingest] suppressed exception", exc_info=True)
     # 路2: 回退到 python-docx
     try:
         return _extract_docx(path)
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("Exception 失败: %s", e, exc_info=True)
         return ""
 
@@ -348,7 +348,7 @@ def _extract_wps(path: Path) -> str:
     """提取 .wps 文件内容（新版 WPS 可能是 docx 格式）"""
     try:
         return _extract_docx(path)
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("Exception 失败: %s", e, exc_info=True)
         return ""
 
@@ -434,13 +434,13 @@ def _extract_ppt_legacy(path: Path) -> str:
             raw = ole.openstream(stream).read()
             try:
                 t = raw.decode("utf-16-le", errors="ignore")
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 continue
             t = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", t)
             t = t.strip()
             if len(t) > 20:
                 texts.append(t)
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
     ole.close()
     result = "\n\n".join(texts)
@@ -455,11 +455,11 @@ def _extract_pptx(path: Path) -> str:
         result = _extract_pptx_modern(path)
         if result:
             return result
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.warning(f"[ingest] suppressed exception", exc_info=True)
     try:
         return _extract_ppt_legacy(path)
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.warning(f"[ingest] suppressed exception", exc_info=True)
     return ""
 
@@ -487,10 +487,10 @@ def _extract_zip(path: Path) -> str:
                     shutil.rmtree(tmp_dir, ignore_errors=True)
                     if inner_text.strip():
                         lines.append(f"[ZIP内: {name}]\n{inner_text[:2000]}")
-                except Exception:
+                except Exception:  # TODO: Narrow exception type
                     lines.append(f"[ZIP内: {name}] 提取失败")
         return "\n\n---\n\n".join(lines[:20])
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         return f"[ZIP提取失败: {e}]"
 
 
@@ -504,7 +504,7 @@ def _extract_generic_fallback(path: Path) -> str:
     try:
         with open(str(path), "rb") as f:
             raw = f.read()
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("Exception 失败: %s", e, exc_info=True)
         return ""
 
@@ -513,7 +513,7 @@ def _extract_generic_fallback(path: Path) -> str:
         text = raw.decode("utf-8")
         if len(text.strip()) > 50:
             return text
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         pass
 
     # 尝试 UTF-16 LE
@@ -522,7 +522,7 @@ def _extract_generic_fallback(path: Path) -> str:
         text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f]", "", text)
         if len(text.strip()) > 100:
             return text
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         pass
 
     # 尝试 latin-1 + 可读行提取
@@ -536,7 +536,7 @@ def _extract_generic_fallback(path: Path) -> str:
                 readable.append(line.strip())
         if len(readable) > 3:
             return "\n".join(readable)
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         pass
 
     return ""
@@ -615,10 +615,10 @@ def _extract_text(file_path: str, ext: str) -> str:
         # 未知格式：尝试 UTF-8 文本读取
         try:
             return path.read_text(encoding="utf-8", errors="replace")
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             return f"[文件: {path.name}] (未知格式)"
 
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         return f"[提取失败: {e}]"
 
     # Phase 2: 通用降级（仅当 Phase 1 未 return 时到达）
@@ -647,12 +647,9 @@ def _extract_text(file_path: str, ext: str) -> str:
 """
 import os
 import re
-import json
-import uuid
 import hashlib
 import logging
-import asyncio
-from typing import List, Dict, Optional
+from typing import List, Dict
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -736,7 +733,7 @@ def chunk_image(file_path: str, ocr_text: str = "") -> List[str]:
         if transcription and len(transcription) > 20:
             logger.info(f"[multimodal] 图片转录成功: {Path(file_path).name} ({len(transcription)}字)")
             return [f"[图片内容] {transcription}"]
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.debug(f"[multimodal] 图片转录跳过: {e}")
     
     # Fallback: OCR 文本
@@ -766,7 +763,7 @@ def _resolve_category(file_name: str, text: str, category: str) -> str:
             _cat = _match_cat(text[:5000], file_ext=ext, file_name=file_name)
             if _cat:
                 category = _cat
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             logger.debug("[suppressed] category = _cat")
     # 防御性校验：category 不能是 Python repr() 格式
     if category and ("[{" in category or "': " in category):
@@ -923,19 +920,19 @@ async def ingest_document(
     # Phase 2: 写入向量库
     try:
         result["chunks_added"] = await _store_to_vector(chunks, file_hash, embed_fn, vector_store)
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         result["errors"].append(f"vector_store: {str(e)}")
 
     # Phase 2: 写入 BM25 索引
     try:
         _store_to_memory(chunks, memory_store)
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         result["errors"].append(f"memory_store: {str(e)}")
 
     # Phase 2: 写入表格独立索引
     try:
         result["tables_indexed"] = await _index_tables(chunks, tables, table_store)
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         result["errors"].append(f"table_store: {str(e)}")
 
     return result
@@ -972,7 +969,7 @@ async def ingest_directory(
                 total["files_processed"] += 1
                 if result.get("errors"):
                     total["errors"].extend(result["errors"])
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 total["errors"].append(f"{fpath}: {str(e)}")
     
     return total

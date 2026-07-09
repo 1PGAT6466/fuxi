@@ -14,12 +14,11 @@ synthesis.py — 跨实体合成 API
   - src.taiyang.retrieval / src.services.retrieval
 """
 
-from __future__ import annotations
 
 import logging
 from typing import Any, Dict, List, Optional
 
-from fastapi import APIRouter, Query, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
@@ -216,7 +215,7 @@ async def cross_entity_synthesize(body: CrossEntityRequest, request: Request = N
             "error": "参数错误",
             "detail": str(e),
         })
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception("跨实体合成失败: %s", e)
         return JSONResponse(status_code=500, content={
             "error": "内部服务错误",
@@ -239,7 +238,7 @@ async def synthesis_health(request: Request = None):
             "module": "synthesis",
             "stats": syn.get_stats(),
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         return JSONResponse(status_code=503, content={
             "status": "unavailable",
             "error": str(e),

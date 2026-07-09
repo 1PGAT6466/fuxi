@@ -8,11 +8,9 @@ v2 升级:
   - 结果标记 result_type: "table" 供前端特殊渲染
   - LLM 修复兜底：表格质量差时调 LLM 纠正
 """
-import asyncio
 import re
 import logging
-import json
-from typing import List, Dict, Optional
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -118,7 +116,7 @@ async def _llm_fix_table(bad_table: str, context: str = "") -> Optional[str]:
         result = call_ai_raw(prompt)
         if result and '|' in result:
             return result.strip()
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"[TableView] LLM fix failed: {e}")
     return None
 
@@ -128,8 +126,9 @@ def get_table_store():
     import chromadb
     from chromadb.config import Settings as ChromaSettings
     import os
+    from src.data_service import get_chroma_dir
     
-    persist_dir = os.path.join(os.getenv("KB_CHROMA_DIR", "data/chromadb"))
+    persist_dir = get_chroma_dir()
     client = chromadb.PersistentClient(
         path=persist_dir,
         settings=ChromaSettings(anonymized_telemetry=False),
@@ -194,7 +193,7 @@ async def index_tables_from_chunks(chunks: list, clear_first: bool = True) -> Di
                 if existing and existing.get("ids"):
                     collection.delete(ids=existing["ids"])
                     logger.info(f"[TableView] Cleared {len(existing['ids'])} old table vectors")
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
 
                 logger.warning(f"[{module}] suppressed exception", exc_info=True)
         # 3. 批量向量化
@@ -218,7 +217,7 @@ async def index_tables_from_chunks(chunks: list, clear_first: bool = True) -> Di
         logger.info(f"[TableView] ✅ Indexed {len(table_entries)} tables")
         return {"tables_indexed": len(table_entries), "collection": TABLE_COLLECTION}
     
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[TableView] Index failed: {e}")
         return {"tables_indexed": 0, "errors": [str(e)]}
 
@@ -272,7 +271,7 @@ async def table_view_search(query: str, top_k: int = 10) -> list:
         hits.sort(key=lambda x: x["score"], reverse=True)
         return hits[:top_k]
     
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"[TableView] search failed: {e}")
         return []
 
@@ -284,7 +283,7 @@ async def table_view_recall(query: str, chunks: list = None, top_k: int = 10) ->
         results = await table_view_search(query, top_k)
         if results:
             return results
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
 
         logger.warning(f"[{module}] suppressed exception", exc_info=True)
     # 回退：实时提取（兼容旧逻辑）
@@ -328,7 +327,7 @@ async def table_view_recall(query: str, chunks: list = None, top_k: int = 10) ->
         
         scored.sort(key=lambda x: x["score"], reverse=True)
         return scored[:top_k]
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"[TableView] fallback recall failed: {e}")
         return []
 

@@ -1,6 +1,8 @@
 // ===== 对话 =====
 var chatHistory = [];
 var _webSearchEnabled = false;
+var _currentAbortController = null;   // SSE 流式中止控制器
+var _streamSpeed = 30;                // 打字机速度 (ms/字)，可调
 
 function toggleWebSearch() {
   _webSearchEnabled = !_webSearchEnabled;
@@ -13,13 +15,21 @@ function quickChat(text) {
   sendChat();
 }
 
-// P3-6 fix: 高度逻辑已由 init-app.js (addEventListener) 统一处理
-// 保留此函数供外部兼容性调用
-function autoResizeChat(el) {
-  el.style.height = '22px';
-  el.style.height = Math.min(el.scrollHeight, 120) + 'px';
+/**
+ * 停止当前正在进行的 SSE 流式响应
+ */
+function stopStreaming() {
+  if (_currentAbortController) {
+    _currentAbortController.abort();
+    _currentAbortController = null;
+  }
 }
 
+/**
+ * 发送对话消息 — SSE 流式版本
+ * 后端 POST /api/chat/send 返回 SSE 格式（Content-Type: text/event-stream）
+ * 数据帧格式: data: {"delta":"文本片段","done":false}
+ */
 async function sendChat(forceWeb) {
   var input = document.getElementById('chatInput');
   var q = input.value.trim();
@@ -32,34 +42,287 @@ async function sendChat(forceWeb) {
   var prefix = useWeb ? '🌐 ' : '';
   appendMsg('user', prefix + q);
   chatHistory.push({ role: 'user', content: q });
-  var lid = appendMsg('loading', '');
 
-  // P1-5: 非流式模式增加超时提示
-  var progressTimer = setTimeout(function() {
-    var el = document.getElementById(lid);
-    if (el) {
-      var bubble = el.querySelector('.msg-bubble');
-      if (bubble) bubble.innerHTML = '<div class="typing-indicator"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div><div style="font-size:11px;color:var(--text3);margin-top:6px">正在思考，请耐心等待...</div>';
+  // Web 搜索走非流式分支
+  if (useWeb) {
+    var lid = appendMsg('loading', '');
+    var progressTimer = setTimeout(function() {
+      var el = document.getElementById(lid);
+      if (el) {
+        var bubble = el.querySelector('.msg-bubble');
+        if (bubble) bubble.innerHTML = '<div class="typing-indicator"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div><div style="font-size:11px;color:var(--text3);margin-top:6px">正在搜索，请耐心等待...</div>';
+      }
+    }, 3000);
+    try {
+      var d = await api('/api/antenna/search', { method: 'POST', body: { query: q }, timeout: 30000 });
+      clearTimeout(progressTimer);
+      removeMsg(lid);
+      var answer = d.answer || '未能生成回答';
+      appendMsg('ai', answer, d.sources, d.trace);
+      chatHistory.push({ role: 'assistant', content: answer });
+    } catch (e) {
+      clearTimeout(progressTimer);
+      removeMsg(lid);
+      var errMsg = e.message;
+      if (e.message.indexOf('超时') >= 0) errMsg = '请求超时，请稍后重试';
+      else if (errMsg.indexOf('Not logged') >= 0) errMsg = '登录已过期，请重新登录';
+      appendMsg('error', '请求失败: ' + errMsg);
     }
-  }, 3000);
+    return;
+  }
+
+  // ===== SSE 流式模式 =====
+  await sendChatSSE(q);
+}
+
+/**
+ * SSE 流式对话核心
+ */
+async function sendChatSSE(query) {
+  var loadingId = appendMsg('loading-stream', '');
+  var answerId = null;
+  var answerText = '';
+  var sources = null;
+  var trace = null;
+  var abortController = new AbortController();
+  _currentAbortController = abortController;
+
+  // 流式进度计时器：2s 后显示"生成中..."
+  var progressEl = null;
+  var progressTimer = setTimeout(function() {
+    var el = document.getElementById(loadingId);
+    if (el) {
+      progressEl = el.querySelector('.stream-progress');
+      if (progressEl) progressEl.style.display = 'block';
+    }
+  }, 2000);
+
+  var token = getToken ? getToken() : '';
+  var fetchTimeoutMs = 60000; // SSE 流式超时 60 秒
 
   try {
-    var apiPath = useWeb ? '/api/antenna/search' : '/api/chat';
-    var body = useWeb ? { query: q } : { query: q, history: chatHistory.slice(-6), stream: false };
-    var d = await api(apiPath, { method: 'POST', body: body, timeout: 30000 });
+    var resp = await __fetchWithTimeout('/api/chat/send', {
+      method: 'POST',
+      headers: Object.assign(
+        { 'Content-Type': 'application/json', 'Accept': 'text/event-stream' },
+        token ? { 'Authorization': 'Bearer ' + token } : {}
+      ),
+      body: JSON.stringify({ query: query, history: chatHistory.slice(-6), stream: true }),
+      signal: abortController.signal
+    }, fetchTimeoutMs);
+
+    // HTTP 状态码检查
+    if (resp.status === 401) {
+      if (typeof clearAuth === 'function') clearAuth();
+      if (typeof showLogin === 'function') showLogin();
+      throw new Error('Not logged in');
+    }
+    if (resp.status === 403) throw new Error('Forbidden');
+    if (resp.status === 429) throw new Error('请求过于频繁，请稍后重试');
+    if (resp.status >= 500) throw new Error('服务器错误 (' + resp.status + ')，请稍后重试');
+    if (!resp.ok) throw new Error('请求失败: HTTP ' + resp.status);
+
+    // 检查 Content-Type 是否为 SSE
+    var contentType = resp.headers.get('Content-Type') || '';
+    if (contentType.indexOf('text/event-stream') < 0 && contentType.indexOf('application/json') < 0) {
+      // 非预期的响应类型
+      var rawText = await resp.text();
+      if (rawText.trim().startsWith('{')) {
+        try {
+          var jsonData = JSON.parse(rawText);
+          if (jsonData && jsonData.status === 'error') {
+            throw new Error(jsonData.message || '请求失败');
+          }
+          // 非流式 JSON 兜底
+          answerText = jsonData.answer || jsonData.data.answer || '未能生成回答';
+          sources = jsonData.sources || (jsonData.data && jsonData.data.sources);
+          trace = jsonData.trace || (jsonData.data && jsonData.data.trace);
+        } catch (parseErr) {
+          throw new Error('响应格式异常');
+        }
+      } else {
+        throw new Error('响应格式异常: ' + contentType);
+      }
+    }
+
+    // 如果还没从 JSON 兜底拿到结果，走 SSE 流式解析
+    if (!answerText) {
+      var reader = resp.body.getReader();
+      var decoder = new TextDecoder('utf-8');
+      var buffer = '';
+      var lastRenderTime = 0;
+      var RENDER_INTERVAL = 50; // 每 50ms 最多渲染一次
+
+      while (true) {
+        var result = await reader.read();
+        if (result.done) break;
+
+        // decode 流数据（stream: true 避免截断多字节 UTF-8）
+        buffer += decoder.decode(result.value, { stream: true });
+
+        // 按行解析 SSE 帧
+        var lines = buffer.split('\n');
+        // 最后一行可能不完整，保留到下次
+        buffer = lines.pop();
+
+        for (var i = 0; i < lines.length; i++) {
+          var line = lines[i].trim();
+          if (!line) continue;
+
+          // SSE data 帧: "data: {...}"
+          if (line.indexOf('data:') === 0) {
+            var jsonStr = line.substring(5).trim();
+            if (!jsonStr) continue;
+
+            // 特殊标记: [DONE] (OpenAI 兼容)
+            if (jsonStr === '[DONE]') continue;
+
+            try {
+              var chunk = JSON.parse(jsonStr);
+
+              // 提取 delta 文本
+              var delta = chunk.delta || chunk.content || '';
+              if (delta) {
+                answerText += delta;
+
+                // 首次收到文本时，将 loading 替换为 ai 消息
+                if (!answerId) {
+                  removeMsg(loadingId);
+                  clearTimeout(progressTimer);
+                  answerId = appendMsg('ai-stream', answerText, null, null);
+                  var answerEl = document.getElementById(answerId);
+                  if (answerEl) {
+                    answerEl.querySelector('.msg-bubble').classList.add('streaming');
+                  }
+                } else {
+                  // 节流更新渲染
+                  var now = Date.now();
+                  if (now - lastRenderTime >= RENDER_INTERVAL) {
+                    updateStreamingBubble(answerId, answerText);
+                    lastRenderTime = now;
+                  }
+                }
+              }
+
+              // done 标记: 流结束
+              if (chunk.done) {
+                sources = chunk.sources || null;
+                trace = chunk.trace || null;
+              }
+
+              // 错误帧
+              if (chunk.error) {
+                throw new Error(chunk.error);
+              }
+
+            } catch (parseErr) {
+              if (parseErr.message && parseErr.message !== 'Unexpected end of JSON input') {
+                throw parseErr;
+              }
+              // JSON 不完整，放回 buffer
+              buffer = line + '\n' + buffer;
+              break;
+            }
+          }
+        }
+      }
+
+      // flush 剩余 buffer（最后一段可能不完整的 JSON）
+      var remainder = decoder.decode();
+      if (remainder) buffer += remainder;
+    }
+
+    // 清理
     clearTimeout(progressTimer);
-    removeMsg(lid);
-    var answer = d.answer || '未能生成回答';
-    appendMsg('ai', answer, d.sources, d.trace);
-    chatHistory.push({ role: 'assistant', content: answer });
+    _currentAbortController = null;
+
+    // 最终渲染
+    if (!answerText) answerText = '未能生成回答';
+    if (answerId) {
+      updateStreamingBubble(answerId, answerText, true);
+      // 替换为完整的 ai 消息（带 sources/trace）
+      removeMsg(answerId);
+      appendMsg('ai', answerText, sources, trace);
+    } else {
+      // 无流式输出，直接用 appendMsg
+      removeMsg(loadingId);
+      appendMsg('ai', answerText, sources, trace);
+    }
+    chatHistory.push({ role: 'assistant', content: answerText });
+
   } catch (e) {
     clearTimeout(progressTimer);
-    removeMsg(lid);
-    var errMsg = e.message;
-    if (e.message.indexOf('超时') >= 0) errMsg = '请求超时，请稍后重试';
-    else if (errMsg.indexOf('Not logged') >= 0) errMsg = '登录已过期，请重新登录';
+    _currentAbortController = null;
+
+    // 用户主动中止不显示错误
+    if (e.name === 'AbortError') {
+      removeMsg(loadingId);
+      if (answerId) {
+        updateStreamingBubble(answerId, answerText, true);
+        // 保留已生成的内容
+        if (answerText) {
+          removeMsg(answerId);
+          appendMsg('ai', answerText + '\n\n*[已中止]*', null, null);
+          chatHistory.push({ role: 'assistant', content: answerText });
+        }
+      }
+      return;
+    }
+
+    // 错误处理
+    removeMsg(loadingId);
+    if (answerId) removeMsg(answerId);
+
+    var errMsg = e.message || '未知错误';
+    if (errMsg.indexOf('超时') >= 0) {
+      errMsg = '⏱️ 请求超时，AI 响应时间较长，请稍后重试';
+    } else if (errMsg.indexOf('Not logged') >= 0) {
+      errMsg = '🔒 登录已过期，请重新登录';
+    } else if (errMsg.indexOf('Forbidden') >= 0) {
+      errMsg = '🚫 没有权限访问该资源';
+    } else if (errMsg.indexOf('频繁') >= 0) {
+      errMsg = '⏳ 请求过于频繁，请稍后重试';
+    } else if (errMsg.indexOf('网络') >= 0 || errMsg.indexOf('fetch') >= 0 || errMsg.indexOf('Network') >= 0) {
+      errMsg = '🌐 网络连接失败，请检查网络后重试';
+    } else if (errMsg.indexOf('JSON') >= 0 || errMsg.indexOf('格式异常') >= 0) {
+      errMsg = '📡 服务器响应格式异常，请联系管理员';
+    } else {
+      errMsg = '❌ ' + errMsg;
+    }
     appendMsg('error', '请求失败: ' + errMsg);
   }
+}
+
+/**
+ * 更新流式消息气泡内容
+ * @param {string} msgId - 消息 DOM ID
+ * @param {string} text  - 累积文本
+ * @param {boolean} done - 是否完成（去除 streaming class）
+ */
+function updateStreamingBubble(msgId, text, done) {
+  var el = document.getElementById(msgId);
+  if (!el) return;
+  var bubble = el.querySelector('.msg-bubble');
+  if (!bubble) return;
+
+  if (typeof marked !== 'undefined' && typeof DOMPurify !== 'undefined') {
+    // 流式过程中用纯文本渲染（避免 Markdown 不完整导致格式错乱）
+    if (!done) {
+      bubble.innerHTML = esc(text);
+    } else {
+      var rendered = marked.parse(text);
+      if (typeof DOMPurify !== 'undefined') rendered = DOMPurify.sanitize(rendered);
+      bubble.innerHTML = rendered;
+      bubble.classList.remove('streaming');
+    }
+  } else {
+    bubble.textContent = text;
+    if (done) bubble.classList.remove('streaming');
+  }
+
+  // 滚动到底部
+  var c = document.getElementById('chatMsgs');
+  if (c) c.scrollTop = c.scrollHeight;
 }
 
 function appendMsg(role, content, sources, trace) {
@@ -71,7 +334,17 @@ function appendMsg(role, content, sources, trace) {
   if (role === 'user') {
     div.innerHTML = '<div class="msg-avatar">U</div><div class="msg-bubble">' + esc(content) + '</div>';
   } else if (role === 'loading') {
+    // 兼容旧的非流式 loading
     div.innerHTML = '<div class="msg-avatar">AI</div><div class="msg-bubble"><div class="typing-indicator"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div></div>';
+  } else if (role === 'loading-stream') {
+    // SSE 流式加载态：带动画点 + 进度文字
+    div.innerHTML = '<div class="msg-avatar">AI</div><div class="msg-bubble">' +
+      '<div class="typing-indicator"><span class="typing-dot"></span><span class="typing-dot"></span><span class="typing-dot"></span></div>' +
+      '<div class="stream-progress" style="display:none;font-size:11px;color:var(--text3);margin-top:6px">AI 正在生成回复…</div>' +
+      '</div>';
+  } else if (role === 'ai-stream') {
+    // SSE 流式输出态：占位，内容由 updateStreamingBubble 逐字更新
+    div.innerHTML = '<div class="msg-avatar">AI</div><div class="msg-bubble streaming">' + esc(content || '') + '<span class="stream-cursor">▍</span></div>';
   } else if (role === 'error') {
     div.innerHTML = '<div class="msg-avatar">!</div><div class="msg-bubble" style="color:var(--error)">' + esc(content) + '</div>';
   } else {

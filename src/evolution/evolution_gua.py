@@ -32,7 +32,6 @@ Usage::
     gua.stop()
 """
 
-from __future__ import annotations
 
 import asyncio
 import logging
@@ -41,14 +40,11 @@ from typing import Any, Dict, List, Optional
 
 from src.bagua.base_gua import (
     GuaBase,
-    CircuitState,
-    HealthLevel,
     DegradationRule,
     FallbackAction,
 )
 from src.bagua.intent_bus import (
     IntentBus,
-    get_intent_bus,
 )
 
 logger = logging.getLogger("evolution.gua")
@@ -238,7 +234,7 @@ class EvolutionGua(GuaBase):
                 user_id, query[:40], result.get("dedup"), result.get("learn_triggered"),
             )
             return result
-        except Exception as exc:
+        except Exception as exc:  # TODO: Narrow exception type
             logger.error("⊙ [中宫] 反馈记录异常: %s", exc, exc_info=True)
             return {"ok": False, "error": str(exc)}
 
@@ -267,7 +263,7 @@ class EvolutionGua(GuaBase):
                 result.get("processed", 0), result.get("terms_updated", 0),
             )
             return result
-        except Exception as exc:
+        except Exception as exc:  # TODO: Narrow exception type
             logger.error("⊙ [中宫] 学习异常: %s", exc, exc_info=True)
             return {"ok": False, "error": str(exc)}
 
@@ -317,7 +313,7 @@ class EvolutionGua(GuaBase):
                 "edges_added": evolve_result.get("edges_added", 0),
                 "entities_discovered": entities_discovered,
             }
-        except Exception as exc:
+        except Exception as exc:  # TODO: Narrow exception type
             logger.error("⊙ [中宫] 知识进化异常: %s", exc, exc_info=True)
             return {"ok": False, "error": str(exc)}
 
@@ -350,7 +346,7 @@ class EvolutionGua(GuaBase):
                     "⊙ [中宫] 生命周期事件已记录: type=%s",
                     event_type,
                 )
-            except Exception as exc:
+            except Exception as exc:  # TODO: Narrow exception type
                 logger.error("⊙ [中宫] 生命周期记录异常: %s", exc, exc_info=True)
 
         # 检查触发条件
@@ -369,7 +365,7 @@ class EvolutionGua(GuaBase):
                         "⊙ [中宫] 生命周期触发: %d 种事件类型",
                         len(triggers),
                     )
-            except Exception as exc:
+            except Exception as exc:  # TODO: Narrow exception type
                 logger.error("⊙ [中宫] 生命周期检查异常: %s", exc, exc_info=True)
 
         return {
@@ -466,7 +462,6 @@ class EvolutionGua(GuaBase):
     def _is_feedback_available(self) -> bool:
         """检查反馈闭环是否可用"""
         try:
-            from src.services.feedback_store import log_feedback_unified
             return True
         except ImportError:
             return False
@@ -474,7 +469,6 @@ class EvolutionGua(GuaBase):
     def _is_learner_available(self) -> bool:
         """检查学习者是否可用"""
         try:
-            from src.services.learner import load_term_weights
             return True
         except ImportError:
             return False
@@ -482,7 +476,6 @@ class EvolutionGua(GuaBase):
     def _is_evolver_available(self) -> bool:
         """检查进化器是否可用"""
         try:
-            from src.services.evolver import evolve_graph
             return True
         except ImportError:
             return False
@@ -490,7 +483,6 @@ class EvolutionGua(GuaBase):
     def _is_lifecycle_available(self) -> bool:
         """检查生命周期管理器是否可用"""
         try:
-            from src.services.knowledge_lifecycle import get_knowledge_lifecycle
             return True
         except ImportError:
             return False

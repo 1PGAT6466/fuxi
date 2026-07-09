@@ -28,9 +28,7 @@ auto_graph.py — 自组网知识图谱构建器
   GBrain: garrytan/gbrain — Self-Wiring KG, P@5 49.1% / R@5 97.9%
 """
 
-from __future__ import annotations
 
-import hashlib
 import logging
 import re
 import time

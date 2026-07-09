@@ -9,7 +9,7 @@ WebSocket 端点: ws://host/api/feature-flags/ws
 import asyncio
 import json
 import logging
-from typing import List, Set
+from typing import Set
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from starlette.websockets import WebSocketState
@@ -28,7 +28,7 @@ async def _safe_send(ws: WebSocket, data: dict):
     try:
         if ws.client_state == WebSocketState.CONNECTED:
             await ws.send_json(data)
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         pass
 
 
@@ -53,7 +53,7 @@ async def broadcast_flag_change(flag_name: str, old_value: bool, new_value: bool
         for ws in _active_connections:
             try:
                 await _safe_send(ws, event)
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.debug(f"[FF-WS] 发送失败，标记失活: {e}")
                 dead_connections.append(ws)
 
@@ -97,7 +97,7 @@ async def feature_flags_websocket(websocket: WebSocket):
                 pass
     except WebSocketDisconnect:
         logger.info("[FF-WS] 客户端断开连接")
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"[FF-WS] 连接异常: {e}")
     finally:
         async with _connections_lock:

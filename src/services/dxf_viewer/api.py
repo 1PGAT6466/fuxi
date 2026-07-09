@@ -144,7 +144,7 @@ async def upload_dxf(file: UploadFile = File(...)):
     except ValueError as e:
         temp_path.unlink(missing_ok=True)
         raise HTTPException(400, f"Invalid DXF file: {e}")
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         temp_path.unlink(missing_ok=True)
         logger.error(f"Upload failed: {e}")
         raise HTTPException(500, f"Upload processing failed: {e}")

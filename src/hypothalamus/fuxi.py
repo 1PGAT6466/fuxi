@@ -5,7 +5,6 @@ hypothalamus/fuxi.py — 伏羲生命体启动器 v2.1
 v2.1: 器官层已归档，仅保留四象 + 八卦模块。
 """
 
-import asyncio
 import logging
 from typing import Dict, Optional
 

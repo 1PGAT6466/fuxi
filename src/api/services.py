@@ -4,10 +4,9 @@ services.py — 伏羲 v2.1 /api/services 聚合端点
 GET /api/services — 返回所有已注册服务的清单（JSON 数组），含健康检查。
 """
 import logging
-from typing import List, Optional
+from typing import List
 
 from fastapi import APIRouter, Request, Depends
-from fastapi.responses import JSONResponse
 
 from src.api.response import success, error
 from src.api.auth import require_admin  # v1.50 R2: 内部端点需要认证
@@ -267,7 +266,7 @@ async def list_services(request: Request):
             "total": len(services),
             "auto_discovered_routes": len(discovered),
         })
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[Services] 获取服务清单失败: {e}", exc_info=True)
         return error("获取服务清单失败", status_code=500, detail=str(e))
 

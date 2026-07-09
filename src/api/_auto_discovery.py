@@ -40,7 +40,6 @@ import importlib
 import inspect
 import logging
 import os
-import pkgutil
 from pathlib import Path
 from typing import Dict, List, Optional
 
@@ -127,7 +126,7 @@ def discover_routers(api_dir: Optional[Path] = None) -> Dict[str, APIRouter]:
         module_path = f"src.api.{entry[:-3]}"
         try:
             module = importlib.import_module(module_path)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[AutoDiscovery] 跳过 {entry}（导入失败）: {e}")
             continue
 
@@ -171,7 +170,7 @@ def auto_discover_routers(app: FastAPI, api_dir: Optional[Path] = None) -> int:
         try:
             app.include_router(router, prefix="")  # all routes use absolute paths
             registered += 1
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error(
                 f"[AutoDiscovery] 注册失败 {source_file}::{var_name} (prefix={prefix}): {e}"
             )

@@ -2,8 +2,6 @@
 chunker_quality.py — Phase 1.5: 分块质量校验 + 补充3 文档版本管理
 """
 import re, hashlib, logging
-from pathlib import Path
-from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +52,7 @@ def check_duplicate(content_hash: str, file_name: str) -> dict:
         logger.info(f"[Ingest] Updating existing file: {file_name}")
         try:
             store.invalidate_by_name(file_name)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Ingest] Failed to invalidate old chunks: {e}")
         return {'action': 'update', 'reason': f'同名文件更新，已清理 {len(existing)} 个旧 chunks'}
     

@@ -85,38 +85,15 @@ export async function login(
 }
 
 /**
- * 刷新 token
+ * 刷新 token（统一入口 — 委托给 TokenManager）
  * @returns 新的 token 字符串
  */
 export async function refreshToken(): Promise<string> {
-  const currentToken = TokenManager.getToken();
-
-  const response = await fetch('/api/auth/refresh', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: currentToken ? `Bearer ${currentToken}` : '',
-    },
-  });
-
-  if (!response.ok) {
+  const newToken = await TokenManager.refreshToken();
+  if (!newToken) {
     throw new Error('Token 刷新失败，请重新登录');
   }
-
-  const data = await response.json();
-
-  // 后端返回 {token} 或 {code, data: {token}}
-  if (data.token) {
-    return data.token;
-  }
-  if (data.code !== undefined && data.code !== 0 && data.code !== 200) {
-    throw new Error(data.message || 'Token 刷新失败');
-  }
-  if (data.data?.token) {
-    return data.data.token;
-  }
-
-  throw new Error('Token 刷新失败：响应格式异常');
+  return newToken;
 }
 
 /**

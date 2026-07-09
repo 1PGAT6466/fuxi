@@ -1,6 +1,6 @@
 # 兼容层 - 文件查看/下载路由
 from fastapi import APIRouter, HTTPException, Request
-from fastapi.responses import FileResponse, StreamingResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse
 from pathlib import Path
 import os
 import logging
@@ -38,7 +38,7 @@ def view_document(file_hash: str, request: Request):
                         computed_hash = hashlib.sha256(content).hexdigest()[:16]
                         if computed_hash == file_hash[:16] or file_hash in str(fpath):
                             return FileResponse(str(fpath))
-                    except Exception as e:
+                    except Exception as e:  # TODO: Narrow exception type
                         logger.warning("文件哈希计算失败: %s", e, exc_info=True)
         # Fallback: check kb-images
         if KB_IMAGES_DIR.exists():
@@ -51,7 +51,7 @@ def view_document(file_hash: str, request: Request):
         raise HTTPException(404, detail="文档未找到")
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"view_document 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -82,12 +82,12 @@ def download_document(file_hash: str, request: Request):
                                 filename=fname,
                                 media_type="application/octet-stream"
                             )
-                    except Exception as e:
+                    except Exception as e:  # TODO: Narrow exception type
                         logger.warning("文件下载哈希计算失败: %s", e, exc_info=True)
         raise HTTPException(404, detail="文档未找到")
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"download_document 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -130,7 +130,7 @@ async def antenna_search(request: Request, q: str = ""):
             message = f"找到 {len(results)} 条相关结果"
     except (ImportError, ModuleNotFoundError) as e:
         logger.warning(f"知识库检索不可用: {e}")
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"知识库检索失败: {e}")
 
     # 2) 如果本地无结果，尝试联网搜索（如果配置了 Brave API）
@@ -165,7 +165,7 @@ async def antenna_search(request: Request, q: str = ""):
                     message = f"联网搜索找到 {len(results)} 条结果"
         except ImportError:
             logger.debug("urllib 不可用，跳过联网搜索")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"联网搜索失败: {e}")
 
     if not results:

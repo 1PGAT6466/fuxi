@@ -3,7 +3,7 @@ output_aligner.py — 输出格式对齐器
 装载机和kb-server输出格式统一
 """
 import logging
-from typing import Dict, List
+from typing import Dict
 
 logger = logging.getLogger("services.output_aligner")
 

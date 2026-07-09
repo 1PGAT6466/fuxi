@@ -7,15 +7,16 @@ import hashlib
 import logging
 import time
 from pathlib import Path
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict
 from dataclasses import dataclass, field
 
 from src.models.chunk import Chunk, ChunkType
 from src.models.event import Event
 from src.models.entity import Entity
 from src.pipeline.errors import (
-    PipelineError, ParseError, CleanError, ChunkError,
-    EmbedError, SaveError, ExtractError
+    ParseError,
+    CleanError,
+    SaveError,
 )
 
 logger = logging.getLogger("pipeline")
@@ -72,7 +73,7 @@ class UnifiedParser:
                 return self._parse_text(file_path)
         except ParseError:
             raise
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise ParseError(f"解析失败 ({ext}): {e}")
 
     def _parse_pdf(self, file_path: str) -> Dict:
@@ -91,7 +92,7 @@ class UnifiedParser:
             doc.close()
             if text.strip():
                 return {"text": text, "tables": tables, "metadata": {"parser": "fitz"}}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("Exception 失败: %s", e, exc_info=True)
 
         # 方式2: pdfplumber — 表格提取
@@ -110,7 +111,7 @@ class UnifiedParser:
                 text = "\n".join(pages_text)
                 if text.strip():
                     return {"text": text, "tables": tables, "metadata": {"parser": "pdfplumber"}}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("Exception 失败: %s", e, exc_info=True)
 
         # 方式3: PyPDF2 — 兜底
@@ -124,7 +125,7 @@ class UnifiedParser:
                     pages_text.append(page_text)
             text = "\n".join(pages_text)
             return {"text": text, "tables": tables, "metadata": {"parser": "PyPDF2"}}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise ParseError(f"PDF解析失败: {e}")
 
     def _parse_docx(self, file_path: str) -> Dict:
@@ -139,7 +140,7 @@ class UnifiedParser:
                 rows = [[cell.text for cell in row.cells] for row in table.rows[1:]] if len(table.rows) > 1 else []
                 tables.append({"headers": headers, "rows": rows})
             return {"text": "\n".join(paragraphs), "tables": tables, "metadata": {"parser": "python-docx"}}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise ParseError(f"DOCX解析失败: {e}")
 
     def _parse_excel(self, file_path: str) -> Dict:
@@ -150,7 +151,7 @@ class UnifiedParser:
             text = df.to_string(index=False)
             tables = [{"headers": list(df.columns), "rows": df.values.tolist()}]
             return {"text": text, "tables": tables, "metadata": {"parser": "pandas"}}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise ParseError(f"Excel解析失败: {e}")
 
     def _parse_text(self, file_path: str) -> Dict:
@@ -159,7 +160,7 @@ class UnifiedParser:
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 text = f.read()
             return {"text": text, "tables": [], "metadata": {"parser": "text"}}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise ParseError(f"文本解析失败: {e}")
 
     def _parse_markdown(self, file_path: str) -> Dict:
@@ -174,7 +175,7 @@ class UnifiedParser:
             text = df.to_string(index=False)
             tables = [{"headers": list(df.columns), "rows": df.values.tolist()}]
             return {"text": text, "tables": tables, "metadata": {"parser": "pandas"}}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise ParseError(f"CSV解析失败: {e}")
 
     def _parse_json(self, file_path: str) -> Dict:
@@ -185,7 +186,7 @@ class UnifiedParser:
                 data = json.load(f)
             text = json.dumps(data, ensure_ascii=False, indent=2)
             return {"text": text, "tables": [], "metadata": {"parser": "json"}}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise ParseError(f"JSON解析失败: {e}")
 
     def _parse_html(self, file_path: str) -> Dict:
@@ -196,7 +197,7 @@ class UnifiedParser:
                 soup = BeautifulSoup(f.read(), "html.parser")
             text = soup.get_text(separator="\n", strip=True)
             return {"text": text, "tables": [], "metadata": {"parser": "beautifulsoup"}}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise ParseError(f"HTML解析失败: {e}")
 
 
@@ -213,7 +214,7 @@ class UnifiedCleaner:
             text = self._clean_text(text)
             parsed["text"] = text
             return parsed
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise CleanError(f"清洗失败: {e}")
 
     def _clean_text(self, text: str) -> str:
@@ -334,7 +335,7 @@ class UnifiedClassifier:
         try:
             from src.category_registry import match_category
             return match_category(chunk.text, file_ext=chunk.file_type, file_name=chunk.file_name) or "通用办公"
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             return "通用办公"
 
 
@@ -349,7 +350,7 @@ class UnifiedEmbedder:
         try:
             from src.db.vector_store import embed_texts
             return await embed_texts(texts)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Embedder] 向量化失败: {e}")
             return [None] * len(texts)
 
@@ -379,7 +380,7 @@ class UnifiedSaver:
 
             store.insert_many(chunk_dicts)
             logger.info(f"[Saver] 存储 {len(chunk_dicts)} 个 chunk")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise SaveError(f"存储失败: {e}")
 
 
@@ -434,7 +435,7 @@ class UnifiedExtractor:
                     )
                     all_entities.append(entity)
 
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning(f"[Extractor] 提取失败 chunk {i}: {e}")
 
         # 实体去重归一化
@@ -447,7 +448,6 @@ class UnifiedExtractor:
         """单个 chunk 提取"""
         try:
             from src.services.llm import call_ai
-            from src.services.security import sanitize_user_input
 
             prev_heading = all_chunks[index - 1].heading if index > 0 else ""
             prev_summary = all_chunks[index - 1].text[:300] if index > 0 else ""
@@ -481,7 +481,7 @@ class UnifiedExtractor:
                 except json.JSONDecodeError as e:
                     logger.warning("json.JSONDecodeError 失败: %s", e, exc_info=True)
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.debug(f"[Extractor] LLM提取失败: {e}")
 
         return {"events": [], "entities": []}
@@ -564,7 +564,7 @@ class UnifiedPipeline:
             try:
                 cleaned = self.cleaner.clean(parsed)
                 result.cleaned_text = cleaned.get("text", "")
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning(f"[Pipeline] 清洗失败，使用原文: {e}")
                 result.cleaned_text = result.raw_text
                 result.errors.append(f"CleanError: {e}")
@@ -573,7 +573,7 @@ class UnifiedPipeline:
             try:
                 chunks = self.chunker.chunk(parsed, result.tables)
                 result.chunks = chunks
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning(f"[Pipeline] 分块失败，降级为单块: {e}")
                 result.chunks = [Chunk(text=result.cleaned_text, chunk_index=0)]
                 result.errors.append(f"ChunkError: {e}")
@@ -582,7 +582,7 @@ class UnifiedPipeline:
             for chunk in result.chunks:
                 try:
                     chunk.category = self.classifier.classify(chunk)
-                except Exception:
+                except Exception:  # TODO: Narrow exception type
                     chunk.category = "通用办公"
 
             # Step 5: 设置来源信息
@@ -598,7 +598,7 @@ class UnifiedPipeline:
                 embeddings = await self.embedder.embed_batch([c.text for c in result.chunks])
                 for chunk, emb in zip(result.chunks, embeddings):
                     chunk.embedding = emb
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning(f"[Pipeline] 向量化失败，标记待补: {e}")
                 result.errors.append(f"EmbedError: {e}")
 
@@ -615,10 +615,10 @@ class UnifiedPipeline:
                         result.entities = entities
                         result.events = events
                         logger.info(f"[Pipeline] SAG提取: {len(events)} 事件, {len(entities)} 实体")
-                    except Exception as e:
+                    except Exception as e:  # TODO: Narrow exception type
                         logger.warning(f"[Pipeline] 事件/实体提取失败，跳过: {e}")
                         result.errors.append(f"ExtractError: {e}")
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("Exception 失败: %s", e, exc_info=True)
 
             result.duration_ms = (time.time() - start_time) * 1000

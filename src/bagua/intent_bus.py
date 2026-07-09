@@ -13,7 +13,6 @@ intent_bus.py — 意图调度总线（IntentBus）
   - Session 隔离
   - 取消 + 进度信号
 """
-from __future__ import annotations
 
 import logging
 import threading
@@ -632,7 +631,7 @@ class IntentBus:
                     current_delay *= self.DEFAULT_RETRY_BACKOFF
                     retry_count = attempt + 1
 
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 last_result = IntentResult(
                     status=DispatchStatus.UNKNOWN_ERROR,
                     error_message=str(e),
@@ -683,7 +682,7 @@ class IntentBus:
         def _target() -> None:
             try:
                 result_container["result"] = handler.handle_signal(signal)
-            except Exception as exc:
+            except Exception as exc:  # TODO: Narrow exception type
                 result_container["error"] = exc
             finally:
                 done_event.set()

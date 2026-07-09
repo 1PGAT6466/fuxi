@@ -7,7 +7,7 @@ import json
 import logging
 import os
 import time
-from typing import Dict, List, Optional, Any
+from typing import Dict, List
 from pathlib import Path
 
 logger = logging.getLogger("taiyin.mcp_tools")
@@ -25,7 +25,7 @@ async def sag_search(query: str, top_k: int = 10) -> Dict:
             "count": len(results),
             "query": query,
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] sag_search 失败: {e}")
         return {"error": str(e), "results": []}
 
@@ -42,7 +42,7 @@ async def sag_ingest(file_path: str, category: str = "") -> Dict:
             "entities": result.get("entities", 0),
             "file_path": file_path,
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] sag_ingest 失败: {e}")
         return {"error": str(e)}
 
@@ -58,7 +58,7 @@ async def sag_explain(query: str) -> Dict:
             "confidence": result.get("confidence", 0),
             "sources": result.get("sources", []),
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] sag_explain 失败: {e}")
         return {"error": str(e)}
 
@@ -69,7 +69,7 @@ async def sag_status() -> Dict:
     try:
         monitor = get_monitor()
         return monitor.get_health_report()
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] sag_status 失败: {e}")
         return {"error": str(e)}
 
@@ -86,7 +86,7 @@ async def kb_search(query: str, top_k: int = 5, mode: str = "semantic") -> Dict:
             return {"results": results, "total": len(results)}
         except ImportError:
             pass
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"kb_search retrieval 回退: {e}")
 
         # 回退 ChromaDB
@@ -103,7 +103,7 @@ async def kb_search(query: str, top_k: int = 5, mode: str = "semantic") -> Dict:
             } for r in raw]
             return {"results": results, "total": len(results)}
         return {"results": [], "total": 0}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] kb_search 失败: {e}")
         return {"error": str(e), "results": [], "total": 0}
 
@@ -127,7 +127,7 @@ async def kb_list_documents() -> Dict:
                 }
         docs = list(seen.values())
         return {"documents": docs, "total": len(docs)}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] kb_list_documents 失败: {e}")
         return {"error": str(e), "documents": [], "total": 0}
 
@@ -154,7 +154,7 @@ async def kb_get_document(doc_id: str) -> Dict:
             } for c in matching],
             "total_chunks": len(matching),
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] kb_get_document 失败: {e}")
         return {"error": str(e)}
 
@@ -204,7 +204,7 @@ async def graph_query(entity: str = "", source: str = "", target: str = "",
 
         total = len(filtered)
         return {"total": total, "limit": limit, "edges": filtered[:limit]}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] graph_query 失败: {e}")
         return {"error": str(e), "edges": [], "total": 0}
 
@@ -240,7 +240,7 @@ async def graph_stats() -> Dict:
             from src.bagua.auto_graph import get_auto_graph_builder
             builder = get_auto_graph_builder()
             builder_stats = builder.get_stats()
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
 
         return {
@@ -250,7 +250,7 @@ async def graph_stats() -> Dict:
             "entity_type_distribution": entity_type_dist,
             "auto_graph_builder": builder_stats,
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] graph_stats 失败: {e}")
         return {"error": str(e)}
 
@@ -268,7 +268,7 @@ async def wiki_search(q: str = "", category: str = "", limit: int = 20) -> Dict:
             if not pages:
                 pages = engine.search_by_title(q, limit=limit)
         return {"pages": pages, "total": len(pages)}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] wiki_search 失败: {e}")
         return {"error": str(e), "pages": [], "total": 0}
 
@@ -285,7 +285,7 @@ async def wiki_get(page_id: str) -> Dict:
         linked = engine.get_linked_pages(page_id)
         page["linked_pages"] = linked
         return page
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] wiki_get 失败: {e}")
         return {"error": str(e)}
 
@@ -301,7 +301,7 @@ async def dream_cycle_run() -> Dict:
     except ImportError as e:
         logger.error(f"[MCP] DreamCycle 导入失败: {e}")
         return {"ok": False, "error": "DreamCycle 模块不可用", "detail": str(e)}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] dream_cycle_run 失败: {e}")
         return {"ok": False, "error": str(e)}
 
@@ -326,7 +326,7 @@ async def dream_cycle_report() -> Dict:
             "report": content,
             "generated_at": latest.stem.replace("dream_report_", ""),
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] dream_cycle_report 失败: {e}")
         return {"error": str(e)}
 
@@ -343,7 +343,7 @@ async def gap_analyze(query: str = "", topic: str = "") -> Dict:
             # 只跑 gap_scan 阶段
             results = await dc._run_gap_scan()
             gaps = results if isinstance(results, list) else []
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"gap_scan 调用失败，使用基础分析: {e}")
             # 基础：查询知识库覆盖
             try:
@@ -357,7 +357,7 @@ async def gap_analyze(query: str = "", topic: str = "") -> Dict:
                         "top_scores": [r.get("score", 0) for r in results[:5]],
                         "gap_detected": any(r.get("score", 0) < 0.5 for r in results),
                     }]
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 pass
 
         return {
@@ -366,7 +366,7 @@ async def gap_analyze(query: str = "", topic: str = "") -> Dict:
             "gaps": gaps,
             "query": query or topic,
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] gap_analyze 失败: {e}")
         return {"ok": False, "error": str(e)}
 
@@ -384,7 +384,7 @@ async def entity_expand(entity_name: str, top_k: int = 10) -> Dict:
             expanded = expand_entity(entity_name, top_k=top_k)
         except ImportError:
             pass
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"expand_entity 失败: {e}")
 
         return {
@@ -392,7 +392,7 @@ async def entity_expand(entity_name: str, top_k: int = 10) -> Dict:
             "expanded_entities": expanded,
             "total": len(expanded),
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] entity_expand 失败: {e}")
         return {"error": str(e), "expanded_entities": [], "total": 0}
 
@@ -461,7 +461,7 @@ async def cross_entity_synthesize(entity_a: str, entity_b: str) -> Dict:
             "synthesis": f"发现 {len(direct_edges)} 条直接关联、{len(indirect_paths)} 条间接路径"
                 if direct_edges or indirect_paths else "未找到关联",
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] cross_entity_synthesize 失败: {e}")
         return {"error": str(e)}
 
@@ -486,7 +486,7 @@ async def file_upload(file_path: str, category: str = "") -> Dict:
             "events": result.get("events", 0),
             "entities": result.get("entities", 0),
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] file_upload 失败: {e}")
         return {"ok": False, "error": str(e)}
 
@@ -511,7 +511,7 @@ async def file_list(page: int = 1, page_size: int = 50) -> Dict:
                 seen[fh]["chunk_count"] += 1
         files = list(seen.values())
         return {"files": files, "total": len(files), "page": page, "page_size": page_size}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] file_list 失败: {e}")
         return {"error": str(e), "files": [], "total": 0}
 
@@ -529,7 +529,7 @@ async def chat_query(query: str, history: List[dict] = None) -> Dict:
             "sources": result.get("sources", []),
             "mode": result.get("mode", "shaoyin"),
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] chat_query 失败: {e}")
         return {"answer": f"对话失败: {str(e)}", "error": str(e)}
 
@@ -548,7 +548,7 @@ async def eval_run(dataset: str = "", test_name: str = "") -> Dict:
             "errors": result.get("errors", []),
             "dataset": dataset or "smoke_test",
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] eval_run 失败: {e}")
         return {"ok": False, "error": str(e)}
 
@@ -565,7 +565,7 @@ async def notifications_list(page: int = 1, page_size: int = 20,
             "page": page,
             "page_size": page_size,
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] notifications_list 失败: {e}")
         return {"error": str(e), "notifications": []}
 
@@ -577,7 +577,7 @@ async def feature_flags_list() -> Dict:
         from src.services.feature_flags import load_flags, DEFAULT_FLAGS
         flags = load_flags()
         return {"flags": flags, "defaults": DEFAULT_FLAGS}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] feature_flags_list 失败: {e}")
         return {"error": str(e), "flags": {}}
 
@@ -601,7 +601,7 @@ async def health_check() -> Dict:
                 "memory": "ok",
             },
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] health_check 失败: {e}")
         return {"status": "error", "error": str(e)}
 
@@ -615,7 +615,7 @@ async def audit_logs(user: str = "", action: str = "", days: int = 1,
         results = query_audit(user=user or None, action=action or None,
                              days=days, limit=limit)
         return {"entries": results, "count": len(results)}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] audit_logs 失败: {e}")
         return {"error": str(e), "entries": [], "count": 0}
 

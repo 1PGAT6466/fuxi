@@ -7,7 +7,7 @@ import json
 import re
 import logging
 import asyncio
-from typing import List, Dict, Any
+from typing import List, Dict
 
 logger = logging.getLogger("taiyang.multi_hop")
 
@@ -45,7 +45,7 @@ class SAGMultiHopSearch:
             import jieba.posseg as pseg
             words = pseg.cut(query)
             jieba_entities = [w for w, flag in words if flag in ['nr', 'ns', 'nt', 'nz', 'eng']]
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("jieba词性标注失败: %s", e, exc_info=True)
             jieba_entities = []
 
@@ -75,7 +75,7 @@ class SAGMultiHopSearch:
             response = await call_ai(prompt)
             if response:
                 return [e.strip() for e in response.split(",") if e.strip() and len(e.strip()) > 1]
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[实体提取] LLM调用失败: {e}")
         return []
 
@@ -88,7 +88,7 @@ class SAGMultiHopSearch:
                 r["_search_mode"] = "vector_fallback"
                 r["_reason"] = "no_entities_found"
             return results
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error(f"[SAG多跳] 向量检索降级失败: {e}")
             return []
 
@@ -129,7 +129,7 @@ class SAGMultiHopSearch:
                 (f'%{entity}%',)
             ).fetchall()
             return [json.loads(r[0]) for r in rows if r[0]]
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             return []
 
     async def _multi_hop_search(self, entities: List[str], query: str, top_k: int) -> List[Dict]:
@@ -245,7 +245,7 @@ async def entity_recall(query: str, top_k: int = 10) -> list:
             (query, top_k)
         ).fetchall()
         return [{"name": r[0], "type": r[1], "description": r[2]} for r in rows]
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         return []
 
 
@@ -280,7 +280,7 @@ async def get_events_by_entity(entity_name: str) -> list:
                 "_from_entity_channel": True,
             })
         return events
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         return []
 
 
@@ -296,7 +296,7 @@ async def get_chunk_by_id(chunk_id: str) -> dict:
         ).fetchall()
         if rows:
             return json.loads(rows[0][0])
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         pass
     return None
 
@@ -306,5 +306,5 @@ async def vector_recall(query: str, top_k: int = 15) -> list:
     try:
         from src.taiyang.retrieval import hybrid_search
         return await hybrid_search(query, top_k=top_k)
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         return []

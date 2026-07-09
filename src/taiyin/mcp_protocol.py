@@ -4,9 +4,8 @@ mcp_protocol.py — MCP协议深度集成
 """
 import json
 import logging
-import time
-from typing import Dict, List, Any, Callable
-from dataclasses import dataclass, field
+from typing import Dict, Any, Callable
+from dataclasses import dataclass
 
 logger = logging.getLogger("taiyin.mcp_protocol")
 
@@ -78,7 +77,7 @@ class MCPServer:
                 return await self._handle_resources_read(request_id, params)
             else:
                 return self._error_response(request_id, -32601, f"Unknown method: {method}")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error(f"[MCP] 请求处理失败: {e}")
             return self._error_response(request_id, -32603, str(e))
 
@@ -143,7 +142,7 @@ class MCPServer:
                     ],
                 },
             }
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             return {
                 "jsonrpc": "2.0",
                 "id": request_id,

@@ -1,6 +1,5 @@
 """P2.6 多模态转录 — A: 表格提取增强 + B: SiliconFlow 图片转录"""
-import os, base64, json, requests, logging
-from pathlib import Path
+import os, base64, requests, logging
 from typing import Optional
 
 logger = logging.getLogger(__name__)
@@ -81,7 +80,7 @@ def encode_image_base64(image_path: str) -> Optional[str]:
     try:
         with open(image_path, 'rb') as f:
             return base64.b64encode(f.read()).decode('utf-8')
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"图片编码失败: {image_path} — {e}")
         return None
 
@@ -131,7 +130,7 @@ def transcribe_image(image_path: str, api_key: str = None) -> Optional[str]:
         else:
             logger.error(f"图片转录失败 HTTP {r.status_code}: {r.text[:200]}")
             return None
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"图片转录异常: {e}")
         return None
 
@@ -170,7 +169,7 @@ def transcribe_image_from_bytes(image_bytes: bytes, mime_type: str = "image/png"
             return r.json()["choices"][0]["message"]["content"]
         logger.error(f"图片转录失败 HTTP {r.status_code}")
         return None
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"图片转录异常: {e}")
         return None
 
@@ -194,7 +193,7 @@ def enhance_pdf_extraction(file_path: str, extract_images: bool = False, api_key
                 enhanced = enhance_table_extraction(raw_text, tables)
                 page_texts.append(f"[Page {i+1}]\n{enhanced}")
             text = "\n\n".join(page_texts)
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"pdfplumber 提取失败: {e}")
         # 回退 PyMuPDF
         try:
@@ -206,7 +205,7 @@ def enhance_pdf_extraction(file_path: str, extract_images: bool = False, api_key
                 page_texts.append(f"[Page {i+1}]\n{page.get_text()}")
             doc.close()
             text = "\n\n".join(page_texts)
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             logger.warning(f"[multimodal] suppressed exception", exc_info=True)
             pass
     
@@ -233,13 +232,13 @@ def enhance_pdf_extraction(file_path: str, extract_images: bool = False, api_key
                         )
                         if desc:
                             image_descriptions.append(f"[图片 P{i+1}-{j+1}]: {desc}")
-                    except Exception:
+                    except Exception:  # TODO: Narrow exception type
                         logger.warning(f"[multimodal] suppressed exception", exc_info=True)
                         pass
             doc.close()
             if image_descriptions:
                 text += "\n\n### 📷 图片转录\n\n" + "\n\n".join(image_descriptions)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"图片提取失败: {e}")
     
     return text

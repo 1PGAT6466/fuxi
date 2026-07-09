@@ -4,7 +4,7 @@ query_expansion.py — 太阳·查询扩展
 """
 import re
 import logging
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 logger = logging.getLogger("taiyang.query_expansion")
 
@@ -20,7 +20,7 @@ def _load_synonyms():
     try:
         from src.services.synonym_loader import load_synonyms
         _SYNONYM_MAP = load_synonyms()
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         _SYNONYM_MAP = {}
 
 

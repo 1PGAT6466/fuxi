@@ -35,7 +35,7 @@ class EntityGraph:
         if GRAPH_FILE.exists():
             try:
                 self._graph = json.loads(GRAPH_FILE.read_text(encoding="utf-8"))
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 pass
         self._graph.setdefault("nodes", {})
         self._graph.setdefault("edges", [])

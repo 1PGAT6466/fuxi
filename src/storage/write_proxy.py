@@ -18,7 +18,6 @@
 """
 
 import logging
-import asyncio
 from dataclasses import dataclass, field
 from typing import List, Dict, Optional, Any
 from datetime import datetime
@@ -173,7 +172,7 @@ class WriteProxy:
                     item.get("entities") or [], item.get("links") or [],
                 )
                 replayed += 1
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 still_pending.append(item)
                 logger.error(f"[WriteProxy] 回放失败: {e}")
 
@@ -219,7 +218,7 @@ class WriteProxy:
                 result["chroma"] = {"ok": True, "events_count": events_count}
             else:
                 result["chroma"] = {"ok": None, "reason": "chroma not available"}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             self._chroma_ok = False
             result["chroma"] = {"ok": False, "error": str(e)}
             result["errors"].append(f"ChromaDB write failed: {e}")
@@ -285,11 +284,11 @@ class WriteProxy:
                 )
             self.pg.commit()
             return True
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             self._pg_ok = False
             try:
                 self.pg.rollback()
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 pass
             logger.error(f"[WriteProxy] PostgreSQL 写入失败: {e}")
             return False

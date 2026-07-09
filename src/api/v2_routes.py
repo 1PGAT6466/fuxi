@@ -13,6 +13,6 @@ async def v2_status():
     """v2状态"""
     try:
         return {"status": "ok"}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"v2_status 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})

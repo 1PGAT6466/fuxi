@@ -8,11 +8,10 @@ learner.py — 离线学习封装层（第九宫 · 中宫）
 """
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 # ---- 从 services 导入原有实现 ----
 from src.services.learner import (
-    load_term_weights,
     update_term_weight,
     log_feedback as _learner_log_feedback,
     extract_new_terms,

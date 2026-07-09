@@ -6,7 +6,6 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 import logging
 import time
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -77,7 +76,7 @@ async def dashboard(request: Request = None):
                 vector_count = vs.count
                 if vector_count < 0:
                     vector_count = 0
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 pass
 
         # 3. 搜索统计 —— 从运行时指标
@@ -89,7 +88,7 @@ async def dashboard(request: Request = None):
             search_total = metrics.total_requests or 0
             if hasattr(metrics, 'avg_latency_ms'):
                 search_avg_latency_ms = round(metrics.avg_latency_ms, 1)
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
 
         # 4. 评测状态
@@ -106,7 +105,7 @@ async def dashboard(request: Request = None):
                 eval_last_run = report.get("timestamp")
             if history:
                 eval_report_count = len(history)
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
 
         # 5. 系统运行时间
@@ -172,7 +171,7 @@ async def dashboard(request: Request = None):
             from src.api.response import success
             return success(data=data, message="仪表板数据")
         return data
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"dashboard 失败: {e}")
         return JSONResponse(
             status_code=500,

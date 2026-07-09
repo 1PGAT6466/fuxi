@@ -2,10 +2,9 @@
 brain.py — 少阴·炼化 决策合成中枢
 合并大脑(决策)+心(路由)+Self-RAG+CRAG
 """
-import asyncio
 import logging
 import time
-from typing import Dict, Any, Optional, List
+from typing import Dict, List
 
 from src.infra.symbol_base import SymbolBase
 
@@ -34,7 +33,7 @@ class ShaoyinBrain(SymbolBase):
             try:
                 from src.shaoyin.smart_self_rag import SmartSelfRAG
                 self._self_rag = SmartSelfRAG()
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("Exception 失败: %s", e, exc_info=True)
         return self._self_rag
 
@@ -44,7 +43,7 @@ class ShaoyinBrain(SymbolBase):
             try:
                 from src.shaoyin.crag_corrector import CRAGCorrector
                 self._crag = CRAGCorrector()
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("Exception 失败: %s", e, exc_info=True)
         return self._crag
 
@@ -122,7 +121,7 @@ class ShaoyinBrain(SymbolBase):
                         if new_answer:
                             answer = new_answer
                             logger.info(f"[{trace_id}] [少阴] L5 CRAG 重新合成完成")
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.debug(f"[{trace_id}] [少阴] L5 CRAG 评估跳过: {e}")
 
             # Step 7: 校验
@@ -145,7 +144,7 @@ class ShaoyinBrain(SymbolBase):
                     confidence=confidence, retry_count=1 if confidence < 0.5 else 0,
                     duration_ms=duration,
                 )
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("Exception 失败: %s", e, exc_info=True)
 
             if logger.isEnabledFor(logging.DEBUG):
@@ -165,7 +164,7 @@ class ShaoyinBrain(SymbolBase):
                 "crag_status": crag_status,
             }
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error(f"[{trace_id}] [少阴] 决策失败: {e}")
             return {"answer": "抱歉，处理您的问题时出现错误。", "confidence": 0, "error": str(e), "trace_id": trace_id}
         finally:
@@ -175,19 +174,18 @@ class ShaoyinBrain(SymbolBase):
         """意图识别"""
         try:
             from src.bagua.qian import QianGua, _match_intent_preload
-            import os
             cache = {}
             _load = getattr(QianGua, '_load_intent_preload_cache', None)
             if _load:
                 try:
                     cache = _load()
-                except Exception:
+                except Exception:  # TODO: Narrow exception type
                     pass
             result = _match_intent_preload(query, cache)
             if result:
                 return {"intent": result, "confidence": 0.98, "reasoning": "预加载匹配"}
             return {"intent": "SEARCH", "confidence": 0.85, "reasoning": "默认检索"}
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             return {"intent": "general_search", "intents": {}, "count": 0}
 
     def _select_strategy(self, intent: Dict) -> str:
@@ -205,7 +203,7 @@ class ShaoyinBrain(SymbolBase):
         try:
             from src.taiyang.retrieval import hybrid_search
             return await hybrid_search(query, top_k=10)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[少阴] 检索失败: {e}")
             return []
 
@@ -218,7 +216,7 @@ class ShaoyinBrain(SymbolBase):
             answer = await call_deepseek(prompt)
             if answer:
                 return answer
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[少阴] LLM 合成失败: {e}")
 
         # 降级：模板拼接
@@ -244,7 +242,7 @@ class ShaoyinBrain(SymbolBase):
             answer = await call_deepseek(prompt)
             if answer:
                 return answer
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("Exception 失败: %s", e, exc_info=True)
         return "知识库中未找到相关信息。"
 

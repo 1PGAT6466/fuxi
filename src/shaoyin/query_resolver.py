@@ -3,7 +3,7 @@ services/query_resolver.py — 指代消解 + 上下文压缩
 Phase 1: 多轮对话核心模块
 """
 import logging
-from typing import List, Optional
+from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ async def resolve_query(query: str, history: List[dict], llm_fn=None) -> str:
             else:
                 logger.info(f"[QueryResolver] resolved: query_len={len(query)}, result_len={len(resolved)}")
         return resolved if resolved else query
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"[QueryResolver] failed: {e}")
         return query
 
@@ -120,7 +120,7 @@ async def compress_history(history: List[dict], llm_fn=None, max_turns: int = 5)
             compressed.extend(recent)
             logger.info(f"[HistoryCompress] {len(history)} msgs → {len(compressed)} msgs")
             return compressed
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"[HistoryCompress] failed: {e}")
 
     return recent

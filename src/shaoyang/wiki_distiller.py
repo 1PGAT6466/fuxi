@@ -1,8 +1,8 @@
 """
 wiki_distiller.py — Phase 5.4: Wiki 知识蒸馏 + 交叉引用 + 增量更新
 """
-import json, logging, time
-from typing import Dict, List, Optional
+import json, logging
+from typing import List
 
 logger = logging.getLogger(__name__)
 

@@ -93,7 +93,7 @@ async def _get_bagua_health(request: Request) -> dict:
                     bagua_result[api_name] = health.get("status", "unknown")
                 else:
                     bagua_result[api_name] = "unknown"
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             bagua_result[api_name] = "error"
 
     return bagua_result
@@ -139,7 +139,7 @@ async def health_check(request: Request):
                 result["bagua"] = bagua_status
                 result["engine"] = getattr(request.app.state, "engine", "v2")
                 result["intent_mode"] = getattr(request.app.state, "intent_mode", "rule_based")
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
 
         if fmt == "v2":
@@ -150,7 +150,7 @@ async def health_check(request: Request):
 
         # 默认保持旧格式兼容
         return result
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         if fmt in ("v2", "extended"):
             return error("健康检查失败", status_code=500, detail=str(e))
         return {"status": "error", "error": str(e)}
@@ -170,7 +170,7 @@ async def health_check_bagua(request: Request):
         checker = get_health_checker()
         result = await checker.check_bagua()
         return success(data=result, message="八卦健康检查完成")
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         return error("八卦健康检查失败", status_code=500, detail=str(e))
 
 
@@ -186,7 +186,7 @@ async def health_check_infra(request: Request):
         checker = get_health_checker()
         result = await checker.check_infra()
         return success(data=result, message="基础设施健康检查完成")
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         return error("基础设施健康检查失败", status_code=500, detail=str(e))
 
 
@@ -202,7 +202,7 @@ async def health_check_alerts(request: Request):
         checker = get_health_checker()
         result = await checker.evaluate_alerts()
         return success(data={"alerts": result, "count": len(result)}, message="告警评估完成")
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         return error("告警评估失败", status_code=500, detail=str(e))
 
 
@@ -217,7 +217,7 @@ async def health_check_alert_rules(request: Request):
         from src.infra.health_check import get_health_checker
         checker = get_health_checker()
         return success(data={"rules": checker.get_alert_rules()})
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         return success(data={"rules": [], "error": str(e)})
 
 
@@ -234,7 +234,7 @@ async def system_stats(request: Request):
         if request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2":
             return success(data=result, message="系统统计")
         return result
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         if request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2":
             return error("获取系统统计失败", status_code=500, detail=str(e))
         return {"error": str(e)}
@@ -253,7 +253,7 @@ async def cache_stats(request: Request):
         if request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2":
             return success(data=result, message="缓存统计")
         return result
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         if request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2":
             return error("获取缓存统计失败", status_code=500, detail=str(e))
         return {"error": str(e)}
@@ -272,7 +272,7 @@ async def error_stats(request: Request):
         if request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2":
             return success(data=result, message="错误统计")
         return result
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         if request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2":
             return error("获取错误统计失败", status_code=500, detail=str(e))
         return {"error": str(e)}

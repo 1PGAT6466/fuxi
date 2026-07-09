@@ -2,10 +2,9 @@
 symbol_base.py — 四象基类
 不继承 OrganBase，避免八卦/五行/天干元数据
 """
-import asyncio
 import logging
 import time
-from typing import Dict, Any, Optional
+from typing import Dict, Any
 
 logger = logging.getLogger("symbol_base")
 

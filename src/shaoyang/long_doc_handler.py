@@ -3,7 +3,7 @@ long_doc_handler.py — Phase 6.6: 长文档处理
 文档级摘要索引 + 层级分块 + 跨 chunk 上下文
 """
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 

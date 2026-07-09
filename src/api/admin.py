@@ -30,7 +30,7 @@ def _get_chunks_stats():
             "unique_files": unique_files,
             "categories": categories,
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"_get_chunks_stats 失败: {e}")
         return {"total_chunks": 0, "unique_files": 0, "categories": {}}
 
@@ -53,7 +53,7 @@ def _load_users():
                 })
             return users
         return []
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"_load_users 失败: {e}")
         return []
 
@@ -71,7 +71,7 @@ async def admin_stats(request: Request = None):
             from src.api.response import success
             return success(data={"ok": True, "chunks": stats["total_chunks"], "categories": stats["categories"], "unique_files": stats["unique_files"]}, message="管理统计")
         return {"ok": True, "chunks": stats["total_chunks"], "categories": stats["categories"], "unique_files": stats["unique_files"]}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"admin_stats 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -88,7 +88,7 @@ async def server_status(request: Request = None):
             from src.api.response import success
             return success(data={"ok": True, "uptime_seconds": round(uptime), "uptime_hours": round(uptime/3600, 1)}, message="服务器状态")
         return {"ok": True, "uptime_seconds": round(uptime), "uptime_hours": round(uptime/3600, 1)}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"server_status 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -111,7 +111,7 @@ async def admin_documents(request: Request = None):
             from src.api.response import success
             return success(data={"ok": True, "documents": stats}, message="文档统计")
         return {"ok": True, "documents": stats}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"admin_documents 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -138,7 +138,7 @@ async def admin_evaluations(request: Request = None):
             "evaluations": history,
             "latest_report": report or {"message": "暂无评测报告"},
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"admin_evaluations 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -150,7 +150,7 @@ async def admin_evaluations_run():
         automation = get_eval_automation()
         result = await automation.run_daily_eval()
         return {"ok": True, "result": result}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"admin_evaluations_run 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -166,7 +166,7 @@ async def admin_users(request: Request = None):
             from src.api.response import success
             return success(data={"ok": True, "users": users, "total": len(users)}, message="用户列表")
         return {"ok": True, "users": users, "total": len(users)}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"admin_users 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -217,7 +217,7 @@ async def admin_create_user(request: Request):
             from src.api.response import success
             return success(data={"username": username, "role": role, "display_name": display_name}, message="用户创建成功")
         return {"ok": True, "username": username, "role": role, "display_name": display_name}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"admin_create_user 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -252,7 +252,7 @@ async def admin_update_user(user_id: str, request: Request):
             from src.api.response import success
             return success(data={"username": user_id, **users[user_id]}, message="用户更新成功")
         return {"ok": True, "username": user_id}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"admin_update_user 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -280,7 +280,7 @@ async def admin_delete_user(user_id: str, request: Request = None):
             from src.api.response import success
             return success(data=None, message=f"用户 {user_id} 已删除")
         return {"ok": True, "message": f"用户 {user_id} 已删除"}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"admin_delete_user 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -308,7 +308,7 @@ async def admin_teams_list(request: Request = None):
             from src.api.response import success
             return success(data={"teams": teams, "total": len(teams)}, message="团队列表")
         return {"ok": True, "teams": teams, "total": len(teams)}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"admin_teams_list 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -364,7 +364,7 @@ async def admin_create_team(request: Request):
 
     except ValueError as e:
         return JSONResponse(status_code=400, content={"error": "参数错误", "detail": str(e)})
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"admin_create_team 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -388,7 +388,7 @@ async def admin_get_team(team_id: str, request: Request = None):
             from src.api.response import success
             return success(data=team.to_dict(), message="团队详情")
         return {"ok": True, "team": team.to_dict()}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"admin_get_team 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -415,7 +415,7 @@ async def admin_delete_team(team_id: str, request: Request = None):
             from src.api.response import success as resp_success
             return resp_success(data=None, message=f"团队 {team_id} 已删除")
         return {"ok": True, "message": f"团队 {team_id} 已删除"}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"admin_delete_team 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -452,7 +452,7 @@ async def admin_add_team_member(team_id: str, request: Request):
             from src.api.response import success
             return success(data=team.to_dict() if team else {}, message=f"用户 {user_id} 已加入团队 {team_id}")
         return {"ok": True, "team": team.to_dict() if team else {}, "message": f"用户 {user_id} 已加入团队"}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"admin_add_team_member 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -481,7 +481,7 @@ async def admin_remove_team_member(team_id: str, user_id: str, request: Request 
             from src.api.response import success
             return success(data=team.to_dict() if team else {}, message=f"用户 {user_id} 已从团队 {team_id} 移除")
         return {"ok": True, "team": team.to_dict() if team else {}, "message": f"用户 {user_id} 已从团队移除"}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"admin_remove_team_member 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -506,6 +506,6 @@ async def user_teams(request: Request = None):
             from src.api.response import success
             return success(data={"teams": team_list, "user_id": user_id}, message="用户团队列表")
         return {"ok": True, "teams": team_list, "user_id": user_id}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"user_teams 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})

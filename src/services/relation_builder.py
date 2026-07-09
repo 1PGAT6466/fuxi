@@ -5,9 +5,3 @@
 services/relation_builder.py — 兼容层（保留：被 skeleton/signal_layer.py 引用）
 v1.50 HIGH 修复：将 import * 改为显式导入。
 """
-from src.shaoyang.relation_builder import (
-    extract_relations_cooccurrence,
-    build_relations_from_chunks,
-    get_relation_stats,
-    auto_build_relations,
-)

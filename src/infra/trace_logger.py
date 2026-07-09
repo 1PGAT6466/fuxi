@@ -6,7 +6,6 @@ import os
 import logging
 import asyncio
 from datetime import datetime
-from typing import Optional
 
 logger = logging.getLogger("infra.trace")
 
@@ -44,7 +43,7 @@ class TraceLogger:
             trace_file = os.path.join(TRACE_DIR, f"{self.trace_id}.log")
             with open(trace_file, "a", encoding="utf-8") as f:
                 f.write(log_line + "\n")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error(f"写入 trace 文件失败: {e}")
 
     def log_exception(self, module: str, exception: Exception):

@@ -17,7 +17,7 @@
   - GET /api/wiki/page/{id} → /api/wiki/{id}       (Legacy 前端兼容)
   - GET /api/antenna/search → 联网搜索              (Vue3 前端用 GET 方法)
 """
-from fastapi import APIRouter, Request, HTTPException
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 import logging
 
@@ -91,7 +91,7 @@ async def antenna_search_get(q: str = "", request: Request = None):
             "source": "unavailable",
             "message": "搜索服务暂不可用，请稍后重试",
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"antenna_search_get 失败: {e}")
         return JSONResponse(
             status_code=500,

@@ -3,15 +3,14 @@ pipeline.py — 少阳·消化 统一处理管线
 合并胃(解析)+脾(存储)+肺(呼吸)+小肠(分类)的能力
 """
 import asyncio
-import json
 import logging
 import struct
 import time
 from pathlib import Path
-from typing import List, Dict, Any, Optional
+from typing import List, Dict
 from dataclasses import dataclass, field
 
-from src.models.chunk import Chunk, ChunkType
+from src.models.chunk import Chunk
 from src.models.event import Event
 from src.models.entity import Entity
 from src.infra.symbol_base import SymbolBase
@@ -94,7 +93,7 @@ class ShaoyangPipeline(SymbolBase):
 
             return result
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error(f"[少阳] 处理失败: {file_path} → {e}")
             raise
         finally:
@@ -118,7 +117,7 @@ class ShaoyangPipeline(SymbolBase):
                 return self._parse_text(file_path)
             else:
                 return self._parse_text(file_path)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise Exception(f"解析失败 ({ext}): {e}")
 
     def _parse_pdf(self, file_path: str) -> Dict:
@@ -131,7 +130,7 @@ class ShaoyangPipeline(SymbolBase):
                 pages_text.append(page.get_text())
             doc.close()
             return {"text": "\n".join(pages_text), "tables": [], "metadata": {"parser": "fitz"}}
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             return {"text": "", "tables": [], "metadata": {"parser": "none"}}
 
     def _parse_docx(self, file_path: str) -> Dict:
@@ -141,7 +140,7 @@ class ShaoyangPipeline(SymbolBase):
             doc = Document(file_path)
             paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
             return {"text": "\n".join(paragraphs), "tables": [], "metadata": {"parser": "python-docx"}}
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             return {"text": "", "tables": [], "metadata": {"parser": "none"}}
 
     def _parse_excel(self, file_path: str) -> Dict:
@@ -150,7 +149,7 @@ class ShaoyangPipeline(SymbolBase):
             import pandas as pd
             df = pd.read_excel(file_path)
             return {"text": df.to_string(index=False), "tables": [], "metadata": {"parser": "pandas"}}
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             return {"text": "", "tables": [], "metadata": {"parser": "none"}}
 
     def _parse_text(self, file_path: str) -> Dict:
@@ -158,7 +157,7 @@ class ShaoyangPipeline(SymbolBase):
         try:
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 return {"text": f.read(), "tables": [], "metadata": {"parser": "text"}}
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             return {"text": "", "tables": [], "metadata": {"parser": "none"}}
 
     def _clean(self, text: str) -> str:
@@ -205,7 +204,7 @@ class ShaoyangPipeline(SymbolBase):
         try:
             from src.category_registry import match_category
             return match_category(chunk.text, file_ext=chunk.file_type, file_name=chunk.file_name) or "通用办公"
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             return "通用办公"
 
     def _compute_hash(self, file_path: str) -> str:
@@ -222,7 +221,7 @@ class ShaoyangPipeline(SymbolBase):
             if embeddings:
                 for chunk, emb in zip(chunks, embeddings):
                     chunk.embedding = emb
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[少阳] 向量化失败: {e}")
 
     # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
@@ -235,7 +234,7 @@ class ShaoyangPipeline(SymbolBase):
             chunk_dicts = [c.to_dict() for c in chunks]
             store.insert_many(chunk_dicts)
             logger.info(f"[少阳] BM25 存储 {len(chunk_dicts)} 个 chunk")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error(f"[少阳] BM25 存储失败: {e}")
             raise
 
@@ -267,7 +266,7 @@ class ShaoyangPipeline(SymbolBase):
                 logger.info(f"[少阳] 向量存储 {len(vectorized)} 个 chunk → ChromaDB")
             else:
                 logger.warning(f"[少阳] 向量写入失败 ({len(vectorized)} chunks)")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[少阳] 向量写入异常（非致命）: {e}")
 
     # Phase A: SAG 事件/实体提取 + 写入 DB + 向量化
@@ -330,7 +329,7 @@ class ShaoyangPipeline(SymbolBase):
                         total_entities += 1
                         extracted_entities.append(entity_data)
 
-                except Exception as extract_err:
+                except Exception as extract_err:  # TODO: Narrow exception type
                     error_msg = str(extract_err)
                     logger.warning(f"[少阳] SAG 提取失败 (chunk={chunk_id[:30]}...): {error_msg}")
                     store.add_event({
@@ -365,7 +364,7 @@ class ShaoyangPipeline(SymbolBase):
             else:
                 logger.info("[少阳] SAG 提取: 无事件/实体产出（LLM 可能不可用）")
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error(f"[少阳] SAG 提取管线异常: {e}")
 
     async def _vectorize_events(self, count: int, store):
@@ -398,7 +397,7 @@ class ShaoyangPipeline(SymbolBase):
             else:
                 logger.info("[少阳] Event 向量化跳过 (embedder 不可用)")
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[少阳] Event 向量化失败: {e}")
 
 

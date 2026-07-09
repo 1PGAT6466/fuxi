@@ -4,8 +4,7 @@ extractor.py — 少阳·SAG式事件/实体提取器
 """
 import json
 import logging
-import time
-from typing import List, Dict, Any, Optional
+from typing import List, Dict
 from dataclasses import dataclass, field
 
 logger = logging.getLogger("shaoyang.extractor")
@@ -112,7 +111,7 @@ class SAGExtractor:
 
             return result
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[SAG] 提取失败: {e}")
             return ExtractionResult()
 
@@ -165,7 +164,7 @@ class SAGExtractor:
                 }
                 store.add_entity(entity_data)
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[SAG] 写入数据库失败: {e}")
 
     def _build_entity_types_text(self) -> str:
@@ -178,7 +177,7 @@ class SAGExtractor:
                 desc = info.get("description", "")
                 types.append(f"- {t}: {label}（{desc}）" if desc else f"- {t}: {label}")
             return "\n".join(types)
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             return "- person: 人名\n- organization: 组织\n- product: 产品\n- location: 地点\n- time: 时间\n- subject: 主题\n- metric: 指标\n- material: 材料\n- device: 设备"
 
     def _resolve_pronouns(self, result: ExtractionResult) -> ExtractionResult:
@@ -246,7 +245,7 @@ class SAGExtractor:
         try:
             from src.infra.llm import call_ai
             return await call_ai(prompt)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[SAG] LLM调用失败: {e}")
             return ""
 

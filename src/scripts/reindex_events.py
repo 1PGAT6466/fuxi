@@ -19,11 +19,9 @@ reindex_events.py — Phase A 全量回灌脚本
 """
 import sys
 import os
-import json
 import asyncio
 import argparse
 import logging
-import time
 import struct
 from pathlib import Path
 
@@ -57,7 +55,7 @@ async def vectorize_event(store: MemoryStore, row_id: int, event_id: str, conten
             )
             store._db_conn.commit()
             return True
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"  向量化失败 event_id={event_id}: {e}")
     return False
 
@@ -146,7 +144,7 @@ async def reindex(args) -> None:
                 entity_data["source"] = "reindex_events"
                 store.add_entity(entity_data)
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             failed_count += 1
             error_msg = str(e)
             logger.warning(f"  {progress} 提取失败: {error_msg}")
@@ -163,7 +161,7 @@ async def reindex(args) -> None:
                     "file_name": file_name,
                     "status": "pending",
                 })
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 pass
 
         # 速率限制

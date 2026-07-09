@@ -4,7 +4,7 @@ smart_self_rag.py — 智能 Self-RAG
 """
 import re
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 logger = logging.getLogger("shaoyin.smart_self_rag")
 
@@ -102,7 +102,7 @@ class SmartSelfRAG:
         try:
             import jieba
             query_keywords = set(jieba.cut(query))
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("jieba分词失败(查询): %s", e, exc_info=True)
             query_keywords = set(query.split())
 
@@ -113,7 +113,7 @@ class SmartSelfRAG:
         text = top_result.get("text", "")
         try:
             result_keywords = set(jieba.cut(text))
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("jieba分词失败(结果): %s", e, exc_info=True)
             result_keywords = set(text.split())
 
@@ -136,6 +136,6 @@ class SmartSelfRAG:
             if response and "PASS" in response.upper():
                 return ReflectionResult(action="pass", confidence=0.7, reason="llm_pass")
             return ReflectionResult(action="crag_rewrite", confidence=0.3, reason="llm_fail")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Self-RAG] LLM反思失败: {e}")
             return ReflectionResult(action="pass", confidence=0.5, reason="llm_error_fallback")

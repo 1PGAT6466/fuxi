@@ -5,11 +5,8 @@ common_settings.py — 八卦层通用配置 & Meridian 工厂函数
 给 fuxi.py 的 Fuxi 类提供全身唯一信号总线实例。
 """
 
-from __future__ import annotations
 
 import logging
-import sys
-import os
 from typing import Optional
 
 logger = logging.getLogger("bagua.config")

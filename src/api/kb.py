@@ -5,7 +5,6 @@ v1.44 Phase 1 Fix — 知识库(KB)检索路由
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import List, Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -43,7 +42,7 @@ async def kb_search(body: KBSearchRequest, request: Request = None):
             }
         except ImportError:
             pass
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"retrieval.search_chunks 失败: {e}")
 
         # 回退：直接使用 ChromaDB
@@ -61,7 +60,7 @@ async def kb_search(body: KBSearchRequest, request: Request = None):
                         "metadata": r.get("metadata", {}),
                     })
                 return {"results": results, "total": len(results)}
-        except Exception as e2:
+        except Exception as e2:  # TODO: Narrow exception type
             logger.warning(f"vector_store 回退失败: {e2}")
 
         # 最终回退
@@ -69,7 +68,7 @@ async def kb_search(body: KBSearchRequest, request: Request = None):
             "results": [],
             "total": 0,
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"kb_search 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -98,14 +97,14 @@ async def kb_documents(request: Request = None):
                         "chunk_count": sum(1 for cc in chunks if cc.get("file_hash") == fhash),
                         "created_at": c.get("created_at", ""),
                     })
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"load_chunks 失败: {e}")
 
         return {
             "documents": documents,
             "total": len(documents),
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"kb_documents 失败: {e}")
         return JSONResponse(
             status_code=500,

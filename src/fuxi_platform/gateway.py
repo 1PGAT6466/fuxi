@@ -5,7 +5,7 @@ gateway.py — API 网关
 import logging
 from fastapi import APIRouter, HTTPException
 
-from .registry import ServiceRegistry, ServiceStatus
+from .registry import ServiceRegistry
 
 logger = logging.getLogger("platform.gateway")
 

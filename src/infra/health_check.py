@@ -5,7 +5,7 @@ health_check.py — 健康检查（v2.1 扩展版）
 import time
 import logging
 from typing import Dict, List, Optional, Any
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from enum import Enum
 
 logger = logging.getLogger("infra.health_check")
@@ -128,7 +128,7 @@ class HealthChecker:
                     }
                 if not is_healthy:
                     all_healthy = False
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 results[name] = {
                     "status": "error",
                     "error": str(e),
@@ -166,7 +166,7 @@ class HealthChecker:
                 health = state.get("health", "off")
                 if health in summary:
                     summary[health] += 1
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 gua_states[name] = {
                     "health": "off",
                     "error": str(e),
@@ -211,7 +211,7 @@ class HealthChecker:
                 components[name] = result
                 if not result.get("healthy", False):
                     all_healthy = False
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 components[name] = {
                     "healthy": False,
                     "error": str(e),
@@ -292,7 +292,7 @@ class HealthChecker:
                         "context": context,
                         "timestamp": time.time(),
                     })
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("告警规则 [%s] 评估失败: %s", rule.name, e)
 
         return triggered
@@ -434,7 +434,7 @@ async def _check_conn_pool_usage_alert(threshold: float) -> tuple:
             "usage_rate": round(usage, 4),
             "threshold": threshold,
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         return False, {"error": str(e)}
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
@@ -480,7 +480,7 @@ async def check_database_extended() -> dict:
             "status": "connected",
             "has_seed_data": seed_count > 0,
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         return {"healthy": False, "error": str(e), "status": "error"}
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
@@ -512,7 +512,7 @@ async def check_vector_store_extended() -> dict:
             "collection": getattr(vs, "collection_name", "unknown"),
             "status": "connected" if healthy else "error",
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         return {"healthy": False, "vector_count": 0, "error": str(e), "status": "error"}
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
@@ -520,9 +520,8 @@ async def check_vector_store_extended() -> dict:
 async def check_llm() -> bool:
     """检查 LLM 服务"""
     try:
-        from src.infra.llm import call_llm
         return True
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         return False
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
@@ -540,7 +539,6 @@ async def check_bagua_overall() -> Dict:
     }
 
     try:
-        from src.bagua.base_gua import GuaBase, HealthLevel, CircuitState
 
         # 尝试获取所有已实例化的卦
         # 通过全局注册表（如果有）或模块导入方式
@@ -564,7 +562,7 @@ async def check_bagua_overall() -> Dict:
                         for dep_name, dep_info in summary.get("dependencies", {}).items()
                     },
                 }
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 result["guas"][name] = {
                     "health": "off",
                     "error": str(e),
@@ -580,7 +578,7 @@ async def check_bagua_overall() -> Dict:
     except ImportError:
         result["health"] = "off"
         result["message"] = "bagua 模块未安装"
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         result["health"] = "off"
         result["error"] = str(e)
 
@@ -605,7 +603,7 @@ async def check_connection_pool() -> Dict:
             "status": "healthy" if usage < 0.80 else ("warning" if usage < 0.95 else "critical"),
             "timestamp": time.time(),
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         return {
             "healthy": False,
             "error": str(e),
@@ -647,7 +645,7 @@ async def check_llm_api_reachable() -> Dict:
                     "endpoint": MIMO_BASE_URL,
                     "timestamp": time.time(),
                 }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         return {
             "healthy": False,
             "error": str(e),
@@ -667,7 +665,7 @@ async def check_intent_bus() -> Dict:
             "registered_guas": len(intent_bus._guas) if hasattr(intent_bus, '_guas') else 0,
             "circuit_breakers": len(intent_bus._circuit_breakers) if hasattr(intent_bus, '_circuit_breakers') else 0,
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         return {
             "healthy": False,
             "error": str(e),
@@ -725,7 +723,7 @@ def _get_gua_instances() -> Dict[str, Any]:
                         break
             except ImportError:
                 pass
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         pass
 
     return result

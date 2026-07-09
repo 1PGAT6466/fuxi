@@ -98,7 +98,7 @@ class BaseAgent(ABC):
             result = await self._tools[tool_name](**params)
             duration = (time.time() - start) * 1000
             return ToolResult(tool_name=tool_name, success=True, data=result, duration_ms=duration)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             duration = (time.time() - start) * 1000
             return ToolResult(tool_name=tool_name, success=False, data=None, error=str(e), duration_ms=duration)
 

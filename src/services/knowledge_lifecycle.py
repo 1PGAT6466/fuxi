@@ -51,7 +51,7 @@ class KnowledgeLifecycle:
             log_file = LIFECYCLE_DIR / f"{event_type}.jsonl"
             with open(log_file, "a", encoding="utf-8") as f:
                 f.write(json.dumps(event, ensure_ascii=False) + "\n")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Lifecycle] 写入失败: {e}")
 
     async def check_triggers(self) -> List[Dict]:
@@ -85,9 +85,9 @@ class KnowledgeLifecycle:
                     try:
                         event = json.loads(line.strip())
                         candidates.append(event.get("data", {}))
-                    except Exception as e:
+                    except Exception as e:  # TODO: Narrow exception type
                         logger.warning("JSON解析生命周期事件失败: %s", e, exc_info=True)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("加载知识生命周期事件失败: %s", e, exc_info=True)
 
         return candidates
@@ -110,9 +110,9 @@ class KnowledgeLifecycle:
                         event = json.loads(line.strip())
                         if event.get("timestamp", 0) > cutoff:
                             count += 1
-                    except Exception as e:
+                    except Exception as e:  # TODO: Narrow exception type
                         logger.warning("JSON解析生命周期事件统计失败: %s", e, exc_info=True)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("统计知识生命周期事件数量失败: %s", e, exc_info=True)
 
         return count

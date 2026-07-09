@@ -45,7 +45,7 @@ async def judge_answer(query: str, answer: str, contexts: list) -> dict:
                 logger.error(f"[Judge] JSON 解析失败: {e}, raw_result={result[:200]}")
                 return {"overall": 3, "passed": True, "issues": ["JSON 解析失败"]}
         return {"overall": 3, "passed": True, "issues": []}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"[Judge] LLM-as-Judge failed: {e}")
         return {"overall": 3, "passed": True, "issues": [str(e)]}
 

@@ -29,7 +29,7 @@ def load_synonyms() -> Dict[str, list]:
             else:
                 _synonyms_cache = {}
                 logger.warning(f"[Synonyms] File not found: {SYNONYMS_PATH}")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             _synonyms_cache = {}
             logger.warning(f"[Synonyms] Load failed: {e}")
     

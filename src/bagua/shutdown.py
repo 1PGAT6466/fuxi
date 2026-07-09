@@ -16,7 +16,6 @@ shutdown.py — 优雅关机处理器 · 伏羲 v2.1 重构
     register_shutdown_handler(app, fuxi_instance)
 """
 
-from __future__ import annotations
 
 import asyncio
 import logging
@@ -164,7 +163,7 @@ class GracefulShutdown:
             await self._step_drain()
 
             self._ctx.complete()
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             self._ctx.phase = ShutdownPhase.ERROR
             self._ctx.record_error("shutdown", str(e))
             logger.critical("关机流程异常: %s", e, exc_info=True)
@@ -186,7 +185,7 @@ class GracefulShutdown:
             try:
                 self._app.state.shutting_down = True
                 logger.info("  → 已标记应用状态为 shutting_down，拒绝新请求")
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 self._ctx.record_error("STOP", f"标记应用状态失败: {e}")
 
         # 1b. 停止伏羲生命体（调用现有 sleep 方法）
@@ -194,7 +193,7 @@ class GracefulShutdown:
             try:
                 await self._fuxi.sleep()
                 logger.info("  → 伏羲生命体已进入休眠")
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("  → 伏羲休眠异常（继续关机）: %s", e)
 
         # 1c. 停止八卦模块的探活循环
@@ -250,7 +249,7 @@ class GracefulShutdown:
                         await task
                     except asyncio.CancelledError:
                         pass
-                    except Exception as e:
+                    except Exception as e:  # TODO: Narrow exception type
                         self._ctx.record_error("CANCEL", f"任务取消失败: {e}")
 
         # 2d. 取消八卦探活循环
@@ -303,9 +302,9 @@ class GracefulShutdown:
                     if hasattr(gua, "stop"):
                         gua.stop()
                         logger.info("  → [八卦] %s 已停止", name)
-                except Exception as e:
+                except Exception as e:  # TODO: Narrow exception type
                     self._ctx.record_error("STOP", f"卦 {name} 停止失败: {e}")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.debug("  → 八卦停止跳过: %s", e)
 
     async def _stop_meridian_rhythm(self) -> None:
@@ -316,21 +315,21 @@ class GracefulShutdown:
             if hasattr(self._fuxi, "rhythm") and self._fuxi.rhythm:
                 await self._fuxi.rhythm.stop()
                 logger.info("  → 经络流注已停止")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.debug("  → 经络流注停止跳过: %s", e)
 
         try:
             if hasattr(self._fuxi, "stem_scheduler") and self._fuxi.stem_scheduler:
                 await self._fuxi.stem_scheduler.stop()
                 logger.info("  → 天干调度已停止")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.debug("  → 天干调度停止跳过: %s", e)
 
         try:
             if hasattr(self._fuxi, "five_elements") and self._fuxi.five_elements:
                 await self._fuxi.five_elements.stop()
                 logger.info("  → 五行平衡已停止")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.debug("  → 五行平衡停止跳过: %s", e)
 
     def _collect_pending_tasks(self) -> List[asyncio.Task]:
@@ -366,13 +365,13 @@ class GracefulShutdown:
                             await recovery_task
                         except asyncio.CancelledError:
                             pass
-                        except Exception as exc:
+                        except Exception as exc:  # TODO: Narrow exception type
                             logger.debug(
                                 "  → [八卦/%s] 探活循环取消失败: %s", name, exc
                             )
                         else:
                             logger.debug("  → [八卦/%s] 探活循环已取消", name)
-                except Exception as exc:
+                except Exception as exc:  # TODO: Narrow exception type
                     logger.debug("  → [八卦/%s] 恢复探活取消失败: %s", name, exc)
                     pass
 
@@ -386,13 +385,13 @@ class GracefulShutdown:
                             await health_task
                         except asyncio.CancelledError:
                             pass
-                        except Exception as exc:
+                        except Exception as exc:  # TODO: Narrow exception type
                             logger.debug("  → [八卦/%s] 健康任务取消失败: %s", name, exc)
                             pass
-                except Exception as exc:
+                except Exception as exc:  # TODO: Narrow exception type
                     logger.debug("  → [八卦/%s] 任务获取失败: %s", name, exc)
                     pass
-        except Exception as exc:
+        except Exception as exc:  # TODO: Narrow exception type
             logger.debug("  → 八卦实例获取失败: %s", exc)
             pass
 
@@ -403,7 +402,7 @@ class GracefulShutdown:
             pool = get_connection_pool()
             pool.close_all()
             logger.info("  → 数据库连接池已关闭")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             self._ctx.record_error("DRAIN", f"连接池关闭失败: {e}")
 
     async def _drain_http_sessions(self) -> None:
@@ -417,7 +416,7 @@ class GracefulShutdown:
                     try:
                         await attr.close()
                         logger.debug("  → 已关闭 HTTP 会话: %s.%s", mod_name, attr_name)
-                    except Exception:
+                    except Exception:  # TODO: Narrow exception type
                         pass
 
     async def _drain_temp_files(self) -> None:
@@ -434,13 +433,13 @@ class GracefulShutdown:
                         try:
                             os.remove(os.path.join(root, f))
                             count += 1
-                        except Exception:
+                        except Exception:  # TODO: Narrow exception type
                             pass
             if count > 0:
                 logger.info("  → 已清理 %d 个临时文件", count)
             else:
                 logger.debug("  → 无临时文件需清理")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.debug("  → 临时文件清理跳过: %s", e)
 
     async def _drain_circuit_breakers(self) -> None:
@@ -451,14 +450,14 @@ class GracefulShutdown:
                 if hasattr(cb, "reset"):
                     cb.reset()
             logger.debug("  → 断路器已重置 (%d 个)", len(_circuit_breakers))
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
 
         # 同时清理健康检查跟踪的断路器状态
         try:
             from src.infra.health_check import _circuit_open_times
             _circuit_open_times.clear()
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
 
     def _drain_gua_registry(self) -> None:
@@ -467,7 +466,7 @@ class GracefulShutdown:
             from src.infra.health_check import _gua_registry
             _gua_registry.clear()
             logger.debug("  → 八卦注册表已清理")
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
 
     def _flush_logs(self) -> None:
@@ -476,7 +475,7 @@ class GracefulShutdown:
             for handler in logging.getLogger().handlers:
                 handler.flush()
             logger.debug("  → 日志已刷新")
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
 
 
@@ -491,7 +490,7 @@ def _get_all_gua_instances() -> Dict[str, Any]:
         from src.infra.health_check import _gua_registry
         if _gua_registry:
             return dict(_gua_registry)
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         pass
     return {}
 
@@ -589,5 +588,5 @@ def _register_signal_handlers(handler: GracefulShutdown) -> None:
         # Windows 不支持 add_signal_handler
         logger.debug("当前平台不支持 add_signal_handler (Windows)")
         # 在 Windows 上，uvicorn 会自行处理 SIGINT/SIGTERM
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.debug("信号注册跳过: %s", e)

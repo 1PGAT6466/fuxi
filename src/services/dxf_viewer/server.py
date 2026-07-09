@@ -40,7 +40,7 @@ def start_service() -> None:
         _service_running = True
         logger.info("DXF viewer service started")
 
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"Failed to start DXF viewer service: {e}")
         raise
 

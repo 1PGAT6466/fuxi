@@ -4,12 +4,10 @@
 """
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-import asyncio
 import json
 import logging
 import os
 import time
-from datetime import datetime, timezone
 from pathlib import Path
 
 logger = logging.getLogger(__name__)
@@ -50,7 +48,7 @@ async def evolution_overview(request: Request = None):
                 vector_count = vs.count
                 if vector_count < 0:
                     vector_count = 0
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 pass
 
         # 知识图谱统计
@@ -63,7 +61,7 @@ async def evolution_overview(request: Request = None):
             graph_edges = stats.get("edges_count", 0)
         except ImportError:
             pass
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
 
         # Dream Cycle 状态
@@ -89,7 +87,7 @@ async def evolution_overview(request: Request = None):
             from src.api.response import success
             return success(data=data, message="进化概览")
         return data
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"evolution_overview 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -125,7 +123,7 @@ def _get_dream_cycle_status() -> dict:
             claimed_docs = results.get("digest", {}).get("total_docs", 0)
             if actual_chunks < 100 and claimed_docs > 100:
                 is_consistent = False
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
 
         return {
@@ -141,7 +139,7 @@ def _get_dream_cycle_status() -> dict:
                 "gap_queries": results.get("gap_scan", {}).get("gap_queries", 0),
             },
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"解析 Dream 报告失败: {e}")
         return {
             "status": "error",
@@ -171,7 +169,7 @@ async def trigger_dream_cycle():
             status_code=500,
             content={"error": "DreamCycle 模块不可用", "detail": str(e)},
         )
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"DreamCycle 执行失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -237,15 +235,15 @@ async def get_latest_report():
                             f'报告声称 {claimed_total} 个文档，但数据库实际只有 {actual} 条 chunk。'
                             f'此报告数据为占位值，并非真实的演化结果。'
                         )
-                except Exception:
+                except Exception:  # TODO: Narrow exception type
                     pass
 
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.debug("读取日报 JSON 数据失败: %s", e)
 
         return response
 
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"获取日报失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -289,7 +287,7 @@ async def get_report_history(limit: int = 30):
                     ],
                 }
                 history.append(entry)
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.debug("解析日报历史 %s 失败: %s", df, e)
 
         return {
@@ -298,7 +296,7 @@ async def get_report_history(limit: int = 30):
             "history": history,
         }
 
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"获取日报历史失败: {e}")
         return JSONResponse(
             status_code=500,

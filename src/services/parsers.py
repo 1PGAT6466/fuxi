@@ -5,4 +5,3 @@
 services/parsers.py — 兼容层（保留：被 brain.py、ingest.py 引用）
 v1.50 HIGH 修复：将 import * 改为显式导入。
 """
-from src.shaoyang.parser import DocumentParser

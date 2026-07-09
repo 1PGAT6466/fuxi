@@ -13,10 +13,8 @@ Phase 2 实现：
   - 对话摘要：从多轮对话提取摘要
 """
 
-from __future__ import annotations
 
 import hashlib
-import json
 import logging
 import time
 from typing import Any, Dict, List, Optional, Tuple
@@ -542,7 +540,7 @@ class DuiGua(GuaBase):
                 # 如果存在 gaps，将 gap_text 追加到 answer
                 if gap_result.has_gaps and gap_result.gap_text:
                     answer = answer.rstrip() + "\n\n" + gap_result.gap_text
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 logger.warning(
                     "☱ [兑] Gap Analysis 执行失败，跳过", exc_info=True
                 )

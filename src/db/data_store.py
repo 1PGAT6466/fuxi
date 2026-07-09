@@ -5,13 +5,15 @@ data_store.py — 数据存储工具（v10.0）
 """
 import os, json, time, threading
 from datetime import datetime, timezone
-from pathlib import Path
-from collections import Counter
 
 from src.db.memory_store import get_store
 from src.config import (
-    DATA_DIR, LOG_DIR, CHUNKS_FILE, CONFIG_FILE, CONFIG_HISTORY_DIR,
-    GRAPH_PATH, FEEDBACK_DIR, TOOLS_DATA, FAQ_DATA
+    LOG_DIR,
+    CONFIG_FILE,
+    CONFIG_HISTORY_DIR,
+    GRAPH_PATH,
+    TOOLS_DATA,
+    FAQ_DATA,
 )
 
 # ============ 索引初始化 ============
@@ -123,7 +125,7 @@ def load_config() -> dict:
     try:
         if CONFIG_FILE.exists():
             return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.warning(f"[data_store] suppressed exception", exc_info=True)
         pass
     return {"tools": TOOLS_DATA, "faq": FAQ_DATA}
@@ -162,7 +164,7 @@ def log_search(query: str, results: int, ms: float, top_items: list = None):
         with open(f, "a", encoding="utf-8") as fh:
             json.dump(entry, fh, ensure_ascii=False)
             fh.write("\n")
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.warning(f"[data_store] suppressed exception", exc_info=True)
         pass
 
@@ -181,10 +183,10 @@ def search_history(days: int = 7) -> list:
                                 ts = datetime.fromisoformat(e["time"]).timestamp()
                                 if ts >= cutoff:
                                     hist.append(e)
-                        except Exception:
+                        except Exception:  # TODO: Narrow exception type
                             logger.warning(f"[data_store] suppressed exception", exc_info=True)
                             pass
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.warning(f"[data_store] suppressed exception", exc_info=True)
         pass
     return sorted(hist, key=lambda x: x.get("time", ""), reverse=True)[:30]
@@ -255,7 +257,7 @@ def load_graph() -> dict:
                             "relation": d["relation_type"]
                         })
                 return {"nodes": nodes, "edges": edges}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
 
         logger.warning("suppressed exception", exc_info=True)
     return {"nodes": {}, "edges": []}
@@ -280,7 +282,7 @@ def log_behavior(entry: dict):
         with open(f, "a", encoding="utf-8") as fh:
             json.dump(entry, fh, ensure_ascii=False)
             fh.write("\n")
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.warning(f"[data_store] suppressed exception", exc_info=True)
         pass
 
@@ -296,7 +298,7 @@ def get_user_preferences(uid: str) -> dict:
         try:
             all_prefs = json.loads(USER_PREFERENCES_FILE.read_text(encoding="utf-8"))
             prefs = all_prefs.get(uid, {})
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             logger.warning(f"[data_store] suppressed exception", exc_info=True)
             pass
     return prefs
@@ -307,7 +309,7 @@ def save_user_preferences(uid: str, prefs: dict):
     if USER_PREFERENCES_FILE.exists():
         try:
             all_prefs = json.loads(USER_PREFERENCES_FILE.read_text(encoding="utf-8"))
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             logger.warning(f"[data_store] suppressed exception", exc_info=True)
             pass
     all_prefs[uid] = prefs

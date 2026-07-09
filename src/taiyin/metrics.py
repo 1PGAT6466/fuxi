@@ -131,7 +131,7 @@ def inc_counter(name: str, value: int = 1):
     try:
         if name in _counter_map and _counter_map[name]:
             _counter_map[name].inc(value)
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.debug("[suppressed] _counter_map[name].inc(value)")
         pass
 
@@ -140,7 +140,7 @@ def observe_histogram(name: str, value: float):
     try:
         if name == "kb_search_latency_seconds":
             search_duration_seconds.observe(value)
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.debug("[suppressed] search_duration_seconds.observ")
         pass
 
@@ -152,7 +152,7 @@ def generate_health_summary():
     from src.db.data_store import load_chunks
     try:
         chunks = load_chunks()
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("加载chunks指标失败: %s", e, exc_info=True)
         chunks = []
     uptime_hours = round((time.time() - START_TIME) / 3600, 1)

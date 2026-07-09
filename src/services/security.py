@@ -5,10 +5,3 @@
 services/security.py — 兼容层（保留：被 pipeline/unified.py 引用）
 v1.50 HIGH 修复：将 import * 改为显式导入。
 """
-from src.taiyin.security import (
-    SecurityRateLimiter,
-    check_rate_limit,
-    audit_log_entry,
-    sanitize_xss,
-    sanitize_user_input,
-)

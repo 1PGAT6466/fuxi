@@ -93,7 +93,7 @@ def _check_login_rate(ip: str) -> bool:
             )
             conn.commit()
             return True
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"登录限流存储异常，回退到内存模式: {e}")
         # 回退：内存模式
         attempts = _login_attempts[ip]
@@ -192,14 +192,14 @@ def login(body: LoginRequest, request: Request = None):
         return {"token": token, "username": body.username, "role": user.get("role", "user"), "display_name": user.get("display_name", body.username)}
     except HTTPException as e:
         raise
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"login 失败: {e}")
         return server_error("登录服务异常", detail=str(e))
 
 @router.post("/register")
 def register(body: RegisterRequest, request: Request = None):
     """用户注册 — v1.50 R2: 添加邮箱字段和敏感用户名检查"""
-    from src.api.response import success, error, bad_request, server_error
+    from src.api.response import success, error, server_error
     try:
         import json, time
         from pathlib import Path
@@ -236,7 +236,7 @@ def register(body: RegisterRequest, request: Request = None):
         return {"ok": True, "username": body.username}
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"register 失败: {e}")
         return server_error("注册服务异常", detail=str(e))
 
@@ -254,7 +254,7 @@ async def auth_refresh(body: RefreshRequest = None, request: Request = None):
     从 Authorization header 或请求体获取当前 token，验证后签发新 token。
     旧 token 在有效期内仍可使用，但建议客户端切换到新 token。
     """
-    from src.api.response import success, error, unauthorized, server_error
+    from src.api.response import success, unauthorized, server_error
     try:
         from src.api.auth import create_jwt_token, verify_jwt_token
 
@@ -294,7 +294,7 @@ async def auth_refresh(body: RefreshRequest = None, request: Request = None):
             return success(data={"token": new_token, "username": username, "role": role}, message="Token 已刷新")
         return {"token": new_token, "username": username, "role": role}
 
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"auth_refresh 失败: {e}")
         return server_error("Token 刷新服务异常", detail=str(e))
 
@@ -321,7 +321,7 @@ async def auth_logout(request: Request = None):
             return success(data=None, message="已登出")
         return {"ok": True, "message": "已登出"}
 
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"auth_logout 失败: {e}")
         return JSONResponse(
             status_code=500,

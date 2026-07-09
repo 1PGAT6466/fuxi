@@ -196,7 +196,7 @@ def extract_dxf(file_path: str) -> Dict[str, Any]:
         doc = ezdxf.readfile(str(path))
     except ezdxf.DXFStructureError as e:
         raise ValueError(f"Invalid DXF file structure: {e}")
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         raise ValueError(f"Failed to read DXF file: {e}")
 
     msp = doc.modelspace()
@@ -212,7 +212,7 @@ def extract_dxf(file_path: str) -> Dict[str, Any]:
                 entities.append(data)
                 if dxftype in ("TEXT", "MTEXT") and data.get("text"):
                     text_content.append(data["text"])
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning(f"Failed to extract {dxftype}: {e}")
 
     bounds = _compute_bounds(entities)

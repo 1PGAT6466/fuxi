@@ -28,7 +28,7 @@ async def files_list(request: Request, page: int = 1, page_size: int = 50):
 @router.post("/api/files/upload")
 async def files_upload(request: Request):
     """文件上传 — 别名 /api/upload"""
-    from fastapi import UploadFile, File as FastAPIFile
+    from fastapi import File as FastAPIFile
     # 尝试读取 multipart form
     from src.api.documents import upload
     form = await request.form()
@@ -67,7 +67,7 @@ async def files_delete(file_id: str, request: Request):
             vs = get_vector_store()
             if vs:
                 vs.delete_by_file(file_id)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"向量库删除失败（非致命）: {e}")
 
         # 删除物理文件（如果存在）
@@ -82,7 +82,7 @@ async def files_delete(file_id: str, request: Request):
                         if computed_hash == file_id[:16] or file_id in str(fpath):
                             fpath.unlink()
                             logger.info(f"[files_alias] 物理文件已删除: {fpath}")
-                    except Exception as e:
+                    except Exception as e:  # TODO: Narrow exception type
                         logger.warning(f"物理文件删除失败: {e}")
 
         return {
@@ -92,7 +92,7 @@ async def files_delete(file_id: str, request: Request):
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"files_delete 失败: {e}")
         raise HTTPException(500, f"删除失败: {str(e)}")
 
@@ -145,6 +145,6 @@ async def files_update(file_id: str, request: Request):
         }
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"files_update 失败: {e}")
         raise HTTPException(500, f"更新失败: {str(e)}")

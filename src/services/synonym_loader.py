@@ -5,8 +5,3 @@
 services/synonym_loader.py — 兼容层（保留：被 query_expansion.py、results_postprocess、taiyang/query_expansion 引用）
 v1.50 HIGH 修复：将 import * 改为显式导入。
 """
-from src.taiyang.synonym_loader import (
-    load_synonyms,
-    expand_query_with_synonyms,
-    normalize_entity,
-)

@@ -4,7 +4,6 @@ services/crag_validator.py — CRAG 检索校验环
 """
 
 import logging
-from typing import List, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +53,7 @@ async def rewrite_for_retry(original_query: str, reason: str) -> str:
     try:
         rewritten = await call_ai(prompt)
         return rewritten.strip().strip('"').strip("'") or original_query
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"CRAG rewrite failed: {e}, using original query")
         return original_query
 
@@ -129,7 +128,7 @@ async def rewrite_and_retry(query: str, bad_docs: list, top_k: int = 10) -> list
             results = await hybrid_search(new_q, load_chunks(), top_k=top_k)
             if results:
                 return results
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f'[CRAG] Retry {retries+1} failed: {e}')
         retries += 1
     return None

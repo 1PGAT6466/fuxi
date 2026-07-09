@@ -428,6 +428,6 @@ def llm_classify(text: str) -> str:
             timeout=10
         )
         return r.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("LLM分类失败: %s", e, exc_info=True)
         return ""

@@ -2,9 +2,8 @@
 table_parser.py — Phase 8.3: 表格解析与结构化存储
 支持 Excel/CSV/PDF表格 → 结构化 JSON，可独立查询
 """
-import json, os, re, csv, logging
-from pathlib import Path
-from typing import List, Dict, Optional
+import logging
+from typing import List, Dict
 
 logger = logging.getLogger("table_parser")
 

@@ -6,7 +6,6 @@ v1.50: 种子数据自动标记 origin=seed
 from fastapi import APIRouter, Request, Query
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import List, Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -86,7 +85,7 @@ async def rag_search(body: SearchRequest, request: Request = None):
             }
         except ImportError:
             pass
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"taiyang.retrieval 调用失败，回退到基本搜索: {e}")
 
         # 回退：使用 db/vector_store 直接检索
@@ -111,7 +110,7 @@ async def rag_search(body: SearchRequest, request: Request = None):
                     "total": len(formatted),
                     "seed_count": sum(1 for r in formatted if r.get("origin") == "seed"),
                 }
-        except Exception as e2:
+        except Exception as e2:  # TODO: Narrow exception type
             logger.warning(f"vector_store 回退也失败: {e2}")
 
         # 最终回退：返回空结果
@@ -119,7 +118,7 @@ async def rag_search(body: SearchRequest, request: Request = None):
             "results": [],
             "total": 0,
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"rag_search 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -166,7 +165,7 @@ async def rag_sag_search(body: EventSearchRequest, request: Request = None):
                 }
         except ImportError:
             pass
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"sag_pipeline 调用失败，回退: {e}")
 
         # 回退：使用标准 chunk 检索
@@ -189,7 +188,7 @@ async def rag_sag_search(body: EventSearchRequest, request: Request = None):
             }
         except ImportError:
             pass
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"retrieval 回退失败: {e}")
 
         # 最终回退
@@ -199,7 +198,7 @@ async def rag_sag_search(body: EventSearchRequest, request: Request = None):
             "total": 0,
             "granularity": granularity,
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"rag_sag_search 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -237,7 +236,7 @@ async def rag_sag_trace(body: SAGTraceRequest, request: Request = None):
                 real_trace = tracer.get_trace(body.session_id)
             except ImportError:
                 pass
-            except Exception as trace_err:
+            except Exception as trace_err:  # TODO: Narrow exception type
                 logger.warning(f"SAG 追踪获取失败: {trace_err}")
             
             if real_trace and real_trace.get("stages"):
@@ -267,7 +266,7 @@ async def rag_sag_trace(body: SAGTraceRequest, request: Request = None):
                 "X-Accel-Buffering": "no",
             },
         )
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"rag_sag_trace 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -306,7 +305,7 @@ async def rag_entity_expand(
             }
         except ImportError:
             logger.info("taiyang.expand 模块未安装，实体扩展功能不可用")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"expand_entity 调用失败: {e}")
 
         # 尝试知识图谱回退
@@ -336,7 +335,7 @@ async def rag_entity_expand(
                         "total": len(related),
                         "source": "knowledge_graph",
                     }
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"知识图谱回退失败: {e}")
 
         # 明确告知调用方：功能未实现 vs 无匹配结果
@@ -346,7 +345,7 @@ async def rag_entity_expand(
             "total": 0,
             "notice": "实体扩展功能当前不可用：缺少嵌入模型模块 (taiyang.expand) 且知识图谱中无此实体",
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"rag_entity_expand 失败: {e}")
         return JSONResponse(
             status_code=500,

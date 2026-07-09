@@ -57,7 +57,7 @@ def _rotate_if_needed(path: Path) -> None:
             rotated = path.with_suffix(f".{int(time.time())}.jsonl")
             path.rename(rotated)
             logger.info("审计日志轮转: %s → %s (%d 行)", path.name, rotated.name, line_count)
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         pass
 
 
@@ -104,7 +104,7 @@ def write_audit(
                     "success": entry.success,
                     "details": entry.details,
                 }, ensure_ascii=False) + "\n")
-        except Exception as exc:
+        except Exception as exc:  # TODO: Narrow exception type
             logger.error("审计日志写入失败: %s", exc)
 
 
@@ -159,9 +159,9 @@ def query_audit(
                         results.append(entry)
                         if len(results) >= limit:
                             break
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 continue
-    except Exception as exc:
+    except Exception as exc:  # TODO: Narrow exception type
         logger.warning("审计日志查询失败: %s", exc)
 
     return results
@@ -213,9 +213,9 @@ def get_audit_stats(days: int = 7) -> Dict[str, Any]:
                         stats["unique_users"].add(entry.get("user", ""))
                         if not entry.get("success", True):
                             stats["failed_attempts"] += 1
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 continue
-    except Exception as exc:
+    except Exception as exc:  # TODO: Narrow exception type
         logger.warning("审计统计失败: %s", exc)
 
     stats["unique_users"] = len(stats["unique_users"])
@@ -230,7 +230,7 @@ def register_audit_routes():
         checker = get_health_checker()
         checker.register_infra_check("audit_log", _check_audit_log_health)
         logger.info("审计日志路由已注册")
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.debug("审计日志路由注册失败: %s", e)
 
 

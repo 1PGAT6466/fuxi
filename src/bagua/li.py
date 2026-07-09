@@ -12,10 +12,9 @@ Phase 2 实现：
   - 支持多轮查询和结果截断
 """
 
-from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from src.bagua.base_gua import (
     GuaBase,

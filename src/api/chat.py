@@ -1,6 +1,6 @@
 # v2.1 双路由开关 — 对话路由（v1 ShaoyinBrain + v2 乾卦意图循环）
 # v1.44 Phase 1 Fix: 新增会话管理 + SSE流式 + 历史消息端点
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel, field_validator
 from typing import List, Optional
@@ -88,7 +88,7 @@ def _load_sessions_from_db():
                     "timestamp": row_dict["timestamp"],
                 })
         logger.info(f"已从 SQLite 加载 {len(_sessions_store)} 个会话")
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"加载持久化会话失败: {e}")
 
 
@@ -107,7 +107,7 @@ def _save_session_to_db(session: dict):
                 session.get("updated_at", 0), session.get("message_count", 0)
             ))
             conn.commit()
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"持久化会话失败: {e}")
 
 
@@ -123,7 +123,7 @@ def _save_message_to_db(session_id: str, msg: dict):
                 VALUES (?, ?, ?, ?, ?)
             """, (session_id, msg.get("role", ""), msg.get("content", ""), sources_json, msg.get("timestamp", 0)))
             conn.commit()
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"持久化消息失败: {e}")
 
 
@@ -136,7 +136,7 @@ def _delete_session_from_db(session_id: str):
             conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
             conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
             conn.commit()
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"删除持久化会话失败: {e}")
 
 
@@ -210,7 +210,7 @@ async def _chat_v1(body: ChatRequest, request: Optional[Request] = None):
         if _wants_v2:
             return success(data=answer_data, message="对话完成")
         return answer_data
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         _wants_v2 = request and (
             request.query_params.get("format") == "v2"
             or request.headers.get("X-API-Format", "").lower() == "v2"
@@ -246,7 +246,7 @@ async def _chat_v2(body: ChatRequest, request: Optional[Request] = None):
             "mode": "qian",
             "confidence": _compute_qian_confidence(result),
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         return {
             "answer": f"乾卦路径处理失败: {str(e)}",
             "sources": [],
@@ -337,7 +337,7 @@ async def chat_sessions(request: Request):
             "sessions": user_sessions,
             "total": len(user_sessions),
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"chat_sessions 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -372,7 +372,7 @@ async def create_session(body: CreateSessionRequest, request: Request):
             "updated_at": session["updated_at"],
             "message_count": session["message_count"],
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"create_session 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -401,7 +401,7 @@ async def delete_session(session_id: str, request: Request):
         _messages_store.pop(session_id, None)
         _delete_session_from_db(session_id)  # v2.1: 持久化删除
         return {"ok": True, "message": f"会话 {session_id} 已删除"}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"delete_session 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -505,7 +505,7 @@ async def chat_send(body: ChatSendRequest, request: Request):
                         _messages_store.setdefault(session_id, []).append(asst_msg)
                         _save_message_to_db(session_id, asst_msg)  # v2.1: 持久化
 
-                except Exception as e:
+                except Exception as e:  # TODO: Narrow exception type
                     logger.exception(f"SSE 生成失败: {e}")
                     error_chunk = {"type": "error", "content": str(e)}
                     yield f"data: {json.dumps(error_chunk, ensure_ascii=False)}\n\n"
@@ -541,7 +541,7 @@ async def chat_send(body: ChatSendRequest, request: Request):
 
             return result
 
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"chat_send 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -572,7 +572,7 @@ async def chat_session_messages(session_id: str, request: Request):
             "messages": messages,
             "total": len(messages),
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"chat_session_messages 失败: {e}")
         return JSONResponse(
             status_code=500,

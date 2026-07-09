@@ -26,12 +26,11 @@ Usage::
     # result == {"consensus_answer": "...", "votes": {...}, "models_used": [...]}
 """
 
-from __future__ import annotations
 
 import asyncio
 import logging
 import time
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("bagua.water_mirror")
 
@@ -221,7 +220,7 @@ class WaterMirror:
         except asyncio.TimeoutError:
             logger.debug("💧 [水镜] MiMo 超时")
             return None
-        except Exception as exc:
+        except Exception as exc:  # TODO: Narrow exception type
             logger.debug("💧 [水镜] MiMo 异常: %s", exc)
             return None
 
@@ -260,7 +259,7 @@ class WaterMirror:
         except asyncio.TimeoutError:
             logger.debug("💧 [水镜] DeepSeek 超时")
             return None
-        except Exception as exc:
+        except Exception as exc:  # TODO: Narrow exception type
             logger.debug("💧 [水镜] DeepSeek 异常: %s", exc)
             return None
 
@@ -298,7 +297,7 @@ class WaterMirror:
         except asyncio.TimeoutError:
             logger.debug("💧 [水镜] GPT-4o-mini 超时")
             return None
-        except Exception as exc:
+        except Exception as exc:  # TODO: Narrow exception type
             logger.debug("💧 [水镜] GPT-4o-mini 异常: %s", exc)
             return None
 

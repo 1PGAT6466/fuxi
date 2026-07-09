@@ -4,7 +4,7 @@ state_manager.py — 对话状态管理 v4.0
 """
 import time
 import logging
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Any
 from dataclasses import dataclass, field
 from collections import OrderedDict
 

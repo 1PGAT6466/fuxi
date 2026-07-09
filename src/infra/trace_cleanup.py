@@ -2,7 +2,6 @@
 trace_cleanup.py — trace文件清理
 保留7天，定时清理
 """
-import os
 import time
 import logging
 from pathlib import Path
@@ -39,7 +38,7 @@ class TraceCleanup:
                     deleted += 1
                 else:
                     kept += 1
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning(f"[TraceCleanup] 删除失败: {trace_file}: {e}")
 
         logger.info(f"[TraceCleanup] 清理完成: 删除{deleted}个, 保留{kept}个")
@@ -61,7 +60,7 @@ class TraceCleanup:
                     "modified": stat.st_mtime,
                     "age_days": (time.time() - stat.st_mtime) / 86400,
                 })
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("Exception 失败: %s", e, exc_info=True)
 
         return sorted(files, key=lambda x: x["modified"], reverse=True)

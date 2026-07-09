@@ -4,8 +4,7 @@ knowledge_evolver.py — 知识图谱自动进化 (v13.0)
 
 本体（Ontology）定义规则，知识图谱（KG）记录事实。
 """
-import os, json, re
-from pathlib import Path
+import json, re
 from datetime import datetime
 
 from src.config import DATA_DIR
@@ -205,7 +204,7 @@ def get_graph_stats() -> dict:
         return {"total_entities": 0, "total_edges": 0}
     try:
         graph = json.loads(GRAPH_FILE.read_text(encoding='utf-8'))
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("get_graph_stats 读取图谱失败: %s", e, exc_info=True)
         return {"total_entities": 0, "total_edges": 0}
     
@@ -228,7 +227,7 @@ def get_graph_nodes() -> dict:
         return {"nodes": [], "edges": []}
     try:
         graph = json.loads(GRAPH_FILE.read_text(encoding='utf-8'))
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("get_graph_nodes 读取图谱失败: %s", e, exc_info=True)
         return {"nodes": [], "edges": []}
     

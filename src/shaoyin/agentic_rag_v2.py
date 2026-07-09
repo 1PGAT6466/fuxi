@@ -3,7 +3,7 @@ agentic_rag_v2.py — 太极 · 主 Agent v2.0
 Plan → Execute → Reflect 循环，8 个工具，由 MiMo function calling 驱动
 """
 import json, logging, asyncio, time
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -153,7 +153,6 @@ SYSTEM_PROMPT = """你是伏羲知识库的执行智能体。
 
 async def _call_mimo_with_tools(query: str, context: List[Dict], step: int) -> Dict:
     """调用 MiMo API with function calling"""
-    from src.services.llm import _call_api
     from src.config import MIMO_API_KEY, MIMO_BASE_URL, MIMO_MODEL, MIMO_TIMEOUT
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
@@ -289,7 +288,7 @@ async def _tool_describe_image(args: dict) -> str:
         if img_results:
             return img_results[0].get("text", "")[:500]
         return f"无法描述图片。路径: {image_path}"
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         return f"图片描述失败: {str(e)[:200]}"
 
 
@@ -346,7 +345,7 @@ async def _execute_tool(tool_call: Dict) -> str:
             return await handler(args)
         else:
             return handler(args)
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"Tool {func_name} error: {e}")
         return f"工具执行失败: {str(e)[:200]}"
 

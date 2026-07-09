@@ -13,7 +13,7 @@ logger = logging.getLogger('embedder')
 
 from fastapi import FastAPI
 from pydantic import BaseModel
-from typing import List, Optional
+from typing import List
 # sentence_transformers imported lazily in _get_model()
 
 EMBEDDING_MODEL = os.getenv("KB_MODEL", "BAAI/bge-small-zh-v1.5")
@@ -89,7 +89,6 @@ async def rerank(body: RerankRequest):
 @app.get("/health")
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def health():
-    import threading
     return {
         "status": "ready",
         "model": EMBEDDING_MODEL,
@@ -125,7 +124,7 @@ async def embed_text(text: str) -> list:
                 if resp.status == 200:
                     data = await resp.json()
                     return data.get("vectors", data.get("embeddings", [[]]))[0]
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("embed_text 操作失败: %s", e, exc_info=True)
     return []
 
@@ -144,7 +143,7 @@ async def batch_embed(texts: list) -> list:
                 if resp.status == 200:
                     data = await resp.json()
                     return data.get("vectors", data.get("embeddings", []))
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("batch_embed 操作失败: %s", e, exc_info=True)
     return [[]] * len(texts)
 

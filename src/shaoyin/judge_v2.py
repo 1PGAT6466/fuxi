@@ -3,7 +3,7 @@ judge_v2.py — LLM-as-Judge 答案质量评分 (v1.50)
 用 MiMo 2.5 Pro 自动评估答案质量
 """
 import json, logging
-from typing import Dict, Optional
+from typing import Dict
 
 logger = logging.getLogger(__name__)
 
@@ -55,7 +55,7 @@ async def judge_answer(query: str, context: str, answer: str) -> Dict:
                     logger.error(f"[Judge V2] 正则提取的 JSON 解析失败: {e}, matched={match.group()[:200]}")
                     return {"overall": 0, "reason": "JSON 解析失败"}
             return {"overall": 0, "reason": "解析失败"}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"Judge 评分失败: {e}")
         return {"overall": 0, "reason": str(e)}
 

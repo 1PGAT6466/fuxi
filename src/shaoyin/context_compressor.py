@@ -32,7 +32,7 @@ async def compress_text(text, query, call_llm_fn=None, max_output_chars=500):
             ratio = len(compressed) / max(len(text), 1)
             logger.debug(f"[Compress] {len(text)} -> {len(compressed)} chars ({ratio:.0%})")
             return compressed
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"[Compress] failed: {e}")
     
     return text[:max_output_chars]
@@ -69,7 +69,6 @@ def extract_relevant_sentences(query: str, text: str, max_sentences: int = 5) ->
     策略: TF-IDF 关键词重叠 → 取 top-N 相关句子
     """
     import re
-    from collections import Counter
     
     # 分词（中文按字符 2-gram）
     def tokenize(s):

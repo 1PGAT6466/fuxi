@@ -6,10 +6,9 @@ cache.py — 语义缓存服务 (RAG 3.0)
 """
 import asyncio
 import hashlib
-import json
 import time
 from collections import OrderedDict
-from typing import Optional, Any
+from typing import Optional
 import logging
 
 logger = logging.getLogger(__name__)
@@ -70,7 +69,7 @@ async def get_cache(query: str, category: str = "", top_k: int = 15) -> Optional
                     if len(_l2_cache) - valid_count > 10:
                         _l2_cache[:] = [(e, r, t) for e, r, t in _l2_cache
                                         if now - t < MAX_CACHE_AGE_SECONDS]
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
 
                 logger.warning(f"[cache] suppressed exception", exc_info=True)
     _cache_misses += 1
@@ -102,7 +101,7 @@ async def set_cache(query: str, results: list, category: str = "", top_k: int = 
                                 if now - t < MAX_CACHE_AGE_SECONDS]
                 while len(_l2_cache) > MAX_CACHE_SIZE // 2:
                     _l2_cache.pop(0)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
 
             logger.warning(f"[cache] suppressed exception", exc_info=True)
 

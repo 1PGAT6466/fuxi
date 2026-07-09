@@ -8,7 +8,7 @@ lifecycle.py — 知识生命周期封装层（第九宫 · 中宫）
 """
 
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 # ---- 从 services 导入原有实现 ----
 from src.services.knowledge_lifecycle import (

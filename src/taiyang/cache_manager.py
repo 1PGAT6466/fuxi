@@ -3,7 +3,7 @@ cache_manager.py — Phase 4.1: 三层缓存 + 补充5 缓存失效
 L1 精确匹配 + L2 语义匹配 + L3 段落缓存
 """
 import hashlib, time, logging
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -79,7 +79,7 @@ class CacheManager:
             if best_result:
                 self._hits["L2"] += 1
                 return best_result
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             logger.debug("[suppressed] return best_result")
             pass
         return None

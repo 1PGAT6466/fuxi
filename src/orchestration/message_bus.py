@@ -4,11 +4,10 @@ message_bus.py — Agent 间异步通信 v4.0
 """
 import asyncio
 import logging
-import time
 from typing import Dict, List, Callable, Awaitable, Optional
 from collections import defaultdict
 
-from src.protocols import ProtocolMessage, MessageType
+from src.protocols import ProtocolMessage
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +32,7 @@ class MessageBus:
         for handler in handlers:
             try:
                 await handler(message)
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.error(f"[MessageBus] Handler error: {e}")
 
     async def request(self, message: ProtocolMessage, timeout: float = 30) -> Optional[ProtocolMessage]:

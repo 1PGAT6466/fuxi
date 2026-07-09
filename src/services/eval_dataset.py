@@ -2,7 +2,7 @@
 eval_dataset.py — Phase 1.3.1: 评测数据集管理
 """
 import sqlite3, json, os, logging
-from typing import List, Dict, Optional
+from typing import List, Dict
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,7 @@ def add_case(case: Dict) -> bool:
         )
         conn.commit()
         return True
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"add_case failed: {e}")
         return False
     finally:

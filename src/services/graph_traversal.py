@@ -5,12 +5,3 @@
 services/graph_traversal.py — 兼容层（保留：被 agentic_rag_v2、graph_router、retrieval 引用）
 v1.50 HIGH 修复：将 import * 改为显式导入。
 """
-from src.taiyang.graph_traversal import (
-    _get_conn,
-    build_adjacency,
-    load_graph,
-    multi_hop_traverse,
-    find_paths,
-    subgraph,
-    get_reachable_entities,
-)

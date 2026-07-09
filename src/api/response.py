@@ -32,7 +32,6 @@
       return paginated(items=[...], total=100, page=1, page_size=20)
 """
 
-from __future__ import annotations
 
 import functools
 import logging
@@ -239,7 +238,7 @@ def backward_compatible(
 
             try:
                 result = await func(*args, **kwargs)
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 raise
 
             # 如果已经是 JSONResponse，直接返回

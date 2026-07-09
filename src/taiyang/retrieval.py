@@ -6,7 +6,7 @@ import asyncio
 import json
 import logging
 import time
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
 from src.infra.symbol_base import SymbolBase
 from src.taiyang.shared import _deduplicate_chunks
@@ -93,7 +93,7 @@ class TaiyangRetrieval(SymbolBase):
                 else:
                     logger.info(f"[{trace_id}] [太阳] L0 缓存命中: query_len={len(query)}, 返回 {len(cached)} 条")
                     return cached
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.debug(f"[{trace_id}] [太阳] 缓存检查跳过: {e}")
 
             # ==============================================================
@@ -127,7 +127,7 @@ class TaiyangRetrieval(SymbolBase):
                     from src.taiyang.multi_hop import multi_hop_search
                     multi_hop_results = await multi_hop_search(query, top_k=top_k)
                     logger.info(f"[{trace_id}] [太阳] 多跳检索: {len(multi_hop_results)} results")
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.debug(f"[{trace_id}] [太阳] 多跳检索跳过: {e}")
 
             # L2.6: 知识图谱查询
@@ -141,7 +141,7 @@ class TaiyangRetrieval(SymbolBase):
                     entity_context = router.get_entity_context(query)
                     if entity_context.get("found"):
                         logger.info(f"[{trace_id}] [太阳] 图谱查询: {entity_context.get('count', 0)} 实体")
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.debug(f"[{trace_id}] [太阳] 图谱查询跳过: {e}")
 
             # L3: 融合
@@ -166,14 +166,14 @@ class TaiyangRetrieval(SymbolBase):
                 from src.services.online_eval import get_online_evaluator
                 evaluator = get_online_evaluator()
                 await evaluator.record_search_metric(query, expanded, duration, trace_id)
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 pass
 
             # 记录缓存统计
             try:
                 from src.infra.cache_stats import get_cache_stats
                 get_cache_stats().record_miss(duration)
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 pass
 
             # 记录成长数据
@@ -185,7 +185,7 @@ class TaiyangRetrieval(SymbolBase):
                     query=query, trace_id=trace_id or "", search_mode=strategy,
                     result_count=len(expanded), max_score=max_score, duration_ms=duration,
                 )
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 pass
 
             # L7: 写入缓存
@@ -193,7 +193,7 @@ class TaiyangRetrieval(SymbolBase):
                 try:
                     from src.taiyang.cache import set_cache
                     await set_cache(query, expanded, category="", top_k=top_k)
-                except Exception as e:
+                except Exception as e:  # TODO: Narrow exception type
                     logger.debug(f"[{trace_id}] [太阳] 缓存写入跳过: {e}")
 
             if logger.isEnabledFor(logging.DEBUG):
@@ -203,13 +203,13 @@ class TaiyangRetrieval(SymbolBase):
 
             return expanded
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error(f"[{trace_id}] [太阳] 检索失败: {e}")
             # 记录错误
             try:
                 from src.infra.error_tracker import get_error_tracker
                 get_error_tracker().record_error("retrieval_failed", str(e), {"query": query[:100], "trace_id": trace_id})
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 pass
             return []
         finally:
@@ -220,7 +220,7 @@ class TaiyangRetrieval(SymbolBase):
         try:
             from src.taiyang.query_expansion import expand_query
             return expand_query(query)
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             return query
 
     async def _bm25_recall(self, query: str, top_k: int) -> List[Dict[str, Any]]:
@@ -237,7 +237,7 @@ class TaiyangRetrieval(SymbolBase):
                  "score": r.get("score", 0), "_source": "bm25"}
                 for r in results
             ]
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             return []
 
     async def _vector_recall(self, query: str, top_k: int) -> List[Dict[str, Any]]:
@@ -268,7 +268,7 @@ class TaiyangRetrieval(SymbolBase):
                         "_similarity": round(sim, 4),
                     })
             return results
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             return []
 
     def _fuse(self, bm25_results: List[Dict], vector_results: List[Dict]) -> List[Dict[str, Any]]:
@@ -276,7 +276,7 @@ class TaiyangRetrieval(SymbolBase):
         try:
             from src.taiyang.fusion import rrf_fusion
             return rrf_fusion(bm25_results, vector_results)
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             return bm25_results + vector_results
 
     async def _rerank(self, query: str, results: List[Dict]) -> List[Dict[str, Any]]:
@@ -286,7 +286,7 @@ class TaiyangRetrieval(SymbolBase):
             reranked = await rerank_with_deepseek(query, results, top_k=len(results))
             if reranked:
                 return reranked
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
         return results
 
@@ -295,7 +295,7 @@ class TaiyangRetrieval(SymbolBase):
         try:
             from src.taiyang.results_postprocess import expand_context
             return expand_context(results)
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             return results
 
     # ==================================================================
@@ -370,8 +370,9 @@ class TaiyangRetrieval(SymbolBase):
             try:
                 import chromadb
                 from chromadb.config import Settings as ChromaSettings
+                from src.data_service import get_chroma_dir
 
-                persist_dir = "data/chromadb"
+                persist_dir = get_chroma_dir()
                 client = chromadb.PersistentClient(
                     path=persist_dir,
                     settings=ChromaSettings(anonymized_telemetry=False),
@@ -402,11 +403,11 @@ class TaiyangRetrieval(SymbolBase):
                             })
                 return events
 
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 # kb_events collection does not exist yet (Phase A not done)
                 return []
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.debug(f"[太阳] ChromaDB event 检索跳过: {e}")
             return []
 
@@ -471,7 +472,7 @@ class TaiyangRetrieval(SymbolBase):
 
             return events[:top_k]
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.debug(f"[太阳] DB event 反查跳过: {e}")
             return []
 
@@ -506,7 +507,7 @@ class TaiyangRetrieval(SymbolBase):
             chunks.sort(key=lambda x: x.get("_event_score", 0), reverse=True)
             return chunks[:top_k]
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.debug(f"[太阳] Event→Chunk 映射失败: {e}")
             return []
 
@@ -546,7 +547,7 @@ class TaiyangRetrieval(SymbolBase):
             from src.services.feature_flags import is_enabled
             if not is_enabled("taiyang_sag_pipeline"):
                 return False
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             return False
         return True
 
@@ -569,7 +570,7 @@ class TaiyangRetrieval(SymbolBase):
                 chunks = self._deduplicate_chunks(chunks + bm25_chunks + vector_chunks)
             self._search_count += 1
             return chunks[:top_k]
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[{trace_id}] [太阳] SAG管线失败，降级标准检索: {e}")
             return None
 

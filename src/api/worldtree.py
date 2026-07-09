@@ -34,7 +34,7 @@ async def worldtree_stats(request: Request = None):
             wiki_pages_count = len(pages) if pages else 0
         except ImportError:
             pass
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"Wiki 查询失败: {e}")
 
         # 2. 知识图谱实体数
@@ -44,7 +44,7 @@ async def worldtree_stats(request: Request = None):
             entities_count = stats.get("nodes_count", 0)
         except ImportError:
             pass
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"图谱查询失败: {e}")
 
         # 3. 术语/文件数
@@ -52,7 +52,7 @@ async def worldtree_stats(request: Request = None):
             from src.db.data_store import load_chunks
             chunks = load_chunks() or []
             terms_count = len(set(c.get("file_name", "") for c in chunks if c.get("file_name")))
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
 
         data = {
@@ -70,7 +70,7 @@ async def worldtree_stats(request: Request = None):
             from src.api.response import success
             return success(data=data, message="WorldTree 统计")
         return data
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"worldtree_stats 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -126,7 +126,7 @@ async def worldtree_terms(limit: int = Query(2000, ge=1, le=10000), request: Req
                             break
             except ImportError:
                 pass
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning(f"Wiki 术语补充失败: {e}")
 
         _wants_v2 = request and (
@@ -137,7 +137,7 @@ async def worldtree_terms(limit: int = Query(2000, ge=1, le=10000), request: Req
             from src.api.response import success
             return success(data={"ok": True, "terms": terms, "total": len(terms)}, message="WorldTree 术语列表")
         return {"ok": True, "terms": terms, "total": len(terms)}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"worldtree_terms 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -183,7 +183,7 @@ async def worldtree_wiki_tree(request: Request = None):
                 })
         except ImportError:
             tree = []
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"Wiki 树构建失败: {e}")
 
         if not tree:
@@ -200,7 +200,7 @@ async def worldtree_wiki_tree(request: Request = None):
             from src.api.response import success
             return success(data={"tree": tree, "hint": hint}, message="WorldTree Wiki 树")
         return {"tree": tree, "hint": hint}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"worldtree_wiki_tree 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -247,7 +247,7 @@ async def worldtree_entities(request: Request = None):
                     ]
         except ImportError:
             pass
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"图谱实体查询失败: {e}")
 
         _wants_v2 = request and (
@@ -258,7 +258,7 @@ async def worldtree_entities(request: Request = None):
             from src.api.response import success
             return success(data={"entities": entities, "total": len(entities)}, message="WorldTree 实体列表")
         return {"entities": entities, "total": len(entities)}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"worldtree_entities 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -288,7 +288,7 @@ async def worldtree_wiki_by_id(page_id: str, request: Request = None):
             from src.api.response import success
             return success(data=page, message="获取 Wiki 页面成功")
         return {"ok": True, "page": page}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"worldtree_wiki_by_id 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -315,7 +315,7 @@ async def worldtree_entity_wiki(entity_id: str, request: Request = None):
             from src.api.response import success
             return success(data={"entity_id": entity_id, "wiki_pages": pages, "total": len(pages)}, message="获取实体关联 Wiki 成功")
         return {"entity_id": entity_id, "wiki_pages": pages, "total": len(pages)}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"worldtree_entity_wiki 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -347,7 +347,7 @@ async def worldtree_relations(request: Request = None, entity_id: str = "", enti
                     relations = kg_data.get("edges", [])
         except ImportError:
             pass
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"get_relevant_relations 失败: {e}")
 
         _wants_v2 = request and (
@@ -358,7 +358,7 @@ async def worldtree_relations(request: Request = None, entity_id: str = "", enti
             from src.api.response import success
             return success(data={"relations": relations, "total": len(relations)}, message="获取 WorldTree 关系成功")
         return {"relations": relations, "total": len(relations)}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"worldtree_relations 失败: {e}")
         return JSONResponse(
             status_code=500,

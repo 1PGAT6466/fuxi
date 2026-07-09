@@ -3,7 +3,7 @@ expand.py — 太阳·查询扩展
 同义词扩展 + 意图识别
 """
 import logging
-from typing import List, Dict
+from typing import List
 
 logger = logging.getLogger("taiyang.expand")
 
@@ -31,6 +31,6 @@ class QueryExpander:
                     for syn in syns:
                         result.append(query.replace(word, syn))
             return result[:5]
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("Exception 失败: %s", e, exc_info=True)
             return []

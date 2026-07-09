@@ -7,7 +7,6 @@ services/auto_classifier.py — 向量聚类自动分类器
 import logging
 import numpy as np
 from typing import List, Dict, Tuple
-from collections import Counter
 
 logger = logging.getLogger(__name__)
 
@@ -151,7 +150,7 @@ def reclassify_store(store, batch_size: int = 200) -> Tuple[int, int]:
                         (best_cat, r["rowid"])
                     )
                     updated += 1
-                except Exception as e:
+                except Exception as e:  # TODO: Narrow exception type
                     errors += 1
                     logger.error(f"reclassify error: {e}")
         
@@ -176,7 +175,7 @@ def sync_category_graph(category_counts: Dict[str, int]):
             )
         graph.save()
         logger.info(f"synced {len(category_counts)} categories to graph")
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"graph sync failed: {e}")
 
 
@@ -216,6 +215,6 @@ def sync_graph_to_categories():
         
         logger.info(f"synced {added} graph entities to category keywords")
         return added
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"graph sync failed: {e}")
         return 0

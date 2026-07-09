@@ -1,7 +1,6 @@
 #!/usr/bin/env python3
 """v10.2: Replace MinerU CLI with RAG DataReader API (structured layout output)"""
 
-import os
 import tempfile
 import logging; logger = logging.getLogger(__name__)
 
@@ -68,7 +67,7 @@ def _extract_pdf_mineru(file_path):
             if len(md) > 50:
                 return md
     
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.warning(f"[mineru] suppressed exception", exc_info=True)
         pass
     
@@ -87,7 +86,7 @@ def _extract_text_via_unstructured(file_path, ext=""):
         text = "\n\n".join(str(el) for el in elements if str(el).strip())
         if text and len(text.strip()) > 30:
             return text
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.warning(f"[mineru] suppressed exception", exc_info=True)
         pass
     return ""

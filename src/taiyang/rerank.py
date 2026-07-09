@@ -62,7 +62,7 @@ async def rerank_with_deepseek(query: str, candidates: list, top_k: int = 30) ->
                         scored.append((scores[i] if i < len(scores) else 0, r))
                     scored.sort(key=lambda x: x[0], reverse=True)
                     return [r for _, r in scored[:top_k]]
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.debug(f"DeepSeek rerank failed: {e}")
 
     return []
@@ -97,7 +97,7 @@ async def rerank_with_embedder(query: str, candidates: list, top_k: int = 30) ->
                             r["_rerank_rank"] = rank + 1
                             scored.append(r)
                     return scored[:top_k]
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.warning(f"[rerank] suppressed exception", exc_info=True)
         pass
     return []
@@ -183,7 +183,7 @@ async def rerank_with_siliconflow(query: str, candidates: list, top_k: int = 30)
                 else:
                     err = await resp.text()
                     logger.warning(f"[Rerank SiliconFlow] {resp.status}: {err[:200]}")
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"[Rerank SiliconFlow] failed: {e}")
     return []
 

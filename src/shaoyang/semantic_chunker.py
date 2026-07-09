@@ -97,7 +97,7 @@ def chunk_text(text: str, max_chars: int = 800) -> List[str]:
     """统一分块入口"""
     try:
         return split_by_semantic_boundary(text, max_chars)
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"[Chunker] Semantic chunking failed: {e}, using fixed-size fallback")
         # 固定大小 fallback
         return [text[i:i+max_chars] for i in range(0, len(text), max_chars - 50)]

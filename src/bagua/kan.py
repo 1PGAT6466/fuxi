@@ -16,12 +16,10 @@ kan.py — 坎卦 ☵ · 伏羲 v2.1
 注意：本模块不依赖 organs/ 目录，所有逻辑已内联。
 """
 
-from __future__ import annotations
 
 import json
 import logging
 import os
-import time
 import traceback
 from datetime import datetime, timezone
 from pathlib import Path
@@ -157,7 +155,7 @@ class KanGua(GuaBase):
         try:
             from src.db.data_store import load_chunks
             return True
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             return False
 
     @staticmethod
@@ -279,7 +277,7 @@ class KanGua(GuaBase):
                 "category_distribution": cat_counts,
             }
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error("[坎卦] 薄弱检测失败: %s", e)
             return {"error": str(e)}
 
@@ -330,7 +328,7 @@ class KanGua(GuaBase):
                 "total_processed": len(chunks),
             }
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error("[坎卦] 低质量清理失败: %s", e)
             return {"error": str(e)}
 
@@ -356,7 +354,7 @@ class KanGua(GuaBase):
             with open(path, "r", encoding="utf-8") as f:
                 data = json.load(f)
             self._access_counts = data.get("counts", {}) if isinstance(data, dict) else {}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("[坎卦] 加载访问计数失败: %s", e)
             self._access_counts = {}
 
@@ -381,7 +379,7 @@ class KanGua(GuaBase):
                 }, f, ensure_ascii=False, indent=2)
             self._access_counts = counts
             return {"saved": True, "file": str(path)}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("[坎卦] 保存访问计数失败: %s", e)
             return {"saved": False, "error": str(e)}
 
@@ -490,7 +488,7 @@ class KanGua(GuaBase):
             if isinstance(mem, dict):
                 self._immune_memory = mem
                 logger.info("[坎卦] 加载 %d 条免疫记忆", len(mem))
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("[坎卦] 加载免疫记忆失败: %s", e)
 
     def _save_immune_memory_to_store(self) -> None:
@@ -500,7 +498,7 @@ class KanGua(GuaBase):
             cfg = load_config()
             cfg["liver_immune_memory"] = self._immune_memory
             save_config(cfg)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(
                 "[坎卦] 保存免疫记忆失败: %s\n%s",
                 e, traceback.format_exc(),
@@ -516,7 +514,7 @@ class KanGua(GuaBase):
         try:
             from src.db.data_store import load_chunks
             return load_chunks()
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error("[坎卦] 加载数据块失败: %s", e)
             return []
 
@@ -527,7 +525,7 @@ class KanGua(GuaBase):
             from src.db.data_store import save_chunks
             save_chunks(chunks)
             return True
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error("[坎卦] 保存数据块失败: %s", e)
             return False
 

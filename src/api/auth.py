@@ -117,7 +117,7 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 status_code=e.status_code,
                 content={"detail": e.detail}
             )
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"JWT 验证异常: {e}")
             return JSONResponse(
                 status_code=401,

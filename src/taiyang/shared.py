@@ -6,7 +6,6 @@ shared.py — 太阳·筑基 共享工具函数
 M-2: _events_to_chunks — Event → Chunk 映射（批量查询 + 去重排序）
 M-3: _deduplicate_chunks — 按 chunk_id/id/text 去重
 """
-import json
 import logging
 from typing import List, Dict
 

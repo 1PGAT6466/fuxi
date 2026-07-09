@@ -94,7 +94,7 @@ async def _start_fuxi():
         # ---- v2: 八卦体系（默认） ----
         if engine == "v2":
             from src.bagua.qian import QianGua
-            from src.bagua.intent_bus import IntentBus, get_intent_bus
+            from src.bagua.intent_bus import get_intent_bus
 
             # 初始化 IntentBus
             intent_bus = get_intent_bus()
@@ -153,7 +153,7 @@ async def _start_fuxi():
             f"[Fuxi] 无法导入伏羲模块，服务无法启动: {e}", exc_info=True
         )
         raise
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logging.getLogger("server").error(
             f"[Fuxi] 启动失败: {e}", exc_info=True
         )
@@ -189,7 +189,7 @@ def _register_bagua_guas(app: FastAPI, intent_bus: Any) -> None:
             logging.getLogger("server").info(
                 f"[Bagua] {register_name} 已注册到 IntentBus"
             )
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logging.getLogger("server").warning(
                 f"[Bagua] {register_name} 注册失败（服务继续启动）: {e}"
             )
@@ -213,7 +213,7 @@ def _register_shutdown_handler():
         logging.getLogger("server").warning(
             "[Shutdown] bagua.shutdown 模块未找到，跳过优雅关机注册"
         )
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logging.getLogger("server").warning(
             "[Shutdown] 关机 handler 注册失败: %s", e
         )
@@ -250,7 +250,7 @@ async def startup():
                 )
             else:
                 logger.info("[Startup] 启动烟雾测试全部通过 ✓")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(
                 f"[Startup] 启动烟雾测试执行异常（不影响启动）: {e}",
                 exc_info=True
@@ -274,7 +274,7 @@ async def shutdown():
             await _stop_fuxi()
     except ImportError:
         await _stop_fuxi()
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         await _stop_fuxi()
 
 # 注册统一异常处理器
@@ -375,15 +375,15 @@ async def metrics_middleware(request: Request, call_next):
         try:
             from src.infra.request_metrics import get_request_metrics
             get_request_metrics().record_request(duration_ms, response.status_code < 500)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("请求指标记录失败（正常响应）: %s", e, exc_info=True)
         return response
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         duration_ms = (time.time() - start) * 1000
         try:
             from src.infra.request_metrics import get_request_metrics
             get_request_metrics().record_request(duration_ms, False)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("请求指标记录失败（异常响应）: %s", e, exc_info=True)
         raise
 
@@ -433,7 +433,7 @@ async def prometheus_metrics():
             sqlite_count=len(chunks) if chunks else 0,
             vector_count=count_chunks()
         )
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("Prometheus指标更新失败: %s", e, exc_info=True)
     return Response(content=get_metrics_response(), media_type="text/plain")
 
@@ -642,7 +642,7 @@ async def mcp_call(request: Request):
         if inspect.isawaitable(result):
             result = await result
         return {"ok": True, "tool": tool_name, "result": result}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[MCP/call] {tool_name} 执行失败: {e}\n{traceback.format_exc()}")
         return {"ok": False, "tool": tool_name, "error": str(e)}
 
@@ -725,7 +725,7 @@ async def auth_me(request: Request):
     return {"username": getattr(request.state, "user", "anonymous"), "role": getattr(request.state, "role", "user")}
 
 # ============ 统一前端入口 ============
-from fastapi.responses import HTMLResponse, FileResponse
+from fastapi.responses import HTMLResponse
 
 @app.get("/login", response_class=HTMLResponse)
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
@@ -864,7 +864,7 @@ async def proxy_loader_files():
         async with aiohttp.ClientSession() as session:
             async with session.get(f"{LOADER_URL}/api/files", timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 return await resp.json()
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         return {"error": str(e), "files": []}
 
 @app.post("/api/proxy/loader/upload")
@@ -881,7 +881,7 @@ async def proxy_loader_upload(request: Request):
                 headers={"Content-Type": request.headers.get("Content-Type", "multipart/form-data")}
             ) as resp:
                 return await resp.json()
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         return {"error": str(e)}
 
 if __name__ == "__main__":

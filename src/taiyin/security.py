@@ -62,7 +62,7 @@ def audit_log_entry(ip: str, method: str, path: str, status: int, latency_ms: fl
         AUDIT_LOG_PATH.parent.mkdir(parents=True, exist_ok=True)
         with open(AUDIT_LOG_PATH, "a", encoding="utf-8") as f:
             f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"[Audit] Failed to write: {e}")
 
 

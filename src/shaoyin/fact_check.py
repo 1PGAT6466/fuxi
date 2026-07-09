@@ -2,7 +2,7 @@
 fact_check.py — 事实性校验 (v1.50)
 生成答案后再检索验证关键断言是否有出处
 """
-import logging, asyncio, json
+import logging, asyncio
 from typing import List, Dict
 
 logger = logging.getLogger(__name__)
@@ -76,6 +76,6 @@ async def fact_check(answer: str, sources: List[str]) -> Dict:
             "claims": verified,
             "score": round(score, 2),
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"事实性校验失败: {e}")
         return {"verified": True, "claims": [], "score": 1.0}

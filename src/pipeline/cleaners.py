@@ -43,7 +43,7 @@ class UnifiedCleaner:
             text = self._clean_text(text)
             parsed["text"] = text
             return parsed
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise CleanError(f"清洗失败: {e}")
 
     def _clean_text(self, text: str) -> str:

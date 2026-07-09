@@ -98,7 +98,7 @@ class SeedScoreEvaluator:
             for line in f:
                 try:
                     data.append(json.loads(line.strip()))
-                except Exception as e:
+                except Exception as e:  # TODO: Narrow exception type
                     logger.warning("JSON解析A/B测试数据失败: %s", e, exc_info=True)
 
         control_data = [d for d in data if d.get("group") == "control"]

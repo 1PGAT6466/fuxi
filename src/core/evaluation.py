@@ -2,10 +2,9 @@
 lib/evaluation.py — 评测引擎
 支持 Precision/Recall/MRR/NDCG 指标计算
 """
-import json, time, os
+import json, time
 from pathlib import Path
 from datetime import datetime
-from collections import defaultdict
 import logging; logger = logging.getLogger(__name__)
 
 BASE = Path(__file__).resolve().parent.parent
@@ -100,7 +99,7 @@ def run_evaluation(search_fn, test_cases: list = None) -> dict:
             retrieved = [r.get("text", r.get("content", str(r)))[:200] 
                         if isinstance(r, dict) else str(r)[:200] 
                         for r in retrieved_texts]
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             retrieved = []
             latency = -1
         

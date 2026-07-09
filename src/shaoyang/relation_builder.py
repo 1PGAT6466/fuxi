@@ -4,13 +4,8 @@ relation_builder.py — 实体关系自动构建 (RAG 3.0 v2)
   1. 快速通道: 从 chunks 文本中匹配已有 entities，共现=关系
   2. LLM 通道: DeepSeek 辅助抽取新实体关系 (限速)
 """
-import asyncio
-import hashlib
-import json
 import logging
 import sqlite3
-import re
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +22,7 @@ async def extract_relations_cooccurrence(chunks: list) -> list:
         entities = db.execute("SELECT id, name, type FROM entities").fetchall()
         entity_names = {r[1]: (r[0], r[2]) for r in entities}
         db.close()
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         return []
     
     if len(entity_names) < 2:
@@ -118,13 +113,13 @@ async def build_relations_from_chunks(chunks: list, batch_size: int = 50) -> dic
                         (r["from_id"], r["to_id"], r["relation_type"])
                     )
                     inserted += 1
-                except Exception as e:
+                except Exception as e:  # TODO: Narrow exception type
 
                     logger.warning(f"[{module}] suppressed exception", exc_info=True)
             db.commit()
             db.close()
             logger.info(f"[RelationBuilder] Extracted {len(relations)} relations (co-occurrence), inserted {inserted}")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[RelationBuilder] DB write failed: {e}")
     
     return {"extracted": len(relations), "inserted": inserted}
@@ -140,7 +135,7 @@ def get_relation_stats() -> dict:
         entities = db.execute("SELECT COUNT(1) FROM entities").fetchone()[0]
         db.close()
         return {"total_relations": total, "total_entities": entities, "density": round(total / max(1, entities), 3)}
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         return {"total_relations": 0, "total_entities": 0, "density": 0}
 
 
@@ -151,5 +146,5 @@ async def auto_build_relations(limit: int = 100) -> dict:
         if not chunks:
             return {"message": "no chunks to process"}
         return await build_relations_from_chunks(chunks, batch_size=min(limit, 100))
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         return {"error": str(e)}

@@ -17,9 +17,7 @@ dream_cycle.py — 第九宫·中宫：24/7 后台神经消化循环
 调度方式：由 EasyClaw cron 每夜 02:00 触发
 """
 
-from __future__ import annotations
 
-import asyncio
 import json
 import logging
 import os
@@ -165,7 +163,7 @@ class DreamCycle:
                     (today, MAX_DAILY_DIGEST),
                 )
                 new_chunks = [dict(row) for row in cursor.fetchall()]
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("[DreamCycle] chunks query failed: %s", e)
                 new_chunks = []
 
@@ -178,7 +176,7 @@ class DreamCycle:
                         "SELECT COUNT(*) FROM chunks"
                     ).fetchone()
                     result["total_docs"] = total[0] if total else 0
-                except Exception:
+                except Exception:  # TODO: Narrow exception type
                     result["total_docs"] = 0
                 return result
 
@@ -195,7 +193,7 @@ class DreamCycle:
                             existing = vs._collection.get(ids=batch, include=[])
                             if existing and existing.get("ids"):
                                 embedded_count += len(existing["ids"])
-                        except Exception:
+                        except Exception:  # TODO: Narrow exception type
                             pass
                     result["embedded"] = embedded_count
                     result["total_docs"] = (
@@ -204,7 +202,7 @@ class DreamCycle:
                 else:
                     result["errors"].append("VectorStore unavailable")
                     result["total_docs"] = len(new_chunks)
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("[DreamCycle] VectorStore query failed: %s", e)
                 result["errors"].append(f"VectorStore: {e}")
                 result["total_docs"] = len(new_chunks)
@@ -214,7 +212,7 @@ class DreamCycle:
                 result["new_docs"], result["embedded"], result["total_docs"],
             )
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error("[DreamCycle] digest_new error: %s", e, exc_info=True)
             result["errors"].append(str(e))
 
@@ -245,7 +243,7 @@ class DreamCycle:
                     "AND status = 'active' LIMIT 100"
                 )
                 bare_entities = [dict(row) for row in cursor.fetchall()]
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("[DreamCycle] entities query failed: %s", e)
                 bare_entities = []
 
@@ -256,7 +254,7 @@ class DreamCycle:
                         "SELECT COUNT(*) FROM entities WHERE status='active'"
                     ).fetchone()
                     result["total_entities"] = total[0] if total else 0
-                except Exception:
+                except Exception:  # TODO: Narrow exception type
                     pass
                 return result
 
@@ -305,7 +303,7 @@ class DreamCycle:
                             )
                             store._db_conn.commit()
                             enriched_count += 1
-                except Exception as e:
+                except Exception as e:  # TODO: Narrow exception type
                     logger.debug(
                         "[DreamCycle] enrich single fail %s: %s",
                         entity.get("name", "?"), e,
@@ -318,14 +316,14 @@ class DreamCycle:
                     "SELECT COUNT(*) FROM entities WHERE status='active'"
                 ).fetchone()
                 result["total_entities"] = total[0] if total else 0
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 pass
 
             try:
                 from src.db.data_store import load_graph
                 graph = load_graph()
                 result["total_edges"] = len(graph.get("edges", []))
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 pass
 
             logger.info(
@@ -333,7 +331,7 @@ class DreamCycle:
                 result["total_entities"], result["enriched"],
             )
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error("[DreamCycle] enrich error: %s", e, exc_info=True)
             result["errors"].append(str(e))
 
@@ -408,20 +406,20 @@ class DreamCycle:
                                             "'duplicate_candidate' WHERE id = ?",
                                             (raw_id,),
                                         )
-                                    except Exception:
+                                    except Exception:  # TODO: Narrow exception type
                                         pass
                                     break
-                        except Exception as e:
+                        except Exception as e:  # TODO: Narrow exception type
                             logger.debug(
                                 "[DreamCycle] consolidate single fail: %s", e
                             )
 
                 try:
                     store._db_conn.commit()
-                except Exception:
+                except Exception:  # TODO: Narrow exception type
                     pass
 
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning(
                     "[DreamCycle] consolidate vector fail: %s", e
                 )
@@ -436,7 +434,7 @@ class DreamCycle:
                 duplicates_found, candidates,
             )
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error("[DreamCycle] consolidate error: %s", e, exc_info=True)
             result["errors"].append(str(e))
 
@@ -519,7 +517,7 @@ class DreamCycle:
                 result["total_searches"], result["gap_queries"],
             )
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error("[DreamCycle] gap_scan error: %s", e, exc_info=True)
             result["errors"].append(str(e))
 
@@ -673,7 +671,7 @@ class DreamCycle:
                 encoding="utf-8",
             )
             logger.info("[DreamCycle] report saved: %s", fp)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error("[DreamCycle] save failed: %s", e)
         return str(fp)
 
@@ -707,7 +705,7 @@ class DreamCycle:
             )
             logger.info("[DreamCycle] report pushed to notification center")
             return True
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error("[DreamCycle] push failed: %s", e, exc_info=True)
             return False
 

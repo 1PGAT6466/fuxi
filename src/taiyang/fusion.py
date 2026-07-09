@@ -9,7 +9,6 @@ services/retrieval.py — 混合检索服务（v10.0）
 """
 import logging; logger = logging.getLogger(__name__)
 import re, asyncio
-from typing import List, Dict
 
 # v11: Concurrent control for ChromaDB
 _VECTOR_SEM = asyncio.Semaphore(8)
@@ -20,10 +19,6 @@ try:
 except ImportError:
     jieba = None
 
-from src.db.memory_store import get_store
-from src.db.vector_store import get_vector_store, embed_texts
-from src.taiyang.graph_router import route_to_categories, expand_query_with_synonyms, get_entity_context
-from src.config import EMBEDDER_URL
 from src.taiyang.synonym_loader import load_synonyms
 # 兼容别名
 _SYNONYM_MAP = load_synonyms()
@@ -174,7 +169,7 @@ def personalized_boost(query: str, results: list) -> list:
             if bonus > 0:
                 r["score"] = round(float(r.get("score", 0)) + bonus, 2)
         results.sort(key=lambda x: float(x.get("score", 0)), reverse=True)
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.warning(f"[retrieval] suppressed exception", exc_info=True)
         pass
     return results

@@ -11,7 +11,6 @@ sys.path.insert(0, repo_root)
 sys.path.insert(0, os.path.join(repo_root, 'src'))
 
 from db.memory_store import MemoryStore
-from models.chunk import Chunk
 
 async def verify():
     # 使用临时数据库
@@ -83,7 +82,7 @@ async def verify():
     print(f"✅ 任务 2: SAGExtractor.extract() 调用成功 (events={len(result.events)}, entities={len(result.entities)})")
 
     # 6. 验证 pipeline._extract_events_entities 可用
-    from shaoyang.pipeline import ShaoyangPipeline, PipelineResult
+    from shaoyang.pipeline import ShaoyangPipeline
 
     # 测试：直接验证方法存在
     assert hasattr(ShaoyangPipeline, '_extract_events_entities'), "❌ _extract_events_entities 方法缺失"

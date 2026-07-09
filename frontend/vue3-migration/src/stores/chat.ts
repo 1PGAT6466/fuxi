@@ -59,7 +59,8 @@ export const useChatStore = defineStore('chat', () => {
     sessionsLoading.value = true;
     try {
       sessions.value = await fetchSessions();
-    } catch {
+    } catch (err) {
+      logger.warn('加载会话列表失败', err);
       ElMessage.warning('加载会话列表失败，使用本地数据');
     } finally {
       sessionsLoading.value = false;
@@ -72,7 +73,8 @@ export const useChatStore = defineStore('chat', () => {
       sessions.value = [session, ...sessions.value];
       await switchSession(session.id);
       return session;
-    } catch {
+    } catch (err) {
+      logger.error('创建会话失败', err);
       ElMessage.warning('创建会话失败');
       return null;
     }
@@ -92,7 +94,8 @@ export const useChatStore = defineStore('chat', () => {
           messages.value = [];
         }
       }
-    } catch {
+    } catch (err) {
+      logger.error('删除会话失败', err);
       ElMessage.error('删除会话失败');
       throw new Error('删除会话失败');
     }

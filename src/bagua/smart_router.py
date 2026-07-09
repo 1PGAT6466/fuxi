@@ -24,7 +24,6 @@ smart_router.py — 5 层阶梯路由框架（伏羲 v2.1 Phase 0）
 不依赖 organs/ 或 Meridian，仅依赖 src/services/llm.py 的 _call_api。
 """
 
-from __future__ import annotations
 
 import asyncio
 import hashlib
@@ -626,7 +625,7 @@ async def _l4_small_model_route(
             metadata={"type": "flash_classified", "model": flash_model},
         )
 
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         return RoutingDecision(
             level=4, result=None, confidence=0.0,
             should_upgrade=True,
@@ -750,7 +749,7 @@ async def _l5_full_model_route(
             metadata={"type": "full_model_routed"},
         )
 
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"L5 full model route exception: {e}")
         return RoutingDecision(
             level=5,
@@ -970,7 +969,7 @@ async def shadow_route(
             shadow_entry["production_intent"] or "N/A",
         )
 
-    except Exception as exc:
+    except Exception as exc:  # TODO: Narrow exception type
         logger.debug("[Shadow] 影子评估异常: %s", exc)
 
 

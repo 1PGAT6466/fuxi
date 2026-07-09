@@ -11,7 +11,6 @@ v2.1 Phase 1: 融合鼻(NoseAgent)异常嗅探能力
   → 独立于 organs/ 目录，数据通过 params 传入
 """
 
-from __future__ import annotations
 
 import asyncio
 import logging
@@ -647,7 +646,7 @@ class GenGua(GuaBase):
             except RuntimeError:
                 return asyncio.run(call_ai_raw(prompt, max_tokens=20))
 
-        except Exception as exc:
+        except Exception as exc:  # TODO: Narrow exception type
             logger.debug("☶ [艮] LLM 安全审核异常: %s", exc)
             return None
 
@@ -705,7 +704,7 @@ class GenGua(GuaBase):
                 except asyncio.CancelledError:
                     logger.debug("[艮卦] 嗅探循环已取消")
                     break
-                except Exception as exc:
+                except Exception as exc:  # TODO: Narrow exception type
                     logger.error(
                         "[艮卦] 嗅探异常: %s", exc, exc_info=True
                     )

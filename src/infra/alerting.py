@@ -183,7 +183,7 @@ async def send_webhook(url: str, title: str, message: str, level: str = "info") 
                 else:
                     logger.warning(f"Webhook 发送失败: {resp.status} {await resp.text()}")
                     return False
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"Webhook 发送异常: {e}")
         return False
 

@@ -2,12 +2,11 @@
 services/graph_router.py — 图谱驱动检索路由（v10.0）
 负责：实体识别 → 分类定位 → 对应 Collection 检索 → 关系扩展
 """
-import json, re, os
-from typing import List, Dict, Tuple, Optional
-from pathlib import Path
+import json
+from typing import List, Dict
 
 import sqlite3
-from src.config import DATA_DIR, GRAPH_PATH
+from src.config import GRAPH_PATH
 import logging; logger = logging.getLogger(__name__)
 
 
@@ -69,7 +68,7 @@ def validate_graph_relation(entity_a, entity_b, rel_type="related_to"):
         if range_types and type_b not in range_types and type_b != "unknown":
             return False, f"{entity_b}({type_b}) not in range {range_types}"
         return True, "ok"
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         return True, "validation_skipped"
 
 
@@ -102,7 +101,7 @@ def normalize_entity(name: str) -> str:
 def load_graph() -> dict:
     try:
         return json.loads(GRAPH_PATH.read_text(encoding="utf-8"))
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("Exception 失败: %s", e, exc_info=True)
         return {}
 
@@ -296,7 +295,7 @@ def route_entity_with_neighbors(query: str, max_entities: int = 5) -> dict:
                         "auto_linked": True
                     })
             conn.close()
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         import logging; logging.getLogger(__name__).warning(f"[Graph wiki-link] {e}")
     sub_categories = [c for c, _ in sorted_cats[:5]]
     
@@ -338,7 +337,7 @@ def route_entity_with_neighbors(query: str, max_entities: int = 5) -> dict:
             for row in cur.fetchall():
                 wiki_links.append({"entity": entity_name, "wiki_id": row[0], "wiki_title": row[1]})
         conn.close()
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         import logging; logging.getLogger(__name__).warning(f"[Graph wiki-link] {e}")
 
     return {

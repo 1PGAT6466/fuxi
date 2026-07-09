@@ -7,7 +7,7 @@ import json
 import logging
 import time
 from pathlib import Path
-from typing import Dict, Any, Optional, List
+from typing import Dict, List
 from dataclasses import dataclass, field
 
 logger = logging.getLogger("growth.engine")
@@ -66,7 +66,7 @@ class GrowthEngine:
         try:
             with open(log_file, "a", encoding="utf-8") as f:
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Growth] 写入失败: {e}")
 
         # 内存缓存
@@ -126,9 +126,9 @@ class GrowthEngine:
                 for line in f:
                     try:
                         events.append(json.loads(line.strip()))
-                    except Exception as e:
+                    except Exception as e:  # TODO: Narrow exception type
                         logger.warning("JSON解析成长事件失败: %s", e, exc_info=True)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("Exception 失败: %s", e, exc_info=True)
 
         # 计算各指标的统计
@@ -174,7 +174,7 @@ class GrowthEngine:
                 with open(log_file, "r", encoding="utf-8") as f:
                     lines = f.readlines()
                 stats[symbol] = {"events": len(lines)}
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("读取成长统计失败 [%s]: %s", symbol, e, exc_info=True)
                 stats[symbol] = {"events": 0}
         return stats

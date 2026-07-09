@@ -30,7 +30,7 @@ class AnswerComposer:
                 prompt=f"基于以下资料回答问题。\n\n资料：{context}\n\n问题：{query}\n\n回答：",
             )
             confidence = self._estimate_confidence(answer, results)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Composer] LLM合成失败: {e}")
             answer = self._template_compose(query, results)
             confidence = 0.3

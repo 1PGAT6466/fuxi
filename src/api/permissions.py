@@ -17,13 +17,12 @@ permissions.py — 伏羲 v1.50 Phase E: Company Brain 权限隔离
   4. 管理员（role="admin"）自动绕过所有权限检查
 """
 
-from __future__ import annotations
 
 import json
 import logging
 import time
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 from dataclasses import dataclass, field
 
 logger = logging.getLogger("api.permissions")
@@ -433,7 +432,7 @@ class PermissionManager:
                 users = json.loads(users_file.read_text(encoding="utf-8"))
                 user = users.get(user_id, {})
                 return user.get("role", "user") == self.ADMIN_ROLE
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
 
         return False
@@ -499,7 +498,7 @@ class PermissionManager:
             with open(self._persist_file, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             logger.debug("权限数据已持久化到 %s", self._persist_file)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("权限持久化失败: %s", e)
 
     def _load_from_file(self) -> None:
@@ -528,7 +527,7 @@ class PermissionManager:
                     )
 
             logger.info("✅ 已从 %s 加载 %d 个团队", self._persist_file, len(self._teams))
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("权限持久化文件加载失败: %s，使用默认状态", e)
 
     def _is_team_member(self, user_id: str, team_id: str) -> bool:

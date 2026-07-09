@@ -60,7 +60,7 @@ class MemorySystem:
             session_file = MEMORY_DIR / f"session_{session_id}.json"
             with open(session_file, "w", encoding="utf-8") as f:
                 json.dump(messages, f, ensure_ascii=False, indent=2)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Memory] 保存会话失败: {e}")
 
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
@@ -76,7 +76,7 @@ class MemorySystem:
                 messages = json.load(f)
                 self._session_memory[session_id] = messages
                 return messages
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Memory] 加载会话失败: {e}")
             return []
 
@@ -92,7 +92,7 @@ class MemorySystem:
             }
             with open(memory_file, "a", encoding="utf-8") as f:
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Memory] 添加长期记忆失败: {e}")
 
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
@@ -113,9 +113,9 @@ class MemorySystem:
                         # 简单的关键词匹配
                         if query.lower() in json.dumps(record.get("value", {})).lower():
                             results.append(record)
-                    except Exception as e:
+                    except Exception as e:  # TODO: Narrow exception type
                         logger.warning("JSON解析会话记忆失败: %s", e, exc_info=True)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("搜索会话记忆失败: %s", e, exc_info=True)
 
         return results[-limit:]

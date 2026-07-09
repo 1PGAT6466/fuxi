@@ -4,7 +4,7 @@ server.py — 太阴·显化 对外接口中枢
 """
 import logging
 import time
-from typing import Dict, Any, Optional
+from typing import Dict
 
 from src.infra.symbol_base import SymbolBase
 
@@ -60,14 +60,14 @@ class TaiyinServer(SymbolBase):
                     trace_id=trace_id, endpoint="/api/chat",
                     method="POST", status_code=200, duration_ms=duration,
                 )
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("Exception 失败: %s", e, exc_info=True)
 
             logger.info(f"[{trace_id}] [太阴] 查询完成: {duration:.0f}ms, confidence={result.get('confidence', 0):.2f}")
 
             return result
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             self._error_count += 1
             logger.error(f"[{trace_id}] [太阴] 查询失败: {e}")
 
@@ -80,7 +80,7 @@ class TaiyinServer(SymbolBase):
                     trace_id=trace_id or "", endpoint="/api/chat",
                     method="POST", status_code=500, duration_ms=duration,
                 )
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("Exception 失败: %s", e, exc_info=True)
 
             return {
@@ -123,7 +123,7 @@ class TaiyinServer(SymbolBase):
                     trace_id=trace_id, endpoint="/api/search",
                     method="GET", status_code=200, duration_ms=duration,
                 )
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("Exception 失败: %s", e, exc_info=True)
 
             return {
@@ -133,7 +133,7 @@ class TaiyinServer(SymbolBase):
                 "duration_ms": duration,
             }
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             self._error_count += 1
             logger.error(f"[{trace_id}] [太阴] 搜索失败: {e}")
 
@@ -146,7 +146,7 @@ class TaiyinServer(SymbolBase):
                     trace_id=trace_id or "", endpoint="/api/search",
                     method="GET", status_code=500, duration_ms=duration,
                 )
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("Exception 失败: %s", e, exc_info=True)
 
             return {"results": [], "count": 0, "error": str(e), "trace_id": trace_id}
@@ -183,7 +183,7 @@ class TaiyinServer(SymbolBase):
                 "trace_id": trace_id,
             }
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             self._error_count += 1
             logger.error(f"[{trace_id}] [太阴] 入库失败: {e}")
             return {"success": False, "error": str(e), "trace_id": trace_id}
@@ -205,7 +205,7 @@ class TaiyinServer(SymbolBase):
                 "sources": [r.get("file_name", "") for r in results[:3]],
                 "fallback": True,
             }
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             return {"answer": "抱歉，处理您的问题时出现错误。", "confidence": 0, "error": str(e)}
 
     # DEPRECATED: 未使用，v1.50 标记待删除

@@ -2,8 +2,8 @@
 graph_traversal.py — Phase 8.1: 图遍历推理引擎
 支持多跳实体遍历 + SQLite 邻接表加速
 """
-import json, os, logging, sqlite3, time
-from typing import List, Dict, Set, Optional
+import json, os, logging, sqlite3
+from typing import List, Dict, Optional
 from collections import deque
 from pathlib import Path
 
@@ -93,7 +93,7 @@ def _get_neighbors_from_db(entity_id: str) -> List[tuple]:
         ).fetchall()
         conn.close()
         return rows
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("Exception 失败: %s", e, exc_info=True)
         return []
 

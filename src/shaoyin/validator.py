@@ -4,7 +4,7 @@ validator.py — 少阴·校验模块
 """
 import re
 import logging
-from typing import Dict, List, Any
+from typing import Dict, List
 
 logger = logging.getLogger("shaoyin.validator")
 

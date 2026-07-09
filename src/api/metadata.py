@@ -49,7 +49,7 @@ async def metadata(request: Request = None):
                     vector_count = vs.count
                     if vector_count < 0:
                         vector_count = 0
-                except Exception:
+                except Exception:  # TODO: Narrow exception type
                     pass
 
             metadata_items.append({"key": "total_chunks", "value": len(chunks), "label": "文档块数"})
@@ -68,7 +68,7 @@ async def metadata(request: Request = None):
             metadata_items.append({"key": "wiki_pages", "value": len(pages), "label": "Wiki 页面数"})
         except ImportError:
             pass
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
 
         # 5. 系统运行时间
@@ -87,7 +87,7 @@ async def metadata(request: Request = None):
             from src.api.response import success
             return success(data=data, message="元数据")
         return data
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"metadata 失败: {e}")
         return JSONResponse(
             status_code=500,

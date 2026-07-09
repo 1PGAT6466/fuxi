@@ -4,7 +4,7 @@ SQLite audit_log 表，记录 who/what/when/result
 """
 import sqlite3, time, os, json, logging
 from pathlib import Path
-from typing import Optional, Dict
+from typing import Dict
 
 logger = logging.getLogger(__name__)
 
@@ -54,7 +54,7 @@ def log_audit(
         )
         conn.commit()
         conn.close()
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.warning("审计日志写入失败", exc_info=True)
 
 
@@ -69,7 +69,7 @@ def get_audit_stats(hours: int = 24) -> Dict:
         ).fetchall()
         conn.close()
         return {r[0]: {"count": r[1], "avg_ms": round(r[2] or 0)} for r in rows}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("Exception 失败: %s", e, exc_info=True)
         return {}
 
@@ -87,6 +87,6 @@ def get_recent_audits(limit: int = 50) -> list:
             {"timestamp": r[0], "user_id": r[1], "action": r[2], "query": r[3][:100], "result": r[4][:100], "duration_ms": r[5], "status": r[6]}
             for r in rows
         ]
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("Exception 失败: %s", e, exc_info=True)
         return []

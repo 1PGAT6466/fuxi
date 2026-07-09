@@ -46,7 +46,7 @@ def start_service() -> None:
         _service_running = True
         logger.info("AI 工具服务已启动")
 
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"AI 工具服务启动失败: {e}")
         raise
 

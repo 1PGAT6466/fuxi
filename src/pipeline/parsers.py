@@ -60,7 +60,7 @@ class UnifiedParser:
                 return self._parse_text(file_path)
         except ParseError:
             raise
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise ParseError(f"解析失败 ({ext}): {e}")
 
     def _parse_pdf(self, file_path: str) -> Dict:
@@ -79,7 +79,7 @@ class UnifiedParser:
             doc.close()
             if text.strip():
                 return {"text": text, "tables": tables, "metadata": {"parser": "fitz"}}
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass  # 静默：Exception 失败不影响主流程
 
         # 方式2: pdfplumber — 表格提取
@@ -98,7 +98,7 @@ class UnifiedParser:
                 text = "\n".join(pages_text)
                 if text.strip():
                     return {"text": text, "tables": tables, "metadata": {"parser": "pdfplumber"}}
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass  # 静默：Exception 失败不影响主流程
 
         # 方式3: PyPDF2 — 兜底
@@ -112,7 +112,7 @@ class UnifiedParser:
                     pages_text.append(page_text)
             text = "\n".join(pages_text)
             return {"text": text, "tables": tables, "metadata": {"parser": "PyPDF2"}}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise ParseError(f"PDF解析失败: {e}")
 
     def _parse_docx(self, file_path: str) -> Dict:
@@ -127,7 +127,7 @@ class UnifiedParser:
                 rows = [[cell.text for cell in row.cells] for row in table.rows[1:]] if len(table.rows) > 1 else []
                 tables.append({"headers": headers, "rows": rows})
             return {"text": "\n".join(paragraphs), "tables": tables, "metadata": {"parser": "python-docx"}}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise ParseError(f"DOCX解析失败: {e}")
 
     def _parse_excel(self, file_path: str) -> Dict:
@@ -138,7 +138,7 @@ class UnifiedParser:
             text = df.to_string(index=False)
             tables = [{"headers": list(df.columns), "rows": df.values.tolist()}]
             return {"text": text, "tables": tables, "metadata": {"parser": "pandas"}}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise ParseError(f"Excel解析失败: {e}")
 
     def _parse_text(self, file_path: str) -> Dict:
@@ -147,7 +147,7 @@ class UnifiedParser:
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 text = f.read()
             return {"text": text, "tables": [], "metadata": {"parser": "text"}}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise ParseError(f"文本解析失败: {e}")
 
     def _parse_markdown(self, file_path: str) -> Dict:
@@ -155,7 +155,7 @@ class UnifiedParser:
         try:
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 raw = f.read()
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise ParseError(f"Markdown读取失败: {e}")
 
         # 尝试使用 mistune 解析结构
@@ -238,7 +238,7 @@ class UnifiedParser:
                 "tables": [],
                 "metadata": {"parser": "python-pptx", "pages": len(prs.slides)},
             }
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise ParseError(f"PPTX解析失败: {e}")
 
     def _parse_csv(self, file_path: str) -> Dict:
@@ -249,7 +249,7 @@ class UnifiedParser:
             text = df.to_string(index=False)
             tables = [{"headers": list(df.columns), "rows": df.values.tolist()}]
             return {"text": text, "tables": tables, "metadata": {"parser": "pandas"}}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise ParseError(f"CSV解析失败: {e}")
 
     def _parse_json(self, file_path: str) -> Dict:
@@ -260,7 +260,7 @@ class UnifiedParser:
                 data = json.load(f)
             text = json.dumps(data, ensure_ascii=False, indent=2)
             return {"text": text, "tables": [], "metadata": {"parser": "json"}}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise ParseError(f"JSON解析失败: {e}")
 
     def _parse_html(self, file_path: str) -> Dict:
@@ -271,5 +271,5 @@ class UnifiedParser:
                 soup = BeautifulSoup(f.read(), "html.parser")
             text = soup.get_text(separator="\n", strip=True)
             return {"text": text, "tables": [], "metadata": {"parser": "beautifulsoup"}}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             raise ParseError(f"HTML解析失败: {e}")

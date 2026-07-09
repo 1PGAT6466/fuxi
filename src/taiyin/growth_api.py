@@ -7,8 +7,8 @@ import os
 import json
 import time
 import logging
-from typing import Dict, List, Optional
-from datetime import datetime, timedelta
+from typing import Dict, List
+from datetime import datetime
 
 logger = logging.getLogger("taiyin.growth_api")
 
@@ -82,7 +82,7 @@ def _read_symbol_growth(symbol: str) -> Dict:
             for line in f:
                 if line.strip():
                     records.append(json.loads(line))
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"读取成长数据失败: {e}")
 
     if not records:
@@ -177,7 +177,7 @@ def _get_symbol_metrics(symbol: str) -> Dict:
     try:
         with open(growth_file, "r", encoding="utf-8") as f:
             records = [json.loads(line) for line in f if line.strip()]
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("读取象指标失败 [%s]: %s", symbol, e, exc_info=True)
         return {"query_count": 0, "avg_latency_ms": 0, "avg_confidence": 0}
 

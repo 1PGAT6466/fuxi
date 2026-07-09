@@ -86,7 +86,7 @@ def _generate_system_notifications() -> list:
             "priority": "critical",
             "timestamp": time.time(),
         })
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"生成通知时查询数据失败: {e}")
 
     # 2. 检查评测状态
@@ -117,7 +117,7 @@ def _generate_system_notifications() -> list:
             })
     except ImportError:
         pass
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"生成评测通知失败: {e}")
 
     # 3. 检查审计日志
@@ -136,7 +136,7 @@ def _generate_system_notifications() -> list:
             })
     except ImportError:
         pass
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         pass
 
     return notifications
@@ -196,7 +196,7 @@ async def list_notifications(
             from src.api.response import success
             return success(data=data, message="通知列表")
         return data
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"list_notifications 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -221,7 +221,7 @@ async def mark_notification_read(notification_id: str, request: Request = None):
             _save_notifications(notifications)
 
         return {"ok": True, "id": notification_id, "read": found}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"mark_notification_read 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -246,7 +246,7 @@ async def mark_all_notifications_read(request: Request = None):
             _save_notifications(notifications)
 
         return {"ok": True, "read_all": True, "marked_count": count}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"mark_all_read 失败: {e}")
         return JSONResponse(
             status_code=500,

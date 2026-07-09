@@ -8,7 +8,6 @@ memory_store.py — Phase 0 重构：SQLite 游标 + LRU 缓存
 import sqlite3, json, os, logging
 from pathlib import Path
 from typing import List, Dict, Optional
-from functools import lru_cache
 from collections import OrderedDict
 import threading
 
@@ -31,7 +30,7 @@ class MemoryStore:
                 _t = _sq.connect(self._db_path)
                 _t.execute("SELECT COUNT(*) FROM chunks")
                 _t.close()
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 # DB corrupted, try to restore from .bak
                 bak = db_file.with_suffix('.db.bak')
                 if bak.exists():
@@ -48,7 +47,7 @@ class MemoryStore:
                         dst.commit()
                         dst.close()
                         os.replace(new_path, self._db_path)
-                    except Exception:
+                    except Exception:  # TODO: Narrow exception type
                         logger.debug("[suppressed] os.replace(new_path, self._db_")
                         pass
         self._db_conn = None
@@ -202,7 +201,7 @@ class MemoryStore:
                         self._db_conn.execute("DROP INDEX IF EXISTS idx_entities_status")
 
             self._db_conn.commit()
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[MemoryStore] 迁移 events/entities 表失败: {e}")
 
     def _maybe_migrate_json(self):
@@ -236,7 +235,7 @@ class MemoryStore:
                 )
             self._db_conn.commit()
             logger.info(f"[MemoryStore] Migrated {len(rows)} chunks from JSON")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error(f"[MemoryStore] JSON migration failed: {e}")
 
     def _count_rows(self) -> int:
@@ -307,7 +306,7 @@ class MemoryStore:
                 c["score"] = round(score, 2)
                 results.append(c)
             return results
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[MemoryStore] hierarchical_search failed: {e}")
             return []
 
@@ -341,7 +340,7 @@ class MemoryStore:
                     results.append(c)
             results.sort(key=lambda x: x.get("score", 0), reverse=True)
             return results[:top_k]
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[MemoryStore] keyword_search failed: {e}")
             return []
 
@@ -520,7 +519,7 @@ class MemoryStore:
             if isinstance(emb, list) and len(emb) > 0:
                 try:
                     embedding_blob = struct.pack(f'{len(emb)}f', *emb)
-                except Exception:
+                except Exception:  # TODO: Narrow exception type
                     embedding_blob = _json.dumps(emb).encode('utf-8')
 
         with self._db_conn:
@@ -590,7 +589,7 @@ class MemoryStore:
                 "SELECT * FROM events LIMIT 0"
             ).description]
             return [dict(zip(cols, row)) for row in rows]
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[MemoryStore] get_events_by_chunk_id failed: {e}")
             return []
 
@@ -605,7 +604,7 @@ class MemoryStore:
                 "SELECT * FROM entities LIMIT 0"
             ).description]
             return [dict(zip(cols, row)) for row in rows]
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[MemoryStore] get_entities_by_name failed: {e}")
             return []
 
@@ -615,7 +614,7 @@ class MemoryStore:
             return self._db_conn.execute(
                 "SELECT COUNT(*) FROM entities WHERE status='active'"
             ).fetchone()[0]
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             return 0
 
     def get_event_count(self) -> int:
@@ -624,7 +623,7 @@ class MemoryStore:
             return self._db_conn.execute(
                 "SELECT COUNT(*) FROM events WHERE status='active'"
             ).fetchone()[0]
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             return 0
 
     def get_chunks_batch(self, chunk_ids: List[str]) -> Dict[str, dict]:
@@ -676,7 +675,7 @@ class MemoryStore:
                         break
                 # 缓存
                 self._json_cache_put(str(cid_from_doc), c)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.debug(f"[MemoryStore] get_chunks_batch failed: {e}")
 
         return result
@@ -704,7 +703,7 @@ class MemoryStore:
                     "SELECT * FROM events WHERE status='active' ORDER BY id"
                 ).fetchall()
             return [dict(zip(cols, row)) for row in rows]
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[MemoryStore] get_all_events failed: {e}")
             return []
 
@@ -724,7 +723,7 @@ class MemoryStore:
                     "SELECT * FROM entities WHERE status='active' ORDER BY id"
                 ).fetchall()
             return [dict(zip(cols, row)) for row in rows]
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[MemoryStore] get_all_entities failed: {e}")
             return []
 
@@ -746,7 +745,7 @@ class MemoryStore:
                 (question, source_chunk_id, qa_index)
             )
             self._db_conn.commit()
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error(f"[MemoryStore] add_qa_pair failed: {e}")
 
     def search_qa_pairs(self, query: str, top_k: int = 3) -> list:
@@ -757,7 +756,7 @@ class MemoryStore:
                 (f'%{query}%', top_k)
             ).fetchall()
             return [{"question": r[0], "source_chunk_id": r[1]} for r in rows]
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[MemoryStore] search_qa_pairs failed: {e}")
             return []
 

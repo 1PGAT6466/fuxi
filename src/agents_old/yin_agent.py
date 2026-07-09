@@ -68,7 +68,7 @@ class YinAgent(BaseAgent):
                     "reason": llm_result.get("reason", ""),
                     "duration_ms": round(duration, 1),
                 }
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning(f"[Yin] LLM verify failed: {e}")
 
         duration = (time.time() - start) * 1000

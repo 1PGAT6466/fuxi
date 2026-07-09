@@ -4,7 +4,7 @@ rate_limiter.py — 速率限制
 """
 import time
 import logging
-from typing import Dict, Optional
+from typing import Dict
 from collections import deque
 
 logger = logging.getLogger("infra.rate_limiter")

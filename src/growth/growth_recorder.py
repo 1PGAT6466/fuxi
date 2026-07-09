@@ -6,7 +6,7 @@ import os
 import json
 import time
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 logger = logging.getLogger("growth.recorder")
 
@@ -35,7 +35,7 @@ class GrowthRecorder:
         try:
             with open(log_file, "a", encoding="utf-8") as f:
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Growth] 写入失败: {e}")
     # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
@@ -62,7 +62,7 @@ class GrowthRecorder:
                         continue
 
                     records.append(record)
-                except Exception as e:
+                except Exception as e:  # TODO: Narrow exception type
                     logger.warning("JSON解析成长记录失败: %s", e, exc_info=True)
                     continue
 

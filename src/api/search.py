@@ -79,7 +79,7 @@ async def _search_impl(q: str, top_k: int, page: int, page_size: int, granularit
             "page_size": page_size,
             "total": len(results),
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
             return error("搜索失败", status_code=500, detail=str(e))
@@ -114,10 +114,10 @@ async def search_history(request: Request = None):
             ]
         except ImportError:
             pass
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"审计日志提取搜索历史失败: {e}")
 
         return logs
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"search_history 失败: {e}")
         return []

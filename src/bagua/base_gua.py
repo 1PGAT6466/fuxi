@@ -17,7 +17,6 @@ GuaBase 是所有八卦模块的抽象基类，提供：
   - 完整 type hints 与 docstring
 """
 
-from __future__ import annotations
 
 import asyncio
 import logging
@@ -25,7 +24,7 @@ import time
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
 from enum import Enum
-from typing import Any, Callable, Dict, List, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Callable, Dict, List, Optional, Tuple
 
 from src.bagua.intent_bus import (
     Trigrams,
@@ -41,7 +40,6 @@ from src.bagua.intent_bus import (
 from src.infra.circuit_breaker import (
     CircuitState,
     CircuitBreaker,
-    DependencyStatus,
 )
 
 logger = logging.getLogger("bagua.base_gua")
@@ -337,7 +335,7 @@ class GuaBase(ABC, GuaHandler):
                 self._health = HealthLevel.FULL
                 logger.info("[%s] 健康状态恢复 → FULL", self.GUA_NAME)
             return result
-        except Exception as exc:
+        except Exception as exc:  # TODO: Narrow exception type
             logger.error(
                 "[%s] 核心执行异常: %s", self.GUA_NAME, exc, exc_info=True
             )
@@ -378,7 +376,7 @@ class GuaBase(ABC, GuaHandler):
                 payload={"result": result} if not isinstance(result, dict) else result,
                 latency_ms=(time.time() - start) * 1000,
             )
-        except Exception as exc:
+        except Exception as exc:  # TODO: Narrow exception type
             logger.error(
                 "[%s] handle_signal 异常: %s", self.GUA_NAME, exc, exc_info=True
             )
@@ -407,7 +405,7 @@ class GuaBase(ABC, GuaHandler):
                 "[%s] 已注册到 IntentBus (name=%s, trigram=%s)",
                 self.GUA_NAME, register_name, self.trigram.value,
             )
-        except Exception as exc:
+        except Exception as exc:  # TODO: Narrow exception type
             logger.error(
                 "[%s] 注册到 IntentBus 失败: %s", self.GUA_NAME, exc
             )
@@ -551,7 +549,7 @@ class GuaBase(ABC, GuaHandler):
         # 注册到 IntentBus（确保 dispatch() 能找到本卦）
         try:
             self.register_to_bus()
-        except Exception as exc:
+        except Exception as exc:  # TODO: Narrow exception type
             logger.error("[%s] IntentBus 注册失败: %s", self.GUA_NAME, exc)
 
         # 启动异步探活循环
@@ -576,7 +574,7 @@ class GuaBase(ABC, GuaHandler):
         # 从 IntentBus 反注册
         try:
             self.unregister_from_bus()
-        except Exception as exc:
+        except Exception as exc:  # TODO: Narrow exception type
             logger.debug("[%s] IntentBus 反注册异常: %s", self.GUA_NAME, exc)
 
         if self._recovery_task is not None:
@@ -608,7 +606,7 @@ class GuaBase(ABC, GuaHandler):
             except asyncio.CancelledError:
                 logger.debug("[%s] 探活循环已取消", self.GUA_NAME)
                 break
-            except Exception as exc:
+            except Exception as exc:  # TODO: Narrow exception type
                 logger.error("[%s] 探活异常: %s", self.GUA_NAME, exc, exc_info=True)
 
             await asyncio.sleep(self.RECOVERY_LOOP_INTERVAL)
@@ -623,7 +621,7 @@ class GuaBase(ABC, GuaHandler):
                         cb.record_success()
                     else:
                         cb.record_failure()
-                except Exception:
+                except Exception:  # TODO: Narrow exception type
                     cb.record_failure()
                     logger.debug("[%s] 依赖 [%s] 探活失败", self.GUA_NAME, name)
 

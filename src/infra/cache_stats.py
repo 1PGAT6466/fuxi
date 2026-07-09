@@ -4,7 +4,7 @@ cache_stats.py — 缓存统计
 """
 import time
 import logging
-from typing import Dict, List
+from typing import Dict
 from collections import deque
 
 logger = logging.getLogger("infra.cache_stats")

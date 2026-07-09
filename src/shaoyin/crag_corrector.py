@@ -29,7 +29,7 @@ class RetrievalEvaluator:
         try:
             import jieba
             query_keywords = set(jieba.cut(query))
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("jieba分词失败(查询): %s", e, exc_info=True)
             query_keywords = set(query.split())
 
@@ -37,7 +37,7 @@ class RetrievalEvaluator:
             text = r.get("text", "")
             try:
                 result_keywords = set(jieba.cut(text))
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("jieba分词失败(结果): %s", e, exc_info=True)
                 result_keywords = set(text.split())
 
@@ -91,6 +91,6 @@ class CRAGCorrector:
         try:
             from src.taiyang.retrieval import hybrid_search
             return await hybrid_search(query, top_k=top_k)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error(f"[CRAG] 检索失败: {e}")
             return []

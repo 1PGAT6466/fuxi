@@ -42,7 +42,7 @@ class ReflectionAgent(BaseAgent):
                 "issues": result.get("judge_result", {}).get("issues", []),
                 "duration_ms": round(duration, 1),
             }
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             duration = (time.time() - start) * 1000
             self._record_run(duration, error=True)
             return {"success": True, "passed": True, "answer": ctx.metadata.get("answer", ""), "error": str(e)}

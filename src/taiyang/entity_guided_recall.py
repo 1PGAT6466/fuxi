@@ -228,7 +228,7 @@ class EntityGuidedRecall:
             self._cache_put(self._entity_cache, cache_key, result)
             return result
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Path A] 实体匹配失败: {e}")
             return []
 
@@ -305,7 +305,7 @@ class EntityGuidedRecall:
 
             return list(all_events.values())
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Path A] 事件查找失败: {e}")
             return []
 
@@ -393,7 +393,7 @@ class EntityGuidedRecall:
 
             return list(all_chunks.values())
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Path A] Event→Chunk映射失败: {e}")
             return []
 

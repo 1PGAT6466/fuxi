@@ -8,7 +8,7 @@ IntentBus._get_circuit_breaker() 和 GuaBase._circuits 使用同一套断路器�
 import time
 import logging
 from dataclasses import dataclass
-from typing import Dict, Optional, Any
+from typing import Dict
 from enum import Enum
 
 logger = logging.getLogger("infra.circuit_breaker")
@@ -53,7 +53,7 @@ class CircuitBreaker:
             try:
                 result = do_something()
                 cb.record_success()
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 cb.record_failure()
                 raise
 

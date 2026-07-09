@@ -35,7 +35,8 @@ function startAutoRefresh(refreshFn: () => Promise<unknown>): void {
       if (TokenManager.isExpiringSoon(token)) {
         try {
           await refreshFn();
-        } catch {
+        } catch (err) {
+          logger.warn('自动刷新 token 失败，停止定时刷新', err);
           stopAutoRefresh();
         }
       }
@@ -98,8 +99,9 @@ export const useAuthStore = defineStore('auth', () => {
       token.value = newToken;
       TokenManager.setToken(newToken);
       return newToken;
-    } catch {
-      logout();
+    } catch (err) {
+      logger.warn('Token 刷新失败，退出登录', err);
+      await logout();
       throw new Error('Token 刷新失败，已退出登录');
     }
   }

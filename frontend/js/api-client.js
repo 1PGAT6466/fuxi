@@ -128,9 +128,26 @@ async function api(url, opt) {
 
       var data = await r.json();
 
-      // P2-7 fix: 统一处理后端 {status: 'error', message: '...'} 格式的响应
+      // P2-7 fix + v1.50 unified: 处理后端 {status: 'success'|'error', data: {...}} 统一格式
       if (data && data.status === 'error' && data.message) {
         throw new Error(data.message);
+      }
+
+      // v1.50: 统一格式自动解包 data 字段，同时保留顶层字段用于兼容
+      // 前端代码可以继续用 data.answer / data.files / data.results 等旧路径
+      // 也可以开始迁移到 data.data.xxx 新路径
+      if (data && data.status === 'success' && data.data && typeof data.data === 'object') {
+        // 将 data.data 中的字段展开到顶层，保持向后兼容
+        // 但也保留 data.data 让新代码可以逐步迁移
+        for (var key in data.data) {
+          if (data.data.hasOwnProperty(key) && !(key in data)) {
+            data[key] = data.data[key];
+          }
+        }
+        // 分页兼容: {data: {items: [...]}} → data.files = data.items
+        if (data.items && !data.files) {
+          data.files = data.items;
+        }
       }
 
       // 缓存 GET 响应

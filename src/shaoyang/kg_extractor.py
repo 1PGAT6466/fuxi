@@ -1,7 +1,7 @@
 """
 kg_extractor.py — Phase 5.3: 知识图谱 LLM 抽取 + 实体消歧 + 增量更新
 """
-import json, logging, time
+import json, logging
 from typing import Dict, List
 
 logger = logging.getLogger(__name__)

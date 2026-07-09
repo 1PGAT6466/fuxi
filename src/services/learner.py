@@ -5,10 +5,9 @@ feedback_learner.py — 反馈学习闭环 (P0-A + P0-B + P0-C)
 - 自动补充术语词表和同义词表
 - 使用数据训练轻量级 ranking
 """
-import os, json, time
-from pathlib import Path
+import json
 from datetime import datetime, timedelta
-from collections import Counter, defaultdict
+from collections import defaultdict
 
 from src.config import DATA_DIR
 import logging; logger = logging.getLogger(__name__)
@@ -128,7 +127,7 @@ def get_feedback_stats(days: int = 7) -> dict:
                     stats["dislikes"] += 1
                 elif entry["action"] == "correct":
                     stats["corrections"] += 1
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("处理反馈条目失败: %s", e, exc_info=True)
                 continue
     

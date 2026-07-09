@@ -75,7 +75,7 @@ class UnifiedChunker:
                     best = h
                     break
             return best
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass  # 静默：Exception 失败,返回None
             return None
 

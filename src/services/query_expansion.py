@@ -9,8 +9,7 @@ services/retrieval.py — 混合检索服务（v10.0）
 负责：BM25 + 向量双路召回 → RRF 融合 → 精排 → 去重 → 上下文扩展
 """
 import logging; logger = logging.getLogger(__name__)
-import re, asyncio
-from typing import List, Dict
+import asyncio
 
 # v11: Concurrent control for ChromaDB
 _VECTOR_SEM = asyncio.Semaphore(8)
@@ -21,10 +20,6 @@ try:
 except ImportError:
     jieba = None
 
-from src.db.memory_store import get_store
-from src.db.vector_store import get_vector_store, embed_texts
-from src.services.graph_router import route_to_categories, expand_query_with_synonyms, get_entity_context
-from src.config import EMBEDDER_URL
 from src.services.synonym_loader import load_synonyms
 # 兼容别名
 _SYNONYM_MAP = load_synonyms()
@@ -44,7 +39,7 @@ def expand_query(query: str) -> str:
                 if token_lower in _SYNONYM_MAP:
                     tokens.extend(_SYNONYM_MAP[token_lower][:2])
             rewritten = " ".join(tokens)
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("expand_query 操作失败: %s", e, exc_info=True)
     return rewritten
 
@@ -72,7 +67,7 @@ async def llm_rewrite_query(query: str) -> str:
         if rewritten and 3 < len(rewritten.strip()) < 200:
             logger.info(f"[LLM Rewrite] '{query}' → '{rewritten.strip()}'")
             return rewritten.strip()
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("llm_rewrite_query 操作失败: %s", e, exc_info=True)
     return query
 
@@ -100,7 +95,7 @@ async def hyde_expand_query(query: str) -> str:
             else:
                 logger.info(f"[HyDE] generated {len(hyde_response)} chars, query_len={len(query)}")
             return hyde_response.strip()
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("hyde_expand_query 操作失败: %s", e, exc_info=True)
     return ""
 

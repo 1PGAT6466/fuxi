@@ -67,7 +67,7 @@ async def _call_llm(system_prompt: str, user_prompt: str, max_tokens: int = 2048
             temperature=temperature,
         )
         return result or ""
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"LLM 调用失败: {e}", exc_info=True)
         raise HTTPException(502, detail="AI 模型调用失败，请稍后重试")
 

@@ -98,7 +98,7 @@ async def _llm_plan(query: str) -> Optional[List[PlanStep]]:
             logger.info(f"[Planner] LLM 分解: {len(steps)} 步")
             return steps
 
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.debug(f"[Planner] LLM 分解失败: {e}")
 
     return None

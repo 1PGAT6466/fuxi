@@ -4,7 +4,7 @@ request_metrics.py — 请求指标
 """
 import time
 import logging
-from typing import Dict, List
+from typing import Dict
 from collections import deque
 
 logger = logging.getLogger("infra.request_metrics")

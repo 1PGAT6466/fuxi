@@ -50,8 +50,9 @@ import chromadb
 from chromadb.config import Settings as _ChromaSettings
 import logging; logger = logging.getLogger(__name__)
 
-DATA_DIR = Path(__file__).parent.parent / "data"
-from src.config import WORLDTREE_DB_PATH
+# v1.50 R4: Use config DATA_DIR, avoid relative path pointing to src/data
+from src.config import DATA_DIR as _CFG_DATA_DIR, WORLDTREE_DB_PATH
+DATA_DIR = Path(_CFG_DATA_DIR)
 WIKI_DB = WORLDTREE_DB_PATH  # P2-4: merged
 WIKI_CHROMA_COLLECTION = "wiki_pages"  # 只存摘要向量
 
@@ -102,7 +103,7 @@ class WikiEngine:
             os.makedirs(_cdir, exist_ok=True)
             _cli = chromadb.PersistentClient(path=_cdir, settings=_ChromaSettings(anonymized_telemetry=False))
             self._wiki_collection = _cli.get_or_create_collection(name="wiki_summaries", metadata={"hnsw:space": "cosine"})
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             logger.warning(f"[wiki] suppressed exception", exc_info=True)
             pass
     
@@ -190,7 +191,7 @@ class WikiEngine:
                 "INSERT INTO wiki_history (page_id, version, content_snapshot, summary_snapshot, changed_at, source) VALUES (?, ?, ?, ?, ?, ?)",
                 (page_id, row[7] if len(row) > 7 else 1, row[5] if len(row) > 5 else "", row[4] if len(row) > 4 else "", updates.get("updated_at", ""), "manual_update")
             )
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             logger.warning(f"[wiki] suppressed exception", exc_info=True)
             pass
         
@@ -388,7 +389,7 @@ class WikiEngine:
                 r = requests.post(f"{EMBEDDER_URL}/embed", json={"texts": summaries}, timeout=60)
                 if r.status_code == 200:
                     vectors = r.json().get("vectors")
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 logger.warning(f"[wiki] suppressed exception", exc_info=True)
                 pass
             if not vectors or len(vectors) != len(ids_list):
@@ -397,7 +398,7 @@ class WikiEngine:
                 old = self._wiki_collection.get(include=[])
                 if old and old.get("ids"):
                     self._wiki_collection.delete(ids=old["ids"])
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 logger.warning(f"[wiki] suppressed exception", exc_info=True)
                 pass
             metadatas = [{
@@ -408,7 +409,7 @@ class WikiEngine:
             } for p in pages]
             self._wiki_collection.add(ids=ids_list, embeddings=vectors, metadatas=metadatas)
             return {"ok": True, "synced": len(pages), "collection_count": self._wiki_collection.count()}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             return {"ok": False, "error": str(e)}
     
     def vector_search_wiki(self, query_embedding, top_k=5):
@@ -436,7 +437,7 @@ class WikiEngine:
                         "similarity": round(sim, 4)
                     })
             return out
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("Exception 失败: %s", e, exc_info=True)
             return []
 

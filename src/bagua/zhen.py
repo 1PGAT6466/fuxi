@@ -12,7 +12,6 @@ Phase 1 器官迁移：肺(LungAgent) → 震卦
   - 呼吸间隔 BREATH_INTERVAL = 25s
 """
 
-from __future__ import annotations
 
 import hashlib
 import logging
@@ -185,7 +184,7 @@ class ZhenGua(GuaBase):
         except OSError as e:
             logger.warning("[%s] 文件读取失败: %s — %s", self.GUA_NAME, file_path, e)
             return ""
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error(
                 "[%s] compute_file_fingerprint 异常: %s — %s",
                 self.GUA_NAME, file_path, e, exc_info=True,
@@ -382,7 +381,7 @@ class ZhenGua(GuaBase):
             try:
                 cleaned = cleaner.clean(parsed)
                 cleaned_text = cleaned.get("text", raw_text)
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("[%s] 清洗失败，使用原文: %s", self.GUA_NAME, e)
                 cleaned_text = raw_text
                 errors.append(f"CleanWarning: {e}")
@@ -392,7 +391,7 @@ class ZhenGua(GuaBase):
             try:
                 from src.models.chunk import Chunk
                 chunks = chunker.chunk(parsed, tables)
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("[%s] 分块失败，降级为单块: %s", self.GUA_NAME, e)
                 from src.models.chunk import Chunk
                 chunks = [Chunk(text=cleaned_text, chunk_index=0)]
@@ -403,7 +402,7 @@ class ZhenGua(GuaBase):
             for chunk in chunks:
                 try:
                     chunk.category = classifier.classify(chunk)
-                except Exception:
+                except Exception:  # TODO: Narrow exception type
                     chunk.category = "通用办公"
 
             # Step 5: 设置来源信息
@@ -420,7 +419,6 @@ class ZhenGua(GuaBase):
                 embedder = UnifiedEmbedder({})
                 loop = asyncio.get_event_loop()
                 if loop.is_running():
-                    import concurrent.futures
                     future = asyncio.ensure_future(
                         embedder.embed_batch([c.text for c in chunks])
                     )
@@ -433,7 +431,7 @@ class ZhenGua(GuaBase):
                     if embeddings:
                         for chunk, emb in zip(chunks, embeddings):
                             chunk.embedding = emb
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("[%s] 向量化失败: %s", self.GUA_NAME, e)
                 errors.append(f"EmbedWarning: {e}")
 
@@ -447,7 +445,7 @@ class ZhenGua(GuaBase):
                 else:
                     loop.run_until_complete(saver.save(chunks))
                 logger.info("[%s] 已存储 %d 个 chunk: %s", self.GUA_NAME, len(chunks), file_path)
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.error("[%s] 存储失败: %s", self.GUA_NAME, e)
                 errors.append(f"SaveError: {e}")
                 raise
@@ -461,7 +459,7 @@ class ZhenGua(GuaBase):
             if store_in_kun:
                 try:
                     self._store_to_kun(file_path, chunks, cleaned_text)
-                except Exception as e:
+                except Exception as e:  # TODO: Narrow exception type
                     logger.warning("[%s] 坤卦存储失败: %s", self.GUA_NAME, e)
                     errors.append(f"KunStoreWarning: {e}")
 
@@ -476,7 +474,7 @@ class ZhenGua(GuaBase):
             )
             return result
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error("[%s] 消化异常: %s — %s", self.GUA_NAME, file_path, e, exc_info=True)
             errors.append(f"DigestError: {e}")
             result["errors"] = errors
@@ -584,7 +582,7 @@ class ZhenGua(GuaBase):
 
             logger.info("[%s] 坤卦知识库已更新: %s", self.GUA_NAME, doc_id)
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("[%s] _store_to_kun 异常: %s", self.GUA_NAME, e)
 
     # ========================================================================
@@ -628,7 +626,7 @@ class ZhenGua(GuaBase):
             self._broadcast_progress(file_path, progress,
                                      params.get("status", ""),
                                      params.get("message", ""))
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
 
         return {
@@ -667,7 +665,7 @@ class ZhenGua(GuaBase):
                 progress=progress,
                 message=f"{file_path}: {status} — {message}"[:100],
             )
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
 
     def stats(self) -> Dict[str, Any]:
@@ -700,7 +698,7 @@ def _get_kun_instance():
             from src.bagua.kun import KunGua
             _kun_instance = KunGua()
             _kun_instance.start()
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("坤卦实例创建失败: %s", e)
             return None
     return _kun_instance

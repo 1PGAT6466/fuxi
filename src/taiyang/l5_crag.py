@@ -4,7 +4,7 @@ l5_crag.py — L5 CRAG 执行器
 """
 import asyncio
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 logger = logging.getLogger("taiyang.l5_crag")
 
@@ -62,7 +62,7 @@ class L5CRAGExecutor:
 
             except asyncio.TimeoutError:
                 trace_logger.log("timeout", f"L5 CRAG 超时 (尝试 {attempt + 1})")
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 trace_logger.log("error", f"L5 CRAG 异常: {e}")
 
         # 4. 所有重试失败，返回部分结果
@@ -93,7 +93,7 @@ class L5CRAGExecutor:
             rewritten = await call_ai(prompt)
             return rewritten.strip() if rewritten else original_query
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[L5 CRAG] 查询改写失败: {e}")
             return original_query
 

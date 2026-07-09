@@ -4,17 +4,14 @@ routes.py — 文档工具服务 API 路由
 """
 
 import io
-import json
 import logging
 import os
 import shutil
-import tempfile
 from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
-from pydantic import BaseModel
+from fastapi.responses import FileResponse
 
 logger = logging.getLogger("services.doc-tools.routes")
 
@@ -53,7 +50,7 @@ def _cleanup_temp(*paths: Path) -> None:
                 p.unlink()
             elif p.is_dir():
                 shutil.rmtree(str(p))
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"清理临时文件失败 {p}: {e}")
 
 
@@ -134,7 +131,7 @@ async def convert_file(
     except HTTPException:
         _cleanup_temp(input_path, output_path)
         raise
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         _cleanup_temp(input_path, output_path)
         logger.error(f"文件转换失败: {e}", exc_info=True)
         raise HTTPException(500, "文件转换失败，请稍后重试")
@@ -215,7 +212,7 @@ async def merge_pdfs(files: List[UploadFile] = File(...)):
     except HTTPException:
         _cleanup_temp(*input_paths)
         raise
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         _cleanup_temp(*input_paths)
         logger.error(f"PDF 合并失败: {e}", exc_info=True)
         raise HTTPException(500, "PDF 合并失败，请稍后重试")
@@ -281,7 +278,7 @@ async def split_pdf(
     except HTTPException:
         _cleanup_temp(input_path)
         raise
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         _cleanup_temp(input_path)
         logger.error(f"PDF 拆分失败: {e}", exc_info=True)
         raise HTTPException(500, "PDF 拆分失败，请稍后重试")
@@ -335,7 +332,7 @@ async def compress_file(file: UploadFile = File(...)):
     except HTTPException:
         _cleanup_temp(input_path)
         raise
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         _cleanup_temp(input_path)
         logger.error(f"文件压缩失败: {e}", exc_info=True)
         raise HTTPException(500, "文件压缩失败，请稍后重试")
@@ -448,7 +445,7 @@ async def image_info(file: UploadFile = File(...)):
 
         return info
 
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"读取图片信息失败: {e}", exc_info=True)
         raise HTTPException(500, "读取图片信息失败，请稍后重试")
 
@@ -546,7 +543,7 @@ async def compress_image(
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"图片压缩失败: {e}", exc_info=True)
         raise HTTPException(500, "图片压缩失败，请稍后重试")
 
@@ -598,7 +595,7 @@ async def text_extract(file: UploadFile = File(...)):
 
     except HTTPException:
         raise
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"文本提取失败: {e}", exc_info=True)
         raise HTTPException(500, "文本提取失败，请稍后重试")
     finally:
@@ -644,8 +641,6 @@ def _write_text_to_pdf(text: str, output_path: Path) -> None:
     try:
         from reportlab.pdfgen import canvas
         from reportlab.lib.pagesizes import A4
-        from reportlab.pdfbase import pdfmetrics
-        from reportlab.pdfbase.ttfonts import TTFont
 
         c = canvas.Canvas(str(output_path), pagesize=A4)
         width, height = A4

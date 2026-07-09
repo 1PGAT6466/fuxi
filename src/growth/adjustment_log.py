@@ -4,7 +4,7 @@ adjustment_log.py — 成长引擎·参数调整记录
 import json
 import time
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, List
 from pathlib import Path
 from dataclasses import dataclass, field
 
@@ -53,7 +53,7 @@ class AdjustmentLog:
             }
             with open(log_file, "a", encoding="utf-8") as f:
                 f.write(json.dumps(entry, ensure_ascii=False) + "\n")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[AdjustmentLog] 写入失败: {e}")
     # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
@@ -69,9 +69,9 @@ class AdjustmentLog:
                 for line in f:
                     try:
                         records.append(json.loads(line.strip()))
-                    except Exception as e:
+                    except Exception as e:  # TODO: Narrow exception type
                         logger.warning("JSON解析调整记录失败: %s", e, exc_info=True)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("Exception 失败: %s", e, exc_info=True)
 
         return records[-20:]

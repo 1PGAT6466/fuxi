@@ -9,6 +9,9 @@
  * - 解析 JWT exp
  * - 过期检测（5 分钟余量）
  * - 带并发锁的 token 刷新
+ *
+ * 注意：refreshToken() 是全局唯一的 token 刷新入口。
+ * auth.ts 中的 refreshToken() 和 router/index.ts 中的刷新逻辑均委托给此方法。
  */
 
 import { TOKEN_KEY, TOKEN_EXPIRY_KEY } from '@/constants/storage-keys';
@@ -65,7 +68,8 @@ class TokenManager {
       const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
       const payload = JSON.parse(atob(base64));
       return payload.exp ? payload.exp * 1000 : null;
-    } catch {
+    } catch (err) {
+      console.warn('[TokenManager] 解析 token 过期时间失败', err);
       return null;
     }
   }

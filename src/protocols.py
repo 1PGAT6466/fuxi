@@ -2,11 +2,10 @@
 protocols.py — Agent 通信协议 v4.0
 标准化消息格式 + JSON Schema 定义
 """
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any
 from dataclasses import dataclass, field
 from enum import Enum
 import time
-import json
 
 
 class MessageType(str, Enum):

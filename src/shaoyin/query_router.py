@@ -4,7 +4,7 @@ query_router.py — 统一查询分类（9种类型）
 """
 import re
 import logging
-from typing import Tuple, Dict
+from typing import Tuple
 
 logger = logging.getLogger("shaoyin.query_router")
 

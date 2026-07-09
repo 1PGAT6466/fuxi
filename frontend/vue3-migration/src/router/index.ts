@@ -215,19 +215,19 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'profile',
         name: 'Profile',
-        redirect: '/',
+        component: () => import('@/views/Placeholder.vue'),
         meta: { title: '个人中心（建设中）' },
       },
       {
         path: 'about',
         name: 'About',
-        redirect: '/',
+        component: () => import('@/views/Placeholder.vue'),
         meta: { title: '关于伏羲（建设中）' },
       },
       {
         path: 'settings',
         name: 'Settings',
-        redirect: '/',
+        component: () => import('@/views/Placeholder.vue'),
         meta: { title: '设置（建设中）' },
       },
 

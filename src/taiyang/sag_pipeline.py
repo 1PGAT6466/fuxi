@@ -102,7 +102,7 @@ class SAGPipeline:
                     path_b_result, path_a_result = await asyncio.gather(path_b_task, path_a_task)
                 else:
                     path_b_result = await path_b_task
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning(f"[{trace_id or 'SAG'}] 阶段1 异常，降级到 Path B only: {e}")
                 # D-1: 阶段 1 整体失败 → fallback 到纯向量
                 degraded = True
@@ -149,7 +149,7 @@ class SAGPipeline:
                     multi_hop_events = await self._query_time_expansion(
                         all_events, top_k=MAX_MULTI_HOP_EVENTS
                     )
-                except Exception as e:
+                except Exception as e:  # TODO: Narrow exception type
                     # D-2: 阶段 2 失败 → 跳过，继续使用阶段 1 结果
                     logger.warning(f"[{trace_id or 'SAG'}] 阶段2 异常，跳过: {e}")
                     multi_hop_events = []
@@ -205,7 +205,7 @@ class SAGPipeline:
                         "after_count": len(final_chunks),
                         "duration_ms": (time.time() - phase_start) * 1000,
                     }
-                except Exception as e:
+                except Exception as e:  # TODO: Narrow exception type
                     # D-3: 阶段 3 失败 → 按得分排序返回
                     logger.warning(f"[{trace_id or 'SAG'}] 阶段3 异常，按得分排序: {e}")
                     final_chunks = coarse_ranked[:top_k]
@@ -253,14 +253,14 @@ class SAGPipeline:
                 },
             }
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             # D-整体: 整个 SAG 管线崩溃 → fallback 到纯向量检索
             logger.error(
                 f"[{trace_id or 'SAG'}] SAG 三阶段管线整体失败，降级到纯向量: {e}", exc_info=True
             )
             try:
                 vector_chunks = await self._path_b_vector_search(query, top_k=top_k, trace_id=trace_id)
-            except Exception as vec_e:
+            except Exception as vec_e:  # TODO: Narrow exception type
                 logger.error(f"[{trace_id or 'SAG'}] 纯向量降级也失败: {vec_e}")
                 vector_chunks = []
 
@@ -294,7 +294,7 @@ class SAGPipeline:
             return await entity_guided_search(
                 query=query, entities_list=entities, top_k=top_k, trace_id=trace_id,
             )
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[SAG Path A] 实体引导召回失败: {e}")
             return {"events": [], "chunks": [], "entity_hits": [], "path": "path_a_error"}
 
@@ -339,7 +339,7 @@ class SAGPipeline:
                         "_similarity": round(sim, 4),
                     })
             return results
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[SAG Path B] 向量检索失败: {e}")
             return []
 
@@ -414,7 +414,7 @@ class SAGPipeline:
                                 "_score": 0.7,
                             })
                     return events
-                except Exception:
+                except Exception:  # TODO: Narrow exception type
                     return []
 
             # 并行执行所有 entity_name 查询
@@ -435,7 +435,7 @@ class SAGPipeline:
 
             return all_new_events[:MAX_MULTI_HOP_EVENTS]
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[SAG 多跳] 扩展失败: {e}")
             return []
 
@@ -450,7 +450,7 @@ class SAGPipeline:
             return _events_to_chunks(
                 events, top_k=top_k, max_events=MAX_EVENTS_TO_CHUNKS
             )
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[SAG] Event→Chunk失败: {e}")
             return []
 
@@ -470,7 +470,7 @@ class SAGPipeline:
             reranked = await rerank_with_deepseek(query, chunks, top_k=top_k)
             if reranked:
                 return reranked
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[SAG Rerank] DeepSeek Rerank失败: {e}")
 
         return sorted(

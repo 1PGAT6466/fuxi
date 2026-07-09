@@ -4,7 +4,6 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 import logging
-from typing import List
 
 logger = logging.getLogger(__name__)
 
@@ -46,7 +45,7 @@ async def wiki_home(request: Request = None):
             "total": len(pages),
             "categories": categories,
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"wiki_home 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -64,7 +63,7 @@ async def wiki_pages(request: Request = None, category: str = "", limit: int = 5
             from src.api.response import success
             return success(data={"pages": pages, "total": len(pages)}, message="获取 Wiki 页面列表成功")
         return {"pages": pages, "total": len(pages)}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"wiki_pages 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -89,7 +88,7 @@ async def wiki_search(q: str = Query(""), request: Request = None):
             from src.api.response import success
             return success(data={"pages": pages, "total": len(pages)}, message="Wiki 搜索完成")
         return {"pages": pages, "total": len(pages)}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"wiki_search 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -113,7 +112,7 @@ async def wiki_page(page_id: str, request: Request = None):
             from src.api.response import success
             return success(data=page, message="获取 Wiki 页面成功")
         return page
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"wiki_page 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -170,7 +169,7 @@ async def wiki_create(body: WikiCreateRequest, request: Request = None):
             from src.api.response import success
             return success(data=page, message="Wiki 页面创建成功")
         return {"ok": True, "page": page, "message": "Wiki 页面创建成功"}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"wiki_create 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -202,7 +201,7 @@ async def wiki_update(page_id: str, request: Request):
             from src.api.response import success
             return success(data=page, message="Wiki 页面更新成功")
         return {"ok": True, "page": page, "message": "Wiki 页面更新成功"}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"wiki_update 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
 
@@ -229,6 +228,6 @@ async def wiki_delete(page_id: str, request: Request = None):
             from src.api.response import success
             return success(data=None, message=f"Wiki 页面 {page_id} 已删除")
         return {"ok": True, "message": f"Wiki 页面 {page_id} 已删除"}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"wiki_delete 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})

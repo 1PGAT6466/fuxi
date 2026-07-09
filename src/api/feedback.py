@@ -8,7 +8,7 @@ import logging
 import json
 import os
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -42,7 +42,7 @@ def _load_feedback_files(days: int = 7) -> List[Dict]:
                             entries.append(entry)
                     except json.JSONDecodeError:
                         continue
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"读取反馈文件 {fname} 失败: {e}")
 
     entries.sort(key=lambda e: e.get("timestamp", 0), reverse=True)
@@ -78,7 +78,7 @@ async def feedback_weekly(request: Request = None):
             from src.api.response import success
             return success(data=data, message="每周反馈")
         return data
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"feedback_weekly 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -136,7 +136,7 @@ async def feedback_submit(request: Request):
                 message="反馈提交成功" if not result.get("dedup") else "重复反馈已忽略"
             )
         return {"ok": True}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"feedback_submit 失败: {e}")
         return JSONResponse(
             status_code=500,

@@ -3,7 +3,7 @@ protocol.py — 象间通信协议
 定义象间通信的数据结构 + 信号类型
 """
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any, Dict
 from enum import Enum
 import time
 

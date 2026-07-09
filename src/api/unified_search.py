@@ -84,7 +84,7 @@ async def unified_search(
                 })
         except ImportError:
             searched_sources.append("knowledge_base (unavailable)")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"统一搜索 - 知识库查询失败: {e}")
             searched_sources.append(f"knowledge_base (error)")
 
@@ -104,7 +104,7 @@ async def unified_search(
                 })
         except ImportError:
             searched_sources.append("wiki (unavailable)")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"统一搜索 - Wiki 查询失败: {e}")
             searched_sources.append(f"wiki (error)")
 
@@ -123,7 +123,7 @@ async def unified_search(
                 })
         except ImportError:
             searched_sources.append("knowledge_graph (unavailable)")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"统一搜索 - 图谱查询失败: {e}")
             searched_sources.append(f"knowledge_graph (error)")
 
@@ -140,7 +140,7 @@ async def unified_search(
 
         return _build_response(request, q, matches, took_ms, hint=hint, sources=searched_sources)
 
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"unified_search 失败: {e}")
         return JSONResponse(
             status_code=500,

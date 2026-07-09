@@ -4,7 +4,7 @@ config_validation.py — 配置验证
 """
 import os
 import logging
-from typing import Dict, List
+from typing import Dict
 
 logger = logging.getLogger("infra.config_validation")
 
@@ -50,7 +50,7 @@ class ConfigValidator:
         if not os.path.exists(db_dir):
             try:
                 os.makedirs(db_dir, exist_ok=True)
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 self._errors.append(f"无法创建数据库目录: {e}")
 
     def _check_llm_config(self):

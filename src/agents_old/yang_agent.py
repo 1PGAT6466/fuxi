@@ -5,7 +5,7 @@ yang_agent.py — 太极·阳 Agent v4.0
 import json
 import logging
 import time
-from typing import Dict, List, Optional
+from typing import Dict, List
 
 from src.agents import BaseAgent, AgentContext
 
@@ -187,7 +187,7 @@ class YangAgent(BaseAgent):
                     "content": json.dumps(result, ensure_ascii=False)[:3000],
                 })
 
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.error(f"[Yang] Step {step} failed: {e}")
                 duration = (time.time() - start) * 1000
                 self._record_run(duration, total_tokens, error=True)
@@ -257,7 +257,7 @@ class YangAgent(BaseAgent):
                 from src.db.data_store import load_chunks
                 doc_results = await hybrid_search(query, load_chunks(), top_k=top_k)
                 results.extend(doc_results)
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning(f"[Yang] doc search failed: {e}")
 
         if scope in ("all", "wiki"):
@@ -266,7 +266,7 @@ class YangAgent(BaseAgent):
                 we = get_wiki_engine()
                 wiki_results = we.search_content(query, limit=3)
                 results.extend(wiki_results)
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning(f"[Yang] wiki search failed: {e}")
 
         if scope in ("all", "graph"):
@@ -275,7 +275,7 @@ class YangAgent(BaseAgent):
                 graph_ctx = get_entity_context(query)
                 if graph_ctx:
                     results.append({"text": graph_ctx, "file_name": "知识图谱", "source": "graph"})
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning(f"[Yang] graph search failed: {e}")
 
         return {"results": results[:top_k], "count": len(results)}
@@ -292,7 +292,7 @@ class YangAgent(BaseAgent):
             if chunk_index >= 0:
                 chunks = [c for c in chunks if c.get("chunk_index") == chunk_index]
             return {"chunks": chunks[:10], "count": len(chunks)}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             return {"error": str(e)}
     # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
@@ -302,5 +302,5 @@ class YangAgent(BaseAgent):
             from src.services.graph_router import get_entity_context
             ctx = get_entity_context(entity_name)
             return {"context": ctx} if ctx else {"error": "Entity not found"}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             return {"error": str(e)}

@@ -85,7 +85,7 @@ async def log_feedback_unified(user_id: str, query: str, action: str,
     # 2. 写入反馈文件
     try:
         _write_feedback_log(user_id, query, action, results, metadata, now)
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.warning("写反馈日志失败", exc_info=True)
 
     # 3. 积累学习 buffer
@@ -145,7 +145,7 @@ async def _maybe_learn_batch():
         logger.info(f"[反馈闭环] 学习完成: {len(batch)} 条反馈")
     except ImportError:
         logger.debug("[反馈闭环] learner 模块不存在，跳过批量学习")
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.warning("[反馈闭环] 学习失败", exc_info=True)
         # 失败时放回 buffer（最多重试 MAX_RETRY 次）
         for item in batch:

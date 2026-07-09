@@ -19,8 +19,8 @@ SAG 论文核心机制: 查询时用 SQL JOIN 动态激活局部超边，
 import json
 import logging
 import sqlite3
-from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Set, Tuple
+from dataclasses import dataclass
+from typing import List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -395,7 +395,7 @@ class EntityFrontier:
         if self._pg_frontier:
             try:
                 return self._pg_frontier.expand_seed(seed_event_ids)
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning(f"PG expand_seed 失败，降级 SQLite: {e}")
         return self._sqlite.expand_seed(seed_event_ids) if self._sqlite else []
 
@@ -406,7 +406,7 @@ class EntityFrontier:
         if self._pg_frontier:
             try:
                 return self._pg_frontier.hop_entities(entity_ids, exclude_event_ids, hop_limit)
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning(f"PG hop_entities 失败，降级 SQLite: {e}")
         return self._sqlite.hop_entities(entity_ids, exclude_event_ids, hop_limit) if self._sqlite else []
 
@@ -414,7 +414,7 @@ class EntityFrontier:
         if self._pg_frontier:
             try:
                 return self._pg_frontier.get_hyperedge(query_entity_ids, max_events)
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning(f"PG get_hyperedge 失败，降级 SQLite: {e}")
         return self._sqlite.get_hyperedge(query_entity_ids, max_events) if self._sqlite else []
 

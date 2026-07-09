@@ -49,7 +49,6 @@ def start_service() -> None:
             logger.warning("Pillow 未安装 — 图片功能将受限")
 
         try:
-            import docx
             logger.info("python-docx 可用")
         except ImportError:
             logger.warning("python-docx 未安装 — DOCX 文本提取功能将受限")
@@ -57,7 +56,7 @@ def start_service() -> None:
         _service_running = True
         logger.info("文档工具服务已启动")
 
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.error(f"文档工具服务启动失败: {e}")
         raise
 
@@ -73,7 +72,7 @@ def stop_service() -> None:
         try:
             shutil.rmtree(str(TEMP_DIR))
             logger.info("临时目录已清理")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"清理临时目录失败: {e}")
 
     _service_running = False

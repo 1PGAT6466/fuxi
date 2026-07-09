@@ -4,7 +4,6 @@ runner.py — 评测运行器（P0-E1）
 """
 import json
 import logging
-import os
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any
@@ -158,7 +157,7 @@ async def run_evaluation(
     for tc in test_cases:
         try:
             retrieved = await retriever_fn(tc["query"], top_k=10)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Eval] 检索失败: tc={tc['id']} error={e}")
             retrieved = []
 

@@ -308,7 +308,8 @@ import { ref, computed, onMounted } from 'vue';
 import DOMPurify from 'dompurify';
 import TokenManager from '@/utils/TokenManager';
 import { ElMessage, ElMessageBox } from 'element-plus';
-import { logger } from '@/utils/logger';
+import { createLogger } from '@/utils/logger';
+const logger = createLogger('KnowledgeView');
 import {
   Upload,
   UploadFilled,
@@ -325,46 +326,6 @@ import {
 import apiClient from '@/api';
 import { formatSize, formatDate } from '@/utils/helpers';
 import type { UploadFile, UploadInstance } from 'element-plus';
-
-// ───── Mock 数据 ─────
-function generateMockCollections() {
-  const now = Date.now();
-  return [
-    {
-      id: 'col_1',
-      name: '技术文档库',
-      status: 'ready',
-      docCount: 45,
-      document_count: 45,
-      vectorCount: 1280,
-      vector_count: 1280,
-      updatedAt: new Date(now - 3600000).toISOString(),
-      updated_at: new Date(now - 3600000).toISOString(),
-    },
-    {
-      id: 'col_2',
-      name: '产品知识库',
-      status: 'ready',
-      docCount: 32,
-      document_count: 32,
-      vectorCount: 890,
-      vector_count: 890,
-      updatedAt: new Date(now - 86400000).toISOString(),
-      updated_at: new Date(now - 86400000).toISOString(),
-    },
-    {
-      id: 'col_3',
-      name: '培训资料',
-      status: 'processing',
-      docCount: 18,
-      document_count: 18,
-      vectorCount: 450,
-      vector_count: 450,
-      updatedAt: new Date(now - 172800000).toISOString(),
-      updated_at: new Date(now - 172800000).toISOString(),
-    },
-  ];
-}
 
 interface CollectionItem {
   id: string;
@@ -423,12 +384,13 @@ const totalChunks = computed(() => {
 });
 
 const totalSizeText = computed(() => {
-  const total = collections.value.length * 1024 * 1024 * 15; // mock ~15MB per collection
+  // 从真实的文档大小累加计算，不再使用 mock 数据
+  const total = documents.value.reduce((sum, d) => sum + (d.size || 0), 0);
   return formatSize(total);
 });
 
 // ───── 上传配置 ─────
-const uploadUrl = '/api/kb/documents';
+const uploadUrl = '/api/documents';
 const uploadHeaders = computed(() => ({
   Authorization: `Bearer ${TokenManager.getToken() || ''}`,
 }));
@@ -440,11 +402,30 @@ const uploadData = computed(() => ({
 async function fetchCollections(): Promise<void> {
   loading.value = true;
   try {
-    const res = (await apiClient.get('/api/kb/collections')) as Record<string, unknown>;
-    collections.value = res.collections ?? res.data ?? [];
-  } catch {
-    console.warn('[KnowledgeView] API 不可用，使用 mock 数据');
-    collections.value = generateMockCollections();
+    const res = (await apiClient.get('/api/documents')) as Record<string, unknown>;
+    // 后端 GET /api/documents 返回文档列表，前端将其分组为集合
+    const docs = (res.documents ?? res.data ?? []) as Record<string, unknown>[];
+    if (docs.length > 0) {
+      // 将文档列表按某种方式分组展示为"集合"
+      const defaultCollection: CollectionItem = {
+        id: 'default',
+        name: '默认知识库',
+        status: 'ready',
+        docCount: docs.length,
+        document_count: docs.length,
+        vectorCount: docs.reduce((sum, d) => sum + ((d.chunk_count as number) || 0), 0),
+        vector_count: docs.reduce((sum, d) => sum + ((d.chunk_count as number) || 0), 0),
+        updatedAt: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
+      collections.value = [defaultCollection];
+    } else {
+      collections.value = [];
+    }
+  } catch (err) {
+    logger.error('获取知识集合失败', err);
+    collections.value = [];
+    ElMessage.warning('知识库接口暂不可用，请稍后重试');
   } finally {
     loading.value = false;
   }
@@ -453,51 +434,19 @@ async function fetchCollections(): Promise<void> {
 async function fetchDocuments(collectionId: string): Promise<void> {
   documentsLoading.value = true;
   try {
-    const res = (await apiClient.get(`/api/kb/documents?collection_id=${collectionId}`)) as Record<
+    // GET /api/documents 支持 ?collection_id= 参数
+    const res = (await apiClient.get(`/api/documents?collection_id=${collectionId}`)) as Record<
       string,
       unknown
     >;
-    documents.value = res.documents ?? res.data ?? [];
-  } catch {
-    // 使用 mock 文档
-    documents.value = [
-      {
-        id: 'd1',
-        name: '产品需求文档_v3.pdf',
-        size: 2450000,
-        chunks: 12,
-        chunk_count: 12,
-        indexed: true,
-        created: new Date().toISOString(),
-      },
-      {
-        id: 'd2',
-        name: 'API接口规范.md',
-        size: 45000,
-        chunks: 3,
-        chunk_count: 3,
-        indexed: true,
-        created: new Date(Date.now() - 86400000).toISOString(),
-      },
-      {
-        id: 'd3',
-        name: '系统架构设计.docx',
-        size: 1200000,
-        chunks: 8,
-        chunk_count: 8,
-        indexed: true,
-        created: new Date(Date.now() - 172800000).toISOString(),
-      },
-      {
-        id: 'd4',
-        name: '用户手册_v2.pdf',
-        size: 3200000,
-        chunks: 15,
-        chunk_count: 15,
-        indexed: false,
-        created: new Date(Date.now() - 259200000).toISOString(),
-      },
-    ];
+    documents.value = (res.documents ?? res.data ?? []) as DocumentItem[];
+    if (documents.value.length === 0) {
+      ElMessage.info('该集合下暂无文档');
+    }
+  } catch (err) {
+    logger.error('获取文档列表失败', err);
+    documents.value = [];
+    ElMessage.error('获取文档列表失败，请稍后重试');
   } finally {
     documentsLoading.value = false;
   }
@@ -523,20 +472,17 @@ async function toggleCollection(col: CollectionItem): Promise<void> {
 async function viewChunks(doc: DocumentItem): Promise<void> {
   selectedDoc.value = doc;
   showChunksDialog.value = true;
+  chunks.value = [];
   try {
-    const res = (await apiClient.get(`/api/kb/chunks?doc_id=${doc.id}`)) as Record<string, unknown>;
-    chunks.value = res.chunks ?? res.data ?? [];
-  } catch {
-    // mock 分块数据
-    chunks.value = Array.from({ length: doc.chunks || 3 }, (_, i) => ({
-      content:
-        `这是文档「${doc.name}」的第 ${i + 1} 个分块内容。` +
-        '人工智能技术正在深刻改变着我们的生活方式。从智能手机上的语音助手，到自动驾驶汽车，' +
-        '再到医疗影像诊断，AI的应用已经无处不在。深度学习、自然语言处理和计算机视觉等技术的突破，' +
-        '让机器能够完成越来越多过去只有人类才能完成的任务。',
-      token_count: 120 + i * 20,
-      tokens: 120 + i * 20,
-    }));
+    const res = (await apiClient.get(`/api/documents/${doc.id}/chunks`)) as Record<string, unknown>;
+    chunks.value = (res.chunks ?? res.data ?? []) as Record<string, unknown>[];
+    if (chunks.value.length === 0) {
+      ElMessage.info('该文档暂无分块数据');
+    }
+  } catch (err) {
+    logger.error('获取文档分块失败', err);
+    chunks.value = [];
+    ElMessage.warning('分块数据暂不可用');
   }
 }
 
@@ -546,61 +492,25 @@ async function handleSearch(): Promise<void> {
   if (!q) return;
 
   searching.value = true;
+  searched.value = false;
   const startTime = performance.now();
   try {
-    const res = (await apiClient.post('/api/kb/search', {
+    const res = (await apiClient.post('/api/documents/search', {
       query: q,
       top_k: searchTopK.value,
       collection_id: activeCollectionId.value || undefined,
     })) as Record<string, unknown>;
 
-    searchResults.value = res.results ?? res.data ?? [];
+    searchResults.value = (res.results ?? res.data ?? []) as Record<string, unknown>[];
     searchTime.value = Math.round(performance.now() - startTime);
-  } catch {
-    // mock 检索结果
-    searchResults.value = [
-      {
-        content:
-          '人工智能技术正在深刻改变生活方式。从语音助手到自动驾驶，再到医疗诊断，AI应用无处不在。深度学习等技术突破让机器能完成越来越多人类任务。',
-        score: 0.92,
-        source_doc: '产品需求文档_v3.pdf',
-        source: '产品需求文档_v3.pdf',
-        chunk_id: 'chunk_5',
-      },
-      {
-        content:
-          '自然语言处理（NLP）是人工智能的重要分支，涉及文本理解、生成、翻译等任务。现代NLP基于Transformer架构的预训练模型取得了突破性进展。',
-        score: 0.85,
-        source_doc: 'API接口规范.md',
-        source: 'API接口规范.md',
-        chunk_id: 'chunk_2',
-      },
-      {
-        content:
-          '计算机视觉技术让机器能够理解和分析图像与视频。在医疗影像诊断中，AI辅助系统可以提高诊断准确率，减少医生工作负担。',
-        score: 0.78,
-        source_doc: '系统架构设计.docx',
-        source: '系统架构设计.docx',
-        chunk_id: 'chunk_12',
-      },
-      {
-        content:
-          '深度学习模型如GPT、BERT等在各类NLP任务上取得了state-of-the-art的成绩。这些模型通过在大量未标注文本上预训练，再针对特定任务微调。',
-        score: 0.71,
-        source_doc: '用户手册_v2.pdf',
-        source: '用户手册_v2.pdf',
-        chunk_id: 'chunk_8',
-      },
-      {
-        content:
-          '随着算力的不断提升和数据量的爆炸式增长，未来AI将在更多领域发挥关键作用，包括自动驾驶、智能医疗、金融科技等。',
-        score: 0.65,
-        source_doc: '系统架构设计.docx',
-        source: '系统架构设计.docx',
-        chunk_id: 'chunk_3',
-      },
-    ].slice(0, searchTopK.value);
+    if (searchResults.value.length === 0) {
+      ElMessage.info('未找到相关结果');
+    }
+  } catch (err) {
+    logger.error('知识检索失败', err);
+    searchResults.value = [];
     searchTime.value = Math.round(performance.now() - startTime);
+    ElMessage.error('检索服务暂不可用，请稍后重试');
   } finally {
     searching.value = false;
     searched.value = true;
@@ -653,16 +563,15 @@ async function handleDeleteDoc(row: DocumentItem): Promise<void> {
     await ElMessageBox.confirm(`确定要删除文档「${row.name}」吗？`, '确认删除', {
       type: 'warning',
     });
-    try {
-      await apiClient.delete(`/api/kb/documents/${row.id}`);
-    } catch {
-      /* 忽略 */
-    }
+    await apiClient.delete(`/api/documents/${row.id}`);
     documents.value = documents.value.filter((d) => d.id !== row.id);
     ElMessage.success('删除成功');
     fetchCollections();
-  } catch {
-    // 取消
+  } catch (err: unknown) {
+    if (err !== 'cancel' && err !== 'close') {
+      logger.error('删除文档失败', err);
+      ElMessage.error('删除失败，请稍后重试');
+    }
   }
 }
 

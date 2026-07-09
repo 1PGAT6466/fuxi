@@ -5,8 +5,3 @@
 services/wiki.py — 兼容层（保留：被 sanjiao/signal_layer、spleen/signal_layer、agentic_rag_v2、integrated_search 引用）
 v1.50 HIGH 修复：将 import * 改为显式导入。
 """
-from src.taiyang.wiki import (
-    WikiEngine,
-    get_wiki_engine,
-    sync_wiki_vectors,
-)

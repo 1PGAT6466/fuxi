@@ -2,7 +2,7 @@
 lib/db.py — 统一数据库访问层
 所有数据库操作集中在这里，router 层禁止直接 sqlite3.connect
 """
-import sqlite3, os, json
+import sqlite3, json
 from pathlib import Path
 from contextlib import contextmanager
 import logging; logger = logging.getLogger(__name__)
@@ -108,7 +108,7 @@ def log_search_to_db(query: str, result_count: int, latency_ms: float, mode: str
                 "mode": mode,
                 "timestamp": __import__('datetime').datetime.now().isoformat()
             }, ensure_ascii=False) + "\n")
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.warning(f"[db] 搜索日志写入失败", exc_info=True)
 
 logger.info("lib/db.py 加载完成")

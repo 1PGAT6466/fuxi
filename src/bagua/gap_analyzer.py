@@ -32,12 +32,11 @@ gap_analyzer.py — 兑卦后处理 · 知识盲区标注 (Gap Analysis)
 创建：2026-07-08
 """
 
-from __future__ import annotations
 
 import logging
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 logger = logging.getLogger("bagua.gap_analyzer")
 

@@ -47,7 +47,7 @@ def expand_context(results: List[Dict]) -> List[Dict]:
 
         return expanded
 
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"[结果后处理] 上下文扩展失败: {e}")
         return results
 
@@ -62,7 +62,7 @@ def _get_adjacent_chunk(store, file_hash: str, chunk_index: int) -> Dict:
         if rows:
             import json
             return json.loads(rows[0][0])
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("Exception 失败: %s", e, exc_info=True)
     return None
 

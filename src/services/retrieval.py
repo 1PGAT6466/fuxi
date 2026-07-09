@@ -3,8 +3,7 @@ services/retrieval.py — 混合检索服务（v10.0）
 负责：BM25 + 向量双路召回 → RRF 融合 → 精排 → 去重 → 上下文扩展
 """
 import logging; logger = logging.getLogger(__name__)
-import re, asyncio
-from typing import List, Dict
+import asyncio
 
 # v11: Concurrent control for ChromaDB
 _VECTOR_SEM = asyncio.Semaphore(2)
@@ -17,11 +16,10 @@ except ImportError:
 
 from src.db.memory_store import get_store
 from src.db.vector_store import get_vector_store, embed_texts
-from src.services.graph_router import route_to_categories, expand_query_with_synonyms, get_entity_context
-from src.config import EMBEDDER_URL
+from src.services.graph_router import route_to_categories, expand_query_with_synonyms
 from src.services.query_expansion import expand_query, llm_rewrite_query, hyde_expand_query
 from src.services.fusion import rrf_fusion, weighted_fusion_adjust, exact_match_boost, dynamic_category_weight, personalized_boost
-from src.services.results_postprocess import mmr_dedup, expand_context, _split_sentences_zh, _expand_parent_child, _find_best_sentence
+from src.services.results_postprocess import mmr_dedup, expand_context, _expand_parent_child
 from src.services.synonym_loader import load_synonyms
 # 兼容别名
 _SYNONYM_MAP = load_synonyms()
@@ -78,7 +76,7 @@ async def vector_recall(query: str, n_results: int = 30, category: str = "") -> 
                     "_source": "vector",
                     "_similarity": round(sim, 4),
                 })
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("vector_recall 操作失败: %s", e, exc_info=True)
     return results
 
@@ -103,7 +101,7 @@ async def _l_minus_1_qa_match(query: str) -> bool:
                     else:
                         logger.info(f"[Retrieval] QA pair match: {len(qa_chunk_ids)} source chunks, query_len={len(query)}")
                     return True
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("QA对匹配失败: %s", e, exc_info=True)
     return False
 
@@ -215,7 +213,7 @@ async def _l175_wiki_recall(query: str) -> list:
                         "category": d.get("category_path", "") or "",
                         "similarity": 0.7
                     })
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"[Wiki recall] {e}")
     return wiki_hits
 
@@ -376,7 +374,7 @@ async def hybrid_search(query: str, chunks: list = None, category: str = "",
     try:
         from src.services.cache import set_cache as _set_cache_sync
         await _set_cache_sync(query, result, category, top_k)
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("缓存写入失败: %s", e, exc_info=True)
     return result
 
@@ -403,7 +401,7 @@ async def _rerank_layer(query: str, candidates: list, top_k: int = 30) -> list:
             import json as _json
             logger.debug(f'intermediate-rerank top score: {rr_score:.4f}, source: {first.get("_source", "?")}')
             return ranked
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("intermediate-rerank 降级: %s", e, exc_info=True)
     # 最终兜底：返回原始排序
     return candidates[:top_k]
@@ -415,7 +413,7 @@ async def _check_cache(query: str, category: str, top_k: int):
     try:
         from src.services.cache import get_cache
         return await get_cache(query, category, top_k)
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("Exception 失败: %s", e, exc_info=True)
         return None
 
@@ -423,14 +421,14 @@ async def _set_cache(query: str, results: list, category: str, top_k: int):
     try:
         from src.services.cache import set_cache
         await set_cache(query, results, category, top_k)
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("_set_cache 操作失败: %s", e, exc_info=True)
 # RAG 3.0: Multi-View 表格视图
 async def _table_recall(query: str, chunks: list, top_k: int) -> list:
     try:
         from src.services.table_view import table_view_recall
         return await table_view_recall(query, chunks, top_k)
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("Exception 失败: %s", e, exc_info=True)
         return []
 

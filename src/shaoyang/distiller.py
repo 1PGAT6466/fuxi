@@ -8,13 +8,10 @@ v4→v5: asyncio 5路并发 + aiohttp + 增量蒸馏 + 断点恢复 + 去独立F
 import asyncio
 import json
 import logging
-import os
 import re
 import sqlite3
 from collections import defaultdict
-from datetime import datetime
-from pathlib import Path
-from typing import Dict, List, Tuple
+from typing import List, Tuple
 
 import aiohttp
 
@@ -70,7 +67,7 @@ async def _call_llm_async(
     except asyncio.TimeoutError:
         logger.warning("DeepSeek timeout")
         return ""
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"LLM fail: {e}")
         return ""
 
@@ -418,7 +415,7 @@ def load_state() -> set:
         try:
             with open(STATE_FILE) as f:
                 return set(json.load(f).get("distilled", []))
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             logger.warning("Failed to load distill state, starting fresh")
     return set()
 
@@ -433,7 +430,7 @@ def save_state(distilled_ids: set, total: int):
                 "last_run": now_iso(),
                 "total_distilled": total,
             }, f, ensure_ascii=False)
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.warning("Failed to save distill state", exc_info=True)
 
 
@@ -456,7 +453,7 @@ async def run_full_async(incremental: bool = True) -> dict:
     ).fetchall():
         try:
             doc = json.loads(doc_json)
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             continue
         text = doc.get("text", "").strip()
         if len(text) >= 50:

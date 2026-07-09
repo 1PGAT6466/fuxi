@@ -47,7 +47,7 @@ class GenerationAgent(BaseAgent):
                 "sources": ctx.intermediate_results[:5],
                 "duration_ms": round(duration, 1),
             }
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             duration = (time.time() - start) * 1000
             self._record_run(duration, error=True)
             return {"success": False, "answer": f"生成异常: {str(e)[:200]}", "error": str(e)}
@@ -62,5 +62,5 @@ class GenerationAgent(BaseAgent):
         try:
             from src.services.context_compressor import compress_context
             return await compress_context(context_parts, query, total_budget=budget)
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             return context_parts

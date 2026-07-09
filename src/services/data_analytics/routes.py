@@ -14,7 +14,6 @@ import csv
 import io
 import json
 import logging
-import os
 import sqlite3
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -127,7 +126,7 @@ def _get_chroma_stats() -> dict:
             )
             result["storage_size_bytes"] = total_bytes
 
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"获取 ChromaDB 统计失败: {e}")
 
     return result
@@ -180,7 +179,7 @@ def _get_chunks_stats() -> dict:
 
             conn.close()
 
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"获取 chunks 统计失败: {e}")
 
     return result
@@ -199,7 +198,7 @@ def _get_users_stats() -> dict:
                     result["roles"] = data["roles"]
             elif isinstance(data, list):
                 result["total_users"] = len(data)
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"获取用户统计失败: {e}")
 
     return result
@@ -251,7 +250,7 @@ def _get_search_logs_stats(start_date: Optional[str] = None, end_date: Optional[
                             )
                     except json.JSONDecodeError:
                         continue
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning("解析搜索日志条目失败: %s", e, exc_info=True)
                 continue
 
@@ -266,7 +265,7 @@ def _get_search_logs_stats(start_date: Optional[str] = None, end_date: Optional[
             for k, v in sorted(daily_counts.items())
         ]
 
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"获取搜索日志统计失败: {e}")
 
     return records
@@ -298,7 +297,7 @@ def _get_uploads_stats() -> dict:
             result["total_files"] = total_files
             result["total_size_bytes"] = total_bytes
             result["by_extension"] = extensions
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"获取上传文件统计失败: {e}")
 
     return result
@@ -338,7 +337,7 @@ def _get_audit_stats() -> dict:
                 result["api_calls"] = api_calls
 
             conn.close()
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"获取审计统计失败: {e}")
 
     return result
@@ -554,7 +553,7 @@ def _get_chunk_creation_trends(start_date: Optional[str] = None, end_date: Optio
             for k, v in sorted(daily.items())
         ]
 
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"获取 chunk 趋势失败: {e}")
 
     return records

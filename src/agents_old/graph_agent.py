@@ -34,7 +34,7 @@ class GraphAgent(BaseAgent):
                 "entity_context": entity_ctx or "",
                 "categories": categories or [],
             }
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             duration = (time.time() - start) * 1000
             self._record_run(duration, error=True)
             return {"success": False, "entity_context": "", "categories": [], "error": str(e)}

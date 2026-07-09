@@ -6,7 +6,6 @@ from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 import logging
 import json
-import os
 import time
 from pathlib import Path
 
@@ -33,7 +32,7 @@ def _get_real_search_stats() -> dict:
             "zero_result_rate": 0.0,
             "p50_latency_ms": 0,
         }
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         return {
             "total_searches": 0,
             "avg_results": 0,
@@ -109,7 +108,7 @@ async def evaluation_overview(request: Request = None):
                 test_cases_count = len(gt)
         except ImportError:
             pass
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
 
         data = {
@@ -128,7 +127,7 @@ async def evaluation_overview(request: Request = None):
             from src.api.response import success
             return success(data=data, message="评测概览")
         return data
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"evaluation_overview 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -154,9 +153,9 @@ async def evaluation_datasets(request: Request = None):
             try:
                 loop = asyncio.get_event_loop()
                 history = loop.run_until_complete(automation.get_eval_history())
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 pass
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
 
         datasets = history or []
@@ -177,7 +176,7 @@ async def evaluation_datasets(request: Request = None):
                     }]
             except ImportError:
                 pass
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 pass
 
         _wants_v2 = request and (
@@ -192,7 +191,7 @@ async def evaluation_datasets(request: Request = None):
                 "hint": None if datasets else "暂无数据集。上传评测数据或导入 ground_truth.json。",
             }, message="数据集列表")
         return {"datasets": datasets, "total": len(datasets)}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"evaluation_datasets 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -215,9 +214,9 @@ async def evaluation_tasks(request: Request = None):
             try:
                 loop = asyncio.get_event_loop()
                 history = loop.run_until_complete(automation.get_eval_history())
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 pass
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
 
         tasks = history or []
@@ -233,7 +232,7 @@ async def evaluation_tasks(request: Request = None):
                 "hint": None if tasks else "暂无评测任务。前往评测页面创建第一个评测任务。",
             }, message="任务列表")
         return {"tasks": tasks, "hint": None if tasks else "暂无评测任务"}
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"evaluation_tasks 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -259,9 +258,9 @@ async def evaluation_results(request: Request = None):
                 loop = asyncio.get_event_loop()
                 report = loop.run_until_complete(automation.get_latest_report())
                 history = loop.run_until_complete(automation.get_eval_history())
-            except Exception:
+            except Exception:  # TODO: Narrow exception type
                 pass
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             pass
 
         # 如果自动化没有报告，尝试从文件系统读取
@@ -286,7 +285,7 @@ async def evaluation_results(request: Request = None):
             "latest_report": report,
             "hint": None if results else "暂无评测结果",
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"evaluation_results 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -309,7 +308,7 @@ async def evaluation_create(request: Request):
             "result": result,
             "message": "评测已在后台启动，完成后可在评测结果页面查看",
         }
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"evaluation_create 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -330,5 +329,5 @@ def _load_latest_report_from_disk() -> dict:
         latest = report_files[0]
         with open(latest, "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         return None

@@ -112,7 +112,7 @@ class ServiceRegistry:
             info.last_health_check = time.time()
             logger.info(f"Service started: {service_id}")
             return True
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             info.status = ServiceStatus.ERROR
             info.error_message = str(e)
             logger.error(f"Failed to start service {service_id}: {e}")
@@ -131,7 +131,7 @@ class ServiceRegistry:
             info.status = ServiceStatus.STOPPED
             logger.info(f"Service stopped: {service_id}")
             return True
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             info.status = ServiceStatus.ERROR
             info.error_message = str(e)
             logger.error(f"Failed to stop service {service_id}: {e}")
@@ -175,9 +175,9 @@ class ServiceRegistry:
                                 info.error_message = ""
                             else:
                                 info.error_message = f"HTTP {resp.status}"
-                    except Exception as e:
+                    except Exception as e:  # TODO: Narrow exception type
                         info.error_message = str(e)
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.error(f"Health check loop error: {e}")
             await asyncio.sleep(30)
 

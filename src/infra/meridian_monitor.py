@@ -4,7 +4,7 @@ meridian_monitor.py — 经络监控器
 """
 import time
 import logging
-from typing import Dict, List, Optional
+from typing import Dict, Optional
 from collections import deque
 
 logger = logging.getLogger("infra.meridian_monitor")

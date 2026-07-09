@@ -74,7 +74,7 @@ class VectorStore:
             self._usable = True
             logger.info(f"VectorStore: reconnected to collection '{self.collection_name}'")
             return True
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             logger.error(
                 f"VectorStore: failed to reconnect to '{self.collection_name}'",
                 exc_info=True,
@@ -116,7 +116,7 @@ class VectorStore:
             c = self._collection.count()
             self._mark_success()
             return c
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             self._mark_failure()
             return -1
 
@@ -144,7 +144,7 @@ class VectorStore:
             )
             self._mark_success()
             return True
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             logger.error(f"VectorStore.add({len(ids)} ids) failed", exc_info=True)
             self._mark_failure()
             return False
@@ -170,7 +170,7 @@ class VectorStore:
             )
             self._mark_success()
             return result
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             logger.error(
                 f"VectorStore.query(n={n_results}) failed", exc_info=True
             )
@@ -199,7 +199,7 @@ class VectorStore:
             )
             self._mark_success()
             return True
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             logger.error(
                 f"VectorStore.upsert({target_id}) failed", exc_info=True
             )
@@ -225,7 +225,7 @@ class VectorStore:
             if removed:
                 logger.debug(f"VectorStore: deleted {removed} vectors for {file_hash}")
             return True
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             logger.error(
                 f"VectorStore.delete_by_file({file_hash}) failed", exc_info=True
             )
@@ -281,7 +281,7 @@ class VectorStore:
             )
             return True
 
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             logger.error(
                 f"VectorStore.update_metadata_by_file({file_hash}) failed",
                 exc_info=True,
@@ -307,7 +307,7 @@ def get_vector_store() -> Optional[VectorStore]:
     if _vector_store is None:
         try:
             _vector_store = VectorStore()
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             logger.error("VectorStore: init failed", exc_info=True)
             return None
     return _vector_store
@@ -393,6 +393,6 @@ async def embed_texts(texts: List[str]) -> Optional[List[List[float]]]:
         _embedder_last_check = now
         logger.warning(f"embed_texts: embedder unreachable — {e}")
         return None
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         logger.error("embed_texts: unexpected error", exc_info=True)
         return None

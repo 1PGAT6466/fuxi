@@ -61,7 +61,7 @@ def load_flags() -> Dict[str, bool]:
         try:
             saved = json.loads(FLAG_FILE.read_text(encoding="utf-8"))
             _flags = {**DEFAULT_FLAGS, **saved}
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("加载 feature flags 失败: %s", e, exc_info=True)
             _flags = dict(DEFAULT_FLAGS)
     else:
@@ -109,7 +109,7 @@ def _broadcast_change(flag_name: str, old_value, new_value: bool):
             pass
     except ImportError:
         pass
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.debug(f"[FeatureFlag] WebSocket 广播失败: {e}")
 
 def get_all_flags() -> Dict[str, Any]:

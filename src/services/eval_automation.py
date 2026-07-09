@@ -5,7 +5,6 @@ eval_automation.py — 评测管线自动化
 import json
 import logging
 import time
-import os
 from typing import Dict, List, Optional
 from pathlib import Path
 from datetime import datetime
@@ -67,7 +66,7 @@ class EvalAutomation:
                             f"搜索 API 格式校验失败: status={resp.status}, "
                             f"has_results={has_results}, has_query={has_query}"
                         )
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[EvalAutomation] 搜索 API 连通性测试失败: {e}")
             report["checks"]["search"] = {"passed": False, "error": str(e)}
             report["errors"].append(f"搜索 API 连通性测试失败: {e}")
@@ -93,7 +92,7 @@ class EvalAutomation:
                             f"嵌入 API 不健康: status={resp.status}, "
                             f"body_status={body.get('status')}"
                         )
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[EvalAutomation] 嵌入 API 连通性测试失败: {e}")
             report["checks"]["embedder"] = {"passed": False, "error": str(e)}
             report["errors"].append(f"嵌入 API 连通性测试失败: {e}")
@@ -162,7 +161,7 @@ class EvalAutomation:
                 "feedback_count": stats.get("feedback_count", 0),
                 "avg_rating": stats.get("avg_rating", 0),
             }
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[EvalAutomation] 检索质量评测失败: {e}")
             return {}
 
@@ -177,7 +176,7 @@ class EvalAutomation:
                 "total_evals": stats.get("total_evals", 0),
                 "metrics": stats.get("metrics", {}),
             }
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[EvalAutomation] 答案质量评测失败: {e}")
             return {}
 
@@ -198,7 +197,7 @@ class EvalAutomation:
                 "latency_p95": percentiles.get("p95", 0),
                 "latency_p99": percentiles.get("p99", 0),
             }
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[EvalAutomation] 性能评测失败: {e}")
             return {}
 
@@ -269,7 +268,7 @@ class EvalAutomation:
                 }, ensure_ascii=False) + "\n")
 
             logger.info(f"[EvalAutomation] 报告已保存: {report_file}")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[EvalAutomation] 保存报告失败: {e}")
 
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
@@ -289,9 +288,9 @@ class EvalAutomation:
                         record = json.loads(line.strip())
                         # 简单的日期比较
                         records.append(record)
-                    except Exception as e:
+                    except Exception as e:  # TODO: Narrow exception type
                         logger.warning("JSON解析评测历史记录失败: %s", e, exc_info=True)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("读取评测历史记录失败: %s", e, exc_info=True)
 
         return records[-days:]
@@ -313,7 +312,7 @@ class EvalAutomation:
         try:
             with open(report_file, "r", encoding="utf-8") as f:
                 return json.load(f)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("读取评测报告失败: %s", e, exc_info=True)
             return None
 

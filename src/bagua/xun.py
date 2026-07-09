@@ -11,7 +11,6 @@ v2.1 Phase 1: 融合皮肤(SkinAgent)外部搜索能力
   → 独立于 organs/ 目录，保留完整 aiohttp 网络调用逻辑
 """
 
-from __future__ import annotations
 
 import asyncio
 import logging
@@ -30,7 +29,6 @@ from src.bagua.base_gua import (
     GuaBase,
     DegradationRule,
     FallbackAction,
-    CircuitState,
 )
 
 logger = logging.getLogger("bagua.xun")
@@ -239,7 +237,7 @@ class XunGua(GuaBase):
 
         try:
             from src.db.vector_store import VectorStore, COLLECTION_NAME
-            from src.services.embedder import embed_text, cosine_sim
+            from src.services.embedder import embed_text
             import asyncio as _asyncio
 
             # 生成查询向量
@@ -323,7 +321,7 @@ class XunGua(GuaBase):
             elapsed = (time.time() - start_time) * 1000
             logger.warning("[巽卦] _search_internal ImportError: %s", exc)
             return {"results": [], "total_matched": 0, "ms": round(elapsed, 1)}
-        except Exception as exc:
+        except Exception as exc:  # TODO: Narrow exception type
             elapsed = (time.time() - start_time) * 1000
             logger.error("[巽卦] _search_internal 异常: %s", exc, exc_info=True)
             return {"results": [], "total_matched": 0, "ms": round(elapsed, 1)}
@@ -453,7 +451,7 @@ class XunGua(GuaBase):
             if brave_cb is not None:
                 brave_cb.record_failure()
             return {"results": [], "error": str(exc)}
-        except Exception as exc:
+        except Exception as exc:  # TODO: Narrow exception type
             logger.warning("[巽卦·触角] 外探失败: %s", exc)
             if brave_cb is not None:
                 brave_cb.record_failure()
@@ -549,7 +547,7 @@ class XunGua(GuaBase):
                     return text.strip()[:self.MAX_CONTENT_LENGTH]
         except aiohttp.ClientError:
             logger.debug("[巽卦] 抓取失败: %s", url, exc_info=True)
-        except Exception:
+        except Exception:  # TODO: Narrow exception type
             logger.debug("[巽卦] 抓取异常: %s", url, exc_info=True)
 
         return ""

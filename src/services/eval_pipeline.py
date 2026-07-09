@@ -104,7 +104,7 @@ class EvalPipeline:
             eval_file = EVAL_DIR / "eval_results.jsonl"
             with open(eval_file, "a", encoding="utf-8") as f:
                 f.write(json.dumps(result, ensure_ascii=False) + "\n")
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Eval] 保存评测结果失败: {e}")
 
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
@@ -121,9 +121,9 @@ class EvalPipeline:
                 for line in f:
                     try:
                         results.append(json.loads(line.strip()))
-                    except Exception as e:
+                    except Exception as e:  # TODO: Narrow exception type
                         logger.warning("JSON解析评测结果失败: %s", e, exc_info=True)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("读取评测结果文件失败: %s", e, exc_info=True)
 
         if not results:

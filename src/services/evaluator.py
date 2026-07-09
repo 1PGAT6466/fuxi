@@ -1,7 +1,7 @@
 """
 evaluator.py — Phase 1.3.2: RAG 自动化评测器（LLM-as-Judge）
 """
-import json, logging, time, requests
+import json, logging, requests
 from typing import List, Dict
 
 logger = logging.getLogger(__name__)
@@ -29,7 +29,7 @@ def _llm_judge(prompt: str, max_tokens: int = 500) -> str:
             timeout=30
         )
         return r.json().get("choices", [{}])[0].get("message", {}).get("content", "")
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"LLM judge failed: {e}")
         return ""
 
@@ -57,7 +57,7 @@ def eval_relevancy(query: str, results: List[Dict]) -> Dict:
             return json.loads(resp[s:e])
     except json.JSONDecodeError as e:
         logger.error(f"eval_relevancy JSON 解析失败: {e}, resp={resp[:200]}")
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         pass
     return {"score": 0.5, "detail": "LLM 评判解析失败"}
 
@@ -81,7 +81,7 @@ def eval_faithfulness(query: str, answer: str, context: str) -> Dict:
             return json.loads(resp[s:e])
     except json.JSONDecodeError as e:
         logger.error(f"eval_faithfulness JSON 解析失败: {e}, resp={resp[:200]}")
-    except Exception:
+    except Exception:  # TODO: Narrow exception type
         pass
     return {"faithfulness_score": 0.5, "detail": "LLM 评判解析失败"}
 
@@ -98,6 +98,6 @@ def eval_answer_relevancy(query: str, answer: str) -> float:
     resp = _llm_judge(prompt, max_tokens=10)
     try:
         return float(resp.strip())
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("回答相关性评分解析失败: %s", e, exc_info=True)
         return 0.5

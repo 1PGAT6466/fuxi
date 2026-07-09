@@ -4,7 +4,7 @@ timeout.py — 超时处理
 """
 import asyncio
 import logging
-from typing import Any, Callable, Optional
+from typing import Any, Callable
 
 logger = logging.getLogger("infra.timeout")
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
@@ -41,7 +41,7 @@ async def with_timeout_and_retry(
             else:
                 logger.error(f"[Timeout] 所有 {max_retries} 次重试超时")
                 return fallback
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.error(f"[Timeout] 执行失败: {e}")
             if attempt == max_retries:
                 return fallback

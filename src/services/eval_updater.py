@@ -8,8 +8,7 @@ eval_updater.py — 评估集自动更新（P3-5）
   3. 优先选取"零结果查询"（反馈差的）作为新测试用例
   4. 合并已有手动测试用例，不去重
 """
-import json, time
-from pathlib import Path
+import json
 from collections import Counter
 from datetime import datetime, timedelta
 import logging
@@ -48,7 +47,7 @@ def _load_search_logs(days: int = 7) -> list:
                         logs.append(entry)
                     except json.JSONDecodeError as e:
                         logger.warning("json.JSONDecodeError 失败: %s", e, exc_info=True)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("_load_search_logs 操作失败: %s", e, exc_info=True)
     return logs
 
@@ -128,7 +127,7 @@ def update_eval_set() -> dict:
             existing = json.loads(EVAL_CASES_FILE.read_text(encoding="utf-8"))
             if not isinstance(existing, list):
                 existing = []
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("加载评估用例文件失败: %s", e, exc_info=True)
             existing = []
     
@@ -170,7 +169,7 @@ def should_update() -> bool:
             return True
         last_update = datetime.fromisoformat(latest)
         return (datetime.now() - last_update).days >= UPDATE_INTERVAL_DAYS
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning("should_update 检查失败: %s", e, exc_info=True)
         return True
 

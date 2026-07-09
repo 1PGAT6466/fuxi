@@ -124,7 +124,7 @@ async def _call_api(
 
                     return content if content else None
 
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"API {base_url} attempt {attempt+1} 异常: {e}")
             if attempt < 2:
                 import asyncio
@@ -174,7 +174,7 @@ async def _call_api_stream(
                                 yield delta["content"]
                         except (json.JSONDecodeError, KeyError, IndexError):
                             pass
-    except Exception as e:
+    except Exception as e:  # TODO: Narrow exception type
         yield f"[Stream Error: {e}]"
 
 

@@ -68,7 +68,7 @@ class SQLiteConnectionPool:
             for conn in self._pool:
                 try:
                     conn.close()
-                except Exception as e:
+                except Exception as e:  # TODO: Narrow exception type
                     logger.warning("关闭数据库连接失败: %s", e, exc_info=True)
             self._pool.clear()
             self._active_connections = 0

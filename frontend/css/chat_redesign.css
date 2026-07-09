@@ -196,3 +196,52 @@
   0%, 60%, 100% { transform: translateY(0); opacity: 0.3; }
   30% { transform: translateY(-6px); opacity: 1; }
 }
+
+/* --- SSE 流式输出 --- */
+
+/* 流式输出中的气泡：保留光标闪烁 */
+.msg-bubble.streaming {
+  min-height: 24px;
+}
+
+/* 流式光标闪烁动画 */
+.stream-cursor {
+  display: inline-block;
+  color: var(--mi-orange);
+  animation: streamBlink 0.8s step-end infinite;
+  font-weight: 300;
+  margin-left: 1px;
+  vertical-align: baseline;
+}
+@keyframes streamBlink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+/* 流式进度文字淡入 */
+.stream-progress {
+  animation: fadeInUp 0.3s ease;
+}
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* 停止按钮（可选，搭配 stopStreaming 使用） */
+.btn-stop-stream {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 12px;
+  font-size: 12px;
+  border-radius: 12px;
+  border: 1px solid var(--mi-orange);
+  background: transparent;
+  color: var(--mi-orange);
+  cursor: pointer;
+  transition: all 0.15s;
+  margin-top: 8px;
+}
+.btn-stop-stream:hover {
+  background: rgba(255, 103, 0, 0.08);
+}

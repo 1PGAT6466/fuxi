@@ -5,8 +5,3 @@
 services/table_parser.py — 兼容层（重定向到 src.taiyang.table_parser）
 v1.50 HIGH 修复：将 import * 改为显式导入。
 """
-from src.taiyang.table_parser import (
-    parse_table_to_rows,
-    extract_tables_from_markdown,
-    search_table,
-)

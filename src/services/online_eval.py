@@ -71,7 +71,7 @@ class OnlineEvaluator:
                     f.write(json.dumps(metric, ensure_ascii=False) + "\n")
 
             self._metrics_buffer.clear()
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[OnlineEval] 刷新指标失败: {e}")
 
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
@@ -92,9 +92,9 @@ class OnlineEvaluator:
                         metric = json.loads(line.strip())
                         if metric.get("timestamp", 0) > cutoff:
                             metrics.append(metric)
-                    except Exception as e:
+                    except Exception as e:  # TODO: Narrow exception type
                         logger.warning("JSON解析线上评测指标失败: %s", e, exc_info=True)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("获取线上评测指标失败: %s", e, exc_info=True)
 
         if not metrics:
@@ -132,9 +132,9 @@ class OnlineEvaluator:
                         if (metric.get("type") == "search" and
                             metric.get("latency_ms", 0) > threshold_ms):
                             slow_queries.append(metric)
-                    except Exception as e:
+                    except Exception as e:  # TODO: Narrow exception type
                         logger.warning("JSON解析慢查询数据失败: %s", e, exc_info=True)
-        except Exception as e:
+        except Exception as e:  # TODO: Narrow exception type
             logger.warning("获取慢查询数据失败: %s", e, exc_info=True)
 
         # 按延迟排序

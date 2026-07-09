@@ -60,7 +60,7 @@ class OrchestratorAgent(BaseAgent):
                 if reflect_result.get("success") and not reflect_result.get("passed"):
                     logger.info(f"[Orchestrator] Reflection flagged: {reflect_result.get('issues')}")
                     answer = reflect_result.get("answer", answer)
-            except Exception as e:
+            except Exception as e:  # TODO: Narrow exception type
                 logger.warning(f"[Orchestrator] Reflection failed: {e}")
 
         duration = (time.time() - start) * 1000

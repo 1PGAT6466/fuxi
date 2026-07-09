@@ -3,7 +3,6 @@ monitor.py — 太阴·监控
 setup_error_handlers
 """
 import logging
-from typing import Dict
 
 logger = logging.getLogger("taiyin.monitor")
 
@@ -11,7 +10,7 @@ logger = logging.getLogger("taiyin.monitor")
 def setup_error_handlers(app):
     """设置错误处理器"""
     try:
-        from fastapi import FastAPI, Request
+        from fastapi import Request
         from fastapi.responses import JSONResponse
 
         @app.exception_handler(Exception)

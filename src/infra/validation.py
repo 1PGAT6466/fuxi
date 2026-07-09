@@ -4,7 +4,7 @@ validation.py — 请求验证
 """
 import re
 import logging
-from typing import Any, Dict, Optional
+from typing import Any
 
 logger = logging.getLogger("infra.validation")
 

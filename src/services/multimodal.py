@@ -5,10 +5,3 @@
 services/multimodal.py — 兼容层（保留：被 ingest.py、agentic_rag_v2 引用）
 v1.50 HIGH 修复：将 import * 改为显式导入。
 """
-from src.shaoyang.multimodal import (
-    enhance_table_extraction,
-    encode_image_base64,
-    transcribe_image,
-    transcribe_image_from_bytes,
-    enhance_pdf_extraction,
-)
