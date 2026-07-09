@@ -1143,10 +1143,17 @@ class KunGua(GuaBase):
                     sources TEXT DEFAULT '[]',
                     version INTEGER DEFAULT 1,
                     quality_score REAL DEFAULT 0.5,
+                    author TEXT DEFAULT '',
                     created_at TEXT DEFAULT '',
                     updated_at TEXT DEFAULT ''
                 )
             """)
+            # v1.50 R3 Blue Fix: 兼容旧表结构 — 如果 author 列不存在则添加
+            try:
+                conn.execute("SELECT author FROM wiki_pages LIMIT 0")
+            except sqlite3.OperationalError:
+                conn.execute("ALTER TABLE wiki_pages ADD COLUMN author TEXT DEFAULT ''")
+                conn.commit()
             conn.commit()
 
             # 生成 page_id
@@ -1175,12 +1182,13 @@ class KunGua(GuaBase):
             ).fetchone()
             is_new = existing is None
 
+            author = getattr(self, '_caller_user', 'fuxi-system')
             conn.execute(
                 """INSERT OR REPLACE INTO wiki_pages
-                   (id, title, category, tags, summary, content, sources, version, quality_score, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                   (id, title, category, tags, summary, content, sources, version, quality_score, author, created_at, updated_at)
+                   VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
                 (page_id, title, category, tags_json, summary, content,
-                 sources_json, 1, 0.7, now, now),
+                 sources_json, 1, 0.7, author, now, now),
             )
             conn.commit()
             conn.close()
