@@ -249,26 +249,24 @@ async function sendChatSSE(query) {
     if (!answerText) answerText = '未能生成回答';
     if (answerId) {
       updateStreamingBubble(answerId, answerText, true);
-      // 替换为完整的 ai 消息（带 sources/trace）
       removeMsg(answerId);
       appendMsg('ai', answerText, sources, trace);
     } else {
-      // 无流式输出，直接用 appendMsg
       removeMsg(loadingId);
       appendMsg('ai', answerText, sources, trace);
     }
     chatHistory.push({ role: 'assistant', content: answerText });
+    return; // 成功，退出函数
 
   } catch (e) {
     clearTimeout(progressTimer);
     _currentAbortController = null;
 
-    // 用户主动中止不显示错误
+    // 用户主动中止不重试，不显示错误
     if (e.name === 'AbortError') {
       removeMsg(loadingId);
       if (answerId) {
         updateStreamingBubble(answerId, answerText, true);
-        // 保留已生成的内容
         if (answerText) {
           removeMsg(answerId);
           appendMsg('ai', answerText + '\n\n*[已中止]*', null, null);
@@ -278,26 +276,51 @@ async function sendChatSSE(query) {
       return;
     }
 
-    // 错误处理
+    // 认证错误不重试
+    if (e.message && (e.message.indexOf('Not logged') >= 0 || e.message.indexOf('Forbidden') >= 0 || e.message.indexOf('频繁') >= 0)) {
+      break;
+    }
+
+    lastErr = e;
+
+    // 可重试的错误：网络错误、超时、5xx
+    var isRetryable = e.message && (e.message.indexOf('超时') >= 0 || e.message.indexOf('网络') >= 0 ||
+      e.message.indexOf('fetch') >= 0 || e.message.indexOf('Network') >= 0 ||
+      e.message.indexOf('服务器错误') >= 0 || e.message.indexOf('格式异常') >= 0);
+
+    if (isRetryable && _attempt < _SSE_MAX_RETRIES) {
+      // 指数退避: 1s, 2s, 4s
+      var delay = _SSE_BASE_DELAY * Math.pow(2, _attempt);
+      // 显示重试提示
+      var retryEl = document.getElementById(loadingId);
+      if (retryEl) {
+        var progressDiv = retryEl.querySelector('.stream-progress');
+        if (progressDiv) {
+          progressDiv.style.display = 'block';
+          progressDiv.textContent = '连接中断，正在重连 (' + (_attempt + 1) + '/' + _SSE_MAX_RETRIES + ')…';
+        }
+      }
+      await new Promise(function(r) { setTimeout(r, delay); });
+      continue; // 进入下一次重试
+    }
+
+    // 不可重试或重试耗尽，跳出循环
+    break;
+  }
+  } // end for loop
+
+  // 所有重试失败，显示错误
+  if (lastErr) {
     removeMsg(loadingId);
     if (answerId) removeMsg(answerId);
-
-    var errMsg = e.message || '未知错误';
-    if (errMsg.indexOf('超时') >= 0) {
-      errMsg = '⏱️ 请求超时，AI 响应时间较长，请稍后重试';
-    } else if (errMsg.indexOf('Not logged') >= 0) {
-      errMsg = '🔒 登录已过期，请重新登录';
-    } else if (errMsg.indexOf('Forbidden') >= 0) {
-      errMsg = '🚫 没有权限访问该资源';
-    } else if (errMsg.indexOf('频繁') >= 0) {
-      errMsg = '⏳ 请求过于频繁，请稍后重试';
-    } else if (errMsg.indexOf('网络') >= 0 || errMsg.indexOf('fetch') >= 0 || errMsg.indexOf('Network') >= 0) {
-      errMsg = '🌐 网络连接失败，请检查网络后重试';
-    } else if (errMsg.indexOf('JSON') >= 0 || errMsg.indexOf('格式异常') >= 0) {
-      errMsg = '📡 服务器响应格式异常，请联系管理员';
-    } else {
-      errMsg = '❌ ' + errMsg;
-    }
+    var errMsg = lastErr.message || '未知错误';
+    if (errMsg.indexOf('超时') >= 0) errMsg = '⏱️ 请求超时，AI 响应时间较长，请稍后重试';
+    else if (errMsg.indexOf('Not logged') >= 0) errMsg = '🔒 登录已过期，请重新登录';
+    else if (errMsg.indexOf('Forbidden') >= 0) errMsg = '🚫 没有权限访问该资源';
+    else if (errMsg.indexOf('频繁') >= 0) errMsg = '⏳ 请求过于频繁，请稍后重试';
+    else if (errMsg.indexOf('网络') >= 0 || errMsg.indexOf('fetch') >= 0 || errMsg.indexOf('Network') >= 0) errMsg = '🌐 网络连接失败，请检查网络后重试';
+    else if (errMsg.indexOf('JSON') >= 0 || errMsg.indexOf('格式异常') >= 0) errMsg = '📡 服务器响应格式异常，请联系管理员';
+    else errMsg = '❌ ' + errMsg;
     appendMsg('error', '请求失败: ' + errMsg);
   }
 }

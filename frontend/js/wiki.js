@@ -116,6 +116,9 @@ async function loadWikiTree() {
   }
 }
 
+// R4: 分页配置
+var _WIKI_PAGE_SIZE = 50;
+
 function _renderWikiTree(filter) {
   var tree = document.getElementById('wikiTree');
   var filtered = filter ? _wikiPages.filter(function(p) { return (p.title||'').toLowerCase().indexOf(filter.toLowerCase()) >= 0; }) : _wikiPages;
@@ -133,13 +136,11 @@ function _renderWikiTree(filter) {
     if (b === '未分类') return -1;
     return a.localeCompare(b);
   });
-  // P1-9: 如果所有页面都在「未分类」中，显示提示
   var allUnclassified = catOrder.length === 1 && catOrder[0] === '未分类';
   var html = '<div style="padding:0 4px">';
   html += '<div style="font-size:13px;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px">📚 目录 <span style="font-size:11px;color:var(--text3);font-weight:400">('+_wikiPages.length+')</span></div>';
   html += '<div style="display:flex;align-items:center;gap:6px;background:var(--bg);border-radius:8px;padding:6px 10px;margin-bottom:12px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14" style="color:var(--text3);flex-shrink:0"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg><input type="text" placeholder="搜索页面..." value="'+esc(filter)+'" oninput="_renderWikiTree(this.value)" style="flex:1;border:none;background:transparent;font-size:12px;outline:none;font-family:var(--font)"></div>';
 
-  // P1-9: 无分类时显示提示
   if (allUnclassified) {
     html += '<div style="font-size:11px;color:var(--text3);padding:4px 8px;margin-bottom:8px;background:var(--bg);border-radius:6px;line-height:1.5">💡 分类关键词尚未配置，所有页面归入「未分类」。可在后端 /api/wiki 接口返回 categories 字段来启用自动分类。</div>';
   }
@@ -149,21 +150,56 @@ function _renderWikiTree(filter) {
     if (!pages || !pages.length) return;
     var icon = _getCatIcon(cat);
     var color = _getCatColor(cat);
-    html += '<div class="wiki-cat" style="margin-bottom:8px">';
+    var catId = 'wiki-cat-' + cat.replace(/[^a-zA-Z0-9]/g, '_');
+    html += '<div class="wiki-cat" style="margin-bottom:8px" id="'+catId+'">';
     html += '<div onclick="this.parentElement.querySelector(\'.wiki-cat-items\').classList.toggle(\'hidden\')" style="display:flex;align-items:center;gap:6px;padding:6px 8px;cursor:pointer;border-radius:6px;font-size:12px;font-weight:600;color:var(--text2);transition:all .15s" onmouseenter="this.style.background=\'var(--bg)\'" onmouseleave="this.style.background=\'transparent\'">';
     html += '<span style="font-size:14px">'+icon+'</span>';
     html += '<span>'+esc(cat)+'</span>';
     html += '<span style="font-size:10px;color:var(--text3);margin-left:auto">'+pages.length+'</span>';
     html += '</div>';
     html += '<div class="wiki-cat-items" style="padding-left:20px">';
-    pages.forEach(function(p) {
+    // R4: 分页显示，每次加载 _WIKI_PAGE_SIZE 个
+    var showPages = pages.slice(0, _WIKI_PAGE_SIZE);
+    showPages.forEach(function(p) {
       html += '<div class="wiki-tree-item" data-id="'+esc(p.id||p.page_id||'')+'" onclick="loadWikiPage(this.dataset.id)">'+esc(p.title||'未命名')+'</div>';
     });
+    if (pages.length > _WIKI_PAGE_SIZE) {
+      html += '<div id="'+catId+'-more" style="padding:4px 0">';
+      html += '<button class="btn btn-ghost btn-sm" style="font-size:11px;width:100%" onclick="_loadMoreWikiCat(\''+cat+'\',\''+catId+'\','+_WIKI_PAGE_SIZE+')">加载更多 ('+pages.length+' 条，已显示 '+_WIKI_PAGE_SIZE+')</button>';
+      html += '</div>';
+    }
     html += '</div></div>';
   });
 
   html += '</div>';
   tree.innerHTML = html;
+}
+
+// R4: 分类加载更多
+function _loadMoreWikiCat(cat, catId, offset) {
+  var pages = _wikiPages.filter(function(p) { return _classifyWikiPage(p.title, p.content) === cat; });
+  var more = pages.slice(offset, offset + _WIKI_PAGE_SIZE);
+  var catEl = document.getElementById(catId);
+  if (!catEl) return;
+  var itemsEl = catEl.querySelector('.wiki-cat-items');
+  if (!itemsEl) return;
+  var moreBtn = document.getElementById(catId + '-more');
+  if (moreBtn) moreBtn.remove();
+  more.forEach(function(p) {
+    var div = document.createElement('div');
+    div.className = 'wiki-tree-item';
+    div.dataset.id = p.id || p.page_id || '';
+    div.textContent = p.title || '未命名';
+    div.onclick = function() { loadWikiPage(this.dataset.id); };
+    itemsEl.appendChild(div);
+  });
+  if (offset + _WIKI_PAGE_SIZE < pages.length) {
+    var btnDiv = document.createElement('div');
+    btnDiv.id = catId + '-more';
+    btnDiv.style.padding = '4px 0';
+    btnDiv.innerHTML = '<button class="btn btn-ghost btn-sm" style="font-size:11px;width:100%" onclick="_loadMoreWikiCat(\''+cat+'\',\''+catId+'\','+(offset+_WIKI_PAGE_SIZE)+')">加载更多 ('+pages.length+' 条，已显示 '+(offset+_WIKI_PAGE_SIZE)+')</button>';
+    itemsEl.appendChild(btnDiv);
+  }
 }
 
 // 提取 markdown 中的标题作为目录

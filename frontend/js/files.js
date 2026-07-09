@@ -94,8 +94,12 @@ async function loadFiles() {
     // P0-6 fix: store reference to stable file data and avoid stale closure references
     window._filesData = files;
     var _cats = cats;  // capture locally but accessible via closure
+    // R4: 文件列表分页
+    var _FILE_PAGE_SIZE = 20;
+    window._filePageOffset = 0;
 
-    window._renderFiles = function (cat) {
+    window._renderFiles = function (cat, append) {
+      if (!append) window._filePageOffset = 0;
       var activeCat = cat;
       window._activeCat = cat;
       // P0-6 fix: always read from window._filesData to avoid stale closure
@@ -121,22 +125,27 @@ async function loadFiles() {
         (window._batchSelected.size ? '<button class="btn btn-sm btn-ghost" style="color:var(--error);font-size:12px" onclick="batchDelete()">🗑 批量删除 (' + window._batchSelected.size + ')</button>' : '') +
         '<button class="btn btn-sm btn-ghost" style="font-size:12px" onclick="exportCSV()">📊 导出CSV</button>' +
         '</div>';
+
+      // R4: 分页渲染
+      var showFiles = filtered.slice(0, window._filePageOffset + _FILE_PAGE_SIZE);
+      var hasMore = showFiles.length < filtered.length;
+
       grid.innerHTML =
         (_cats.length > 1 ? '<div style="margin-bottom:12px">' + catBtns + '</div>' : '') +
         batchBar +
         '<div class="file-grid">' +
-        filtered.map(function(f) {
+        showFiles.map(function(f) {
           var fh = f.file_hash || '';
           var fn = esc(f.file_name || '?');
           var checked = fh && window._batchSelected.has(fh) ? 'checked' : '';
-          // R2 fix: data 属性替代内联 onclick，消除 XSS 注入面
           return '<div class="file-card" style="position:relative">' +
             (fh ? '<div style="position:absolute;top:8px;left:8px"><input type="checkbox" ' + checked + ' data-file-hash="' + esc(fh) + '" class="batch-checkbox" style="cursor:pointer"></div>' : '') +
             '<div class="file-icon">' + fileIcon(f.file_name) + '</div><div class="file-name">' + fn + '</div><div class="file-meta">' + esc(catLabel(f.category) || '未分类') + '</div><div style="display:flex;gap:8px;margin-top:10px">' +
             (fh ? '<a href="/api/view/' + encodeURIComponent(fh) + '" target="_blank" class="btn btn-sm btn-ghost" style="font-size:11px;padding:4px 8px">👁 查看</a><a href="/api/download/' + encodeURIComponent(fh) + '" class="btn btn-sm btn-ghost" style="font-size:11px;padding:4px 8px">⬇ 下载</a>' : '') +
             '<button class="btn btn-sm btn-ghost file-delete-btn" data-file-hash="' + esc(fh) + '" style="font-size:11px;padding:4px 8px;color:var(--error)">🗑 删除</button></div></div>';
         }).join('') +
-        '</div>';
+        '</div>' +
+        (hasMore ? '<div style="text-align:center;padding:16px 0"><button class="btn btn-ghost btn-sm" onclick="window._filePageOffset+=' + _FILE_PAGE_SIZE + ';window._renderFiles(window._activeCat, true)">加载更多 (' + filtered.length + ' 个文件，已显示 ' + showFiles.length + ')</button></div>' : '');
     };
     window._renderFiles('全部');
 
