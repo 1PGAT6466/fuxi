@@ -158,7 +158,15 @@ async function handleCompress() {
 }
 
 function downloadFile() {
-  if (compressResult.value) ElMessage.info('文件下载中...（Mock 模式）');
+  // R5 蓝队修复：移除硬编码 mock 提示，改为开发环境标记
+  if (compressResult.value) {
+    if (import.meta.env.DEV) {
+      ElMessage.info('文件下载中...（开发环境模拟）');
+    } else {
+      // 生产环境：触发真实下载
+      window.open(`/api/download/${compressResult.value.filename || ''}`, '_blank');
+    }
+  }
 }
 </script>
 

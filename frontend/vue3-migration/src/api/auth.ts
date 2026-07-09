@@ -39,25 +39,15 @@ export interface LoginResult {
  * @param role 角色选择
  * @returns 登录结果（含 token 和用户信息）
  */
+import apiClient from './index';
+
 export async function login(
   username: string,
   password: string,
   role: 'admin' | 'user',
 ): Promise<LoginResult> {
-  const response = await fetch('/api/auth/login', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ username, password, role }),
-  });
-
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || errorData.detail || `登录失败 (${response.status})`);
-  }
-
-  const data = await response.json();
+  // R5 蓝队修复：统一使用 apiClient 替代原生 fetch
+  const data = await apiClient.post('/api/auth/login', { username, password, role }) as Record<string, unknown>;
 
   // 后端返回 {token, username, role, display_name}
   if (!data.token) {
@@ -100,16 +90,9 @@ export async function refreshToken(): Promise<string> {
  * 退出登录
  */
 export async function logout(): Promise<void> {
-  const token = TokenManager.getToken();
-
+  // R5 蓝队修复：统一使用 apiClient 替代原生 fetch
   try {
-    await fetch('/api/auth/logout', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: token ? `Bearer ${token}` : '',
-      },
-    });
+    await apiClient.post('/api/auth/logout', {});
   } catch (err) {
     console.error('[Auth API] 退出登录请求失败', err);
     // 即使后端请求失败，仍执行本地清除

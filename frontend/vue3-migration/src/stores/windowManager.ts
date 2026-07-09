@@ -108,21 +108,22 @@ export const useWindowManager = defineStore('windowManager', () => {
   function open(service: ServiceManifest, context?: Record<string, unknown>): ServiceWindow {
     // singleton 检查（排除 closed 和 closing 状态的窗口）
     if (service.singleton) {
-      const existing = windows.value.find(
+      const existingIdx = windows.value.findIndex(
         (w) => w.serviceId === service.id && w.state !== 'closed' && w.state !== 'closing',
       );
-      if (existing) {
-        // 如果已存在，聚焦该窗口
-        focus(existing.id);
-        // 恢复最小化的窗口
-        if (existing.state === 'minimized') {
-          existing.state = 'normal';
+      if (existingIdx !== -1) {
+        const existing = windows.value[existingIdx];
+        // R5 蓝队修复：shallowRef 深层属性修改不触发响应
+        const updated = { ...existing };
+        if (updated.state === 'minimized') {
+          updated.state = 'normal';
         }
-        // 更新上下文数据
         if (context) {
-          existing.data = { ...existing.data, ...context };
+          updated.data = { ...updated.data, ...context };
         }
-        return existing;
+        windows.value = [...windows.value.slice(0, existingIdx), updated, ...windows.value.slice(existingIdx + 1)];
+        focus(updated.id);
+        return updated;
       }
     }
 
@@ -151,12 +152,16 @@ export const useWindowManager = defineStore('windowManager', () => {
    * 聚焦窗口（提升 zIndex）
    */
   function focus(id: string): void {
-    const window = windows.value.find((w) => w.id === id);
-    if (!window || window.state === 'closed') return;
-    if (window.state === 'minimized') {
-      window.state = 'normal';
+    const idx = windows.value.findIndex((w) => w.id === id);
+    if (idx === -1 || windows.value[idx].state === 'closed') return;
+    const win = windows.value[idx];
+    // R5 蓝队修复：shallowRef 深层属性修改不触发响应，需创建新对象
+    const updated = { ...win };
+    if (updated.state === 'minimized') {
+      updated.state = 'normal';
     }
-    window.zIndex = ++nextZIndex.value;
+    updated.zIndex = ++nextZIndex.value;
+    windows.value = [...windows.value.slice(0, idx), updated, ...windows.value.slice(idx + 1)];
     activeWindowId.value = id;
   }
 
@@ -164,9 +169,11 @@ export const useWindowManager = defineStore('windowManager', () => {
    * 最小化窗口
    */
   function minimize(id: string): void {
-    const window = windows.value.find((w) => w.id === id);
-    if (!window || window.state === 'closed') return;
-    window.state = 'minimized';
+    const idx = windows.value.findIndex((w) => w.id === id);
+    if (idx === -1 || windows.value[idx].state === 'closed') return;
+    // R5 蓝队修复：shallowRef 深层属性修改不触发响应
+    const updated = { ...windows.value[idx], state: 'minimized' as const };
+    windows.value = [...windows.value.slice(0, idx), updated, ...windows.value.slice(idx + 1)];
 
     // 如果最小化的是活跃窗口，切换到下一个
     if (activeWindowId.value === id) {
@@ -181,25 +188,27 @@ export const useWindowManager = defineStore('windowManager', () => {
    * 切换窗口最大化/正常状态
    */
   function toggleMaximize(id: string): void {
-    const window = windows.value.find((w) => w.id === id);
-    if (!window || window.state === 'closed') return;
-
-    if (window.state === 'maximized') {
-      window.state = 'normal';
-    } else if (window.state === 'normal') {
-      window.state = 'maximized';
-    }
+    const idx = windows.value.findIndex((w) => w.id === id);
+    if (idx === -1 || windows.value[idx].state === 'closed') return;
+    // R5 蓝队修复：shallowRef 深层属性修改不触发响应
+    const win = windows.value[idx];
+    const newState = win.state === 'maximized' ? 'normal' as const : 'maximized' as const;
+    const updated = { ...win, state: newState };
+    windows.value = [...windows.value.slice(0, idx), updated, ...windows.value.slice(idx + 1)];
   }
 
   /**
    * 关闭窗口（延迟 300ms 删除，支持动画）
    */
   function close(id: string): void {
-    const window = windows.value.find((w) => w.id === id);
-    if (!window || window.state === 'closed' || window.state === 'closing') return;
+    const idx = windows.value.findIndex((w) => w.id === id);
+    if (idx === -1) return;
+    const win = windows.value[idx];
+    if (win.state === 'closed' || win.state === 'closing') return;
 
-    // 立即设置 closing 中间状态（状态机完善）
-    window.state = 'closing';
+    // R5 蓝队修复：shallowRef 深层属性修改不触发响应
+    const updated = { ...win, state: 'closing' as const };
+    windows.value = [...windows.value.slice(0, idx), updated, ...windows.value.slice(idx + 1)];
     closingWindowIds.value.add(id);
 
     // 300ms 后真正删除
@@ -224,21 +233,30 @@ export const useWindowManager = defineStore('windowManager', () => {
    * 移动窗口（拖拽）
    */
   function move(id: string, x: number, y: number): void {
-    const window = windows.value.find((w) => w.id === id);
-    if (!window || window.state === 'closed') return;
-    window.position = { x, y };
+    const idx = windows.value.findIndex((w) => w.id === id);
+    if (idx === -1 || windows.value[idx].state === 'closed') return;
+    // R5 蓝队修复：shallowRef 深层属性修改不触发响应
+    const updated = { ...windows.value[idx], position: { x, y } };
+    windows.value = [...windows.value.slice(0, idx), updated, ...windows.value.slice(idx + 1)];
   }
 
   /**
    * 调整窗口尺寸
    */
   function resize(id: string, width: number, height: number): void {
-    const window = windows.value.find((w) => w.id === id);
-    if (!window || window.state === 'closed' || window.state === 'maximized') return;
-    window.size = {
-      width: Math.max(320, width),
-      height: Math.max(240, height),
+    const idx = windows.value.findIndex((w) => w.id === id);
+    if (idx === -1) return;
+    const win = windows.value[idx];
+    if (win.state === 'closed' || win.state === 'maximized') return;
+    // R5 蓝队修复：shallowRef 深层属性修改不触发响应
+    const updated = {
+      ...win,
+      size: {
+        width: Math.max(320, width),
+        height: Math.max(240, height),
+      },
     };
+    windows.value = [...windows.value.slice(0, idx), updated, ...windows.value.slice(idx + 1)];
   }
 
   /**
@@ -271,19 +289,20 @@ export const useWindowManager = defineStore('windowManager', () => {
     const cellWidth = window.innerWidth / cols;
     const cellHeight = (window.innerHeight - 40) / rows; // 40px 留顶
 
-    normalWindows.forEach((win, index) => {
-      const col = index % cols;
-      const row = Math.floor(index / cols);
-      win.state = 'normal';
-      win.position = {
-        x: col * cellWidth,
-        y: row * cellHeight + 40,
-      };
-      win.size = {
-        width: cellWidth - 4,
-        height: cellHeight - 4,
+    // R5 蓝队修复：shallowRef 需创建新数组触发响应
+    const updated = windows.value.map((win) => {
+      const normalIdx = normalWindows.findIndex((nw) => nw.id === win.id);
+      if (normalIdx === -1) return win;
+      const col = normalIdx % cols;
+      const row = Math.floor(normalIdx / cols);
+      return {
+        ...win,
+        state: 'normal' as const,
+        position: { x: col * cellWidth, y: row * cellHeight + 40 },
+        size: { width: cellWidth - 4, height: cellHeight - 4 },
       };
     });
+    windows.value = updated;
   }
 
   /**
@@ -296,20 +315,22 @@ export const useWindowManager = defineStore('windowManager', () => {
     const totalRatio = ratios.reduce((a, b) => a + b, 0);
     let leftX = 0;
 
-    normalWindows.forEach((win, index) => {
-      const ratio = ratios[index % ratios.length] / totalRatio;
+    // R5 蓝队修复：shallowRef 需创建新数组触发响应
+    const updated = windows.value.map((win) => {
+      const normalIdx = normalWindows.findIndex((nw) => nw.id === win.id);
+      if (normalIdx === -1) return win;
+      const ratio = ratios[normalIdx % ratios.length] / totalRatio;
       const colWidth = window.innerWidth * ratio;
-      win.state = 'normal';
-      win.position = {
-        x: leftX,
-        y: 40,
-      };
-      win.size = {
-        width: colWidth - 4,
-        height: window.innerHeight - 44,
+      const result = {
+        ...win,
+        state: 'normal' as const,
+        position: { x: leftX, y: 40 },
+        size: { width: colWidth - 4, height: window.innerHeight - 44 },
       };
       leftX += colWidth;
+      return result;
     });
+    windows.value = updated;
   }
 
   /**

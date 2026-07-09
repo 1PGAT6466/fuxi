@@ -209,9 +209,14 @@ async function handleConvert() {
 }
 
 function downloadFile() {
+  // R5 蓝队修复：移除硬编码 mock 提示，改为开发环境标记
   if (result.value?.download_url) {
-    ElMessage.info('文件下载中...（Mock 模式下为模拟下载）');
-    // 实际环境中触发下载
+    if (import.meta.env.DEV) {
+      ElMessage.info('文件下载中...（开发环境模拟）');
+    } else {
+      // 生产环境：触发真实下载
+      window.open(result.value.download_url, '_blank');
+    }
   }
 }
 </script>

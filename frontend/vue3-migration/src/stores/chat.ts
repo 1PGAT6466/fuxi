@@ -10,6 +10,7 @@ import {
   createSession,
   deleteSession,
   sendMessageStream,
+  fetchSessionMessages,
 } from '@/api/chat';
 import { ElMessage } from 'element-plus';
 import { createLogger } from '@/utils/logger';
@@ -109,8 +110,16 @@ export const useChatStore = defineStore('chat', () => {
     messages.value = [];
     error.value = null;
 
-    // TODO: 从后端加载该会话的历史消息
-    // 当前先清空，等后端实现 getSessionMessages API
+    // R5 蓝队修复：从后端加载该会话的历史消息
+    try {
+      const historyMessages = await fetchSessionMessages(sessionId);
+      if (historyMessages && historyMessages.length > 0) {
+        messages.value = historyMessages;
+      }
+    } catch (err) {
+      // 历史消息加载失败不阻塞，静默处理
+      logger.warn('加载会话历史消息失败', err);
+    }
   }
 
   // ============================

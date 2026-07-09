@@ -226,6 +226,37 @@ async function _refreshToken() {
   }
 }
 
+// ===== R5: 统一错误码体系 =====
+var ErrorCodes = {
+  SUCCESS: 0,
+  UNKNOWN: -1,
+  UNAUTHORIZED: 401,
+  FORBIDDEN: 403,
+  NOT_FOUND: 404,
+  VALIDATION_ERROR: 422,
+  RATE_LIMITED: 429,
+  SERVER_ERROR: 500,
+  NETWORK_ERROR: -2,
+  TIMEOUT: -3,
+  TOKEN_EXPIRED: 4011,
+  TOKEN_REFRESH_FAILED: 4012,
+};
+
+/**
+ * 统一错误对象
+ * @param {number} code - 错误码
+ * @param {string} message - 错误信息
+ * @param {any} detail - 原始错误数据
+ */
+function ApiError(code, message, detail) {
+  this.code = code;
+  this.message = message;
+  this.detail = detail || null;
+  this.name = 'ApiError';
+}
+ApiError.prototype = Object.create(Error.prototype);
+ApiError.prototype.constructor = ApiError;
+
 // ===== 核心 getToken — 支持加密/明文双模式 =====
 async function _getTokenDecrypted() {
   var v = __STORE.getItem(__TK);
@@ -389,31 +420,38 @@ async function api(url, opt) {
           if (lp) lp.style.display = 'flex';
           if (ma) ma.style.display = 'none';
         }
-        throw new Error('Not logged in');
+        throw new ApiError(ErrorCodes.TOKEN_EXPIRED, '登录已过期，请重新登录');
       }
-      if (r.status === 403) { toast('没有权限', 'error'); throw new Error('Forbidden'); }
+      if (r.status === 403) { toast('没有权限', 'error'); throw new ApiError(ErrorCodes.FORBIDDEN, '没有权限访问该资源'); }
+      if (r.status === 429) { throw new ApiError(ErrorCodes.RATE_LIMITED, '请求过于频繁，请稍后重试'); }
       if (!r.ok) {
-        // 先尝试解析响应体，提取错误信息（FastAPI 默认 {detail: "..."} 格式）
+        // R5: 统一错误格式处理 — 同时支持 {detail}, {status, message}, {code, message} 三种格式
         var errData = null;
         try { errData = await r.json(); } catch(_) { errData = null; }
-        if (errData && errData.detail) {
-          throw new Error(errData.detail);
+        var errMsg = '请求失败: ' + r.status;
+        var errCode = r.status;
+        if (errData) {
+          if (errData.message) errMsg = errData.message;
+          else if (errData.detail) errMsg = typeof errData.detail === 'string' ? errData.detail : JSON.stringify(errData.detail);
+          if (errData.code) errCode = errData.code;
         }
-        if (errData && errData.status === 'error' && errData.message) {
-          throw new Error(errData.message);
-        }
-        throw new Error('请求失败: ' + r.status);
+        throw new ApiError(errCode, errMsg, errData);
       }
 
       var data = await r.json();
 
-      // P2-7 fix + v1.50 unified + R5: 处理后端 {status: 'success'|'error', data: {...}} 统一格式
-      if (data && data.status === 'error' && data.message) {
-        throw new Error(data.message);
+      // R5: 统一响应格式处理 - 同时支持三种后端返回格式
+      // 格式1: {status: 'error', message: '...'} - 伏羲标准格式
+      // 格式2: {detail: '...'} - FastAPI 默认错误格式
+      // 格式3: {code: 非0, message: '...'} - 通用 code-message 格式
+      if (data && data.status === 'error') {
+        throw new ApiError(data.code || ErrorCodes.SERVER_ERROR, data.message || '请求失败', data);
       }
-      // R5: FastAPI 默认错误格式 {detail: "..."} 兜底（非 success 响应才处理）
       if (data && data.detail && typeof data.detail === 'string' && data.status !== 'success') {
-        throw new Error(data.detail);
+        throw new ApiError(r.status, data.detail, data);
+      }
+      if (data && data.code !== undefined && data.code !== 0 && data.code !== 200 && data.status !== 'success') {
+        throw new ApiError(data.code, data.message || '请求失败', data);
       }
 
       // v1.50: 统一格式自动解包 data 字段，同时保留顶层字段用于兼容
@@ -436,12 +474,20 @@ async function api(url, opt) {
       return data;
     } catch (e) {
       lastErr = e;
+      // R5: 将网络/超时错误包装为 ApiError
+      if (!(e instanceof ApiError)) {
+        if (e.message && e.message.indexOf('超时') >= 0) {
+          lastErr = new ApiError(ErrorCodes.TIMEOUT, e.message);
+        } else if (e.name === 'TypeError' || (e.message && (e.message.indexOf('fetch') >= 0 || e.message.indexOf('Network') >= 0))) {
+          lastErr = new ApiError(ErrorCodes.NETWORK_ERROR, '网络连接失败，请检查网络');
+        }
+      }
       // 超时或网络错误可重试
-      if (attempt < retries && (e.message.indexOf('超时') >= 0 || e.name === 'TypeError')) {
+      if (attempt < retries && (lastErr.code === ErrorCodes.TIMEOUT || lastErr.code === ErrorCodes.NETWORK_ERROR)) {
         await new Promise(function(resolve) { setTimeout(resolve, 1000 * (attempt + 1)); });
         continue;
       }
-      throw e;
+      throw lastErr;
     }
   }
   throw lastErr || new Error('请求失败');

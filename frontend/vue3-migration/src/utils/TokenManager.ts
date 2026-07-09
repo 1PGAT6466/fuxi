@@ -106,6 +106,8 @@ class TokenManager {
 
     refreshPromise = (async () => {
       try {
+        // R5 蓝队修复：使用原生 fetch 保留（因为 apiClient 拦截器依赖 TokenManager.refreshToken()，
+        // 直接用 apiClient 会导致循环调用）。但统一错误处理格式。
         const currentToken = TokenManager.getToken();
         const response = await fetch('/api/auth/refresh', {
           method: 'POST',
@@ -120,7 +122,11 @@ class TokenManager {
         }
 
         const data = await response.json();
-        if (data.code !== 0 && data.code !== 200) {
+        // R5: 统一处理 {status, data, message} 和 {code, data, message} 两种格式
+        if (data.status === 'error') {
+          throw new Error(data.message || 'Token 刷新失败');
+        }
+        if (data.code !== undefined && data.code !== 0 && data.code !== 200) {
           throw new Error(data.message || 'Token 刷新失败');
         }
 

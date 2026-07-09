@@ -127,6 +127,7 @@ export async function subscribeToSearchTrace(
   onTrace: (trace: SAGRetrievalTrace) => void,
   signal?: AbortSignal,
 ): Promise<void> {
+  // R5 蓝队修复：SSE 流式保留 fetch（axios 不支持浏览器 ReadableStream），但 token 统一从 TokenManager 获取
   const token = TokenManager.getToken();
 
   const response = await fetch('/api/rag/sag-trace', {

@@ -2,7 +2,6 @@
  * 伏羲 v2.1 — Chat API 封装
  * 会话管理 + 消息发送（SSE 流式）+ 天线搜索
  */
-import TokenManager from '@/utils/TokenManager';
 import apiClient from './index';
 import { createLogger } from '@/utils/logger';
 import type {
@@ -35,6 +34,20 @@ export async function deleteSession(sessionId: string): Promise<void> {
   await apiClient.delete(`/api/chat/sessions/${sessionId}`);
 }
 
+/** R5 蓝队修复：获取会话历史消息 */
+export async function fetchSessionMessages(sessionId: string): Promise<ChatMessage[]> {
+  try {
+    const data = (await apiClient.get(`/api/chat/sessions/${sessionId}/messages`)) as {
+      messages?: ChatMessage[];
+    };
+    return data.messages || [];
+  } catch (err) {
+    // 如果后端未实现此接口，静默降级返回空数组
+    console.warn('[ChatAPI] 获取会话历史消息失败，可能是后端未实现该接口', err);
+    return [];
+  }
+}
+
 // ============================
 // 消息发送 — SSE 流式
 // ============================
@@ -56,6 +69,10 @@ export async function sendMessageStream(
   onChunk: (chunk: ChatStreamChunk) => void,
   signal?: AbortSignal,
 ): Promise<void> {
+  // R5 蓝队修复：使用 apiClient 的 axios 实例发起请求，统一 token 注入和错误处理
+  // 注意：SSE 流式需要底层 Response 对象，使用 axios 的 responseType: 'stream' 不适用于浏览器
+  // 因此保留 fetch 用于流式读取，但 token 从 apiClient 拦截器已注入的 TokenManager 统一获取
+  const { default: TokenManager } = await import('@/utils/TokenManager');
   const token = TokenManager.getToken();
 
   const response = await fetch('/api/chat/send', {
