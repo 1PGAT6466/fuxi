@@ -29,7 +29,7 @@ def search_chunks(
         )
     except ImportError:
         pass
-except Exception as e:# TODO: Narrow exception type (Appropriate exception types)
+    except Exception as e:  # TODO: Narrow exception type (Appropriate exception types)
         logger.warning(f"taiyang.retrieval 调用失败: {e}")
 
     # 回退：ChromaDB 直接搜索
@@ -46,7 +46,7 @@ except Exception as e:# TODO: Narrow exception type (Appropriate exception types
                     "metadata": r.get("metadata", {}),
                     "source": r.get("metadata", {}).get("source", r.get("file_name", "")),
                 })
-except Exception as e2:# TODO: Narrow exception type (ValueError, RuntimeError)
+    except Exception as e2:  # TODO: Narrow exception type (ValueError, RuntimeError)
         logger.warning(f"vector_store 回退失败: {e2}")
 
     return results
@@ -81,7 +81,7 @@ async def hybrid_search(
     except ImportError as e:
         logger.warning(f"taiyang.retrieval 不可用: {e}")
         return {"wiki_results": [], "chunk_results": [], "results": [], "query": query, "total": 0}
-except Exception as e:# TODO: Narrow exception type (redis.RedisError, ConnectionError)
+    except Exception as e:  # TODO: Narrow exception type (redis.RedisError, ConnectionError)
         logger.warning(f"hybrid_search 失败: {e}")
         return {"wiki_results": [], "chunk_results": [], "results": [], "query": query, "total": 0, "error": str(e)}
 

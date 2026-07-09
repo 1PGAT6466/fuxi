@@ -98,7 +98,7 @@ def delete_document(file_hash: str, current_user: str = "anonymous", current_rol
         vs = get_vector_store()
         if vs:
             vs.delete_by_file(file_hash)
-except Exception as e:  # TODO: Narrow exception type
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"向量库删除失败（非致命）: {e}")
 
     # 删除物理文件
@@ -140,7 +140,7 @@ def update_document_visibility(
     owner_id: str = "",
 ) -> Dict[str, Any]:
     """更新文档可见性"""
-from src.api.permissions import PermissionManager
+    from src.api.permissions import PermissionManager
     from src.db.data_store import load_chunks, save_chunks
     from src.db.vector_store import get_vector_store
 
@@ -168,7 +168,7 @@ from src.api.permissions import PermissionManager
                 "visibility": visibility,
                 "team_id": team_id or "",
             })
-except Exception as e:  # TODO: Narrow exception type
+    except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"向量库 metadata 更新失败（非致命）: {e}")
 
     return {

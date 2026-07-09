@@ -35,7 +35,7 @@ async def start_fuxi(app: FastAPI) -> None:
     try:
         if engine == "v2":
             from src.bagua.qian import QianGua
-from src.bagua.intent_bus import get_intent_bus
+            from src.bagua.intent_bus import get_intent_bus
 
             intent_bus = get_intent_bus()
             _fuxi_instance = QianGua(intent_bus=intent_bus, intent_mode=intent_mode)
