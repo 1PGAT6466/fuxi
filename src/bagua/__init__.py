@@ -20,8 +20,9 @@ from src.bagua.base_gua import (
     HealthLevel,
     FallbackAction,
     DegradationRule,
-    DependencyStatus,
 )
+
+from src.infra.circuit_breaker import DependencyStatus
 
 __all__ = [
     "GuaBase",
