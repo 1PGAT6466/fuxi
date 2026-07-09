@@ -224,3 +224,11 @@ SEED_SCORE_TEST_CONFIG = {
         },
     },
 }
+
+# ============ 影子模式配置 (Shadow Mode) ============
+# 通过环境变量 FUXI_SHADOW_ENABLED=true 启用
+# 影子模式使用实验模型异步对比生产模型，不阻塞主流程
+SHADOW_ENABLED = os.getenv("FUXI_SHADOW_ENABLED", "false").lower() == "true"
+SHADOW_MODEL = os.getenv("FUXI_SHADOW_MODEL", "gemini-flash")
+# 影子模式采样率 (0.0-1.0)，1.0 表示对所有请求进行影子评估
+SHADOW_SAMPLE_RATE = float(os.getenv("FUXI_SHADOW_SAMPLE_RATE", "1.0"))

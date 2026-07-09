@@ -307,8 +307,16 @@ class KanGua(GuaBase):
                 "category_distribution": {category: count, ...}
             }
         """
+        # data_store 断路器保护
+        data_store_cb = self.get_dependency("data_store")
+        if data_store_cb and not data_store_cb.is_healthy:
+            logger.warning("[坎卦] data_store 断路器断开，返回降级结果")
+            return {"degraded": True, "message": "data_store 断路器断开", "action": "detect_deficiency"}
+
         try:
             chunks = self._load_chunks()
+            if data_store_cb:
+                data_store_cb.record_success()
 
             # 统计分类
             cat_counts: Dict[str, int] = {}
@@ -338,6 +346,8 @@ class KanGua(GuaBase):
             }
 
         except Exception as e:  # TODO: Narrow exception type
+            if data_store_cb:
+                data_store_cb.record_failure()
             logger.error("[坎卦] 薄弱检测失败: %s", e)
             return {"error": str(e)}
 
@@ -360,8 +370,17 @@ class KanGua(GuaBase):
         Returns:
             {"purged": int, "survived": int, "total_processed": int}
         """
+        # data_store 断路器保护
+        data_store_cb = self.get_dependency("data_store")
+        if data_store_cb and not data_store_cb.is_healthy:
+            logger.warning("[坎卦] data_store 断路器断开，跳过清理")
+            return {"degraded": True, "message": "data_store 断路器断开", "action": "purge_low_quality"}
+
         try:
             chunks = self._load_chunks()
+            if data_store_cb:
+                data_store_cb.record_success()
+
             if not chunks:
                 return {"purged": 0, "survived": 0, "total_processed": 0}
 
@@ -378,7 +397,9 @@ class KanGua(GuaBase):
 
             # 保存幸存数据
             if purged > 0:
-                self._save_chunks(survivors)
+                save_ok = self._save_chunks(survivors)
+                if not save_ok and data_store_cb:
+                    data_store_cb.record_failure()
 
             logger.info("[坎卦] 清理 %d 个低质量数据块 (threshold=%.2f)", purged, threshold)
 
@@ -389,6 +410,8 @@ class KanGua(GuaBase):
             }
 
         except Exception as e:  # TODO: Narrow exception type
+            if data_store_cb:
+                data_store_cb.record_failure()
             logger.error("[坎卦] 低质量清理失败: %s", e)
             return {"error": str(e)}
 
@@ -540,7 +563,12 @@ class KanGua(GuaBase):
     # ========================================================================
 
     def _load_immune_memory_from_store(self) -> None:
-        """从 data_store 加载免疫记忆"""
+        """从 data_store 加载免疫记忆（data_store 断路器保护）"""
+        data_store_cb = self.get_dependency("data_store")
+        if data_store_cb and not data_store_cb.is_healthy:
+            logger.warning("[坎卦] data_store 断路器断开，跳过加载免疫记忆")
+            return
+
         try:
             from src.db.data_store import load_config
             cfg = load_config()
@@ -548,17 +576,30 @@ class KanGua(GuaBase):
             if isinstance(mem, dict):
                 self._immune_memory = mem
                 logger.info("[坎卦] 加载 %d 条免疫记忆", len(mem))
+            if data_store_cb:
+                data_store_cb.record_success()
         except Exception as e:  # TODO: Narrow exception type
+            if data_store_cb:
+                data_store_cb.record_failure()
             logger.warning("[坎卦] 加载免疫记忆失败: %s", e)
 
     def _save_immune_memory_to_store(self) -> None:
-        """通过 data_store 持久化免疫记忆"""
+        """通过 data_store 持久化免疫记忆（data_store 断路器保护）"""
+        data_store_cb = self.get_dependency("data_store")
+        if data_store_cb and not data_store_cb.is_healthy:
+            logger.warning("[坎卦] data_store 断路器断开，跳过保存免疫记忆")
+            return
+
         try:
             from src.db.data_store import load_config, save_config
             cfg = load_config()
             cfg["liver_immune_memory"] = self._immune_memory
             save_config(cfg)
+            if data_store_cb:
+                data_store_cb.record_success()
         except Exception as e:  # TODO: Narrow exception type
+            if data_store_cb:
+                data_store_cb.record_failure()
             logger.warning(
                 "[坎卦] 保存免疫记忆失败: %s\n%s",
                 e, traceback.format_exc(),

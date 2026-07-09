@@ -800,6 +800,7 @@ async def route(
         elapsed = (time.time() - start_time) * 1000
         logger.info(f"L1 hit in {elapsed:.1f}ms: {l1.metadata.get('type')}")
         l1.metadata["elapsed_ms"] = round(elapsed, 1)
+        await _trigger_shadow_if_enabled(user_input, context, l1)
         return l1
 
     # ---- L2: Template ----
@@ -814,6 +815,7 @@ async def route(
         elapsed = (time.time() - start_time) * 1000
         logger.info(f"L2 hit in {elapsed:.1f}ms: intent={l2.result.get('intent')}")
         l2.metadata["elapsed_ms"] = round(elapsed, 1)
+        await _trigger_shadow_if_enabled(user_input, context, l2)
         return l2
 
     # ---- L3: Cache ----
@@ -826,6 +828,7 @@ async def route(
         elapsed = (time.time() - start_time) * 1000
         logger.info(f"L3 hit in {elapsed:.1f}ms: {l3.metadata.get('type')}")
         l3.metadata["elapsed_ms"] = round(elapsed, 1)
+        await _trigger_shadow_if_enabled(user_input, context, l3)
         return l3
 
     # ---- L4: Flash ----
@@ -844,6 +847,7 @@ async def route(
         elapsed = (time.time() - start_time) * 1000
         logger.info(f"L4 hit in {elapsed:.1f}ms: intent={l4.result.get('intent')}")
         l4.metadata["elapsed_ms"] = round(elapsed, 1)
+        await _trigger_shadow_if_enabled(user_input, context, l4)
         return l4
 
     # ---- L5: Full Model (final fallback) ----
@@ -862,6 +866,7 @@ async def route(
     elapsed = (time.time() - start_time) * 1000
     logger.info(f"L5 final in {elapsed:.1f}ms: intent={l5.result.get('intent')}")
     l5.metadata["elapsed_ms"] = round(elapsed, 1)
+    await _trigger_shadow_if_enabled(user_input, context, l5)
     return l5
 
 
@@ -964,6 +969,42 @@ def route_sync(
         return loop.run_until_complete(route(user_input, context))
     except RuntimeError:
         return asyncio.run(route(user_input, context))
+
+
+# ============================================================================
+# 影子模式触发器
+# ============================================================================
+
+async def _trigger_shadow_if_enabled(
+    user_input: str,
+    context: Optional[List[Dict[str, str]]],
+    production_result: RoutingDecision,
+) -> None:
+    """如果影子模式已启用，异步触发影子评估（不阻塞主流程）"""
+    try:
+        from src.config import SHADOW_ENABLED, SHADOW_MODEL, SHADOW_SAMPLE_RATE
+        import random
+
+        if not SHADOW_ENABLED:
+            return
+
+        # 采样率控制
+        if SHADOW_SAMPLE_RATE < 1.0 and random.random() > SHADOW_SAMPLE_RATE:
+            return
+
+        # 异步触发，不等待结果
+        asyncio.create_task(
+            shadow_route(
+                user_input=user_input,
+                model_name=SHADOW_MODEL,
+                context=context,
+                production_result=production_result,
+            )
+        )
+    except Exception as exc:
+        logger.debug("[Shadow] 触发影子模式异常: %s", exc)
+
+
 # ============================================================================
 # 影子模式：异步对比实验模型，不阻塞生产流量
 # ============================================================================

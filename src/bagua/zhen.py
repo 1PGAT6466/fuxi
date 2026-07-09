@@ -460,14 +460,31 @@ class ZhenGua(GuaBase):
             return result
 
         try:
-            # Step 1: 解析
+            # Step 1: 解析（file_io 断路器保护）
             from src.pipeline.unified import (
                 UnifiedParser, UnifiedCleaner, UnifiedChunker,
                 UnifiedClassifier, UnifiedEmbedder, UnifiedSaver,
             )
             parser_config = {}
             parser = UnifiedParser(parser_config)
-            parsed = parser.parse(file_path)
+
+            # 获取 file_io 断路器
+            file_io_cb = self.get_dependency("file_io")
+            if file_io_cb and not file_io_cb.is_healthy:
+                logger.warning("[%s] file_io 断路器断开，跳过文件解析: %s", self.GUA_NAME, file_path)
+                errors.append("file_io 断路器断开")
+                result["errors"] = errors
+                return result
+
+            try:
+                parsed = parser.parse(file_path)
+                if file_io_cb:
+                    file_io_cb.record_success()
+            except Exception as e:
+                if file_io_cb:
+                    file_io_cb.record_failure()
+                raise
+
             raw_text = parsed.get("text", "")
             tables = parsed.get("tables", [])
 
@@ -513,55 +530,82 @@ class ZhenGua(GuaBase):
                 chunk.source_pipeline = "zhen_digest"
                 chunk.source_file = str(path)
 
-            # Step 6: 向量化（非阻塞，失败不阻断）
-            try:
-                import asyncio
-                embedder = UnifiedEmbedder({})
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    future = asyncio.ensure_future(
-                        embedder.embed_batch([c.text for c in chunks])
-                    )
-                    # 同步等待（在 async context 中这是合理的）
-                    # 如果是纯同步调用，使用 run_until_complete
-                else:
-                    embeddings = loop.run_until_complete(
-                        embedder.embed_batch([c.text for c in chunks])
-                    )
-                    if embeddings:
-                        for chunk, emb in zip(chunks, embeddings):
-                            chunk.embedding = emb
-            except Exception as e:  # TODO: Narrow exception type
-                logger.warning("[%s] 向量化失败: %s", self.GUA_NAME, e)
-                errors.append(f"EmbedWarning: {e}")
+            # Step 6: 向量化（embedder_server 断路器保护）
+            embedder_cb = self.get_dependency("embedder_server")
+            if embedder_cb and not embedder_cb.is_healthy:
+                logger.warning("[%s] embedder_server 断路器断开，跳过向量化", self.GUA_NAME)
+                errors.append("embedder_server 断路器断开，跳过向量化")
+            else:
+                try:
+                    import asyncio
+                    embedder = UnifiedEmbedder({})
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        future = asyncio.ensure_future(
+                            embedder.embed_batch([c.text for c in chunks])
+                        )
+                        # 同步等待（在 async context 中这是合理的）
+                        # 如果是纯同步调用，使用 run_until_complete
+                    else:
+                        embeddings = loop.run_until_complete(
+                            embedder.embed_batch([c.text for c in chunks])
+                        )
+                        if embeddings:
+                            for chunk, emb in zip(chunks, embeddings):
+                                chunk.embedding = emb
+                    if embedder_cb:
+                        embedder_cb.record_success()
+                except Exception as e:  # TODO: Narrow exception type
+                    if embedder_cb:
+                        embedder_cb.record_failure()
+                    logger.warning("[%s] 向量化失败: %s", self.GUA_NAME, e)
+                    errors.append(f"EmbedWarning: {e}")
 
-            # Step 7: 存储到 chunks.db + ChromaDB
-            try:
-                import asyncio
-                saver = UnifiedSaver({})
-                loop = asyncio.get_event_loop()
-                if loop.is_running():
-                    asyncio.ensure_future(saver.save(chunks))
-                else:
-                    loop.run_until_complete(saver.save(chunks))
-                logger.info("[%s] 已存储 %d 个 chunk: %s", self.GUA_NAME, len(chunks), file_path)
-            except Exception as e:  # TODO: Narrow exception type
-                logger.error("[%s] 存储失败: %s", self.GUA_NAME, e)
-                errors.append(f"SaveError: {e}")
-                raise
+            # Step 7: 存储到 chunks.db + ChromaDB（vector_store 断路器保护）
+            vector_store_cb = self.get_dependency("vector_store")
+            if vector_store_cb and not vector_store_cb.is_healthy:
+                logger.warning("[%s] vector_store 断路器断开，跳过向量存储", self.GUA_NAME)
+                errors.append("vector_store 断路器断开，跳过向量存储")
+            else:
+                try:
+                    import asyncio
+                    saver = UnifiedSaver({})
+                    loop = asyncio.get_event_loop()
+                    if loop.is_running():
+                        asyncio.ensure_future(saver.save(chunks))
+                    else:
+                        loop.run_until_complete(saver.save(chunks))
+                    logger.info("[%s] 已存储 %d 个 chunk: %s", self.GUA_NAME, len(chunks), file_path)
+                    if vector_store_cb:
+                        vector_store_cb.record_success()
+                except Exception as e:  # TODO: Narrow exception type
+                    if vector_store_cb:
+                        vector_store_cb.record_failure()
+                    logger.error("[%s] 存储失败: %s", self.GUA_NAME, e)
+                    errors.append(f"SaveError: {e}")
+                    raise
 
             result["chunks_count"] = len(chunks)
             self._digested_count += 1
             self._fingerprint_cache[file_path] = file_hash
             self._dirty = False
 
-            # Step 8: 存入坤卦知识库
+            # Step 8: 存入坤卦知识库（kun_store 断路器保护）
             if store_in_kun:
-                try:
-                    self._store_to_kun(file_path, chunks, cleaned_text)
-                except Exception as e:  # TODO: Narrow exception type
-                    logger.warning("[%s] 坤卦存储失败: %s", self.GUA_NAME, e)
-                    errors.append(f"KunStoreWarning: {e}")
+                kun_store_cb = self.get_dependency("kun_store")
+                if kun_store_cb and not kun_store_cb.is_healthy:
+                    logger.warning("[%s] kun_store 断路器断开，跳过坤卦存储", self.GUA_NAME)
+                    errors.append("kun_store 断路器断开，跳过坤卦存储")
+                else:
+                    try:
+                        self._store_to_kun(file_path, chunks, cleaned_text)
+                        if kun_store_cb:
+                            kun_store_cb.record_success()
+                    except Exception as e:  # TODO: Narrow exception type
+                        if kun_store_cb:
+                            kun_store_cb.record_failure()
+                        logger.warning("[%s] 坤卦存储失败: %s", self.GUA_NAME, e)
+                        errors.append(f"KunStoreWarning: {e}")
 
             result["ok"] = True
             result["digested"] = True
