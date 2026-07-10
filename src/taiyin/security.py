@@ -2,7 +2,7 @@
 security.py - Phase 3: 安全模块
 Rate Limiting + 审计日志 + Prompt 注入防御
 """
-import re, json, time, logging
+import os, re, json, time, logging
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
