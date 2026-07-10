@@ -274,6 +274,7 @@ def route_entity_with_neighbors(query: str, max_entities: int = 5) -> dict:
     primary_category = sorted_cats[0][0] if sorted_cats else ""
     
     # Phase 2: Auto-link matched entities to wiki pages
+    wiki_links = []
     try:
         from src.config import WORLDTREE_DB_PATH
         wiki_db = str(WORLDTREE_DB_PATH)
