@@ -33,7 +33,7 @@ async def documents(page: int = 1, page_size: int = 50, request: Request = None)
         if _wants_v2:
             return paginated(items=files, total=len(files), page=page, page_size=page_size, message="获取文档列表成功")
         return {"files": files, "total": len(files), "page": page, "page_size": page_size}
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError) as e:
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
             return error("获取文档列表失败", status_code=500, detail=str(e))
@@ -98,7 +98,7 @@ async def upload(file: UploadFile = File(...), request: Request = None):
             "task_id": task_id,
             "message": "文件已接收，正在后台处理"
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, IOError, ValueError) as e:
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
             return error("上传失败", status_code=500, detail=str(e))
@@ -136,7 +136,7 @@ async def get_task_status(task_id: str, request: Request = None):
         
     except HTTPException:
         raise
-    except Exception as e:  # TODO: Narrow exception type
+    except (ValueError, KeyError, AttributeError) as e:
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
             return error("获取任务状态失败", status_code=500, detail=str(e))
@@ -191,7 +191,7 @@ async def delete_document(file_hash: str, request: Request = None):
             vs = get_vector_store()
             if vs:
                 vs.delete_by_file(file_hash)
-        except Exception as e:  # TODO: Narrow exception type
+        except (ValueError, KeyError, AttributeError) as e:
             _logger.warning(f"向量库删除失败（非致命）: {e}")
 
         # 删除物理文件（异步化避免阻塞事件循环）
@@ -209,7 +209,7 @@ async def delete_document(file_hash: str, request: Request = None):
                             computed_hash = hashlib.sha256(content).hexdigest()[:16]
                             if computed_hash == file_hash[:16] or file_hash in str(fpath):
                                 fpath.unlink()
-                        except Exception as e:  # TODO: Narrow exception type
+                        except (OSError, IOError, PermissionError) as e:
                             _logger.warning(f"物理文件删除失败: {e}")
             await asyncio.to_thread(_delete_physical_files)
 
@@ -226,7 +226,7 @@ async def delete_document(file_hash: str, request: Request = None):
 
     except HTTPException:
         raise
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError) as e:
         _logger.exception(f"delete_document 失败: {e}")
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:
@@ -280,7 +280,7 @@ async def update_document_visibility(doc_id: str, request: Request):
                 if c.get("file_hash", "") == doc_id:
                     doc_owner_id = c.get("owner_id") or ""
                     break
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError):
             pass
 
         # v2.1: 确保 doc_owner_id 为 str 类型（避免 None）
@@ -305,7 +305,7 @@ async def update_document_visibility(doc_id: str, request: Request):
                     updated_count += 1
             if updated_count > 0:
                 await asyncio.to_thread(save_chunks, chunks)
-        except Exception as e:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError) as e:
             _logger.warning(f"chunks.db metadata 更新失败: {e}")
 
         # 也尝试更新向量库中的 metadata
@@ -317,7 +317,7 @@ async def update_document_visibility(doc_id: str, request: Request):
                     "visibility": visibility,
                     "team_id": team_id or "",
                 })
-        except Exception as e:  # TODO: Narrow exception type
+        except (ValueError, KeyError, AttributeError) as e:
             _logger.warning(f"向量库 metadata 更新失败（非致命）: {e}")
 
         result_data = {
@@ -332,7 +332,7 @@ async def update_document_visibility(doc_id: str, request: Request):
             return success(data=result_data, message=f"文档 {doc_id} 可见性已更新为 {visibility}")
         return {"status": "ok", **result_data, "message": f"文档可见性已更新为 {visibility}"}
 
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError) as e:
         _logger.exception(f"update_document_visibility 失败: {e}")
         return JSONResponse(
             status_code=500,

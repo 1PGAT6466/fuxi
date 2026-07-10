@@ -40,7 +40,7 @@ def _load_sessions_from_db():
         _messages_store.clear()
         _messages_store.update(messages)
         logger.info(f"已从 SQLite 加载 {len(_sessions_store)} 个会话")
-    except Exception as e:
+    except (OSError, ValueError, KeyError) as e:
         logger.warning(f"加载持久化会话失败: {e}")
 
 
@@ -48,7 +48,7 @@ def _save_session_to_db(session: dict):
     """持久化单个会话到 SQLite"""
     try:
         _save_session_to_db_svc(session)
-    except Exception as e:
+    except (OSError, ValueError, KeyError) as e:
         logger.warning(f"持久化会话失败: {e}")
 
 
@@ -56,7 +56,7 @@ def _save_message_to_db(session_id: str, msg: dict):
     """持久化单条消息到 SQLite"""
     try:
         _save_message_to_db_svc(session_id, msg)
-    except Exception as e:
+    except (OSError, ValueError, KeyError) as e:
         logger.warning(f"持久化消息失败: {e}")
 
 
@@ -64,7 +64,7 @@ def _delete_session_from_db(session_id: str):
     """从 SQLite 删除会话及其消息"""
     try:
         _delete_session_from_db_svc(session_id)
-    except Exception as e:
+    except (OSError, ValueError, KeyError) as e:
         logger.warning(f"删除持久化会话失败: {e}")
 
 
@@ -152,7 +152,7 @@ async def _chat_v1(body: ChatRequest, request: Optional[Request] = None):
         if _wants_v2:
             return success(data=answer_data, message="对话完成")
         return answer_data
-    except Exception as e:  # TODO: Narrow exception type
+    except (ImportError, ModuleNotFoundError) as e:
         _wants_v2 = request and (
             request.query_params.get("format") == "v2"
             or request.headers.get("X-API-Format", "").lower() == "v2"
@@ -188,7 +188,7 @@ async def _chat_v2(body: ChatRequest, request: Optional[Request] = None):
             "mode": "qian",
             "confidence": _compute_qian_confidence(result),
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (ImportError, ModuleNotFoundError, ValueError, TypeError) as e:
         return {
             "answer": f"乾卦路径处理失败: {str(e)}",
             "sources": [],
@@ -291,7 +291,7 @@ async def chat_sessions(request: Request):
             "sessions": user_sessions,
             "total": len(user_sessions),
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (KeyError, AttributeError, TypeError) as e:
         logger.exception(f"chat_sessions 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -326,7 +326,7 @@ async def create_session(body: CreateSessionRequest, request: Request):
             "updated_at": session["updated_at"],
             "message_count": session["message_count"],
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (KeyError, AttributeError, ValueError) as e:
         logger.exception(f"create_session 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -355,7 +355,7 @@ async def delete_session(session_id: str, request: Request):
         _messages_store.pop(session_id, None)
         await asyncio.to_thread(_delete_session_from_db, session_id)  # v2.1: 持久化删除
         return {"ok": True, "message": f"会话 {session_id} 已删除"}
-    except Exception as e:  # TODO: Narrow exception type
+    except (KeyError, AttributeError, ValueError) as e:
         logger.exception(f"delete_session 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -460,7 +460,7 @@ async def chat_send(body: ChatSendRequest, request: Request):
                         _messages_store.setdefault(session_id, []).append(asst_msg)
                         await asyncio.to_thread(_save_message_to_db, session_id, asst_msg)  # v2.1: 持久化
 
-                except Exception as e:  # TODO: Narrow exception type
+                except (ImportError, ModuleNotFoundError, ValueError, TypeError, KeyError) as e:
                     logger.exception(f"SSE 生成失败: {e}")
                     error_chunk = {"type": "error", "content": str(e)}
                     yield f"data: {json.dumps(error_chunk, ensure_ascii=False)}\n\n"
@@ -496,7 +496,7 @@ async def chat_send(body: ChatSendRequest, request: Request):
 
             return result
 
-    except Exception as e:  # TODO: Narrow exception type
+    except (ImportError, ModuleNotFoundError, ValueError, TypeError, KeyError) as e:
         logger.exception(f"chat_send 失败: {e}")
         return JSONResponse(
             status_code=500,
@@ -527,7 +527,7 @@ async def chat_session_messages(session_id: str, request: Request):
             "messages": messages,
             "total": len(messages),
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (KeyError, AttributeError, TypeError) as e:
         logger.exception(f"chat_session_messages 失败: {e}")
         return JSONResponse(
             status_code=500,

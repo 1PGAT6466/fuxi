@@ -51,11 +51,7 @@
       <!-- 右侧内容面板 -->
       <div class="tools-content">
         <keep-alive>
-          <SummarizePanel v-if="activeTool === 'summarize'" key="summarize" />
-          <TranslatePanel v-if="activeTool === 'translate'" key="translate" />
-          <KeywordsPanel v-if="activeTool === 'keywords'" key="keywords" />
-          <EntitiesPanel v-if="activeTool === 'entities'" key="entities" />
-          <ClassifyPanel v-if="activeTool === 'classify'" key="classify" />
+          <component :is="currentPanel" :key="activeTool" />
         </keep-alive>
       </div>
     </div>
@@ -63,7 +59,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
+import { ref, computed, onMounted } from 'vue';
 import { Cpu, MagicStick, Connection, Aim, Pointer, Collection } from '@element-plus/icons-vue';
 import SummarizePanel from './SummarizePanel.vue';
 import TranslatePanel from './TranslatePanel.vue';
@@ -88,6 +84,16 @@ const tools = [
 
 // 当前激活的工具
 const activeTool = ref<string>('summarize');
+
+// 动态面板组件映射
+const panelMap: Record<string, any> = {
+  summarize: SummarizePanel,
+  translate: TranslatePanel,
+  keywords: KeywordsPanel,
+  entities: EntitiesPanel,
+  classify: ClassifyPanel,
+};
+const currentPanel = computed(() => panelMap[activeTool.value] || SummarizePanel);
 
 function switchTool(toolId: string) {
   activeTool.value = toolId;

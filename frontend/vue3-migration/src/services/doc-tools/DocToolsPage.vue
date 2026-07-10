@@ -71,17 +71,7 @@
       <!-- 右侧内容面板 -->
       <div class="tools-content">
         <keep-alive>
-          <ConvertPanel v-if="activeTool === 'convert'" key="convert" />
-          <PdfMergePanel v-if="activeTool === 'merge'" key="merge" />
-          <PdfSplitPanel
-            v-if="activeTool === 'split'"
-            key="split"
-            @download-part="handleDownloadPart"
-            @download-all="handleDownloadAll"
-          />
-          <CompressPanel v-if="activeTool === 'compress'" key="compress" />
-          <ImageInfoPanel v-if="activeTool === 'image-info'" key="image-info" />
-          <TextExtractPanel v-if="activeTool === 'extract'" key="extract" />
+          <component :is="currentPanel" :key="activeTool" v-bind="panelProps" />
         </keep-alive>
       </div>
     </div>
@@ -144,6 +134,23 @@ const tools = [
 ];
 
 const activeTool = ref(store.activeTool || 'convert');
+
+// 动态面板组件映射
+const panelMap: Record<string, any> = {
+  convert: ConvertPanel,
+  merge: PdfMergePanel,
+  split: PdfSplitPanel,
+  compress: CompressPanel,
+  'image-info': ImageInfoPanel,
+  extract: TextExtractPanel,
+};
+const currentPanel = computed(() => panelMap[activeTool.value] || ConvertPanel);
+const panelProps = computed(() => {
+  if (activeTool.value === 'split') {
+    return { onDownloadPart: handleDownloadPart, onDownloadAll: handleDownloadAll };
+  }
+  return {};
+});
 
 const recentRecords = computed(() => store.recentRecords);
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+﻿#!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
 qian.py — 乾卦 ☰ · 伏羲 v2.1 重构
@@ -206,7 +206,7 @@ def _load_intent_preload_cache() -> Dict[str, str]:
                 logger.info("☰ [乾] 意图预加载缓存: 加载 %d 条规则 (磁盘 %d + 默认 %d)",
                              len(merged), len(loaded), len(_DEFAULT_INTENT_PRELOAD_CACHE))
                 return merged
-    except Exception as exc:  # TODO: Narrow exception type
+    except (json.JSONDecodeError, OSError, ValueError) as exc:
         logger.warning("☰ [乾] 加载意图预加载缓存失败: %s", exc)
     return dict(_DEFAULT_INTENT_PRELOAD_CACHE)
 
@@ -218,7 +218,7 @@ def _save_intent_preload_cache(cache: Dict[str, str]) -> None:
         with open(_INTENT_CACHE_PATH, "w", encoding="utf-8") as f:
             json.dump(cache, f, ensure_ascii=False, indent=2)
         logger.debug("☰ [乾] 意图预加载缓存已保存: %d 条规则", len(cache))
-    except Exception as exc:  # TODO: Narrow exception type
+    except (OSError, json.JSONDecodeError) as exc:
         logger.warning("☰ [乾] 保存意图预加载缓存失败: %s", exc)
 
 
@@ -395,7 +395,7 @@ class DegradationCounter:
             }
             with open(_DEGRADATION_COUNTER_PATH, "w", encoding="utf-8") as f:
                 json.dump(snapshot, f, ensure_ascii=False, indent=2)
-        except Exception as exc:  # TODO: Narrow exception type
+        except (OSError, json.JSONDecodeError) as exc:
             logger.debug("☰ [乾] 降级计数器备份失败: %s", exc)
 
     def get_summary(self) -> Dict[str, Any]:
@@ -1213,7 +1213,7 @@ class QianGua(GuaBase):
                 "☰ [乾] Semaphore 超时 (30s)，降级为同步处理",
             )
             acquired = False
-        except Exception as exc:  # TODO: Narrow exception type
+        except (asyncio.TimeoutError, RuntimeError) as exc:
             logger.warning("☰ [乾] Semaphore 获取异常: %s", exc)
             acquired = False
 
@@ -1362,7 +1362,7 @@ class QianGua(GuaBase):
                 final_answer = self._build_fallback_answer(session)
                 logger.warning("☰ [乾] 达到最大轮数 %d，强制终止", self.MAX_ROUNDS)
 
-        except Exception as exc:  # TODO: Narrow exception type
+        except (ImportError, ModuleNotFoundError, ValueError, TypeError, KeyError) as exc:
             logger.error("☰ [乾] 意图循环异常: %s", exc, exc_info=True)
             fallback_used = True
             final_answer = f"抱歉，处理您的请求时出错了。请稍后重试。"
@@ -1475,7 +1475,7 @@ class QianGua(GuaBase):
                     "source": "qian_think_loop",
                 },
             )
-        except Exception as exc:  # TODO: Narrow exception type
+        except (ImportError, ModuleNotFoundError, ValueError, TypeError) as exc:
             logger.debug("☰ [乾] 反馈桥接记录异常（非致命）: %s", exc)
 
         # 每次记录后检查是否需要触发定期学习
@@ -1517,7 +1517,7 @@ class QianGua(GuaBase):
                 # 学习完成后触发 evolver 调参
                 await self._evo_maybe_evolve()
 
-        except Exception as exc:  # TODO: Narrow exception type
+        except (ImportError, ModuleNotFoundError, ValueError) as exc:
             logger.debug("☰ [乾] 定期学习检查异常（非致命）: %s", exc)
 
     async def _evo_maybe_evolve(self) -> None:
@@ -1547,7 +1547,7 @@ class QianGua(GuaBase):
                         "☰ [乾] 自动调参完成: entities_added=%d",
                         result.get("entities_added", 0),
                     )
-        except Exception as exc:  # TODO: Narrow exception type
+        except (ImportError, ModuleNotFoundError, ValueError, KeyError) as exc:
             logger.debug("☰ [乾] 自动调参异常（非致命）: %s", exc)
 
     # ========================================================================
@@ -1768,7 +1768,7 @@ class QianGua(GuaBase):
 
             return parsed
 
-        except Exception as exc:  # TODO: Narrow exception type
+        except (ImportError, ModuleNotFoundError, json.JSONDecodeError, ValueError, KeyError) as exc:
             logger.error("☰ [乾] LLM 调用异常: %s", exc)
             return self._decide_fallback(round_num)
 
@@ -1849,7 +1849,7 @@ class QianGua(GuaBase):
             if gua_name in registered:
                 return "FULL"
             return "UNREGISTERED"
-        except Exception:  # TODO: Narrow exception type
+        except (ImportError, ModuleNotFoundError, ValueError, KeyError, AttributeError):
             return "UNKNOWN"
 
     def _get_gua_circuit_status(self, intent: str) -> str:
@@ -1869,7 +1869,7 @@ class QianGua(GuaBase):
             if dep is not None:
                 return "open" if dep.circuit_state == CircuitState.OPEN else "closed"
             return "closed"  # 未注册断路器即视为正常
-        except Exception:  # TODO: Narrow exception type
+        except (ImportError, ModuleNotFoundError, ValueError, KeyError, AttributeError):
             return "unknown"
 
     # ========================================================================
@@ -2091,7 +2091,7 @@ class QianGua(GuaBase):
                 matched,
             )
 
-        except Exception as exc:  # TODO: Narrow exception type
+        except (ImportError, ModuleNotFoundError, json.JSONDecodeError, ValueError) as exc:
             logger.debug("☰ [乾] 影子对比异常（非致命）: %s", exc)
 
     # ========================================================================
@@ -2268,7 +2268,7 @@ class QianGua(GuaBase):
             )
             return answer if answer else None
 
-        except Exception as exc:  # TODO: Narrow exception type
+        except (ImportError, ModuleNotFoundError, ValueError, KeyError) as exc:
             logger.error("☰ [乾] ShaoyinBrain 降级异常: %s", exc)
             return None
 
@@ -2360,7 +2360,7 @@ class QianGua(GuaBase):
             if answer:
                 session.final_answer = answer
                 return answer
-        except Exception as exc:  # TODO: Narrow exception type
+        except (ImportError, ModuleNotFoundError, ValueError, KeyError) as exc:
             logger.error("☰ [乾] 生成最终答案异常: %s", exc)
 
         # 兜底
@@ -2450,7 +2450,7 @@ class QianGua(GuaBase):
                          len(history_list), len(summary))
             return summary
 
-        except Exception as exc:  # TODO: Narrow exception type
+        except (ImportError, ModuleNotFoundError, ValueError, KeyError) as exc:
             logger.debug("☰ [乾] 读取坤卦历史失败: %s", exc)
             return ""
 
@@ -2495,7 +2495,7 @@ class QianGua(GuaBase):
             with open(_INTENT_LOG_PATH, "a", encoding="utf-8") as f:
                 f.write(json.dumps(record, ensure_ascii=False) + "\n")
             logger.debug("☰ [乾] 意图决策已记录: intent=%s conf=%.2f", intent, confidence)
-        except Exception as exc:  # TODO: Narrow exception type
+        except (OSError, json.JSONDecodeError, ValueError) as exc:
             logger.warning("☰ [乾] 记录意图决策日志失败: %s", exc)
 
     # ========================================================================
@@ -2534,7 +2534,7 @@ class QianGua(GuaBase):
             )
             self._intent_bus.dispatch(alert)
             logger.info("☰ [乾] L2 降级告警已发送至艮卦")
-        except Exception as exc:  # TODO: Narrow exception type
+        except (ImportError, ModuleNotFoundError, ValueError, KeyError) as exc:
             logger.debug("☰ [乾] 发送 L2 降级告警至艮卦失败: %s", exc)
 
     # ========================================================================
@@ -2693,7 +2693,7 @@ class QianGua(GuaBase):
                     )
                     return result
 
-            except Exception as exc:  # TODO: Narrow exception type
+            except (ImportError, ModuleNotFoundError, ValueError, KeyError, OSError) as exc:
                 last_error = exc
                 logger.warning(
                     "☰ [乾] dispatch_llm 模型 %s 异常: %s",
@@ -2872,7 +2872,7 @@ class QianGua(GuaBase):
                     health["anomalies"].append(
                         f"卦 {trigram_name} 无响应"
                     )
-        except Exception as exc:  # TODO: Narrow exception type
+        except (ImportError, ModuleNotFoundError, ValueError, KeyError) as exc:
             logger.debug("☰ [乾] 卦健康检查异常: %s", exc)
 
         # 也检查自身
@@ -2959,7 +2959,7 @@ class QianGua(GuaBase):
                 await self._health_task
             except asyncio.CancelledError:
                 pass
-            except Exception as exc:  # TODO: Narrow exception type
+            except Exception as exc:
                 logger.debug("☰ [乾] 健康心跳停止异常: %s", exc)
             self._health_task = None
         logger.info("☰ [乾] 健康心跳已停止")
@@ -2976,7 +2976,7 @@ class QianGua(GuaBase):
                 self.check_health()
             except asyncio.CancelledError:
                 break
-            except Exception as exc:  # TODO: Narrow exception type
+            except Exception as exc:
                 logger.error(
                     "☰ [乾] 心跳异常: %s", exc, exc_info=True
                 )
@@ -3005,7 +3005,7 @@ class QianGua(GuaBase):
                         ttl=30.0,
                     )
                     self._intent_bus.dispatch(alert)
-                except Exception as exc:  # TODO: Narrow exception type
+                except (ImportError, ModuleNotFoundError, ValueError, KeyError) as exc:
                     logger.debug("☰ [乾] 告警派发异常: %s", exc)
 
             self._anomalies.append({
@@ -3023,7 +3023,7 @@ class QianGua(GuaBase):
             from src.db.vector_store import VectorStore
             vs = VectorStore()
             return "ok" if vs else "ok"
-        except Exception as exc:  # TODO: Narrow exception type
+        except (ImportError, ModuleNotFoundError, ValueError, KeyError) as exc:
             logger.debug("☰ [乾] 向量存储检查: %s", exc)
             return "degraded"
 
@@ -3039,7 +3039,7 @@ class QianGua(GuaBase):
             if api_key:
                 return "ok"
             return "degraded"
-        except Exception:  # TODO: Narrow exception type
+        except (ImportError, ModuleNotFoundError, KeyError):
             return "unknown"
 
 

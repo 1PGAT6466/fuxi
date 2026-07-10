@@ -43,6 +43,7 @@ import json
 import logging
 import os
 import re
+import sqlite3
 import time
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -615,7 +616,7 @@ class KunGua(GuaBase):
                 "auto_graph": auto_graph_result,
             }
 
-        except Exception as e:  # TODO: Narrow exception type
+        except (hashlib.Error, ValueError, KeyError, OSError) as e:
             logger.error(
                 "[%s] push_to_wiki 失败: %s", self.GUA_NAME, e, exc_info=True,
             )
@@ -662,7 +663,7 @@ class KunGua(GuaBase):
 
             return results
 
-        except Exception as e:  # TODO: Narrow exception type
+        except (ValueError, KeyError, re.error) as e:
             logger.error(
                 "[%s] recall_wiki 失败: %s", self.GUA_NAME, e, exc_info=True,
             )
@@ -781,7 +782,7 @@ class KunGua(GuaBase):
                 "uptime_sec": round(self.uptime_sec, 1),
             }
 
-        except Exception as e:  # TODO: Narrow exception type
+        except (KeyError, ValueError, TypeError) as e:
             logger.error(
                 "[%s] get_wiki_stats 失败: %s", self.GUA_NAME, e, exc_info=True,
             )
@@ -1063,7 +1064,7 @@ class KunGua(GuaBase):
             else:
                 result["error"] = "ChromaDB 写入失败"
 
-        except Exception as e:  # TODO: Narrow exception type
+        except (ImportError, ModuleNotFoundError, ValueError, KeyError, OSError) as e:
             logger.error("[%s] store_vector 异常: %s", self.GUA_NAME, e, exc_info=True)
             result["error"] = str(e)
 
@@ -1206,7 +1207,7 @@ class KunGua(GuaBase):
                 self.GUA_NAME, page_id, title, len(content), is_new,
             )
 
-        except Exception as e:  # TODO: Narrow exception type
+        except (sqlite3.Error, OSError, ValueError) as e:
             logger.error("[%s] store_wiki 异常: %s", self.GUA_NAME, e, exc_info=True)
             result["error"] = str(e)
 
@@ -1407,7 +1408,7 @@ class KunGua(GuaBase):
                 graph_file, chunks_db_path,
             )
 
-        except Exception as e:  # TODO: Narrow exception type
+        except (sqlite3.Error, OSError, json.JSONDecodeError, ValueError) as e:
             logger.error("[%s] store_graph 异常: %s", self.GUA_NAME, e, exc_info=True)
             result["error"] = str(e)
 
@@ -1481,7 +1482,7 @@ class KunGua(GuaBase):
                             c = _json.loads(doc_json) if isinstance(doc_json, str) else doc_json
                             c["_db_id"] = row_id
                             chunks.append(c)
-                except Exception:  # TODO: Narrow exception type
+                except (json.JSONDecodeError, KeyError, ValueError):
                     pass
 
             if not chunks:
@@ -1565,7 +1566,7 @@ class KunGua(GuaBase):
                                         relation_raw = relation_raw.split("\n", 1)[1].rsplit("```", 1)[0]
                                     all_relations = _json.loads(relation_raw)
 
-                    except Exception as e:  # TODO: Narrow exception type
+                    except (ImportError, ModuleNotFoundError, json.JSONDecodeError, ValueError) as e:
                         logger.warning(
                             "[%s] LLM 实体/关系提取失败，使用关键词提取: %s",
                             self.GUA_NAME, e,
@@ -1600,7 +1601,7 @@ class KunGua(GuaBase):
                 result["entities_extracted"], result["relations_extracted"],
             )
 
-        except Exception as e:  # TODO: Narrow exception type
+        except (ImportError, ModuleNotFoundError, ValueError, KeyError) as e:
             logger.error(
                 "[%s] build_knowledge_graph 异常: %s",
                 self.GUA_NAME, e, exc_info=True,
@@ -1737,7 +1738,7 @@ class KunGua(GuaBase):
                 doc_id, len(entities), len(edges),
             )
         
-        except Exception as e:  # TODO: Narrow exception type
+        except (ValueError, KeyError, OSError) as e:
             logger.warning(
                 "☷ [坤] auto_graph 跳过 (doc=%s): %s", doc_id, e,
             )
@@ -1818,7 +1819,7 @@ class KunGua(GuaBase):
                 doc_id, result["entity_count"], result["edge_count"],
             )
         
-        except Exception as e:  # TODO: Narrow exception type
+        except (ValueError, KeyError, OSError) as e:
             logger.error(
                 "☷ [坤] auto_graph_from_doc 失败: %s", e, exc_info=True,
             )
@@ -1846,7 +1847,7 @@ class KunGua(GuaBase):
                     nodes = kg_data.get("nodes", kg_data.get("entities", {}))
                     kg_stats["nodes_count"] = len(nodes)
                     kg_stats["edges_count"] = len(kg_data.get("edges", []))
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, json.JSONDecodeError, ValueError):
             pass
         
         return {
@@ -1897,7 +1898,7 @@ class KunGua(GuaBase):
             conn.close()
             return True
         
-        except Exception as e:  # TODO: Narrow exception type
+        except (sqlite3.Error, OSError, ValueError) as e:
             logger.warning("☷ [坤] _add_graph_edge 失败: %s", e)
             return False
 
