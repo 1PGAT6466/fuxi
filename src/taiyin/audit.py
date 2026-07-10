@@ -46,6 +46,7 @@ def log_audit(
     ip: str = "",
 ):
     """记录审计日志"""
+    conn = None
     try:
         conn = _get_conn()
         conn.execute(
@@ -53,9 +54,14 @@ def log_audit(
             (time.time(), user_id, action, query[:2000], result_summary[:500], duration_ms, status, json.dumps(metadata or {}, ensure_ascii=False), ip)
         )
         conn.commit()
-        conn.close()
-    except Exception:  # TODO: Narrow exception type
-        logger.warning("审计日志写入失败", exc_info=True)
+    except (sqlite3.Error, OSError) as e:
+        logger.warning("审计日志写入失败: %s", e, exc_info=True)
+    finally:
+        if conn:
+            try:
+                conn.close()
+            except Exception:
+                pass
 
 
 def get_audit_stats(hours: int = 24) -> Dict:

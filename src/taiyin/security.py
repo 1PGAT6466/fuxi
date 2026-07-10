@@ -45,7 +45,8 @@ def check_rate_limit(ip: str, endpoint: str = "default") -> bool:
 
 # ============ Audit Log (3.3) ============
 
-AUDIT_LOG_PATH = Path.home() / "kb-server/data/audit.jsonl"
+# 审计日志路径 — 优先使用环境变量，回退到默认路径
+AUDIT_LOG_PATH = Path(os.getenv("FUXI_AUDIT_LOG_PATH", str(Path.home() / "kb-server/data/audit.jsonl")))
 
 def audit_log_entry(ip: str, method: str, path: str, status: int, latency_ms: float, is_sensitive: bool = False):
     """写入审计日志"""
