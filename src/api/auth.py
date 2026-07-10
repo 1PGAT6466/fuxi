@@ -58,16 +58,8 @@ def increment_token_version(username: str) -> int:
         token_versions[username] = current + 1
         return current + 1
 
-# JWT 密钥 — 优先使用环境变量 FUXI_JWT_SECRET，未设置时自动生成随机密钥
-import secrets as _secrets
-_JWT_SECRET = os.environ.get("FUXI_JWT_SECRET")
-if not _JWT_SECRET:
-    _JWT_SECRET = _secrets.token_hex(32)
-    logger.warning(
-        "[Auth] FUXI_JWT_SECRET 未设置，已自动生成随机密钥。"
-        "注意：服务重启后所有已有 Token 将失效。"
-        "生产环境请设置环境变量 FUXI_JWT_SECRET 以确保 Token 持久有效。"
-    )
+# JWT 密钥 — 统一使用 config.py 中的 JWT_SECRET
+from src.config import JWT_SECRET as _JWT_SECRET
 
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRE_HOURS = int(os.environ.get("FUXI_JWT_EXPIRE_HOURS", "2"))
