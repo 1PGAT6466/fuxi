@@ -46,9 +46,7 @@ logger = logging.getLogger('伏羲·内世界')
 
 import uvicorn
 from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.middleware.gzip import GZipMiddleware
-from src.config import HOST, PORT, VERSION, CORS_ORIGINS
+from src.config import HOST, PORT, VERSION
 
 # ============ 创建 FastAPI 应用 ============
 # v1.44 安全修复: 生产环境禁用 OpenAPI/Swagger 文档
@@ -78,70 +76,9 @@ async def startup():
 async def shutdown():
     await stop_fuxi(app)
 
-# ============ 中间件 ============
-
-# ── 安全响应头中间件 ──
-@app.middleware("http")
-async def security_headers_middleware(request: Request, call_next):
-    """安全响应头中间件：为所有 HTTP 响应添加安全头。
-
-    仅在 HTTP 协议下生效，WebSocket 升级请求会跳过（因为不会返回普通 HTTP 响应）。
-    检测响应是否为 WebSocket（101 Switching Protocols），避免干扰。
-    """
-    response = await call_next(request)
-
-    # 跳过 WebSocket 升级响应（status_code 101 = Switching Protocols）
-    if response.status_code == 101:
-        return response
-
-    response.headers["X-Content-Type-Options"] = "nosniff"
-    response.headers["X-Frame-Options"] = "DENY"
-    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    response.headers["X-XSS-Protection"] = "1; mode=block"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    csp_policy = (
-        "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline'; "
-        "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data: blob: https:; "
-        "font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com; "
-        "connect-src 'self' http://localhost:* ws://localhost:* https:; "
-        "frame-ancestors 'none'"
-    )
-    response.headers["Content-Security-Policy"] = csp_policy
-    response.headers["Server"] = "nginx"
-    return response
-
-# ── API 认证中间件 ──
-from src.api.auth import AuthMiddleware, InputLimitMiddleware
-app.add_middleware(AuthMiddleware)
-app.add_middleware(InputLimitMiddleware)
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=CORS_ORIGINS,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
-    allow_headers=["Content-Type", "x-admin-token", "Authorization"],
-)
-app.add_middleware(GZipMiddleware, minimum_size=500)
-
-# ============ 请求限流 ============
-try:
-    from slowapi import Limiter, _rate_limit_exceeded_handler
-    from slowapi.util import get_remote_address
-    from slowapi.errors import RateLimitExceeded
-    limiter = Limiter(
-        key_func=get_remote_address,
-        default_limits=["60/minute"],
-        headers_enabled=True,
-        strategy="fixed-window",
-    )
-    app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
-    logger.info("[RateLimit] slowapi 限流已启用: 60 req/min (default)")
-except ImportError:
-    limiter = None
-    logger.warning("[RateLimit] slowapi 未安装，限流禁用")
+# ============ 中间件（委托给 src/middleware.py） ============
+from src.middleware import setup_middleware
+setup_middleware(app)
 
 # ============ 全局异常处理器 ============
 # 将 FastAPI 默认的 {detail: "..."} 格式统一转换为 {status: "error", message: "..."}
@@ -188,55 +125,6 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     return _JSONResponse(content=body, status_code=422)
 
 logger.info("[ErrorHandler] 全局异常处理器已注册 — {detail} → {status, message}")
-
-# ============ v2.1 引擎路由中间件 ============
-@app.middleware("http")
-async def engine_middleware(request: Request, call_next):
-    """检测引擎版本并设置 request.state.engine
-
-    检测来源（优先级从高到低）：
-      1. Query 参数 ?engine=v1|v2
-      2. Header X-Fuxi-Engine: v1|v2
-      3. 环境变量 FUXI_ENGINE（默认 v2）
-    """
-    engine = request.query_params.get("engine", "")
-    if not engine:
-        engine = request.headers.get("X-Fuxi-Engine", "")
-    if not engine:
-        engine = getattr(app.state, "engine", "v2")
-    engine = engine.lower()
-    if engine not in ("v1", "v2"):
-        engine = "v2"  # 默认安全回退
-    request.state.engine = engine
-    request.state.intent_mode = getattr(app.state, "intent_mode", "rule_based")
-    response = await call_next(request)
-    if not _is_production:
-        response.headers["X-Fuxi-Engine"] = engine
-    return response
-
-# ============ 请求指标中间件 ============
-@app.middleware("http")
-async def metrics_middleware(request: Request, call_next):
-    """记录请求指标"""
-    import time
-    start = time.time()
-    try:
-        response = await call_next(request)
-        duration_ms = (time.time() - start) * 1000
-        try:
-            from src.infra.request_metrics import get_request_metrics
-            get_request_metrics().record_request(duration_ms, response.status_code < 500)
-        except (ImportError, AttributeError, OSError) as e:
-            logger.warning("请求指标记录失败（正常响应）: %s", e, exc_info=True)
-        return response
-    except (RuntimeError, OSError, ValueError) as e:
-        duration_ms = (time.time() - start) * 1000
-        try:
-            from src.infra.request_metrics import get_request_metrics
-            get_request_metrics().record_request(duration_ms, False)
-        except (ImportError, AttributeError, OSError):
-            logger.warning("请求指标记录失败（异常响应）", exc_info=True)
-        raise
 
 # ============ MCP 工具处理器（从 core/mcp_routes 导入）============
 from src.core.mcp_routes import MCP_TOOL_HANDLERS, _init_mcp_handlers

@@ -14,7 +14,7 @@ logger = logging.getLogger("infra.connection_pool")
 class SQLiteConnectionPool:
     """SQLite连接池"""
 
-    def __init__(self, db_path: str, max_connections: int = 5):
+    def __init__(self, db_path: str, max_connections: int = 20):
         self.db_path = db_path
         self.max_connections = max_connections
         self._pool = []

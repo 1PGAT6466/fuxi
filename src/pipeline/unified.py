@@ -114,9 +114,9 @@ class UnifiedParser:
         except Exception as e:  # TODO: Narrow exception type
             logger.warning("Exception 失败: %s", e, exc_info=True)
 
-        # 方式3: PyPDF2 — 兜底
+        # 方式3: pypdf — 兜底
         try:
-            from PyPDF2 import PdfReader
+            from pypdf import PdfReader
             reader = PdfReader(file_path)
             pages_text = []
             for page in reader.pages:
@@ -124,7 +124,7 @@ class UnifiedParser:
                 if page_text:
                     pages_text.append(page_text)
             text = "\n".join(pages_text)
-            return {"text": text, "tables": tables, "metadata": {"parser": "PyPDF2"}}
+            return {"text": text, "tables": tables, "metadata": {"parser": "pypdf"}}
         except Exception as e:  # TODO: Narrow exception type
             raise ParseError(f"PDF解析失败: {e}")
 

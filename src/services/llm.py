@@ -1,44 +1,62 @@
-"""
-llm.py — LLM 调用服务（v1.43 MiMo 2.5 Pro + Fallback 链）
+﻿"""
+llm.py 鈥?LLM 璋冪敤鏈嶅姟锛坴1.43 MiMo 2.5 Pro + Fallback 閾撅級
 
-调用链：MiMo 2.5 Pro → DeepSeek → 本地（逐级降级）
+璋冪敤閾撅細MiMo 2.5 Pro 鈫?DeepSeek 鈫?鏈湴锛堥€愮骇闄嶇骇锛?
 
-模块结构说明：
-  当前 src/services/llm 是一个单体 .py 文件而非包目录。
-  所有 callers 使用 `from src.services.llm import ...` 导入。
-  未来如需拆分为 llm/__init__.py + llm/provider_a.py 等子模块，
-  需保持 `src/services/llm/__init__.py` 重新导出当前 API
-  （call_ai, call_ai_raw, call_deepseek, call_llm, call_llm_fast, _call_api），
-  确保现有 from 导入不受影响。
-  届时删除本文件，创建同名包目录替代。
+妯″潡缁撴瀯璇存槑锛?
+  褰撳墠 src/services/llm 鏄竴涓崟浣?.py 鏂囦欢鑰岄潪鍖呯洰褰曘€?
+  鎵€鏈?callers 浣跨敤 `from src.services.llm import ...` 瀵煎叆銆?
+  鏈潵濡傞渶鎷嗗垎涓?llm/__init__.py + llm/provider_a.py 绛夊瓙妯″潡锛?
+  闇€淇濇寔 `src/services/llm/__init__.py` 閲嶆柊瀵煎嚭褰撳墠 API
+  锛坈all_ai, call_ai_raw, call_deepseek, call_llm, call_llm_fast, _call_api锛夛紝
+  纭繚鐜版湁 from 瀵煎叆涓嶅彈褰卞搷銆?
+  灞婃椂鍒犻櫎鏈枃浠讹紝鍒涘缓鍚屽悕鍖呯洰褰曟浛浠ｃ€?
 """
 import os, json, logging, asyncio
 from typing import Optional, AsyncGenerator, Dict, Any
+import aiohttp
 
 logger = logging.getLogger(__name__)
 
-# ============ MiMo API 配置 ============
+# ============ MiMo API 閰嶇疆 ============
 from src.config import MIMO_API_KEY, MIMO_BASE_URL, MIMO_MODEL, MIMO_TIMEOUT
 
 # ============ Fallback: DeepSeek ============
 from src.config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL, DEEPSEEK_TIMEOUT
 
-# ============ 缓存 ============
+# ============ 缂撳瓨 ============
 _ai_cache: dict = {}
 _ai_cache_lock = asyncio.Lock()
 
-# ============ 全局连接池 ============
-_aiohttp_session: Optional[aiohttp.ClientSession] = None
+# ============ 鍏ㄥ眬 aiohttp 杩炴帴姹?============
+_global_session: Optional[aiohttp.ClientSession] = None
+_session_lock = asyncio.Lock()
+
 
 async def _get_session() -> aiohttp.ClientSession:
-    """获取全局 aiohttp 连接池（避免每次请求新建 Session）"""
-    global _aiohttp_session
-    if _aiohttp_session is None or _aiohttp_session.closed:
-        connector = aiohttp.TCPConnector(limit=20, limit_per_host=10)
-        _aiohttp_session = aiohttp.ClientSession(connector=connector)
-    return _aiohttp_session
+    """鑾峰彇鍏ㄥ眬 aiohttp 杩炴帴姹?Session锛堝崟渚嬶紝甯﹁繛鎺ラ檺鍒讹級"""
+    global _global_session
+    if _global_session is None or _global_session.closed:
+        async with _session_lock:
+            if _global_session is None or _global_session.closed:
+                connector = aiohttp.TCPConnector(
+                    limit=100,          # 鎬昏繛鎺ユ暟涓婇檺
+                    limit_per_host=20,  # 鍗?host 杩炴帴鏁颁笂闄?
+                    ttl_dns_cache=300,  # DNS 缂撳瓨 TTL
+                    enable_cleanup_closed=True,
+                )
+                _global_session = aiohttp.ClientSession(connector=connector)
+    return _global_session
 
-# ============ 重试配置 ============
+
+async def close_session():
+    """鍏抽棴鍏ㄥ眬杩炴帴姹狅紙搴旂敤鍏抽棴鏃惰皟鐢級"""
+    global _global_session
+    if _global_session and not _global_session.closed:
+        await _global_session.close()
+        _global_session = None
+
+# ============ 閲嶈瘯閰嶇疆 ============
 MAX_RETRIES = 2
 RETRY_DELAY = 1.0
 
@@ -51,20 +69,18 @@ async def _call_api(
     tools: Optional[list] = None,
     tool_choice: Optional[str] = None,
 ) -> Optional[str]:
-    """通用 OpenAI 兼容 API 调用 — 带重试+逐次放大+空内容检测
+    """閫氱敤 OpenAI 鍏煎 API 璋冪敤 鈥?甯﹂噸璇?閫愭鏀惧ぇ+绌哄唴瀹规娴?
 
     Args:
-        tools:       Function calling tools 定义列表 [{"type":"function","function":{...}}]
-        tool_choice: 工具选择策略 "auto"|"none"|"required"|"function_name"
+        tools:       Function calling tools 瀹氫箟鍒楄〃 [{"type":"function","function":{...}}]
+        tool_choice: 宸ュ叿閫夋嫨绛栫暐 "auto"|"none"|"required"|"function_name"
     """
-    import aiohttp
-
-    # MiMo reasoning 模型：reasoning token 和 output token 共享 max_tokens 预算
-    # 太小 = 思考完没空间输出，所以基础值设大
+    # MiMo reasoning 妯″瀷锛歳easoning token 鍜?output token 鍏变韩 max_tokens 棰勭畻
+    # 澶皬 = 鎬濊€冨畬娌＄┖闂磋緭鍑猴紝鎵€浠ュ熀纭€鍊艰澶?
     base_max = max(max_tokens, 4096)
 
     for attempt in range(3):
-        current_max = base_max * (attempt + 1)  # 4096 → 8192 → 12288
+        current_max = base_max * (attempt + 1)  # 4096 鈫?8192 鈫?12288
 
         headers = {
             "Content-Type": "application/json",
@@ -92,11 +108,10 @@ async def _call_api(
                 ) as resp:
                     if resp.status != 200:
                         text = await resp.text()
-                        # v1.50 R4: 脱敏 API 端点，防止日志泄露敏感 URL
+                        # v1.50 R4: 鑴辨晱 API 绔偣锛岄槻姝㈡棩蹇楁硠闇叉晱鎰?URL
                         masked_url = base_url.split("//")[0] + "//***" if "//" in base_url else "***"
                         logger.warning(f"API {masked_url} {resp.status} (attempt {attempt+1}): {text[:200]}")
                         if attempt < 2:
-                            import asyncio
                             await asyncio.sleep(1 * (attempt + 1))
                             continue
                         return None
@@ -107,42 +122,39 @@ async def _call_api(
                     reasoning = msg.get("reasoning_content", "")
                     tool_calls = msg.get("tool_calls", [])
 
-                    # 如果返回了 tool_calls，序列化为 JSON 返回
+                    # 濡傛灉杩斿洖浜?tool_calls锛屽簭鍒楀寲涓?JSON 杩斿洖
                     if tool_calls and not content:
                         logger.info(
-                            f"_call_api: 收到 {len(tool_calls)} 个 tool_calls, "
-                            f"序列化返回"
+                            f"_call_api: 鏀跺埌 {len(tool_calls)} 涓?tool_calls, "
+                            f"搴忓垪鍖栬繑鍥?
                         )
                         return json.dumps({"tool_calls": tool_calls}, ensure_ascii=False)
 
-                    # 检查空内容
+                    # 妫€鏌ョ┖鍐呭
                     if content and content.strip():
                         return content
 
-                    # 思考了但没输出 → max_tokens 不够，重试放大
+                    # 鎬濊€冧簡浣嗘病杈撳嚭 鈫?max_tokens 涓嶅锛岄噸璇曟斁澶?
                     if reasoning and not content:
-                        logger.warning(f"MiMo attempt {attempt+1}: reasoning有({len(reasoning)}字)但content为空, max_tokens={current_max}, 重试...")
+                        logger.warning(f"MiMo attempt {attempt+1}: reasoning鏈?{len(reasoning)}瀛?浣哻ontent涓虹┖, max_tokens={current_max}, 閲嶈瘯...")
                         if attempt < 2:
-                            import asyncio
                             await asyncio.sleep(1 * (attempt + 1))
                             continue
 
-                    # 无 reasoning 也无 content → 可能是 prompt 问题
+                    # 鏃?reasoning 涔熸棤 content 鈫?鍙兘鏄?prompt 闂
                     if not content:
-                        logger.warning(f"MiMo attempt {attempt+1}: 空响应, max_tokens={current_max}")
+                        logger.warning(f"MiMo attempt {attempt+1}: 绌哄搷搴? max_tokens={current_max}")
                         if attempt < 2:
-                            import asyncio
                             await asyncio.sleep(1 * (attempt + 1))
                             continue
 
                     return content if content else None
 
         except (aiohttp.ClientError, OSError, asyncio.TimeoutError) as e:
-            # 脱敏 API 端点
+            # 鑴辨晱 API 绔偣
             masked_url = base_url.split("//")[0] + "//***" if "//" in base_url else "***"
-            logger.warning(f"API {masked_url} attempt {attempt+1} 异常: {e}")
+            logger.warning(f"API {masked_url} attempt {attempt+1} 寮傚父: {e}")
             if attempt < 2:
-                import asyncio
                 await asyncio.sleep(2 * (attempt + 1))
                 continue
             return None
@@ -150,14 +162,13 @@ async def _call_api(
     return None
 
 
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def _call_api_stream(
     base_url: str, api_key: str, model: str,
     messages: list, max_tokens: int = 2048,
     temperature: float = 0.3, timeout: int = 60,
 ) -> AsyncGenerator[str, None]:
-    """通用流式 API 调用"""
-    import aiohttp
+    """閫氱敤娴佸紡 API 璋冪敤"""
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {api_key}",
@@ -170,38 +181,38 @@ async def _call_api_stream(
         "stream": True,
     }
     try:
-        async with aiohttp.ClientSession() as session:
-            async with session.post(
-                f"{base_url}/chat/completions",
-                json=payload, headers=headers,
-                timeout=aiohttp.ClientTimeout(total=timeout),
-            ) as resp:
-                if resp.status != 200:
-                    yield f"[API Error {resp.status}]"
-                    return
-                async for line in resp.content:
-                    line = line.decode("utf-8").strip()
-                    if line.startswith("data: ") and line != "data: [DONE]":
-                        try:
-                            chunk = json.loads(line[6:])
-                            delta = chunk["choices"][0].get("delta", {})
-                            if "content" in delta and delta["content"]:
-                                yield delta["content"]
-                        except (json.JSONDecodeError, KeyError, IndexError):
-                            pass
+        session = await _get_session()
+        async with session.post(
+            f"{base_url}/chat/completions",
+            json=payload, headers=headers,
+            timeout=aiohttp.ClientTimeout(total=timeout),
+        ) as resp:
+            if resp.status != 200:
+                yield f"[API Error {resp.status}]"
+                return
+            async for line in resp.content:
+                line = line.decode("utf-8").strip()
+                if line.startswith("data: ") and line != "data: [DONE]":
+                    try:
+                        chunk = json.loads(line[6:])
+                        delta = chunk["choices"][0].get("delta", {})
+                        if "content" in delta and delta["content"]:
+                            yield delta["content"]
+                    except (json.JSONDecodeError, KeyError, IndexError):
+                        pass
     except (aiohttp.ClientError, OSError, asyncio.TimeoutError) as e:
         yield f"[Stream Error: {e}]"
 
 
-# ============ Fallback 链 ============
+# ============ Fallback 閾?============
 
 async def call_llm(
     prompt: str, system_prompt: str = None, max_tokens: int = 2048,
     temperature: float = 0.3, model: str = None,
 ) -> str:
     """
-    LLM Fallback 链：MiMo 2.5 Pro → DeepSeek → 空
-    所有生成任务统一入口
+    LLM Fallback 閾撅細MiMo 2.5 Pro 鈫?DeepSeek 鈫?绌?
+    鎵€鏈夌敓鎴愪换鍔＄粺涓€鍏ュ彛
     """
     messages = []
     if system_prompt:
@@ -210,7 +221,7 @@ async def call_llm(
 
     # Level 1: MiMo 2.5 Pro
     if not MIMO_API_KEY:
-        logger.warning("MiMo API Key 未配置，跳过 MiMo 直接尝试 DeepSeek")
+        logger.warning("MiMo API Key 鏈厤缃紝璺宠繃 MiMo 鐩存帴灏濊瘯 DeepSeek")
     else:
         for attempt in range(MAX_RETRIES):
             result = await _call_api(
@@ -222,7 +233,7 @@ async def call_llm(
                 return result
             if attempt < MAX_RETRIES - 1:
                 await asyncio.sleep(RETRY_DELAY)
-        logger.warning("MiMo 失败，尝试 DeepSeek")
+        logger.warning("MiMo 澶辫触锛屽皾璇?DeepSeek")
 
     # Level 2: DeepSeek
     if DEEPSEEK_API_KEY:
@@ -233,7 +244,7 @@ async def call_llm(
         if result:
             logger.info(f"DeepSeek fallback OK ({len(result)} chars)")
             return result
-    logger.warning("DeepSeek 也失败")
+    logger.warning("DeepSeek 涔熷け璐?)
 
     return ""
 
@@ -244,15 +255,15 @@ async def call_llm_fast(
     prompt: str, system_prompt: str = None, max_tokens: int = 500,
     temperature: float = 0.1,
 ) -> str:
-    """轻量任务（分类/关键词提取/简单判断）用 MiMo-fast，成本低速度快"""
+    """杞婚噺浠诲姟锛堝垎绫?鍏抽敭璇嶆彁鍙?绠€鍗曞垽鏂級鐢?MiMo-fast锛屾垚鏈綆閫熷害蹇?""
     return await call_llm(prompt, system_prompt, max_tokens, temperature, model="mimo-v2.5-turbo")
 
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def call_llm_stream(
     prompt: str, system_prompt: str = None, max_tokens: int = 2048,
     temperature: float = 0.3, model: str = None,
 ) -> AsyncGenerator[str, None]:
-    """流式 Fallback 链"""
+    """娴佸紡 Fallback 閾?""
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
@@ -265,15 +276,15 @@ async def call_llm_stream(
         yield chunk
 
 
-# ============ 兼容旧接口 ============
+# ============ 鍏煎鏃ф帴鍙?============
 
 async def call_ai_raw(prompt: str, max_tokens: int = 300) -> str:
-    """兼容旧调用"""
+    """鍏煎鏃ц皟鐢?""
     return await call_llm(prompt, max_tokens=max_tokens)
 
 
 async def call_ai(prompt: str, max_tokens: int = 300) -> str:
-    """兼容旧调用"""
+    """鍏煎鏃ц皟鐢?""
     return await call_llm(prompt, max_tokens=max_tokens)
 
 
@@ -281,34 +292,34 @@ async def call_deepseek(
     prompt: str, system_prompt: str = None, max_tokens: int = 2048,
     temperature: float = 0.3, model: str = None,
 ) -> str:
-    """兼容旧调用，重定向到 call_llm"""
+    """鍏煎鏃ц皟鐢紝閲嶅畾鍚戝埌 call_llm"""
     return await call_llm(prompt, system_prompt, max_tokens, temperature, model)
 
 
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def call_deepseek_stream(
     prompt: str, system_prompt: str = None, max_tokens: int = 2048,
     temperature: float = 0.3, model: str = None,
 ) -> AsyncGenerator[str, None]:
-    """兼容旧流式调用"""
+    """鍏煎鏃ф祦寮忚皟鐢?""
     async for chunk in call_llm_stream(prompt, system_prompt, max_tokens, temperature, model):
         yield chunk
 
 
 async def call_ollama(prompt_text: str, model: str = None, max_tokens: int = 300) -> Optional[str]:
-    """已弃用：重定向到 MiMo API"""
+    """宸插純鐢細閲嶅畾鍚戝埌 MiMo API"""
     return await call_llm(prompt_text, max_tokens=max_tokens)
 
 
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def call_ollama_stream(prompt_text: str) -> AsyncGenerator[str, None]:
-    """已弃用：重定向到 MiMo 流式"""
+    """宸插純鐢細閲嶅畾鍚戝埌 MiMo 娴佸紡"""
     async for chunk in call_llm_stream(prompt_text):
         yield chunk
 
 
 async def call_siliconflow(prompt: str, model: str = "") -> str:
-    """SiliconFlow API 调用（用于特殊模型）"""
+    """SiliconFlow API 璋冪敤锛堢敤浜庣壒娈婃ā鍨嬶級"""
     from src.config import SILICONFLOW_API_KEY, SILICONFLOW_BASE_URL
     sf_key = SILICONFLOW_API_KEY
     sf_url = SILICONFLOW_BASE_URL
@@ -318,45 +329,45 @@ async def call_siliconflow(prompt: str, model: str = "") -> str:
     return await _call_api(sf_url, sf_key, sf_model, [{"role": "user", "content": prompt}], 500) or ""
 
 
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def call_siliconflow_stream(prompt: str, model: str = "") -> AsyncGenerator[str, None]:
-    """SiliconFlow 流式"""
+    """SiliconFlow 娴佸紡"""
     from src.config import SILICONFLOW_API_KEY, SILICONFLOW_BASE_URL
     sf_key = SILICONFLOW_API_KEY
     sf_url = SILICONFLOW_BASE_URL
     sf_model = model or "Qwen/Qwen2.5-7B-Instruct"
     if not sf_key:
-        yield "[SiliconFlow Key 未配置]"
+        yield "[SiliconFlow Key 鏈厤缃甝"
         return
     async for chunk in _call_api_stream(sf_url, sf_key, sf_model, [{"role": "user", "content": prompt}]):
         yield chunk
 
 
 async def call_mimo_async(query: str, sources: list, messages: list, api_key: str):
-    """兼容旧调用"""
-    answer = await call_llm(query, system_prompt="你是伏羲知识库助手", max_tokens=2048)
+    """鍏煎鏃ц皟鐢?""
+    answer = await call_llm(query, system_prompt="浣犳槸浼忕静鐭ヨ瘑搴撳姪鎵?, max_tokens=2048)
     if answer:
         async with _ai_cache_lock:
             _ai_cache[query] = answer
 
 
-# ============ 任务→模型映射（v1.50 从 infra/llm.py 合并） ============
+# ============ 浠诲姟鈫掓ā鍨嬫槧灏勶紙v1.50 浠?infra/llm.py 鍚堝苟锛?============
 
 TASK_MODEL_MAP = {
-    # JSON 输出任务 → 非 pro 版
+    # JSON 杈撳嚭浠诲姟 鈫?闈?pro 鐗?
     "extraction": "mimo-v2.5",
     "classification": "mimo-v2.5",
     "parsing": "mimo-v2.5",
     "validation": "mimo-v2.5",
     "distillation": "mimo-v2.5",
 
-    # 推理任务 → pro 版
+    # 鎺ㄧ悊浠诲姟 鈫?pro 鐗?
     "synthesis": "mimo-v2.5-pro",
     "reflection": "mimo-v2.5-pro",
     "reasoning": "mimo-v2.5-pro",
     "planning": "mimo-v2.5-pro",
 
-    # 轻量任务 → turbo 版
+    # 杞婚噺浠诲姟 鈫?turbo 鐗?
     "fast_classify": "mimo-v2.5-turbo",
     "fast_extract": "mimo-v2.5-turbo",
 }
@@ -379,30 +390,30 @@ async def call_llm_by_task(
     tool_choice: Optional[str] = None,
     **kwargs
 ) -> str:
-    """根据任务类型智能选择模型 — 统一调用 dispatch 链
+    """鏍规嵁浠诲姟绫诲瀷鏅鸿兘閫夋嫨妯″瀷 鈥?缁熶竴璋冪敤 dispatch 閾?
 
-    模型选择逻辑:
-      - JSON 提取/分类/解析 → 非 pro 版 (mimo-v2.5)
-      - 推理/综合/决策 → pro 版 (mimo-v2.5-pro)
-      - 轻量任务 (fast_*) → turbo (mimo-v2.5-turbo)
+    妯″瀷閫夋嫨閫昏緫:
+      - JSON 鎻愬彇/鍒嗙被/瑙ｆ瀽 鈫?闈?pro 鐗?(mimo-v2.5)
+      - 鎺ㄧ悊/缁煎悎/鍐崇瓥 鈫?pro 鐗?(mimo-v2.5-pro)
+      - 杞婚噺浠诲姟 (fast_*) 鈫?turbo (mimo-v2.5-turbo)
 
     Args:
-        task:          任务类型
-        prompt:        用户提示
-        system_prompt: 系统提示（可选）
+        task:          浠诲姟绫诲瀷
+        prompt:        鐢ㄦ埛鎻愮ず
+        system_prompt: 绯荤粺鎻愮ず锛堝彲閫夛級
         tools:         Function calling tools
-        tool_choice:   工具选择策略
-        **kwargs:      其他参数传递给 call_llm()
+        tool_choice:   宸ュ叿閫夋嫨绛栫暐
+        **kwargs:      鍏朵粬鍙傛暟浼犻€掔粰 call_llm()
 
     Returns:
-        LLM 输出文本
+        LLM 杈撳嚭鏂囨湰
     """
     model = TASK_MODEL_MAP.get(task, "mimo-v2.5")
     max_tokens_kw = TASK_MAX_TOKENS.get(task, 4096)
 
     kwargs["max_tokens"] = kwargs.get("max_tokens", max_tokens_kw)
 
-    # 如果提供了 tools，直接调用 _call_api 以确保参数正确传递
+    # 濡傛灉鎻愪緵浜?tools锛岀洿鎺ヨ皟鐢?_call_api 浠ョ‘淇濆弬鏁版纭紶閫?
     if tools:
         from src.config import MIMO_API_KEY, MIMO_BASE_URL, MIMO_TIMEOUT
         messages = []
@@ -430,13 +441,13 @@ def get_cached_answer(query: str) -> Optional[str]:
     return _ai_cache.pop(query, None)
 
 
-# ============ TokenBudget — 成本令牌预算熔断器（v1.50 方案第13条） ============
+# ============ TokenBudget 鈥?鎴愭湰浠ょ墝棰勭畻鐔旀柇鍣紙v1.50 鏂规绗?3鏉★級 ============
 
-# Token 价格参考（CNY / 1M tokens）
-# MiMo v2.5 Pro: 输入 ¥4, 输出 ¥16
-# MiMo v2.5:     输入 ¥1, 输出 ¥4
-# MiMo v2.5 Turbo:输入 ¥0.5, 输出 ¥2
-# DeepSeek v4:   输入 ¥1, 输出 ¥4
+# Token 浠锋牸鍙傝€冿紙CNY / 1M tokens锛?
+# MiMo v2.5 Pro: 杈撳叆 楼4, 杈撳嚭 楼16
+# MiMo v2.5:     杈撳叆 楼1, 杈撳嚭 楼4
+# MiMo v2.5 Turbo:杈撳叆 楼0.5, 杈撳嚭 楼2
+# DeepSeek v4:   杈撳叆 楼1, 杈撳嚭 楼4
 MODEL_PRICE_PER_MTOK_IN = {
     "mimo-v2.5-pro":   4.0,
     "mimo-v2.5":       1.0,
@@ -454,55 +465,55 @@ MODEL_PRICE_PER_MTOK_OUT = {
     "4o-mini":         0.6,
 }
 
-# 会话预算默认值 ¥0.15（约 15 万 Mimo 普通 token），可通过 FUXI_SESSION_BUDGET 配置
+# 浼氳瘽棰勭畻榛樿鍊?楼0.15锛堢害 15 涓?Mimo 鏅€?token锛夛紝鍙€氳繃 FUXI_SESSION_BUDGET 閰嶇疆
 _DEFAULT_SESSION_BUDGET: float = float(os.getenv("FUXI_SESSION_BUDGET", "0.15"))
-# 警告阈值：80% 预算
+# 璀﹀憡闃堝€硷細80% 棰勭畻
 _BUDGET_WARN_THRESHOLD: float = 0.80
-# 熔断阈值：100% 预算
+# 鐔旀柇闃堝€硷細100% 棰勭畻
 _BUDGET_CIRCUIT_THRESHOLD: float = 1.00
 
 
 class TokenBudgetExceeded(Exception):
-    """Token 预算熔断异常"""
+    """Token 棰勭畻鐔旀柇寮傚父"""
 
     def __init__(self, session_id: str, consumed: float, budget: float):
         self.session_id = session_id
         self.consumed = consumed
         self.budget = budget
         super().__init__(
-            f"[TokenBudget] Session={session_id} 预算熔断！"
-            f"已消耗 ¥{consumed:.4f} / ¥{budget:.2f}"
+            f"[TokenBudget] Session={session_id} 棰勭畻鐔旀柇锛?
+            f"宸叉秷鑰?楼{consumed:.4f} / 楼{budget:.2f}"
         )
 
 
 class TokenBudget:
-    """Token 成本预算跟踪器 — 会话级成本熔断
+    """Token 鎴愭湰棰勭畻璺熻釜鍣?鈥?浼氳瘽绾ф垚鏈啍鏂?
 
-    跟踪单个 session 的累计 token 消耗（按模型价格折算 RMB），
-    提供预算告警和熔断机制。
+    璺熻釜鍗曚釜 session 鐨勭疮璁?token 娑堣€楋紙鎸夋ā鍨嬩环鏍兼姌绠?RMB锛夛紝
+    鎻愪緵棰勭畻鍛婅鍜岀啍鏂満鍒躲€?
 
-    价格模型：按字符数估算 token 数（中文 ~1.5 char/token，英文 ~4 char/token），
-    再乘以模型单价。
+    浠锋牸妯″瀷锛氭寜瀛楃鏁颁及绠?token 鏁帮紙涓枃 ~1.5 char/token锛岃嫳鏂?~4 char/token锛夛紝
+    鍐嶄箻浠ユā鍨嬪崟浠枫€?
 
     Usage::
 
         budget = TokenBudget(session_id="s1", budget_cny=0.15)
 
-        # 调用 LLM 前
-        budget.warn_if_near_limit()  # 接近预算时 log warning
+        # 璋冪敤 LLM 鍓?
+        budget.warn_if_near_limit()  # 鎺ヨ繎棰勭畻鏃?log warning
 
-        # 调用 LLM 后
+        # 璋冪敤 LLM 鍚?
         budget.consume("mimo-v2.5", input_chars, output_chars)
 
-        # 检查熔断
+        # 妫€鏌ョ啍鏂?
         if budget.is_tripped():
             raise TokenBudgetExceeded(...)
 
     Attributes:
-        session_id:   会话标识
-        budget_cny:   预算上限（人民币元）
-        consumed_cny: 已消耗金额
-        call_count:   累计调用次数
+        session_id:   浼氳瘽鏍囪瘑
+        budget_cny:   棰勭畻涓婇檺锛堜汉姘戝竵鍏冿級
+        consumed_cny: 宸叉秷鑰楅噾棰?
+        call_count:   绱璋冪敤娆℃暟
     """
 
     def __init__(
@@ -518,24 +529,24 @@ class TokenBudget:
         self._warned: bool = False
         self._created_at: float = time.time()
 
-    # ---- Token 估算 ----
+    # ---- Token 浼扮畻 ----
 
     @staticmethod
     def estimate_input_tokens(text: str) -> int:
-        """估算输入 token 数
+        """浼扮畻杈撳叆 token 鏁?
 
-        粗估规则：中文 ~1.5 char/token，英文 ~4 char/token
+        绮椾及瑙勫垯锛氫腑鏂?~1.5 char/token锛岃嫳鏂?~4 char/token
         """
         if not text:
             return 0
-        # 统计中文字符数
+        # 缁熻涓枃瀛楃鏁?
         chinese_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
         other_chars = len(text) - chinese_chars
         return max(1, int(chinese_chars / 1.5 + other_chars / 4.0))
 
     @staticmethod
     def estimate_output_tokens(text: str) -> int:
-        """估算输出 token 数（同 input 估算逻辑）"""
+        """浼扮畻杈撳嚭 token 鏁帮紙鍚?input 浼扮畻閫昏緫锛?""
         return TokenBudget.estimate_input_tokens(text)
 
     @staticmethod
@@ -546,17 +557,17 @@ class TokenBudget:
         input_tokens: Optional[int] = None,
         output_tokens: Optional[int] = None,
     ) -> float:
-        """估算单次调用成本（CNY）
+        """浼扮畻鍗曟璋冪敤鎴愭湰锛圕NY锛?
 
         Args:
-            model:        模型名
-            input_chars:  输入字符数（若未提供 input_tokens）
-            output_chars: 输出字符数（若未提供 output_tokens）
-            input_tokens: 精确输入 token 数（可选）
-            output_tokens: 精确输出 token 数（可选）
+            model:        妯″瀷鍚?
+            input_chars:  杈撳叆瀛楃鏁帮紙鑻ユ湭鎻愪緵 input_tokens锛?
+            output_chars: 杈撳嚭瀛楃鏁帮紙鑻ユ湭鎻愪緵 output_tokens锛?
+            input_tokens: 绮剧‘杈撳叆 token 鏁帮紙鍙€夛級
+            output_tokens: 绮剧‘杈撳嚭 token 鏁帮紙鍙€夛級
 
         Returns:
-            成本估算（元）
+            鎴愭湰浼扮畻锛堝厓锛?
         """
         if input_tokens is None:
             input_tokens = TokenBudget.estimate_input_tokens("x" * input_chars) if input_chars else 0
@@ -569,7 +580,7 @@ class TokenBudget:
         cost = (input_tokens / 1_000_000) * price_in + (output_tokens / 1_000_000) * price_out
         return round(cost, 6)
 
-    # ---- 核心操作 ----
+    # ---- 鏍稿績鎿嶄綔 ----
 
     def consume(
         self,
@@ -579,20 +590,20 @@ class TokenBudget:
         input_tokens: Optional[int] = None,
         output_tokens: Optional[int] = None,
     ) -> float:
-        """记录一次 LLM 调用的 token 消耗
+        """璁板綍涓€娆?LLM 璋冪敤鐨?token 娑堣€?
 
         Args:
-            model:         模型名
-            input_chars:   输入字符数
-            output_chars:  输出字符数
-            input_tokens:  精确输入 token 数（可选）
-            output_tokens: 精确输出 token 数（可选）
+            model:         妯″瀷鍚?
+            input_chars:   杈撳叆瀛楃鏁?
+            output_chars:  杈撳嚭瀛楃鏁?
+            input_tokens:  绮剧‘杈撳叆 token 鏁帮紙鍙€夛級
+            output_tokens: 绮剧‘杈撳嚭 token 鏁帮紙鍙€夛級
 
         Returns:
-            本次调用成本（元）
+            鏈璋冪敤鎴愭湰锛堝厓锛?
 
         Raises:
-            TokenBudgetExceeded: 超出预算时抛出
+            TokenBudgetExceeded: 瓒呭嚭棰勭畻鏃舵姏鍑?
         """
         cost = self.estimate_cost(
             model=model,
@@ -605,8 +616,8 @@ class TokenBudget:
         self.call_count += 1
 
         logger.debug(
-            "[TokenBudget] Session=%s consumed ¥%.6f (model=%s), "
-            "total=¥%.4f/¥%.2f (%.1f%%)",
+            "[TokenBudget] Session=%s consumed 楼%.6f (model=%s), "
+            "total=楼%.4f/楼%.2f (%.1f%%)",
             self.session_id, cost, model,
             self.consumed_cny, self.budget_cny,
             (self.consumed_cny / self.budget_cny * 100) if self.budget_cny > 0 else 0,
@@ -628,15 +639,15 @@ class TokenBudget:
         actual_input_tokens: int,
         actual_output_tokens: int,
     ) -> float:
-        """使用 API 返回的实际 token 数记录消耗（优先使用此方法）
+        """浣跨敤 API 杩斿洖鐨勫疄闄?token 鏁拌褰曟秷鑰楋紙浼樺厛浣跨敤姝ゆ柟娉曪級
 
         Args:
-            model:                模型名
-            actual_input_tokens:  API 返回的 prompt_tokens
-            actual_output_tokens: API 返回的 completion_tokens
+            model:                妯″瀷鍚?
+            actual_input_tokens:  API 杩斿洖鐨?prompt_tokens
+            actual_output_tokens: API 杩斿洖鐨?completion_tokens
 
         Returns:
-            成本（元）
+            鎴愭湰锛堝厓锛?
         """
         return self.consume(
             model=model,
@@ -644,54 +655,54 @@ class TokenBudget:
             output_tokens=actual_output_tokens,
         )
 
-    # ---- 查询方法 ----
+    # ---- 鏌ヨ鏂规硶 ----
 
     @property
     def is_tripped(self) -> bool:
-        """熔断器是否已触发"""
+        """鐔旀柇鍣ㄦ槸鍚﹀凡瑙﹀彂"""
         return self._tripped or self.consumed_cny >= self.budget_cny
 
     @property
     def usage_ratio(self) -> float:
-        """预算使用比例 0.0-1.0"""
+        """棰勭畻浣跨敤姣斾緥 0.0-1.0"""
         if self.budget_cny <= 0:
             return 1.0
         return min(self.consumed_cny / self.budget_cny, 1.0)
 
     @property
     def should_warn(self) -> bool:
-        """是否达到告警阈值（80%）"""
+        """鏄惁杈惧埌鍛婅闃堝€硷紙80%锛?""
         return self.usage_ratio >= _BUDGET_WARN_THRESHOLD
 
     def warn_if_near_limit(self) -> Optional[str]:
-        """接近预算时返回警告信息
+        """鎺ヨ繎棰勭畻鏃惰繑鍥炶鍛婁俊鎭?
 
         Returns:
-            警告字符串或 None
+            璀﹀憡瀛楃涓叉垨 None
         """
         ratio = self.usage_ratio
         if ratio >= _BUDGET_CIRCUIT_THRESHOLD:
             return (
-                f"⚠️ TokenBudget 熔断！Session={self.session_id} "
-                f"已消耗 ¥{self.consumed_cny:.4f}/¥{self.budget_cny:.2f}"
+                f"鈿狅笍 TokenBudget 鐔旀柇锛丼ession={self.session_id} "
+                f"宸叉秷鑰?楼{self.consumed_cny:.4f}/楼{self.budget_cny:.2f}"
             )
         if ratio >= _BUDGET_WARN_THRESHOLD and not self._warned:
             self._warned = True
             remaining = self.budget_cny - self.consumed_cny
             logger.warning(
-                "[TokenBudget] Session=%s 预算告警: "
-                "已使用 %.1f%% (¥%.4f/¥%.2f), 剩余 ¥%.4f",
+                "[TokenBudget] Session=%s 棰勭畻鍛婅: "
+                "宸蹭娇鐢?%.1f%% (楼%.4f/楼%.2f), 鍓╀綑 楼%.4f",
                 self.session_id, ratio * 100,
                 self.consumed_cny, self.budget_cny, remaining,
             )
             return (
-                f"⚠️ TokenBudget 预算告警: 已使用 {ratio*100:.0f}% "
-                f"(¥{self.consumed_cny:.4f}/¥{self.budget_cny:.2f})"
+                f"鈿狅笍 TokenBudget 棰勭畻鍛婅: 宸蹭娇鐢?{ratio*100:.0f}% "
+                f"(楼{self.consumed_cny:.4f}/楼{self.budget_cny:.2f})"
             )
         return None
 
     def get_stats(self) -> Dict[str, Any]:
-        """获取预算统计摘要"""
+        """鑾峰彇棰勭畻缁熻鎽樿"""
         return {
             "session_id": self.session_id,
             "budget_cny": self.budget_cny,
@@ -703,10 +714,10 @@ class TokenBudget:
         }
 
     def reset(self, new_budget: Optional[float] = None) -> None:
-        """重置预算计数器
+        """閲嶇疆棰勭畻璁℃暟鍣?
 
         Args:
-            new_budget: 新的预算上限（None 表示保持原值）
+            new_budget: 鏂扮殑棰勭畻涓婇檺锛圢one 琛ㄧず淇濇寔鍘熷€硷級
         """
         if new_budget is not None:
             self.budget_cny = new_budget
@@ -715,13 +726,13 @@ class TokenBudget:
         self._tripped = False
         self._warned = False
         logger.info(
-            "[TokenBudget] Session=%s 预算已重置 (new_budget=¥%.2f)",
+            "[TokenBudget] Session=%s 棰勭畻宸查噸缃?(new_budget=楼%.2f)",
             self.session_id, self.budget_cny,
         )
 
 
 # ============================================================================
-# 会话级 TokenBudget 注册表（线程安全，由 dispatch_llm 使用）
+# 浼氳瘽绾?TokenBudget 娉ㄥ唽琛紙绾跨▼瀹夊叏锛岀敱 dispatch_llm 浣跨敤锛?
 # ============================================================================
 
 _budget_lock = asyncio.Lock()
@@ -729,13 +740,13 @@ _session_budgets: Dict[str, TokenBudget] = {}
 
 
 async def get_session_budget(session_id: str) -> TokenBudget:
-    """获取或创建会话级 TokenBudget
+    """鑾峰彇鎴栧垱寤轰細璇濈骇 TokenBudget
 
     Args:
-        session_id: 会话标识
+        session_id: 浼氳瘽鏍囪瘑
 
     Returns:
-        TokenBudget 实例
+        TokenBudget 瀹炰緥
     """
     async with _budget_lock:
         if session_id not in _session_budgets:
@@ -744,18 +755,18 @@ async def get_session_budget(session_id: str) -> TokenBudget:
                 budget_cny=_DEFAULT_SESSION_BUDGET,
             )
             logger.info(
-                "[TokenBudget] Session=%s 新建预算 ¥%.2f",
+                "[TokenBudget] Session=%s 鏂板缓棰勭畻 楼%.2f",
                 session_id, _DEFAULT_SESSION_BUDGET,
             )
         return _session_budgets[session_id]
 
 
 async def cleanup_session_budget(session_id: str) -> None:
-    """清理会话预算（会话结束时调用）"""
+    """娓呯悊浼氳瘽棰勭畻锛堜細璇濈粨鏉熸椂璋冪敤锛?""
     async with _budget_lock:
         if session_id in _session_budgets:
             budget = _session_budgets.pop(session_id)
             logger.info(
-                "[TokenBudget] Session=%s 已清理, 最终消耗=¥%.4f/¥%.2f",
+                "[TokenBudget] Session=%s 宸叉竻鐞? 鏈€缁堟秷鑰?楼%.4f/楼%.2f",
                 session_id, budget.consumed_cny, budget.budget_cny,
             )

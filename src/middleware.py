@@ -24,6 +24,10 @@ def setup_middleware(app: FastAPI) -> None:
     # ── 安全响应头 ──
     @app.middleware("http")
     async def security_headers_middleware(request: Request, call_next):
+        """安全响应头中间件：为所有 HTTP 响应添加安全头。
+
+        仅在 HTTP 协议下生效，WebSocket 升级请求会跳过。
+        """
         response = await call_next(request)
         if response.status_code == 101:
             return response
@@ -32,6 +36,16 @@ def setup_middleware(app: FastAPI) -> None:
         response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        csp_policy = (
+            "default-src 'self'; "
+            "script-src 'self' 'unsafe-inline'; "
+            "style-src 'self' 'unsafe-inline'; "
+            "img-src 'self' data: blob: https:; "
+            "font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com; "
+            "connect-src 'self' http://localhost:* ws://localhost:* https:; "
+            "frame-ancestors 'none'"
+        )
+        response.headers["Content-Security-Policy"] = csp_policy
         response.headers["Server"] = "nginx"
         return response
 
@@ -87,7 +101,6 @@ def setup_middleware(app: FastAPI) -> None:
                 get_request_metrics().record_request(duration_ms, False)
             except (ImportError, AttributeError, TypeError) as e:
                 logger.warning("请求指标记录失败（异常响应）: %s", e, exc_info=True)
-            raise
             raise
 
     # ── 请求限流 ──

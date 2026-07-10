@@ -212,12 +212,18 @@ def _register_inline_routes(app: FastAPI) -> None:
     @app.get("/login", response_class=HTMLResponse)
     async def login_page():
         f = STATIC_DIR / "login.html"
-        return HTMLResponse(f.read_text(encoding="utf-8") if f.exists() else "<h1>login.html not found</h1>")
+        if f.exists():
+            content = await asyncio.to_thread(f.read_text, encoding="utf-8")
+            return HTMLResponse(content)
+        return HTMLResponse("<h1>login.html not found</h1>")
 
     @app.get("/", response_class=HTMLResponse)
     async def index_page():
         f = STATIC_DIR / "index.html"
-        return HTMLResponse(f.read_text(encoding="utf-8") if f.exists() else "<h1>index.html not found</h1>")
+        if f.exists():
+            content = await asyncio.to_thread(f.read_text, encoding="utf-8")
+            return HTMLResponse(content)
+        return HTMLResponse("<h1>index.html not found</h1>")
 
     @app.get("/admin", response_class=HTMLResponse)
     async def admin_page(request: Request):
@@ -226,7 +232,10 @@ def _register_inline_routes(app: FastAPI) -> None:
         if not user or user == "anonymous":
             return RedirectResponse(url="/login", status_code=302)
         f = STATIC_DIR / "index.html"
-        return HTMLResponse(f.read_text(encoding="utf-8") if f.exists() else "<h1>index.html not found</h1>")
+        if f.exists():
+            content = await asyncio.to_thread(f.read_text, encoding="utf-8")
+            return HTMLResponse(content)
+        return HTMLResponse("<h1>index.html not found</h1>")
 
     # ── 代理路由 ──
     @app.get("/api/proxy/loader/files")

@@ -220,7 +220,7 @@ def _extract_pdf_dual(file_path: str) -> str:
                 except Exception:  # TODO: Narrow exception type
                     # 单页失败，回退
                     try:
-                        from PyPDF2 import PdfReader
+                        from pypdf import PdfReader
                         reader = PdfReader(file_path)
                         if i < len(reader.pages):
                             txt = reader.pages[i].extract_text() or ""
@@ -234,9 +234,9 @@ def _extract_pdf_dual(file_path: str) -> str:
         logger.warning(f"[ingest] suppressed exception", exc_info=True)
         pass
     
-    # 路2: PyPDF2 回退
+    # 路2: pypdf 回退
     try:
-        from PyPDF2 import PdfReader
+        from pypdf import PdfReader
         reader = PdfReader(file_path)
         total = len(reader.pages)
         for i, page in enumerate(reader.pages):
