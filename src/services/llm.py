@@ -211,42 +211,52 @@ async def call_llm(
     temperature: float = 0.3, model: str = None,
 ) -> str:
     """
-    LLM Fallback 閾撅細MiMo 2.5 Pro 鈫?DeepSeek 鈫?绌?
+    LLM Fallback 鎺ｉ摼锛歁iMo 2.5 Pro -> DeepSeek -> 绌哄瓧绗?
     鎵€鏈夌敓鎴愪换鍔＄粺涓€鍏ュ彛
-    """
+
+    v1.44 R3: 杞婚噺绾?60s 缁撴€昏秴鏃?   """
+    _CHAIN_TIMEOUT = 60.0  # v1.44 R3: 缁撴€昏秴鏃?
+
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
     messages.append({"role": "user", "content": prompt[:8000]})
 
-    # Level 1: MiMo 2.5 Pro
-    if not MIMO_API_KEY:
-        logger.warning("MiMo API Key 鏈厤缃紝璺宠繃 MiMo 鐩存帴灏濊瘯 DeepSeek")
-    else:
-        for attempt in range(MAX_RETRIES):
+    async def _fallback_chain() -> str:
+        # Level 1: MiMo 2.5 Pro
+        if not MIMO_API_KEY:
+            logger.warning("MiMo API Key 未配置，跳过 MiMo 直接尝试 DeepSeek")
+        else:
+            for attempt in range(MAX_RETRIES):
+                result = await _call_api(
+                    MIMO_BASE_URL, MIMO_API_KEY, model or MIMO_MODEL,
+                    messages, max_tokens, temperature, MIMO_TIMEOUT,
+                )
+                if result:
+                    logger.info(f"MiMo OK ({len(result)} chars)")
+                    return result
+                if attempt < MAX_RETRIES - 1:
+                    await asyncio.sleep(RETRY_DELAY)
+            logger.warning("MiMo 失败，尝试 DeepSeek")
+
+        # Level 2: DeepSeek
+        if DEEPSEEK_API_KEY:
             result = await _call_api(
-                MIMO_BASE_URL, MIMO_API_KEY, model or MIMO_MODEL,
-                messages, max_tokens, temperature, MIMO_TIMEOUT,
+                DEEPSEEK_BASE_URL, DEEPSEEK_API_KEY, DEEPSEEK_MODEL,
+                messages, max_tokens, temperature, DEEPSEEK_TIMEOUT,
             )
             if result:
-                logger.info(f"MiMo OK ({len(result)} chars)")
+                logger.info(f"DeepSeek fallback OK ({len(result)} chars)")
                 return result
-            if attempt < MAX_RETRIES - 1:
-                await asyncio.sleep(RETRY_DELAY)
-        logger.warning("MiMo 失败，尝试 DeepSeek")
+        logger.warning("DeepSeek 也失败")
+        return ""
 
-    # Level 2: DeepSeek
-    if DEEPSEEK_API_KEY:
-        result = await _call_api(
-            DEEPSEEK_BASE_URL, DEEPSEEK_API_KEY, DEEPSEEK_MODEL,
-            messages, max_tokens, temperature, DEEPSEEK_TIMEOUT,
-        )
-        if result:
-            logger.info(f"DeepSeek fallback OK ({len(result)} chars)")
-            return result
-    logger.warning("DeepSeek 也失败")
-
-    return ""
+    # v1.44 R3: 杞婚噺鏈€澶?60 纭?
+    try:
+        return await asyncio.wait_for(_fallback_chain(), timeout=_CHAIN_TIMEOUT)
+    except asyncio.TimeoutError:
+        logger.error(f"[call_llm] 鏈€澶勮秴鏃?{_CHAIN_TIMEOUT}s, 鏀惧纯")
+        return ""
 
 
 

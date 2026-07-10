@@ -339,6 +339,10 @@ async def hybrid_search(query: str, chunks: list = None, category: str = "",
     Returns:
         检索结果列表，每个结果含 context 和 meta 字段
     """
+    # v1.44 安全修复: 限制 top_k 上限
+    from src.services.prompt_guard import clamp_top_k
+    top_k = clamp_top_k(top_k)
+
     # L-1: QA对匹配
     qa_results = await _l_minus_1_qa_match(query)
     if qa_results and not skip_cache:
@@ -393,6 +397,13 @@ async def hybrid_search(query: str, chunks: list = None, category: str = "",
     merged = await _l5_l6_postprocess(query, merged, chunks, top_k)
 
     result = merged[:top_k]
+
+    # v1.44 安全修复: RAG 检索结果净化 — 移除 prompt injection 内容
+    try:
+        from src.services.prompt_guard import sanitize_rag_results, RAG_CONTEXT_MAX_RESULTS
+        result = sanitize_rag_results(result, max_results=RAG_CONTEXT_MAX_RESULTS)
+    except ImportError:
+        pass
 
     # 统一返回格式
     result = _format_results(result, query, merged)

@@ -161,8 +161,18 @@ class ShaoyangPipeline(SymbolBase):
             return {"text": "", "tables": [], "metadata": {"parser": "none"}}
 
     def _clean(self, text: str) -> str:
-        """清洗文本"""
+        """清洗文本 + Prompt Injection 净化"""
         import re
+
+        # v1.44 安全修复: Prompt Injection 净化
+        try:
+            from src.services.prompt_guard import sanitize_document_content
+            text, injection_detected = sanitize_document_content(text)
+            if injection_detected:
+                logger.warning("[Security] 文档内容中检测到 Prompt Injection 模式，已净化")
+        except ImportError:
+            pass
+
         text = re.sub(r'<[^>]+>', '', text)
         text = re.sub(r'https?://\S+', '', text)
         text = re.sub(r'\s+', ' ', text)

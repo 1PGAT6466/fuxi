@@ -82,11 +82,11 @@ async def _search_impl(q: str, top_k: int, page: int, page_size: int, granularit
         
         if granularity == "event":
             # Event 粒度检索
-            event_result = await event_search(q, top_k=top_k)
+            event_result = await event_search(q, top_k=top_k, tenant_id=tenant_id)
             results = event_result.get("mapped_chunks", [])
         else:
             # Chunk 粒度（默认）/ auto
-            results = await hybrid_search(q, top_k=top_k, granularity=granularity)
+            results = await hybrid_search(q, top_k=top_k, granularity=granularity, tenant_id=tenant_id)
         
         # v1.44 R2: 多租户隔离过滤
         results = _filter_by_tenant(results, tenant_id)

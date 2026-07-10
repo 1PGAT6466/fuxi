@@ -77,6 +77,11 @@ async def get_cache(query: str, category: str = "", top_k: int = 15) -> Optional
                         valid_count += 1
                         sim = _cosine_similarity(q_vec, emb)
                         if sim >= SIMILARITY_THRESHOLD:
+                            # v1.44 R3: L2 空值缓存穿透防护
+                            if results is _EMPTY_SENTINEL:
+                                _cache_penetration_blocked += 1
+                                logger.debug(f"[Cache] L2 空值缓存命中 (sim={sim:.3f}): '{query[:40]}...'")
+                                return []
                             _cache_hits += 1
                             logger.info(f"[Cache] L2 hit (sim={sim:.3f}): '{query[:40]}...'")
                             return results
@@ -116,7 +121,9 @@ async def set_cache(query: str, results: list, category: str = "", top_k: int = 
             q_emb = await embed_texts([query])
             if q_emb and q_emb[0]:
                 now = time.time()
-                _l2_cache.append((q_emb[0], results, now))
+                # v1.44 R3: L2 也使用空值标记，保持一致性
+                l2_value = _EMPTY_SENTINEL if not results else results
+                _l2_cache.append((q_emb[0], l2_value, now))
                 # 清理过期条目 + 大小淘汰
                 _l2_cache[:] = [(e, r, t) for e, r, t in _l2_cache
                                 if now - t < MAX_CACHE_AGE_SECONDS]

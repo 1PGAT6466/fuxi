@@ -28,7 +28,7 @@ class TaiyangRetrieval(SymbolBase):
         self._search_count = 0
         self._cache_hits = 0
 
-    async def refine(self, query: str, strategy: str = "auto", top_k: int = 15, trace_id: str = None, granularity: str = "chunk", entities: List[str] = None) -> List[Dict]:
+    async def refine(self, query: str, strategy: str = "auto", top_k: int = 15, trace_id: str = None, granularity: str = "chunk", entities: List[str] = None, tenant_id: str = "default") -> List[Dict]:
         """精炼检索入口
 
         Args:
@@ -113,8 +113,8 @@ class TaiyangRetrieval(SymbolBase):
 
             # L2: 多路召回（并行执行）
             import asyncio
-            bm25_task = self._bm25_recall(expanded_q, top_k)
-            vector_task = self._vector_recall(expanded_q, top_k)
+            bm25_task = self._bm25_recall(expanded_q, top_k, tenant_id=tenant_id)
+            vector_task = self._vector_recall(expanded_q, top_k, tenant_id=tenant_id)
             bm25_results, vector_results = await asyncio.gather(bm25_task, vector_task)
             logger.info(f"[{trace_id}] [太阳] BM25召回: {len(bm25_results)} results")
             logger.info(f"[{trace_id}] [太阳] 向量召回: {len(vector_results)} results")
@@ -223,14 +223,14 @@ class TaiyangRetrieval(SymbolBase):
         except Exception:  # TODO: Narrow exception type
             return query
 
-    async def _bm25_recall(self, query: str, top_k: int) -> List[Dict[str, Any]]:
+    async def _bm25_recall(self, query: str, top_k: int, tenant_id: str = "default") -> List[Dict[str, Any]]:
         """BM25 召回 — FIX-D2: SQLite 调用包装到线程池"""
         try:
             import asyncio
             from src.db.memory_store import get_store
             store = get_store()
             results = await asyncio.to_thread(
-                lambda: store.keyword_search(query, top_k)
+                lambda: store.keyword_search(query, top_k, tenant_id=tenant_id)
             )
             return [
                 {"text": r.get("text", ""), "file_name": r.get("file_name", ""),
@@ -240,8 +240,8 @@ class TaiyangRetrieval(SymbolBase):
         except Exception:  # TODO: Narrow exception type
             return []
 
-    async def _vector_recall(self, query: str, top_k: int) -> List[Dict[str, Any]]:
-        """向量召回"""
+    async def _vector_recall(self, query: str, top_k: int, tenant_id: str = "default") -> List[Dict[str, Any]]:
+        """向量召回 — v1.44 R2: 使用 ChromaDB where 子句实现租户隔离"""
         try:
             from src.db.vector_store import embed_texts, get_vector_store
             q_emb = await embed_texts([query])
@@ -250,7 +250,9 @@ class TaiyangRetrieval(SymbolBase):
             vs = get_vector_store()
             if not vs or vs.count <= 0:
                 return []
-            result = vs.query(q_emb[0], n_results=top_k)
+            # v1.44 R2: 租户隔离 — 在 ChromaDB 层面过滤，而非事后过滤
+            where_filter = {"tenant_id": tenant_id} if tenant_id != "default" else None
+            result = vs.query(q_emb[0], n_results=top_k, where=where_filter)
             if not result.get("ids") or not result["ids"][0]:
                 return []
             results = []
@@ -597,7 +599,7 @@ async def hybrid_search(query: str, **kwargs) -> List[Dict]:
     return []
 
 
-async def event_search(query: str, top_k: int = 15, trace_id: str = None) -> Dict[str, Any]:
+async def event_search(query: str, top_k: int = 15, trace_id: str = None, tenant_id: str = "default") -> Dict[str, Any]:
     """Event 粒度检索（任务 1）— 兼容旧接口
     
     Returns:

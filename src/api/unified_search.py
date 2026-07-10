@@ -56,9 +56,13 @@ async def unified_search(
 
     示例数据自动标记 origin=seed。
     结果为空时返回引导信息。
+    v1.44 R2: 多租户隔离 — 从 JWT 提取 tenant_id，过滤搜索结果
     """
     t0 = time.time()
     try:
+        # v1.44 R2: 从 request.state 获取租户 ID
+        tenant_id = getattr(request.state, "tenant_id", "default") if request else "default"
+        
         matches = []
         searched_sources = []
 
@@ -71,7 +75,7 @@ async def unified_search(
         # 1. 知识库搜索
         try:
             from src.taiyang.retrieval import hybrid_search
-            kb_results = await hybrid_search(q, top_k=5)
+            kb_results = await hybrid_search(q, top_k=5, tenant_id=tenant_id)
             searched_sources.append("knowledge_base")
             for r in kb_results:
                 matches.append({
@@ -111,7 +115,7 @@ async def unified_search(
         # 3. 知识图谱搜索
         try:
             from src.taiyang.graph import query_graph
-            graph_results = query_graph(entity=q, limit=5)
+            graph_results = query_graph(entity=q, limit=5, tenant_id=tenant_id)
             searched_sources.append("knowledge_graph")
             for g in graph_results:
                 matches.append({

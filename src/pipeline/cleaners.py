@@ -47,9 +47,21 @@ class UnifiedCleaner:
             raise CleanError(f"清洗失败: {e}")
 
     def _clean_text(self, text: str) -> str:
-        """统一清洗逻辑 — 包含语义清洗"""
+        """统一清洗逻辑 — 包含语义清洗 + Prompt Injection 净化"""
         if not text or not isinstance(text, str):
             return ""
+
+        # 0. v1.44 安全修复: Prompt Injection 净化
+        try:
+            from src.services.prompt_guard import sanitize_document_content
+            text, injection_detected = sanitize_document_content(text)
+            if injection_detected:
+                import logging as _log
+                _log.getLogger("pipeline.cleaners").warning(
+                    "[Security] 文档内容中检测到 Prompt Injection 模式，已净化"
+                )
+        except ImportError:
+            pass  # prompt_guard 模块不可用时降级为无净化
 
         # 1. 去除HTML标签
         text = re.sub(r'<[^>]+>', '', text)
