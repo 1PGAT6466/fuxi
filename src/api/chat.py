@@ -317,7 +317,7 @@ async def create_session(body: CreateSessionRequest, request: Request):
         }
         _sessions_store[session_id] = session
         _messages_store[session_id] = []
-        _save_session_to_db(session)  # v2.1: 持久化
+        await asyncio.to_thread(_save_session_to_db, session)  # v2.1: 持久化
         return {
             "id": session_id,
             "title": session["title"],
@@ -353,7 +353,7 @@ async def delete_session(session_id: str, request: Request):
             )
         del _sessions_store[session_id]
         _messages_store.pop(session_id, None)
-        _delete_session_from_db(session_id)  # v2.1: 持久化删除
+        await asyncio.to_thread(_delete_session_from_db, session_id)  # v2.1: 持久化删除
         return {"ok": True, "message": f"会话 {session_id} 已删除"}
     except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"delete_session 失败: {e}")
@@ -393,11 +393,11 @@ async def chat_send(body: ChatSendRequest, request: Request):
                 }
                 _sessions_store[session_id] = session
                 _messages_store[session_id] = []
-                _save_session_to_db(session)  # v2.1: 持久化
+                await asyncio.to_thread(_save_session_to_db, session)  # v2.1: 持久化
             else:
                 session["last_message"] = body.query[:100]
                 session["updated_at"] = time.time()
-                _save_session_to_db(session)  # v2.1: 持久化更新
+                await asyncio.to_thread(_save_session_to_db, session)  # v2.1: 持久化更新
                 session["message_count"] = session.get("message_count", 0) + 1
 
         # 保存用户消息
@@ -408,10 +408,10 @@ async def chat_send(body: ChatSendRequest, request: Request):
                 "timestamp": time.time(),
             }
             _messages_store.setdefault(session_id, []).append(user_msg)
-            _save_message_to_db(session_id, user_msg)  # v2.1: 持久化
+            await asyncio.to_thread(_save_message_to_db, session_id, user_msg)  # v2.1: 持久化
             # 持久化会话更新
             if session_id in _sessions_store:
-                _save_session_to_db(_sessions_store[session_id])
+                await asyncio.to_thread(_save_session_to_db, _sessions_store[session_id])
 
         # 如果请求流式响应
         if body.stream:
@@ -458,7 +458,7 @@ async def chat_send(body: ChatSendRequest, request: Request):
                             "timestamp": time.time(),
                         }
                         _messages_store.setdefault(session_id, []).append(asst_msg)
-                        _save_message_to_db(session_id, asst_msg)  # v2.1: 持久化
+                        await asyncio.to_thread(_save_message_to_db, session_id, asst_msg)  # v2.1: 持久化
 
                 except Exception as e:  # TODO: Narrow exception type
                     logger.exception(f"SSE 生成失败: {e}")
@@ -492,7 +492,7 @@ async def chat_send(body: ChatSendRequest, request: Request):
                     "timestamp": time.time(),
                 }
                 _messages_store.setdefault(session_id, []).append(asst_msg)
-                _save_message_to_db(session_id, asst_msg)  # v2.1: 持久化
+                await asyncio.to_thread(_save_message_to_db, session_id, asst_msg)  # v2.1: 持久化
 
             return result
 

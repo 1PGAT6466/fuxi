@@ -1,3 +1,4 @@
+import asyncio
 """
 v1.44 Phase 1 Fix — 知识库(KB)检索路由
 提供 KB 搜索 + KB 文档列表端点
@@ -84,7 +85,7 @@ async def kb_documents(request: Request = None):
         documents = []
         try:
             from src.db.data_store import load_chunks
-            chunks = load_chunks()
+            chunks = await asyncio.to_thread(load_chunks)
             seen = set()
             for c in chunks:
                 fhash = c.get("file_hash", "")
@@ -127,7 +128,7 @@ async def kb_stats(request: Request = None):
         stats = {"total_chunks": 0, "total_files": 0, "categories": {}}
         try:
             from src.db.data_store import load_chunks
-            chunks = load_chunks()
+            chunks = await asyncio.to_thread(load_chunks)
             if chunks:
                 stats["total_chunks"] = len(chunks)
                 seen_files = set()

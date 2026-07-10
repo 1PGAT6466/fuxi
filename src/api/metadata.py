@@ -1,3 +1,4 @@
+import asyncio
 """
 伏羲 v1.50 — 元数据路由（真实数据版）
 数据来源：系统版本 + 文档统计 + 矢量库统计
@@ -41,7 +42,7 @@ async def metadata(request: Request = None):
         try:
             from src.db.data_store import load_chunks
             from src.db.vector_store import get_vector_store
-            chunks = load_chunks() or []
+            chunks = await asyncio.to_thread(load_chunks) or []
             vs = get_vector_store()
             vector_count = 0
             if vs:

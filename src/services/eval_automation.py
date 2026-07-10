@@ -8,6 +8,7 @@ import time
 from typing import Dict, List, Optional
 from pathlib import Path
 from datetime import datetime
+import asyncio
 
 logger = logging.getLogger("services.eval_automation")
 
@@ -282,14 +283,17 @@ class EvalAutomation:
         cutoff = time.time() - days * 86400
 
         try:
-            with open(history_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    try:
-                        record = json.loads(line.strip())
-                        # 简单的日期比较
-                        records.append(record)
-                    except Exception as e:  # TODO: Narrow exception type
-                        logger.warning("JSON解析评测历史记录失败: %s", e, exc_info=True)
+            def _read_history():
+                result = []
+                with open(history_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        try:
+                            record = json.loads(line.strip())
+                            result.append(record)
+                        except Exception as e:
+                            logger.warning("JSON解析评测历史记录失败: %s", e, exc_info=True)
+                return result
+            records = await asyncio.to_thread(_read_history)
         except Exception as e:  # TODO: Narrow exception type
             logger.warning("读取评测历史记录失败: %s", e, exc_info=True)
 
@@ -310,8 +314,10 @@ class EvalAutomation:
             return None
 
         try:
-            with open(report_file, "r", encoding="utf-8") as f:
-                return json.load(f)
+            def _read_report():
+                with open(report_file, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            return await asyncio.to_thread(_read_report)
         except Exception as e:  # TODO: Narrow exception type
             logger.warning("读取评测报告失败: %s", e, exc_info=True)
             return None

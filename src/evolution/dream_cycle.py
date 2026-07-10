@@ -1,3 +1,4 @@
+import asyncio
 """
 dream_cycle.py — 第九宫·中宫：24/7 后台神经消化循环
 
@@ -321,7 +322,7 @@ class DreamCycle:
 
             try:
                 from src.db.data_store import load_graph
-                graph = load_graph()
+                graph = await asyncio.to_thread(load_graph)
                 result["total_edges"] = len(graph.get("edges", []))
             except Exception:  # TODO: Narrow exception type
                 pass

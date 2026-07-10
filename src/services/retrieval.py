@@ -215,15 +215,18 @@ async def _l175_wiki_recall(query: str) -> list:
                 # Fallback: keyword search in worldtree.db wiki_pages
                 import sqlite3
                 from src.config import WORLDTREE_DB_PATH
-                wt_db = sqlite3.connect(str(WORLDTREE_DB_PATH), timeout=10)
-                wt_db.execute("PRAGMA journal_mode=WAL")
-                wt_db.execute("PRAGMA busy_timeout=5000")
-                wt_db.row_factory = sqlite3.Row
-                rows = wt_db.execute(
-                    "SELECT id, title, summary, category_path FROM wiki_pages WHERE title LIKE ? OR summary LIKE ? LIMIT 5",
-                    (f"%{query}%", f"%{query}%")
-                ).fetchall()
-                wt_db.close()
+                def _query_wiki():
+                    wt_db = sqlite3.connect(str(WORLDTREE_DB_PATH), timeout=10)
+                    wt_db.execute("PRAGMA journal_mode=WAL")
+                    wt_db.execute("PRAGMA busy_timeout=5000")
+                    wt_db.row_factory = sqlite3.Row
+                    rows = wt_db.execute(
+                        "SELECT id, title, summary, category_path FROM wiki_pages WHERE title LIKE ? OR summary LIKE ? LIMIT 5",
+                        (f"%{query}%", f"%{query}%")
+                    ).fetchall()
+                    wt_db.close()
+                    return rows
+                rows = await asyncio.to_thread(_query_wiki)
                 for r in rows:
                     d = dict(r)
                     wiki_hits.append({
@@ -348,7 +351,7 @@ async def hybrid_search(query: str, chunks: list = None, category: str = "",
 
     if chunks is None:
         from src.db.data_store import load_chunks
-        chunks = load_chunks()
+        chunks = await asyncio.to_thread(load_chunks)
 
     # L0: 图谱路由
     category = await _l0_graph_routing(query, category)

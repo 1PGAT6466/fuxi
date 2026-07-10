@@ -9,6 +9,7 @@ import os
 import time
 from typing import Dict, List
 from pathlib import Path
+import asyncio
 
 logger = logging.getLogger("taiyin.mcp_tools")
 
@@ -113,7 +114,7 @@ async def kb_list_documents(args: dict = None) -> Dict:
     """列出知识库文档"""
     try:
         from src.db.data_store import load_chunks
-        chunks = load_chunks()
+        chunks = await asyncio.to_thread(load_chunks)
         seen = {}
         for c in chunks:
             fhash = c.get("file_hash", "")
@@ -137,7 +138,7 @@ async def kb_get_document(doc_id: str) -> Dict:
     """获取单个文档内容"""
     try:
         from src.db.data_store import load_chunks
-        chunks = load_chunks()
+        chunks = await asyncio.to_thread(load_chunks)
         matching = [c for c in chunks if c.get("file_hash", "") == doc_id]
         if not matching:
             matching = [c for c in chunks if doc_id in c.get("file_name", "")]
@@ -170,9 +171,11 @@ async def graph_query(entity: str = "", source: str = "", target: str = "",
 
         edges = []
         if _os.path.exists(GRAPH_PATH):
-            with open(GRAPH_PATH, "r", encoding="utf-8") as f:
-                kg_data = json.load(f)
-                edges = list(kg_data.get("edges", []))
+            def _read_graph():
+                with open(GRAPH_PATH, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            kg_data = await asyncio.to_thread(_read_graph)
+            edges = list(kg_data.get("edges", []))
 
         filtered = []
         for edge in edges:
@@ -223,17 +226,19 @@ async def graph_stats(args: dict = None) -> Dict:
         entity_type_dist = {}
 
         if _os.path.exists(GRAPH_PATH):
-            with open(GRAPH_PATH, "r", encoding="utf-8") as f:
-                kg_data = json.load(f)
-                nodes = kg_data.get("nodes", kg_data.get("entities", {}))
-                nodes_count = len(nodes)
-                if isinstance(nodes, dict):
-                    types = [n.get("type", "unknown") for n in nodes.values() if isinstance(n, dict)]
-                    entity_type_dist = dict(Counter(types))
-                edges = list(kg_data.get("edges", []))
-                edges_count = len(edges)
-                edge_types = [e.get("relation", e.get("type", "related_to")) for e in edges]
-                edge_type_dist = dict(Counter(edge_types))
+            def _read_graph():
+                with open(GRAPH_PATH, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            kg_data = await asyncio.to_thread(_read_graph)
+            nodes = kg_data.get("nodes", kg_data.get("entities", {}))
+            nodes_count = len(nodes)
+            if isinstance(nodes, dict):
+                types = [n.get("type", "unknown") for n in nodes.values() if isinstance(n, dict)]
+                entity_type_dist = dict(Counter(types))
+            edges = list(kg_data.get("edges", []))
+            edges_count = len(edges)
+            edge_types = [e.get("relation", e.get("type", "related_to")) for e in edges]
+            edge_type_dist = dict(Counter(edge_types))
 
         builder_stats = {}
         try:
@@ -417,8 +422,10 @@ async def cross_entity_synthesize(entity_a: str, entity_b: str) -> Dict:
         if not _os.path.exists(GRAPH_PATH):
             return {"entity_a": entity_a, "entity_b": entity_b, "paths": [], "synthesis": "无图谱数据"}
 
-        with open(GRAPH_PATH, "r", encoding="utf-8") as f:
-            kg_data = json.load(f)
+        def _read_graph():
+            with open(GRAPH_PATH, "r", encoding="utf-8") as f:
+                return json.load(f)
+        kg_data = await asyncio.to_thread(_read_graph)
 
         edges = list(kg_data.get("edges", []))
         nodes = kg_data.get("nodes", kg_data.get("entities", {}))
@@ -506,7 +513,7 @@ async def file_list(page: int = 1, page_size: int = 50) -> Dict:
     """文件列表"""
     try:
         from src.db.data_store import load_chunks
-        chunks = load_chunks()
+        chunks = await asyncio.to_thread(load_chunks)
         seen = {}
         for c in chunks:
             fh = c.get("file_hash", "")

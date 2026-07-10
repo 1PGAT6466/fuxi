@@ -8,6 +8,7 @@ import time
 import hashlib
 import logging
 from typing import Dict, List
+import asyncio
 
 logger = logging.getLogger("taiyang.seed_score_ab")
 
@@ -78,8 +79,10 @@ class SeedScoreABTest:
         }
 
         test_file = os.path.join(TEST_DIR, f"{self.TEST_CONFIG['test_name']}.jsonl")
-        with open(test_file, "a", encoding="utf-8") as f:
-            f.write(json.dumps(test_data, ensure_ascii=False) + "\n")
+        def _write_test():
+            with open(test_file, "a", encoding="utf-8") as f:
+                f.write(json.dumps(test_data, ensure_ascii=False) + "\n")
+        await asyncio.to_thread(_write_test)
 
 
 class SeedScoreEvaluator:
@@ -94,12 +97,16 @@ class SeedScoreEvaluator:
             return {"error": "测试数据不存在"}
 
         data = []
-        with open(test_file, "r", encoding="utf-8") as f:
-            for line in f:
-                try:
-                    data.append(json.loads(line.strip()))
-                except Exception as e:  # TODO: Narrow exception type
-                    logger.warning("JSON解析A/B测试数据失败: %s", e, exc_info=True)
+        def _read_test():
+            result = []
+            with open(test_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        result.append(json.loads(line.strip()))
+                    except Exception as e:
+                        logger.warning("JSON解析A/B测试数据失败: %s", e, exc_info=True)
+            return result
+        data = await asyncio.to_thread(_read_test)
 
         control_data = [d for d in data if d.get("group") == "control"]
         treatment_data = [d for d in data if d.get("group") == "treatment"]

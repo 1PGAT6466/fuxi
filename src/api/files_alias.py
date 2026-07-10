@@ -2,6 +2,7 @@
 P0 修复：/api/files 路由别名 → 前端 Files.vue 调用 /api/files/*
 将 documents 和 upload 端点的 /api/documents 和 /api/upload 映射到 /api/files 前缀。
 """
+import asyncio
 from fastapi import APIRouter, HTTPException, Request
 from pathlib import Path
 import os
@@ -46,7 +47,7 @@ async def files_delete(file_id: str, request: Request):
         from src.db.data_store import load_chunks, save_chunks
         from src.db.vector_store import get_vector_store
 
-        chunks = load_chunks()
+        chunks = await asyncio.to_thread(load_chunks)
         if not chunks:
             raise HTTPException(404, f"无数据，无法删除 {file_id}")
 
@@ -60,7 +61,7 @@ async def files_delete(file_id: str, request: Request):
 
         file_name = matching[0].get("file_name", file_id)
         kept = [c for c in chunks if c.get("file_hash", "") != file_id and file_id not in c.get("file_name", "")]
-        save_chunks(kept)
+        await asyncio.to_thread(save_chunks, kept)
 
         # 删除向量库对应 chunks
         try:
@@ -70,20 +71,22 @@ async def files_delete(file_id: str, request: Request):
         except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"向量库删除失败（非致命）: {e}")
 
-        # 删除物理文件（如果存在）
+        # 删除物理文件（异步化避免阻塞事件循环）
         if UPLOAD_DIR.exists():
-            for root, dirs, files in os.walk(str(UPLOAD_DIR)):
-                for fname in files:
-                    fpath = Path(root) / fname
-                    try:
-                        with open(fpath, "rb") as f:
-                            content = f.read()
-                        computed_hash = hashlib.sha256(content).hexdigest()[:16]
-                        if computed_hash == file_id[:16] or file_id in str(fpath):
-                            fpath.unlink()
-                            logger.info(f"[files_alias] 物理文件已删除: {fpath}")
-                    except Exception as e:  # TODO: Narrow exception type
-                        logger.warning(f"物理文件删除失败: {e}")
+            def _delete_physical_files():
+                for root, dirs, files in os.walk(str(UPLOAD_DIR)):
+                    for fname in files:
+                        fpath = Path(root) / fname
+                        try:
+                            with open(fpath, "rb") as f:
+                                content = f.read()
+                            computed_hash = hashlib.sha256(content).hexdigest()[:16]
+                            if computed_hash == file_id[:16] or file_id in str(fpath):
+                                fpath.unlink()
+                                logger.info(f"[files_alias] 物理文件已删除: {fpath}")
+                        except Exception as e:  # TODO: Narrow exception type
+                            logger.warning(f"物理文件删除失败: {e}")
+            await asyncio.to_thread(_delete_physical_files)
 
         return {
             "status": "ok",
@@ -113,7 +116,7 @@ async def files_update(file_id: str, request: Request):
         body = await request.json()
 
         from src.db.data_store import load_chunks, save_chunks
-        chunks = load_chunks()
+        chunks = await asyncio.to_thread(load_chunks)
         if not chunks:
             raise HTTPException(404, f"文件 {file_id} 未找到")
 
@@ -136,7 +139,7 @@ async def files_update(file_id: str, request: Request):
                 updated_count += 1
 
         if updated_count > 0:
-            save_chunks(chunks)
+            await asyncio.to_thread(save_chunks, chunks)
 
         return {
             "ok": True,

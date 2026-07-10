@@ -311,7 +311,7 @@ async def rag_entity_expand(
         # 尝试知识图谱回退
         try:
             from src.db.data_store import load_graph
-            graph = load_graph()
+            graph = await asyncio.to_thread(load_graph)
             nodes = graph.get("nodes", {})
             if entity_name in nodes:
                 related = []

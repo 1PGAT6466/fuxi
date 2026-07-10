@@ -1,5 +1,6 @@
 # v1.50 统一响应格式 — 文档路由
 # v1.50 Phase E: 新增文档可见性修改 API（Company Brain 权限隔离）
+import asyncio
 from fastapi import APIRouter, HTTPException, Request, UploadFile, File
 from fastapi.responses import JSONResponse
 from pathlib import Path
@@ -13,7 +14,7 @@ async def documents(page: int = 1, page_size: int = 50, request: Request = None)
     from src.db.data_store import load_chunks
     from src.api.response import success, paginated, error, server_error
     try:
-        chunks = load_chunks()
+        chunks = await asyncio.to_thread(load_chunks)
         seen = {}
         for c in chunks:
             fh = c.get("file_hash", "")
@@ -163,7 +164,7 @@ async def delete_document(file_hash: str, request: Request = None):
         current_role = getattr(request.state, "role", "user") if request else "user"
         is_admin = current_role == "admin"
         
-        chunks = load_chunks()
+        chunks = await asyncio.to_thread(load_chunks)
         if not chunks:
             raise HTTPException(404, f"无数据，无法删除 {file_hash}")
 
@@ -183,7 +184,7 @@ async def delete_document(file_hash: str, request: Request = None):
 
         file_name = matching[0].get("file_name", file_hash)
         kept = [c for c in chunks if c.get("file_hash", "") != file_hash and file_hash not in c.get("file_name", "")]
-        save_chunks(kept)
+        await asyncio.to_thread(save_chunks, kept)
 
         # 删除向量库对应 chunks
         try:
@@ -193,22 +194,24 @@ async def delete_document(file_hash: str, request: Request = None):
         except Exception as e:  # TODO: Narrow exception type
             _logger.warning(f"向量库删除失败（非致命）: {e}")
 
-        # 删除物理文件
+        # 删除物理文件（异步化避免阻塞事件循环）
         from src.config import UPLOAD_DIR as _UPLOAD_DIR
         from pathlib import Path as _Path
         upload_dir = _Path(_UPLOAD_DIR)
         if upload_dir.exists():
-            for root, dirs, files in os.walk(str(upload_dir)):
-                for fname in files:
-                    fpath = _Path(root) / fname
-                    try:
-                        with open(fpath, "rb") as f:
-                            content = f.read()
-                        computed_hash = hashlib.sha256(content).hexdigest()[:16]
-                        if computed_hash == file_hash[:16] or file_hash in str(fpath):
-                            fpath.unlink()
-                    except Exception as e:  # TODO: Narrow exception type
-                        _logger.warning(f"物理文件删除失败: {e}")
+            def _delete_physical_files():
+                for root, dirs, files in os.walk(str(upload_dir)):
+                    for fname in files:
+                        fpath = _Path(root) / fname
+                        try:
+                            with open(fpath, "rb") as f:
+                                content = f.read()
+                            computed_hash = hashlib.sha256(content).hexdigest()[:16]
+                            if computed_hash == file_hash[:16] or file_hash in str(fpath):
+                                fpath.unlink()
+                        except Exception as e:  # TODO: Narrow exception type
+                            _logger.warning(f"物理文件删除失败: {e}")
+            await asyncio.to_thread(_delete_physical_files)
 
         result_data = {
             "file_name": file_name,
@@ -272,7 +275,7 @@ async def update_document_visibility(doc_id: str, request: Request):
         doc_owner_id = ""  # 默认为空字符串（无所有者）
         try:
             from src.db.data_store import load_chunks
-            chunks = load_chunks()
+            chunks = await asyncio.to_thread(load_chunks)
             for c in chunks:
                 if c.get("file_hash", "") == doc_id:
                     doc_owner_id = c.get("owner_id") or ""
@@ -291,7 +294,7 @@ async def update_document_visibility(doc_id: str, request: Request):
         updated_count = 0
         try:
             from src.db.data_store import load_chunks, save_chunks
-            chunks = load_chunks()
+            chunks = await asyncio.to_thread(load_chunks)
             for c in chunks:
                 if c.get("file_hash", "") == doc_id:
                     c["visibility"] = visibility
@@ -301,7 +304,7 @@ async def update_document_visibility(doc_id: str, request: Request):
                         c["owner_id"] = user_id
                     updated_count += 1
             if updated_count > 0:
-                save_chunks(chunks)
+                await asyncio.to_thread(save_chunks, chunks)
         except Exception as e:  # TODO: Narrow exception type
             _logger.warning(f"chunks.db metadata 更新失败: {e}")
 

@@ -5,6 +5,7 @@
 from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 import logging
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +51,7 @@ async def worldtree_stats(request: Request = None):
         # 3. 术语/文件数
         try:
             from src.db.data_store import load_chunks
-            chunks = load_chunks() or []
+            chunks = await asyncio.to_thread(load_chunks) or []
             terms_count = len(set(c.get("file_name", "") for c in chunks if c.get("file_name")))
         except Exception:  # TODO: Narrow exception type
             pass
@@ -87,7 +88,7 @@ async def worldtree_terms(limit: int = Query(2000, ge=1, le=10000), request: Req
     """
     try:
         from src.db.data_store import load_chunks
-        chunks = load_chunks() or []
+        chunks = await asyncio.to_thread(load_chunks) or []
 
         # 从 chunks 中提取术语（按 file_name 去重）
         seen = set()
@@ -239,8 +240,10 @@ async def worldtree_entities(request: Request = None):
                     "data", "knowledge_graph.json",
                 )
                 if os.path.exists(kg_path):
-                    with open(kg_path, "r", encoding="utf-8") as f:
-                        kg_data = json.load(f)
+                    def _read_kg():
+                        with open(kg_path, "r", encoding="utf-8") as f:
+                            return json.load(f)
+                    kg_data = await asyncio.to_thread(_read_kg)
                     entities = [
                         {"name": n, "type": n.get("type", "entity") if isinstance(n, dict) else "entity"}
                         for n in kg_data.get("nodes", [])
@@ -342,8 +345,10 @@ async def worldtree_relations(request: Request = None, entity_id: str = "", enti
                     "data", "knowledge_graph.json",
                 )
                 if os.path.exists(kg_path):
-                    with open(kg_path, "r", encoding="utf-8") as f:
-                        kg_data = json.load(f)
+                    def _read_kg():
+                        with open(kg_path, "r", encoding="utf-8") as f:
+                            return json.load(f)
+                    kg_data = await asyncio.to_thread(_read_kg)
                     relations = kg_data.get("edges", [])
         except ImportError:
             pass

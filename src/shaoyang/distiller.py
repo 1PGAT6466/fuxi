@@ -443,27 +443,31 @@ async def run_full_async(incremental: bool = True) -> dict:
     if not CHUNKS_DB.exists():
         return {"ok": True, "msg": "no chunks"}
     
-    # 1. 读取 chunk
-    conn = sqlite3.connect(str(CHUNKS_DB), timeout=10)
-    conn.execute("PRAGMA journal_mode=WAL")
-    conn.execute("PRAGMA busy_timeout=5000")
-    all_chunks = []
-    for rid, doc_json, fname, raw_cat in conn.execute(
-        "SELECT id, doc, file_name, category FROM chunks WHERE status='active' AND chunk_index>=0 ORDER BY id"
-    ).fetchall():
-        try:
-            doc = json.loads(doc_json)
-        except Exception:  # TODO: Narrow exception type
-            continue
-        text = doc.get("text", "").strip()
-        if len(text) >= 50:
-            all_chunks.append({
-                "id": rid,
-                "text": text,
-                "file_name": fname or "",
-                "raw_category": raw_cat or "",
-            })
-    conn.close()
+    # 1. 读取 chunk（异步化避免阻塞事件循环）
+    def _load_chunks():
+        conn = sqlite3.connect(str(CHUNKS_DB), timeout=10)
+        conn.execute("PRAGMA journal_mode=WAL")
+        conn.execute("PRAGMA busy_timeout=5000")
+        rows = conn.execute(
+            "SELECT id, doc, file_name, category FROM chunks WHERE status='active' AND chunk_index>=0 ORDER BY id"
+        ).fetchall()
+        conn.close()
+        result = []
+        for rid, doc_json, fname, raw_cat in rows:
+            try:
+                doc = json.loads(doc_json)
+            except Exception:
+                continue
+            text = doc.get("text", "").strip()
+            if len(text) >= 50:
+                result.append({
+                    "id": rid,
+                    "text": text,
+                    "file_name": fname or "",
+                    "raw_category": raw_cat or "",
+                })
+        return result
+    all_chunks = await asyncio.to_thread(_load_chunks)
     
     if not all_chunks:
         return {"ok": True, "msg": "no valid chunks"}

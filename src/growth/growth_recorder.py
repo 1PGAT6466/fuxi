@@ -7,6 +7,7 @@ import json
 import time
 import logging
 from typing import Dict, List
+import asyncio
 
 logger = logging.getLogger("growth.recorder")
 
@@ -33,8 +34,10 @@ class GrowthRecorder:
 
         log_file = os.path.join(GROWTH_DIR, f"{symbol}_quality.jsonl")
         try:
-            with open(log_file, "a", encoding="utf-8") as f:
-                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            def _write_log():
+                with open(log_file, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            await asyncio.to_thread(_write_log)
         except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Growth] 写入失败: {e}")
     # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
@@ -50,21 +53,25 @@ class GrowthRecorder:
         records = []
         since_seconds = self._parse_since(since) if since else 0
 
-        with open(log_file, "r", encoding="utf-8") as f:
-            for line in f:
-                try:
-                    record = json.loads(line.strip())
+        def _read_log():
+            result = []
+            with open(log_file, "r", encoding="utf-8") as f:
+                for line in f:
+                    try:
+                        record = json.loads(line.strip())
 
-                    if metric and record.get("metric") != metric:
+                        if metric and record.get("metric") != metric:
+                            continue
+
+                        if since_seconds and record.get("timestamp", 0) < time.time() - since_seconds:
+                            continue
+
+                        result.append(record)
+                    except Exception as e:
+                        logger.warning("JSON解析成长记录失败: %s", e, exc_info=True)
                         continue
-
-                    if since_seconds and record.get("timestamp", 0) < time.time() - since_seconds:
-                        continue
-
-                    records.append(record)
-                except Exception as e:  # TODO: Narrow exception type
-                    logger.warning("JSON解析成长记录失败: %s", e, exc_info=True)
-                    continue
+            return result
+        records = await asyncio.to_thread(_read_log)
 
         return records
 

@@ -1,3 +1,4 @@
+import asyncio
 """
 integrated_search.py — Phase 5.5: 三方协同检索
 文档检索 + 知识图谱 + Wiki 融合
@@ -21,7 +22,8 @@ async def integrated_search(query: str, top_k: int = 10) -> Dict:
     try:
         from src.services.retrieval import hybrid_search
         from src.db.data_store import load_chunks
-        doc_results = await hybrid_search(query, load_chunks(), top_k=top_k)
+        _chunks = await asyncio.to_thread(load_chunks)
+        doc_results = await hybrid_search(query, _chunks, top_k=top_k)
         results["documents"] = doc_results[:top_k]
     except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"[Integrated] Doc search failed: {e}")

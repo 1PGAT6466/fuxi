@@ -1,3 +1,4 @@
+import asyncio
 # 兼容层 - 文件查看/下载路由
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
@@ -140,29 +141,31 @@ async def antenna_search(request: Request, q: str = ""):
             if brave_key:
                 import urllib.request
                 import json as _json
-                req = urllib.request.Request(
-                    f"https://api.search.brave.com/res/v1/web/search?q={urllib.parse.quote(query)}&count=5",
-                    headers={
-                        "Accept": "application/json",
-                        "Accept-Encoding": "gzip",
-                        "X-Subscription-Token": brave_key,
-                    }
-                )
-                with urllib.request.urlopen(req, timeout=10) as resp:
-                    data = _json.loads(resp.read().decode("utf-8"))
-                    web_results = data.get("web", {}).get("results", [])
-                    results = [
-                        {
-                            "title": wr.get("title", ""),
-                            "snippet": wr.get("description", "")[:200],
-                            "url": wr.get("url", ""),
-                            "score": 1.0,
-                            "source": "web_brave",
+                def _brave_search():
+                    req = urllib.request.Request(
+                        f"https://api.search.brave.com/res/v1/web/search?q={urllib.parse.quote(query)}&count=5",
+                        headers={
+                            "Accept": "application/json",
+                            "Accept-Encoding": "gzip",
+                            "X-Subscription-Token": brave_key,
                         }
-                        for wr in web_results
-                    ]
-                    source = "web_brave"
-                    message = f"联网搜索找到 {len(results)} 条结果"
+                    )
+                    with urllib.request.urlopen(req, timeout=10) as resp:
+                        return _json.loads(resp.read().decode("utf-8"))
+                data = await asyncio.to_thread(_brave_search)
+                web_results = data.get("web", {}).get("results", [])
+                results = [
+                    {
+                        "title": wr.get("title", ""),
+                        "snippet": wr.get("description", "")[:200],
+                        "url": wr.get("url", ""),
+                        "score": 1.0,
+                        "source": "web_brave",
+                    }
+                    for wr in web_results
+                ]
+                source = "web_brave"
+                message = f"联网搜索找到 {len(results)} 条结果"
         except ImportError:
             logger.debug("urllib 不可用，跳过联网搜索")
         except Exception as e:  # TODO: Narrow exception type

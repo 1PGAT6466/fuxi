@@ -11,6 +11,7 @@ from pathlib import Path
 logger = logging.getLogger("services.knowledge_lifecycle")
 
 from src.config import DATA_DIR as CONFIG_DATA_DIR
+import asyncio
 LIFECYCLE_DIR = Path(CONFIG_DATA_DIR) / "knowledge_lifecycle"
 
 
@@ -49,8 +50,10 @@ class KnowledgeLifecycle:
         # 写入日志
         try:
             log_file = LIFECYCLE_DIR / f"{event_type}.jsonl"
-            with open(log_file, "a", encoding="utf-8") as f:
-                f.write(json.dumps(event, ensure_ascii=False) + "\n")
+            def _write_event():
+                with open(log_file, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(event, ensure_ascii=False) + "\n")
+            await asyncio.to_thread(_write_event)
         except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Lifecycle] 写入失败: {e}")
 
@@ -80,13 +83,17 @@ class KnowledgeLifecycle:
 
         candidates = []
         try:
-            with open(log_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    try:
-                        event = json.loads(line.strip())
-                        candidates.append(event.get("data", {}))
-                    except Exception as e:  # TODO: Narrow exception type
-                        logger.warning("JSON解析生命周期事件失败: %s", e, exc_info=True)
+            def _read_events():
+                result = []
+                with open(log_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        try:
+                            event = json.loads(line.strip())
+                            result.append(event.get("data", {}))
+                        except Exception as e:
+                            logger.warning("JSON解析生命周期事件失败: %s", e, exc_info=True)
+                return result
+            candidates = await asyncio.to_thread(_read_events)
         except Exception as e:  # TODO: Narrow exception type
             logger.warning("加载知识生命周期事件失败: %s", e, exc_info=True)
 
@@ -104,14 +111,18 @@ class KnowledgeLifecycle:
         cutoff = time.time() - period_days * 86400
 
         try:
-            with open(log_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    try:
-                        event = json.loads(line.strip())
-                        if event.get("timestamp", 0) > cutoff:
-                            count += 1
-                    except Exception as e:  # TODO: Narrow exception type
-                        logger.warning("JSON解析生命周期事件统计失败: %s", e, exc_info=True)
+            def _count():
+                c = 0
+                with open(log_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        try:
+                            event = json.loads(line.strip())
+                            if event.get("timestamp", 0) > cutoff:
+                                c += 1
+                        except Exception as e:
+                            logger.warning("JSON解析生命周期事件统计失败: %s", e, exc_info=True)
+                return c
+            count = await asyncio.to_thread(_count)
         except Exception as e:  # TODO: Narrow exception type
             logger.warning("统计知识生命周期事件数量失败: %s", e, exc_info=True)
 

@@ -11,6 +11,7 @@ from pathlib import Path
 logger = logging.getLogger("services.eval_pipeline")
 
 from src.config import DATA_DIR as CONFIG_DATA_DIR
+import asyncio
 EVAL_DIR = Path(CONFIG_DATA_DIR) / "evaluation"
 
 
@@ -117,12 +118,16 @@ class EvalPipeline:
 
         results = []
         try:
-            with open(eval_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    try:
-                        results.append(json.loads(line.strip()))
-                    except Exception as e:  # TODO: Narrow exception type
-                        logger.warning("JSON解析评测结果失败: %s", e, exc_info=True)
+            def _read_eval():
+                result = []
+                with open(eval_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        try:
+                            result.append(json.loads(line.strip()))
+                        except Exception as e:
+                            logger.warning("JSON解析评测结果失败: %s", e, exc_info=True)
+                return result
+            results = await asyncio.to_thread(_read_eval)
         except Exception as e:  # TODO: Narrow exception type
             logger.warning("读取评测结果文件失败: %s", e, exc_info=True)
 

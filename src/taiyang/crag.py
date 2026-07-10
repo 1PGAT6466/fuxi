@@ -1,3 +1,4 @@
+import asyncio
 """
 services/crag_validator.py — CRAG 检索校验环
 检索后校验文档质量 → 不通过则改写重试 → 最多 2 轮 → 降级兜底
@@ -125,7 +126,8 @@ async def rewrite_and_retry(query: str, bad_docs: list, top_k: int = 10) -> list
                 continue
             from src.services.retrieval import hybrid_search
             from src.db.data_store import load_chunks
-            results = await hybrid_search(new_q, load_chunks(), top_k=top_k)
+            _chunks = await asyncio.to_thread(load_chunks)
+            results = await hybrid_search(new_q, _chunks, top_k=top_k)
             if results:
                 return results
         except Exception as e:  # TODO: Narrow exception type

@@ -1,3 +1,4 @@
+import asyncio
 """
 伏羲 v1.50 — 路由注册
 =====================
@@ -124,7 +125,7 @@ def _register_inline_routes(app: FastAPI) -> None:
         try:
             from src.db.data_store import load_chunks
             from src.db.vector_store import count_chunks
-            chunks = load_chunks()
+            chunks = await asyncio.to_thread(load_chunks)
             update_store_stats(
                 sqlite_count=len(chunks) if chunks else 0,
                 vector_count=count_chunks()

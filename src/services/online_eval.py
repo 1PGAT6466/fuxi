@@ -11,6 +11,7 @@ from pathlib import Path
 logger = logging.getLogger("services.online_eval")
 
 from src.config import DATA_DIR as CONFIG_DATA_DIR
+import asyncio
 ONLINE_EVAL_DIR = Path(CONFIG_DATA_DIR) / "online_eval"
 
 
@@ -66,9 +67,12 @@ class OnlineEvaluator:
 
         try:
             metrics_file = ONLINE_EVAL_DIR / "metrics.jsonl"
-            with open(metrics_file, "a", encoding="utf-8") as f:
-                for metric in self._metrics_buffer:
-                    f.write(json.dumps(metric, ensure_ascii=False) + "\n")
+            buf = list(self._metrics_buffer)
+            def _flush():
+                with open(metrics_file, "a", encoding="utf-8") as f:
+                    for metric in buf:
+                        f.write(json.dumps(metric, ensure_ascii=False) + "\n")
+            await asyncio.to_thread(_flush)
 
             self._metrics_buffer.clear()
         except Exception as e:  # TODO: Narrow exception type
@@ -86,14 +90,18 @@ class OnlineEvaluator:
         cutoff = time.time() - hours * 3600
 
         try:
-            with open(metrics_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    try:
-                        metric = json.loads(line.strip())
-                        if metric.get("timestamp", 0) > cutoff:
-                            metrics.append(metric)
-                    except Exception as e:  # TODO: Narrow exception type
-                        logger.warning("JSON解析线上评测指标失败: %s", e, exc_info=True)
+            def _read_metrics():
+                result = []
+                with open(metrics_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        try:
+                            metric = json.loads(line.strip())
+                            if metric.get("timestamp", 0) > cutoff:
+                                result.append(metric)
+                        except Exception as e:
+                            logger.warning("JSON解析线上评测指标失败: %s", e, exc_info=True)
+                return result
+            metrics = await asyncio.to_thread(_read_metrics)
         except Exception as e:  # TODO: Narrow exception type
             logger.warning("获取线上评测指标失败: %s", e, exc_info=True)
 
@@ -125,15 +133,19 @@ class OnlineEvaluator:
 
         slow_queries = []
         try:
-            with open(metrics_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    try:
-                        metric = json.loads(line.strip())
-                        if (metric.get("type") == "search" and
-                            metric.get("latency_ms", 0) > threshold_ms):
-                            slow_queries.append(metric)
-                    except Exception as e:  # TODO: Narrow exception type
-                        logger.warning("JSON解析慢查询数据失败: %s", e, exc_info=True)
+            def _read_slow():
+                result = []
+                with open(metrics_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        try:
+                            metric = json.loads(line.strip())
+                            if (metric.get("type") == "search" and
+                                metric.get("latency_ms", 0) > threshold_ms):
+                                result.append(metric)
+                        except Exception as e:
+                            logger.warning("JSON解析慢查询数据失败: %s", e, exc_info=True)
+                return result
+            slow_queries = await asyncio.to_thread(_read_slow)
         except Exception as e:  # TODO: Narrow exception type
             logger.warning("获取慢查询数据失败: %s", e, exc_info=True)
 

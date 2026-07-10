@@ -2,6 +2,7 @@
 伏羲 v1.50 — 仪表板路由（真实数据版）
 数据来源：真实数据库查询 + 运行时指标
 """
+import asyncio
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 import logging
@@ -45,7 +46,7 @@ async def dashboard(request: Request = None):
         from src.db.data_store import load_chunks
         from src.db.vector_store import get_vector_store
 
-        chunks = load_chunks() or []
+        chunks = await asyncio.to_thread(load_chunks) or []
         unique_files = set()
         categories = {}
         seed_files = 0

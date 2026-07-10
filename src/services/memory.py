@@ -11,6 +11,7 @@ from pathlib import Path
 logger = logging.getLogger("services.memory")
 
 from src.config import DATA_DIR as CONFIG_DATA_DIR
+import asyncio
 MEMORY_DIR = Path(CONFIG_DATA_DIR) / "memory"
 
 
@@ -58,8 +59,10 @@ class MemorySystem:
 
         try:
             session_file = MEMORY_DIR / f"session_{session_id}.json"
-            with open(session_file, "w", encoding="utf-8") as f:
-                json.dump(messages, f, ensure_ascii=False, indent=2)
+            def _write_session():
+                with open(session_file, "w", encoding="utf-8") as f:
+                    json.dump(messages, f, ensure_ascii=False, indent=2)
+            await asyncio.to_thread(_write_session)
         except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Memory] 保存会话失败: {e}")
 
@@ -72,10 +75,12 @@ class MemorySystem:
             return []
 
         try:
-            with open(session_file, "r", encoding="utf-8") as f:
-                messages = json.load(f)
-                self._session_memory[session_id] = messages
-                return messages
+            def _read_session():
+                with open(session_file, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            messages = await asyncio.to_thread(_read_session)
+            self._session_memory[session_id] = messages
+            return messages
         except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Memory] 加载会话失败: {e}")
             return []
@@ -90,8 +95,10 @@ class MemorySystem:
                 "value": value,
                 "timestamp": time.time(),
             }
-            with open(memory_file, "a", encoding="utf-8") as f:
-                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            def _write_memory():
+                with open(memory_file, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            await asyncio.to_thread(_write_memory)
         except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Memory] 添加长期记忆失败: {e}")
 
@@ -106,15 +113,18 @@ class MemorySystem:
 
         results = []
         try:
-            with open(memory_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    try:
-                        record = json.loads(line.strip())
-                        # 简单的关键词匹配
-                        if query.lower() in json.dumps(record.get("value", {})).lower():
-                            results.append(record)
-                    except Exception as e:  # TODO: Narrow exception type
-                        logger.warning("JSON解析会话记忆失败: %s", e, exc_info=True)
+            def _search_memory():
+                found = []
+                with open(memory_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        try:
+                            record = json.loads(line.strip())
+                            if query.lower() in json.dumps(record.get("value", {})).lower():
+                                found.append(record)
+                        except Exception as e:
+                            logger.warning("JSON解析会话记忆失败: %s", e, exc_info=True)
+                return found
+            results = await asyncio.to_thread(_search_memory)
         except Exception as e:  # TODO: Narrow exception type
             logger.warning("搜索会话记忆失败: %s", e, exc_info=True)
 

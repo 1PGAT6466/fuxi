@@ -2078,8 +2078,10 @@ class QianGua(GuaBase):
 
             _DATA_DIR.mkdir(parents=True, exist_ok=True)
             shadow_path = _DATA_DIR / "shadow_decisions.jsonl"
-            with open(shadow_path, "a", encoding="utf-8") as f:
-                f.write(json.dumps(shadow_log, ensure_ascii=False) + "\n")
+            def _write_shadow():
+                with open(shadow_path, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(shadow_log, ensure_ascii=False) + "\n")
+            await asyncio.to_thread(_write_shadow)
 
             logger.info(
                 "☰ [乾][影子] R%d LLM→%s vs 规则→%s (match=%s)",

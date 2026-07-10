@@ -7,6 +7,7 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import List, Dict, Any
+import asyncio
 
 logger = logging.getLogger("eval.runner")
 
@@ -209,8 +210,10 @@ async def run_evaluation(
     date_str = datetime.now().strftime("%Y-%m-%d")
     result_path = _RESULTS_DIR / f"{date_str}.json"
 
-    with open(result_path, "w", encoding="utf-8") as f:
-        json.dump(report, f, ensure_ascii=False, indent=2)
+    def _write_result():
+        with open(result_path, "w", encoding="utf-8") as f:
+            json.dump(report, f, ensure_ascii=False, indent=2)
+    await asyncio.to_thread(_write_result)
 
     logger.info(f"[Eval] 评测完成，报告已写入: {result_path}")
     return report

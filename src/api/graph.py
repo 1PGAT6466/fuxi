@@ -7,6 +7,7 @@ graph.py — 知识图谱 API 路由
 """
 
 from fastapi import APIRouter, Query, Request, HTTPException
+import asyncio
 
 router = APIRouter(tags=["知识图谱"])
 
@@ -21,7 +22,7 @@ async def graph(entity: str = Query(""), request: Request = None):
     """知识图谱查询 — 兼容原有 API"""
     from src.db.data_store import load_graph
     try:
-        data = load_graph()
+        data = await asyncio.to_thread(load_graph)
         nodes = data.get("nodes", {})
         edges = data.get("edges", [])
         _wants_v2 = request and (request.query_params.get("format") == "v2" or
@@ -80,9 +81,11 @@ async def auto_edges(
 
         edges = []
         if os.path.exists(GRAPH_PATH):
-            with open(GRAPH_PATH, "r", encoding="utf-8") as f:
-                kg_data = json.load(f)
-                edges = list(kg_data.get("edges", []))
+            def _read_graph():
+                with open(GRAPH_PATH, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            kg_data = await asyncio.to_thread(_read_graph)
+            edges = list(kg_data.get("edges", []))
 
         # 过滤
         filtered = []
@@ -171,25 +174,27 @@ async def graph_stats(request: Request = None):
         recent_edges: list = []
 
         if os.path.exists(GRAPH_PATH):
-            with open(GRAPH_PATH, "r", encoding="utf-8") as f:
-                kg_data = json.load(f)
-                nodes = kg_data.get("nodes", kg_data.get("entities", {}))
-                nodes_count = len(nodes)
-                
-                # 实体类型分布
-                if isinstance(nodes, dict):
-                    types = [n.get("type", "unknown") for n in nodes.values() if isinstance(n, dict)]
-                    entity_type_dist = dict(Counter(types))
-                
-                edges = list(kg_data.get("edges", []))
-                edges_count = len(edges)
-                
-                # 边类型分布
-                edge_types = [e.get("relation", e.get("type", "related_to")) for e in edges]
-                edge_type_dist = dict(Counter(edge_types))
-                
-                # 最近 20 条边
-                recent_edges = edges[-20:]
+            def _read_graph():
+                with open(GRAPH_PATH, "r", encoding="utf-8") as f:
+                    return json.load(f)
+            kg_data = await asyncio.to_thread(_read_graph)
+            nodes = kg_data.get("nodes", kg_data.get("entities", {}))
+            nodes_count = len(nodes)
+            
+            # 实体类型分布
+            if isinstance(nodes, dict):
+                types = [n.get("type", "unknown") for n in nodes.values() if isinstance(n, dict)]
+                entity_type_dist = dict(Counter(types))
+            
+            edges = list(kg_data.get("edges", []))
+            edges_count = len(edges)
+            
+            # 边类型分布
+            edge_types = [e.get("relation", e.get("type", "related_to")) for e in edges]
+            edge_type_dist = dict(Counter(edge_types))
+            
+            # 最近 20 条边
+            recent_edges = edges[-20:]
         
         # 自动图谱构建器统计
         builder = get_auto_graph_builder()

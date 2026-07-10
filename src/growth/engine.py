@@ -13,6 +13,7 @@ from dataclasses import dataclass, field
 logger = logging.getLogger("growth.engine")
 
 from src.config import DATA_DIR as CONFIG_DATA_DIR
+import asyncio
 GROWTH_DIR = Path(CONFIG_DATA_DIR) / "growth"
 
 
@@ -64,8 +65,10 @@ class GrowthEngine:
         }
 
         try:
-            with open(log_file, "a", encoding="utf-8") as f:
-                f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            def _write_log():
+                with open(log_file, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(record, ensure_ascii=False) + "\n")
+            await asyncio.to_thread(_write_log)
         except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Growth] 写入失败: {e}")
 
@@ -122,12 +125,16 @@ class GrowthEngine:
 
         events = []
         try:
-            with open(log_file, "r", encoding="utf-8") as f:
-                for line in f:
-                    try:
-                        events.append(json.loads(line.strip()))
-                    except Exception as e:  # TODO: Narrow exception type
-                        logger.warning("JSON解析成长事件失败: %s", e, exc_info=True)
+            def _read_log():
+                result = []
+                with open(log_file, "r", encoding="utf-8") as f:
+                    for line in f:
+                        try:
+                            result.append(json.loads(line.strip()))
+                        except Exception as e:
+                            logger.warning("JSON解析成长事件失败: %s", e, exc_info=True)
+                return result
+            events = await asyncio.to_thread(_read_log)
         except Exception as e:  # TODO: Narrow exception type
             logger.warning("Exception 失败: %s", e, exc_info=True)
 

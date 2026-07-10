@@ -3,6 +3,7 @@
 =========================
 从 server.py 拆分: 自动路由发现、服务路由、MCP 路由、内联路由、静态资源。
 """
+import asyncio
 import logging
 from pathlib import Path
 
@@ -124,7 +125,7 @@ def _register_inline_routes(app: FastAPI) -> None:
         try:
             from src.db.data_store import load_chunks
             from src.db.vector_store import count_chunks
-            chunks = load_chunks()
+            chunks = await asyncio.to_thread(load_chunks)
             update_store_stats(
                 sqlite_count=len(chunks) if chunks else 0,
                 vector_count=count_chunks()

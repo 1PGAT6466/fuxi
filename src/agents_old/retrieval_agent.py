@@ -1,3 +1,4 @@
+import asyncio
 """
 retrieval_agent.py — 检索 Agent v4.0
 封装多路召回 + RRF 融合 + 精排为独立 Agent
@@ -26,8 +27,8 @@ class RetrievalAgent(BaseAgent):
         try:
             from src.services.retrieval import hybrid_search
             from src.db.data_store import load_chunks
-
-            results = await hybrid_search(ctx.query, load_chunks(), top_k=10)
+            _chunks = await asyncio.to_thread(load_chunks)
+            results = await hybrid_search(ctx.query, _chunks, top_k=10)
             duration = (time.time() - start) * 1000
             self._record_run(duration)
 
@@ -46,7 +47,8 @@ class RetrievalAgent(BaseAgent):
         """混合检索工具"""
         from src.services.retrieval import hybrid_search
         from src.db.data_store import load_chunks
-        return await hybrid_search(query, load_chunks(), top_k=top_k)
+        _chunks = await asyncio.to_thread(load_chunks)
+        return await hybrid_search(query, _chunks, top_k=top_k)
     # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def _wiki_search(self, query: str) -> List[Dict]:

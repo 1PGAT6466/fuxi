@@ -1,3 +1,4 @@
+import asyncio
 """
 伏羲 v1.50 — 进化路由（真实数据版）
 数据来源：Dream Cycle 日报 + 系统指标
@@ -38,7 +39,7 @@ async def evolution_overview(request: Request = None):
         from src.db.data_store import load_chunks
         from src.db.vector_store import get_vector_store
 
-        chunks = load_chunks() or []
+        chunks = await asyncio.to_thread(load_chunks) or []
         unique_files = len(set(c.get("file_name", "") for c in chunks if c.get("file_name")))
 
         vs = get_vector_store()
@@ -119,7 +120,8 @@ def _get_dream_cycle_status() -> dict:
         is_consistent = True
         try:
             from src.db.data_store import load_chunks
-            actual_chunks = len(load_chunks() or [])
+            _chunks = await asyncio.to_thread(load_chunks)
+            actual_chunks = len(_chunks or [])
             claimed_docs = results.get("digest", {}).get("total_docs", 0)
             if actual_chunks < 100 and claimed_docs > 100:
                 is_consistent = False
@@ -228,7 +230,8 @@ async def get_latest_report():
                 # v1.50: 检查数据一致性
                 try:
                     from src.db.data_store import load_chunks
-                    actual = len(load_chunks() or [])
+                    _chunks2 = await asyncio.to_thread(load_chunks)
+                    actual = len(_chunks2 or [])
                     claimed_total = results.get("digest", {}).get("total_docs", 0)
                     if actual < 100 and claimed_total > 100:
                         response["data_warning"] = (

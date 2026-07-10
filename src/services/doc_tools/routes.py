@@ -199,8 +199,10 @@ async def merge_pdfs(files: List[UploadFile] = File(...)):
                 merger.add_page(page)
 
         output_path = temp_dir / f"merged_{os.urandom(8).hex()}.pdf"
-        with open(str(output_path), "wb") as out_f:
-            merger.write(out_f)
+        def _write_pdf():
+            with open(str(output_path), "wb") as out_f:
+                merger.write(out_f)
+        await asyncio.to_thread(_write_pdf)
 
         return FileResponse(
             path=str(output_path),
@@ -265,8 +267,10 @@ async def split_pdf(
             writer.add_page(reader.pages[page_num])
 
         output_path = temp_dir / f"split_out_{os.urandom(8).hex()}.pdf"
-        with open(str(output_path), "wb") as out_f:
-            writer.write(out_f)
+        def _write_pdf():
+            with open(str(output_path), "wb") as out_f:
+                writer.write(out_f)
+        await asyncio.to_thread(_write_pdf)
 
         return FileResponse(
             path=str(output_path),
@@ -381,8 +385,13 @@ def _compress_pdf_file(input_path: Path) -> Path:
         page.compress_content_streams()
         writer.add_page(page)
 
-    with open(str(output_path), "wb") as out_f:
-        writer.write(out_f)
+    def _write_pdf():
+        with open(str(output_path), "wb") as out_f:
+            writer.write(out_f)
+    import asyncio
+    asyncio.get_event_loop().run_in_executor(None, _write_pdf) if not asyncio.get_event_loop().is_running() else None
+    # Note: this is a sync helper, will be called from async context via to_thread
+    _write_pdf()
 
     return output_path
 

@@ -6,6 +6,7 @@ relation_builder.py — 实体关系自动构建 (RAG 3.0 v2)
 """
 import logging
 import sqlite3
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -16,12 +17,15 @@ async def extract_relations_cooccurrence(chunks: list) -> list:
     """基于共现: 在同一 chunk 中出现的 entities → 建立关系"""
     try:
         from src.config import WORLDTREE_DB_PATH
-        db = sqlite3.connect(str(WORLDTREE_DB_PATH), timeout=10)
-        db.execute("PRAGMA journal_mode=WAL")
-        db.execute("PRAGMA busy_timeout=5000")
-        entities = db.execute("SELECT id, name, type FROM entities").fetchall()
-        entity_names = {r[1]: (r[0], r[2]) for r in entities}
-        db.close()
+        def _load_entities():
+            db = sqlite3.connect(str(WORLDTREE_DB_PATH), timeout=10)
+            db.execute("PRAGMA journal_mode=WAL")
+            db.execute("PRAGMA busy_timeout=5000")
+            entities = db.execute("SELECT id, name, type FROM entities").fetchall()
+            entity_names = {r[1]: (r[0], r[2]) for r in entities}
+            db.close()
+            return entity_names
+        entity_names = await asyncio.to_thread(_load_entities)
     except Exception:  # TODO: Narrow exception type
         return []
     
@@ -102,22 +106,25 @@ async def build_relations_from_chunks(chunks: list, batch_size: int = 50) -> dic
     if relations:
         try:
             from src.config import WORLDTREE_DB_PATH
-            db = sqlite3.connect(str(WORLDTREE_DB_PATH), timeout=10)
-            db.execute("PRAGMA journal_mode=WAL")
-            db.execute("PRAGMA busy_timeout=5000")
-            
-            for r in relations:
-                try:
-                    db.execute(
-                        "INSERT OR IGNORE INTO entity_relations (from_id, to_id, relation_type) VALUES (?, ?, ?)",
-                        (r["from_id"], r["to_id"], r["relation_type"])
-                    )
-                    inserted += 1
-                except Exception as e:  # TODO: Narrow exception type
-
-                    logger.warning(f"[{module}] suppressed exception", exc_info=True)
-            db.commit()
-            db.close()
+            def _insert_relations():
+                db = sqlite3.connect(str(WORLDTREE_DB_PATH), timeout=10)
+                db.execute("PRAGMA journal_mode=WAL")
+                db.execute("PRAGMA busy_timeout=5000")
+                
+                count = 0
+                for r in relations:
+                    try:
+                        db.execute(
+                            "INSERT OR IGNORE INTO entity_relations (from_id, to_id, relation_type) VALUES (?, ?, ?)",
+                            (r["from_id"], r["to_id"], r["relation_type"])
+                        )
+                        count += 1
+                    except Exception as e:
+                        logger.warning(f"插入关系失败: {e}")
+                db.commit()
+                db.close()
+                return count
+            inserted = await asyncio.to_thread(_insert_relations)
             logger.info(f"[RelationBuilder] Extracted {len(relations)} relations (co-occurrence), inserted {inserted}")
         except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[RelationBuilder] DB write failed: {e}")
@@ -142,7 +149,7 @@ def get_relation_stats() -> dict:
 async def auto_build_relations(limit: int = 100) -> dict:
     try:
         from src.db.data_store import load_chunks
-        chunks = load_chunks(limit=limit)
+        chunks = await asyncio.to_thread(load_chunks, limit=limit)
         if not chunks:
             return {"message": "no chunks to process"}
         return await build_relations_from_chunks(chunks, batch_size=min(limit, 100))

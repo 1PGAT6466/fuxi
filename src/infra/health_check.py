@@ -1,3 +1,4 @@
+import asyncio
 """
 health_check.py — 健康检查（v2.1 扩展版）
 系统状态 + 组件状态 + 八卦级健康 + 基础设施 + 告警规则
@@ -463,7 +464,7 @@ async def check_database_extended() -> dict:
         store = get_store()
         store._db_conn.execute("SELECT 1")
 
-        chunks = load_chunks() or []
+        chunks = await asyncio.to_thread(load_chunks) or []
         unique_files = len(set(c.get("file_name", "") for c in chunks if c.get("file_name")))
         seed_count = sum(
             1 for c in chunks

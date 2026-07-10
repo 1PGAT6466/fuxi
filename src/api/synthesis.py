@@ -21,6 +21,7 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
+import asyncio
 
 logger = logging.getLogger("api.synthesis")
 
@@ -159,7 +160,7 @@ async def cross_entity_synthesize(body: CrossEntityRequest, request: Request = N
             # 尝试从 graph_router 或 auto_graph 获取
             try:
                 from src.taiyang.graph_router import load_graph
-                graph_data = load_graph()
+                graph_data = await asyncio.to_thread(load_graph)
                 graph_entities = graph_data.get("entities", [])
                 graph_edges = graph_data.get("edges", graph_data.get("relations", []))
             except (ImportError, Exception):
@@ -175,8 +176,10 @@ async def cross_entity_synthesize(body: CrossEntityRequest, request: Request = N
                         "data", "knowledge_graph.json"
                     )
                     if os.path.exists(kg_path):
-                        with open(kg_path, "r", encoding="utf-8") as f:
-                            kg_data = json.load(f)
+                        def _read_kg():
+                            with open(kg_path, "r", encoding="utf-8") as f:
+                                return json.load(f)
+                        kg_data = await asyncio.to_thread(_read_kg)
                         graph_entities = kg_data.get("entities", [])
                         graph_edges = kg_data.get("edges", kg_data.get("relations", []))
                 except (ImportError, Exception) as e:

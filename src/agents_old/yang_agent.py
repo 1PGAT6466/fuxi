@@ -1,3 +1,4 @@
+import asyncio
 """
 yang_agent.py — 太极·阳 Agent v4.0
 执行层：MiMo 2.5 Pro + FC 工具调用 + 多步推理
@@ -255,7 +256,8 @@ class YangAgent(BaseAgent):
             try:
                 from src.services.retrieval import hybrid_search
                 from src.db.data_store import load_chunks
-                doc_results = await hybrid_search(query, load_chunks(), top_k=top_k)
+                _chunks = await asyncio.to_thread(load_chunks)
+                doc_results = await hybrid_search(query, _chunks, top_k=top_k)
                 results.extend(doc_results)
             except Exception as e:  # TODO: Narrow exception type
                 logger.warning(f"[Yang] doc search failed: {e}")
