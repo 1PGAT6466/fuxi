@@ -1,5 +1,5 @@
 """
-伏羲 v1.50 — MCP 路由（从 server.py 拆分）
+伏羲 v1.44 — MCP 路由（从 server.py 拆分）
 =======================================
 MCP 协议入口、工具列表、工具调用端点。
 """
@@ -86,10 +86,6 @@ def register_mcp_routes(app: FastAPI) -> None:
     """注册所有 MCP 路由到 FastAPI app"""
     _init_mcp_handlers()
 
-    # 让全局别名可用
-    import src.server as _server
-    _server.MCP_TOOL_HANDLERS = MCP_TOOL_HANDLERS
-
     @app.post("/api/mcp")
     async def mcp_handler(request: Request):
         """MCP协议入口 — 标准JSON-RPC 2.0"""
@@ -110,7 +106,7 @@ def register_mcp_routes(app: FastAPI) -> None:
 
     @app.post("/api/mcp/call")
     async def mcp_call(request: Request):
-        """MCP 通用工具调用端点 — v1.50 Phase F"""
+        """MCP 通用工具调用端点 — Phase F"""
         body = await request.json()
         tool_name = body.get("tool", "")
         args = body.get("args", {})
@@ -143,3 +139,32 @@ def register_mcp_routes(app: FastAPI) -> None:
         except (RuntimeError, ValueError, TypeError, OSError) as e:
             logger.error(f"[MCP/call] {tool_name} 执行失败: {e}\n{traceback.format_exc()}")
             return error(f"MCP工具 {tool_name} 执行失败", status_code=500, detail=str(e))
+
+    # ── Legacy SAG 直接端点（向后兼容） ──
+
+    @app.post("/api/mcp/sag_search")
+    async def mcp_sag_search(request: Request):
+        """MCP: 搜索知识库"""
+        from src.taiyin.mcp_tools import sag_search
+        body = await request.json()
+        return await sag_search(body.get("query", ""), body.get("top_k", 10))
+
+    @app.post("/api/mcp/sag_ingest", dependencies=[Depends(require_admin)])
+    async def mcp_sag_ingest(request: Request):
+        """MCP: 入库文档 — 需要管理员权限"""
+        from src.taiyin.mcp_tools import sag_ingest
+        body = await request.json()
+        return await sag_ingest(body.get("file_path", ""), body.get("category", ""))
+
+    @app.post("/api/mcp/sag_explain")
+    async def mcp_sag_explain(request: Request):
+        """MCP: 解释查询"""
+        from src.taiyin.mcp_tools import sag_explain
+        body = await request.json()
+        return await sag_explain(body.get("query", ""))
+
+    @app.get("/api/mcp/sag_status")
+    async def mcp_sag_status():
+        """MCP: 系统状态"""
+        from src.taiyin.mcp_tools import sag_status
+        return await sag_status()

@@ -129,7 +129,7 @@ class HealthChecker:
                     }
                 if not is_healthy:
                     all_healthy = False
-            except Exception as e:  # TODO: Narrow exception type
+            except (RuntimeError, ValueError, AttributeError) as e:
                 results[name] = {
                     "status": "error",
                     "error": str(e),
@@ -167,7 +167,7 @@ class HealthChecker:
                 health = state.get("health", "off")
                 if health in summary:
                     summary[health] += 1
-            except Exception as e:  # TODO: Narrow exception type
+            except (RuntimeError, AttributeError, ImportError) as e:
                 gua_states[name] = {
                     "health": "off",
                     "error": str(e),
@@ -212,7 +212,7 @@ class HealthChecker:
                 components[name] = result
                 if not result.get("healthy", False):
                     all_healthy = False
-            except Exception as e:  # TODO: Narrow exception type
+            except (RuntimeError, AttributeError, ImportError, OSError) as e:
                 components[name] = {
                     "healthy": False,
                     "error": str(e),
@@ -293,7 +293,7 @@ class HealthChecker:
                         "context": context,
                         "timestamp": time.time(),
                     })
-            except Exception as e:  # TODO: Narrow exception type
+            except (RuntimeError, ValueError, AttributeError) as e:
                 logger.warning("告警规则 [%s] 评估失败: %s", rule.name, e)
 
         return triggered
@@ -435,7 +435,7 @@ async def _check_conn_pool_usage_alert(threshold: float) -> tuple:
             "usage_rate": round(usage, 4),
             "threshold": threshold,
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (ImportError, AttributeError, OSError) as e:
         return False, {"error": str(e)}
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
@@ -481,7 +481,7 @@ async def check_database_extended() -> dict:
             "status": "connected",
             "has_seed_data": seed_count > 0,
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (ImportError, AttributeError, OSError) as e:
         return {"healthy": False, "error": str(e), "status": "error"}
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
@@ -513,7 +513,7 @@ async def check_vector_store_extended() -> dict:
             "collection": getattr(vs, "collection_name", "unknown"),
             "status": "connected" if healthy else "error",
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (ImportError, AttributeError, OSError) as e:
         return {"healthy": False, "vector_count": 0, "error": str(e), "status": "error"}
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
@@ -522,7 +522,7 @@ async def check_llm() -> bool:
     """检查 LLM 服务"""
     try:
         return True
-    except Exception:  # TODO: Narrow exception type
+    except (RuntimeError, OSError):
         return False
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
@@ -563,7 +563,7 @@ async def check_bagua_overall() -> Dict:
                         for dep_name, dep_info in summary.get("dependencies", {}).items()
                     },
                 }
-            except Exception as e:  # TODO: Narrow exception type
+            except (RuntimeError, AttributeError) as e:
                 result["guas"][name] = {
                     "health": "off",
                     "error": str(e),
@@ -579,7 +579,7 @@ async def check_bagua_overall() -> Dict:
     except ImportError:
         result["health"] = "off"
         result["message"] = "bagua 模块未安装"
-    except Exception as e:  # TODO: Narrow exception type
+    except (RuntimeError, AttributeError, OSError) as e:
         result["health"] = "off"
         result["error"] = str(e)
 
@@ -604,7 +604,7 @@ async def check_connection_pool() -> Dict:
             "status": "healthy" if usage < 0.80 else ("warning" if usage < 0.95 else "critical"),
             "timestamp": time.time(),
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (ImportError, AttributeError, OSError) as e:
         return {
             "healthy": False,
             "error": str(e),
@@ -646,7 +646,7 @@ async def check_llm_api_reachable() -> Dict:
                     "endpoint": MIMO_BASE_URL,
                     "timestamp": time.time(),
                 }
-    except Exception as e:  # TODO: Narrow exception type
+    except (ImportError, OSError, TimeoutError) as e:
         return {
             "healthy": False,
             "error": str(e),
@@ -666,12 +666,52 @@ async def check_intent_bus() -> Dict:
             "registered_guas": len(intent_bus._guas) if hasattr(intent_bus, '_guas') else 0,
             "circuit_breakers": len(intent_bus._circuit_breakers) if hasattr(intent_bus, '_circuit_breakers') else 0,
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (ImportError, AttributeError, RuntimeError) as e:
         return {
             "healthy": False,
             "error": str(e),
         }
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+
+
+async def check_redis() -> Dict:
+    """检查 Redis 连接状态
+
+    Returns:
+        dict with {"healthy": bool, "status": str, "latency_ms": float}
+    """
+    try:
+        from src.config import REDIS_HOST, REDIS_PORT, REDIS_DB, REDIS_PASSWORD
+        import redis.asyncio as redis
+        import time as _time
+
+        client = redis.Redis(
+            host=REDIS_HOST,
+            port=REDIS_PORT,
+            db=REDIS_DB,
+            password=REDIS_PASSWORD if REDIS_PASSWORD else None,
+            decode_responses=True,
+            socket_connect_timeout=3,
+        )
+        start = _time.time()
+        pong = await client.ping()
+        latency_ms = (_time.time() - start) * 1000
+        await client.aclose()
+
+        return {
+            "healthy": pong is True,
+            "status": "connected" if pong else "no_pong",
+            "endpoint": f"{REDIS_HOST}:{REDIS_PORT}/{REDIS_DB}",
+            "latency_ms": round(latency_ms, 2),
+            "timestamp": _time.time(),
+        }
+    except (ImportError, OSError, RuntimeError, TimeoutError) as e:
+        return {
+            "healthy": False,
+            "status": "error",
+            "error": str(e),
+            "timestamp": time.time(),
+        }
 
 
 # ============================================================================
@@ -724,7 +764,7 @@ def _get_gua_instances() -> Dict[str, Any]:
                         break
             except ImportError:
                 pass
-    except Exception:  # TODO: Narrow exception type
+    except (ImportError, AttributeError):
         pass
 
     return result
@@ -752,4 +792,5 @@ def get_health_checker() -> HealthChecker:
         # -- 基础设施检查 --
         _health_checker.register_infra_check("connection_pool", check_connection_pool)
         _health_checker.register_infra_check("llm_api", check_llm_api_reachable)
+        _health_checker.register_infra_check("redis", check_redis)
     return _health_checker

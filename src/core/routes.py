@@ -1,6 +1,6 @@
 import asyncio
 """
-伏羲 v1.50 — 路由注册
+伏羲 v1.44 — 路由注册
 =====================
 从 server.py 拆分: 自动路由发现、服务路由、MCP 路由、内联路由。
 """
@@ -83,6 +83,9 @@ def _register_service_routes(app: FastAPI) -> None:
 
     from src.api.kb import router as kb_router
     app.include_router(kb_router)
+
+    from src.api.tenant_routes import router as tenant_router
+    app.include_router(tenant_router)
 
     from src.api.files_view import router as files_view_router
     app.include_router(files_view_router)

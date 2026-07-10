@@ -126,7 +126,7 @@ SILICONFLOW_BASE_URL = os.getenv("SILICONFLOW_BASE_URL", "https://api.siliconflo
 EVAL_AUTO_RUN = os.getenv("FUXI_EVAL_AUTO_RUN", "false").lower() == "true"
 
 # ============ 版本 ============
-VERSION = "1.50"
+VERSION = "1.44"
 START_TIME = __import__("time").time()
 
 # ============ 工具与 FAQ 默认数据 ============

@@ -126,8 +126,8 @@ async def _call_api(
 
                     return content if content else None
 
-        except Exception as e:  # TODO: Narrow exception type
-            # v1.50 R4: 脱敏 API 端点
+        except (aiohttp.ClientError, OSError, asyncio.TimeoutError) as e:
+            # 脱敏 API 端点
             masked_url = base_url.split("//")[0] + "//***" if "//" in base_url else "***"
             logger.warning(f"API {masked_url} attempt {attempt+1} 异常: {e}")
             if attempt < 2:
@@ -178,7 +178,7 @@ async def _call_api_stream(
                                 yield delta["content"]
                         except (json.JSONDecodeError, KeyError, IndexError):
                             pass
-    except Exception as e:  # TODO: Narrow exception type
+    except (aiohttp.ClientError, OSError, asyncio.TimeoutError) as e:
         yield f"[Stream Error: {e}]"
 
 
@@ -198,17 +198,20 @@ async def call_llm(
     messages.append({"role": "user", "content": prompt[:8000]})
 
     # Level 1: MiMo 2.5 Pro
-    for attempt in range(MAX_RETRIES):
-        result = await _call_api(
-            MIMO_BASE_URL, MIMO_API_KEY, model or MIMO_MODEL,
-            messages, max_tokens, temperature, MIMO_TIMEOUT,
-        )
-        if result:
-            logger.info(f"MiMo OK ({len(result)} chars)")
-            return result
-        if attempt < MAX_RETRIES - 1:
-            await asyncio.sleep(RETRY_DELAY)
-    logger.warning("MiMo 失败，尝试 DeepSeek")
+    if not MIMO_API_KEY:
+        logger.warning("MiMo API Key 未配置，跳过 MiMo 直接尝试 DeepSeek")
+    else:
+        for attempt in range(MAX_RETRIES):
+            result = await _call_api(
+                MIMO_BASE_URL, MIMO_API_KEY, model or MIMO_MODEL,
+                messages, max_tokens, temperature, MIMO_TIMEOUT,
+            )
+            if result:
+                logger.info(f"MiMo OK ({len(result)} chars)")
+                return result
+            if attempt < MAX_RETRIES - 1:
+                await asyncio.sleep(RETRY_DELAY)
+        logger.warning("MiMo 失败，尝试 DeepSeek")
 
     # Level 2: DeepSeek
     if DEEPSEEK_API_KEY:

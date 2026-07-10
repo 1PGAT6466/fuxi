@@ -1,7 +1,9 @@
 import { createApp } from 'vue';
 import { createPinia } from 'pinia';
-import ElementPlus from 'element-plus';
-import 'element-plus/dist/index.css';
+// Element Plus 按需导入：
+// - unplugin-vue-components 自动注册模板中使用的组件
+// - unplugin-element-plus 自动导入组件样式
+// 不再需要全局 app.use(ElementPlus)
 import App from './App.vue';
 import router from './router';
 import i18n from './locales';
@@ -15,7 +17,8 @@ const app = createApp(App);
 app.use(createPinia());
 app.use(router);
 app.use(i18n);
-app.use(ElementPlus, { size: 'default' });
+// Element Plus 组件通过 unplugin-vue-components 自动注册
+// 不再全局注册，实现按需加载
 
 // 【修复】全局错误边界 — 捕获未处理的组件错误
 app.config.errorHandler = (err, _instance, info) => {

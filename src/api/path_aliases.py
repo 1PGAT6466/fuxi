@@ -1,5 +1,5 @@
 """
-伏羲 v1.50 — API 路径别名兼容层
+伏羲 v1.44 — API 路径别名兼容层
 =================================
 解决前后端 API 路径不匹配问题。
 
@@ -11,10 +11,9 @@
   - /api/download/{hash} ↔ /api/files/{id}/download → files_alias.py 已处理
   - /api/view/{hash} ↔ 文件查看           → files_view.py 已处理
   - /api/admin/status → /api/admin/server-status → admin.py 已处理
+  - /api/wiki/pages, /api/wiki/page/{id} → wiki.py 已处理（v1.44 去重）
 
 本文件新增的别名（本模块独有）：
-  - GET /api/wiki/pages     → /api/wiki            (Legacy 前端兼容)
-  - GET /api/wiki/page/{id} → /api/wiki/{id}       (Legacy 前端兼容)
   - GET /api/antenna/search → 联网搜索              (Vue3 前端用 GET 方法)
 """
 from fastapi import APIRouter, Request
@@ -26,26 +25,8 @@ logger = logging.getLogger(__name__)
 router = APIRouter(tags=["路径别名兼容层"])
 
 
-# ============ Wiki 路径别名（Legacy 前端兼容）============
-# Legacy 前端 js/wiki.js 调用 GET /api/wiki/pages 和 GET /api/wiki/page/<id>
-# Vue3 前端调用 GET /api/wiki 和 GET /api/wiki/<id>
-# 主路径 /api/wiki 和 /api/wiki/{id} 已在 wiki.py 中实现
-
-
-@router.get("/api/wiki/pages")
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
-async def wiki_list_alias(request: Request):
-    """别名 GET /api/wiki/pages → /api/wiki (Legacy 前端兼容)"""
-    from src.api.wiki import wiki_home
-    return await wiki_home(request=request)
-
-
-@router.get("/api/wiki/page/{page_id}")
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
-async def wiki_page_alias(page_id: str, request: Request):
-    """别名 GET /api/wiki/page/{id} → /api/wiki/{id} (Legacy 前端兼容)"""
-    from src.api.wiki import wiki_page
-    return await wiki_page(page_id=page_id, request=request)
+# v1.44: Wiki 路径别名已移除 — /api/wiki/pages 和 /api/wiki/page/{id}
+# 已在 wiki.py 中定义，保留 wiki.py 作为唯一实现源。
 
 
 # ============ 联网搜索方法别名（Legacy POST ↔ Vue3 GET）============
@@ -91,7 +72,7 @@ async def antenna_search_get(q: str = "", request: Request = None):
             "source": "unavailable",
             "message": "搜索服务暂不可用，请稍后重试",
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (ImportError, OSError, RuntimeError) as e:
         logger.exception(f"antenna_search_get 失败: {e}")
         return JSONResponse(
             status_code=500,
