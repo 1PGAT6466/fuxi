@@ -5,7 +5,7 @@ v1.50: 种子数据自动标记 origin=seed
 """
 from fastapi import APIRouter, Request, Query
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 import logging
 
 logger = logging.getLogger(__name__)
@@ -52,6 +52,13 @@ class SearchRequest(BaseModel):
     mode: str = "semantic"  # semantic / keyword / hybrid
     score_threshold: float = 0
 
+    @field_validator("top_k")
+    @classmethod
+    def validate_top_k(cls, v: int) -> int:
+        """v1.44 安全修复: top_k 上限验证"""
+        from src.services.prompt_guard import clamp_top_k
+        return clamp_top_k(v)
+
 
 class EventSearchRequest(BaseModel):
     query: str
@@ -59,6 +66,13 @@ class EventSearchRequest(BaseModel):
     granularity: str = "auto"  # chunk / event / auto
     score_threshold: float = 0
     mode: str = "semantic"  # semantic / keyword / hybrid
+
+    @field_validator("top_k")
+    @classmethod
+    def validate_top_k(cls, v: int) -> int:
+        """v1.44 安全修复: top_k 上限验证"""
+        from src.services.prompt_guard import clamp_top_k
+        return clamp_top_k(v)
 
 
 # ============ POST /api/rag/search — 传统 chunk 粒度检索 ============
@@ -91,6 +105,10 @@ async def rag_search(body: SearchRequest, request: Request = None):
     """
     # v1.44 R2: 从 request.state 获取租户 ID
     tenant_id = getattr(request.state, "tenant_id", "default") if request else "default"
+
+    # v1.44 安全修复: top_k 上限
+    from src.services.prompt_guard import clamp_top_k
+    top_k = clamp_top_k(body.top_k)
     
     try:
         # 尝试使用 taiyang 检索模块
@@ -98,7 +116,7 @@ async def rag_search(body: SearchRequest, request: Request = None):
             from src.taiyang.retrieval import search_chunks
             results = search_chunks(
                 query=body.query,
-                top_k=body.top_k,
+                top_k=top_k,
                 mode=body.mode,
                 score_threshold=body.score_threshold,
             )
@@ -118,7 +136,7 @@ async def rag_search(body: SearchRequest, request: Request = None):
             from src.db.vector_store import get_vector_store
             vs = get_vector_store()
             if vs:
-                results = vs.search(body.query, top_k=body.top_k)
+                results = vs.search(body.query, top_k=top_k)
                 formatted = []
                 for r in results:
                     formatted.append({
@@ -164,6 +182,10 @@ async def rag_sag_search(body: EventSearchRequest, request: Request = None):
     """
     # v1.44 R2: 从 request.state 获取租户 ID
     tenant_id = getattr(request.state, "tenant_id", "default") if request else "default"
+
+    # v1.44 安全修复: top_k 上限
+    from src.services.prompt_guard import clamp_top_k
+    top_k = clamp_top_k(body.top_k)
     
     try:
         granularity = body.granularity or "auto"
@@ -175,7 +197,7 @@ async def rag_sag_search(body: EventSearchRequest, request: Request = None):
             from src.taiyang.sag_pipeline import search_sag
             sag_results = search_sag(
                 query=body.query,
-                top_k=body.top_k,
+                top_k=top_k,
                 granularity=granularity,
                 score_threshold=body.score_threshold,
             )
@@ -206,7 +228,7 @@ async def rag_sag_search(body: EventSearchRequest, request: Request = None):
             from src.taiyang.retrieval import search_chunks
             results = search_chunks(
                 query=body.query,
-                top_k=body.top_k,
+                top_k=top_k,
                 mode=body.mode,
                 score_threshold=body.score_threshold,
             )

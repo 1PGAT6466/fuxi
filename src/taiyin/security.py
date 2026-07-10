@@ -1,5 +1,5 @@
 """
-security.py — Phase 3: 安全模块
+security.py - Phase 3: 安全模块
 Rate Limiting + 审计日志 + Prompt 注入防御
 """
 import re, json, time, logging
@@ -12,13 +12,13 @@ logger = logging.getLogger(__name__)
 # ============ Rate Limiting (3.1) ============
 
 class RateLimiter:
-    """简单内存限流器（无需 slowapi 依赖）"""
-    
+    """简单内存限流器(无需 slowapi 依赖)"""
+
     def __init__(self):
         self._windows = {}  # key -> list of timestamps
-    
+
     def check(self, key: str, max_requests: int, window_seconds: int = 60) -> bool:
-        """返回 True 表示允许，False 表示超限"""
+        """返回 True 表示允许,False 表示超限"""
         now = time.time()
         if key not in self._windows:
             self._windows[key] = []
@@ -89,7 +89,7 @@ _JS_PROTOCOL_PATTERN = re.compile(
     r'(?:javascript|vbscript|livescript|data)\s*:',
     re.IGNORECASE
 )
-# HTML 标签拦截（script, iframe, object, embed, form 等危险标签）
+# HTML 标签拦截(script, iframe, object, embed, form 等危险标签)
 _DANGEROUS_TAG_PATTERN = re.compile(
     r'<\s*(?:script|iframe|object|embed|applet|form|input|textarea|button|select|link|meta|base|style|svg|math|marquee|details|dialog|template|slot|portal|fencedframe)\b[^>]*>',
     re.IGNORECASE
@@ -102,59 +102,68 @@ _DATA_URI_PATTERN = re.compile(
 
 
 def sanitize_xss(input_str: str) -> str:
-    """v1.44 R2: XSS 防御 — 净化输入中的 XSS 攻击向量
-    
-    检测并移除：
+    """v1.44 R2: XSS 防御 - 净化输入中的 XSS 攻击向量
+
+    检测并移除:
       - 事件处理器 (onerror, onclick, onload 等)
       - javascript: / vbscript: / data: 协议
       - 危险 HTML 标签 (script, iframe, object 等)
       - data: URI 中的 HTML/JS 内容
-    
+
     Args:
         input_str: 用户输入
-    
+
     Returns:
         净化后的字符串
     """
     if not input_str:
         return input_str
-    
+
     result = input_str
-    
+
     # 拦截事件处理器
     if _EVENT_HANDLER_PATTERN.search(result):
         logger.warning(f"[Security] XSS: 事件处理器拦截, input_len={len(result)}")
         result = _EVENT_HANDLER_PATTERN.sub('', result)
-    
+
     # 拦截 javascript: 等协议
     if _JS_PROTOCOL_PATTERN.search(result):
         logger.warning(f"[Security] XSS: 危险协议拦截, input_len={len(result)}")
         result = _JS_PROTOCOL_PATTERN.sub('', result)
-    
+
     # 拦截危险 HTML 标签
     if _DANGEROUS_TAG_PATTERN.search(result):
         logger.warning(f"[Security] XSS: 危险标签拦截, input_len={len(result)}")
         result = _DANGEROUS_TAG_PATTERN.sub('', result)
-    
+
     # 拦截 data: URI 中的 HTML/JS
     if _DATA_URI_PATTERN.search(result):
         logger.warning(f"[Security] XSS: data: URI 危险内容拦截, input_len={len(result)}")
         result = _DATA_URI_PATTERN.sub('', result)
-    
+
     return result
 
 
 def sanitize_user_input(query: str) -> Optional[str]:
     """检测并拦截 Prompt 注入 + XSS 攻击，返回 None 表示拦截
-    
+
     v1.44 R2: 增加 XSS 防御层
+    v1.44 R3: 集中化注入检测 — 使用 prompt_guard 模块
     """
-    # 1. Prompt 注入检测
-    for pat in INJECTION_PATTERNS:
-        if re.search(pat, query, re.IGNORECASE):
-            pat_name = pat[:40].replace('\n', ' ')
-            logger.warning(f"[Security] Prompt injection detected: pattern={pat_name}, query_len={len(query)}")
+    # 1. Prompt 注入检测 — 优先使用集中的 prompt_guard 模块
+    try:
+        from src.services.prompt_guard import detect_injection
+        is_injection, pattern_desc = detect_injection(query)
+        if is_injection:
+            logger.warning(f"[Security] Prompt injection detected: pattern={pattern_desc[:40]}, query_len={len(query)}")
             return None
+    except ImportError:
+        # 降级：使用本地模式
+        for pat in INJECTION_PATTERNS:
+            if re.search(pat, query, re.IGNORECASE):
+                pat_name = pat[:40].replace('\n', ' ')
+                logger.warning(f"[Security] Prompt injection detected: pattern={pat_name}, query_len={len(query)}")
+                return None
     
     # 2. XSS 净化
     sanitized = sanitize_xss(query)

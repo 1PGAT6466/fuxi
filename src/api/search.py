@@ -16,23 +16,25 @@ class SearchBody(BaseModel):
     granularity: str = "chunk"
 
     def __init__(self, **data):
-        # v1.44 R3: top_k 上限保护，最大100
-        if 'top_k' in data and data['top_k'] > 100:
-            data['top_k'] = 100
+        # v1.44 安全修复: top_k 上限保护，使用集中的 clamp_top_k
+        if 'top_k' in data:
+            from src.services.prompt_guard import clamp_top_k
+            data['top_k'] = clamp_top_k(data['top_k'])
         super().__init__(**data)
 
 
 @router.get("/api/search")
 async def search_get(
     q: str = Query(...),
-    top_k: int = Query(15, le=100, ge=1, description="返回结果数，最大100"),
+    top_k: int = Query(15, le=50, ge=1, description="返回结果数，最大50"),
     page: int = 1,
     page_size: int = 8,
     granularity: str = Query("chunk", description="检索粒度: chunk/event/auto"),
     request: Request = None,
 ):
-    # v1.44 R3: top_k 上限保护
-    top_k = min(top_k, 100)
+    # v1.44 安全修复: top_k 上限保护
+    from src.services.prompt_guard import clamp_top_k
+    top_k = clamp_top_k(top_k)
     return await _search_impl(q, top_k, page, page_size, granularity, request)
 
 

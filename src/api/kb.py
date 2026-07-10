@@ -5,7 +5,7 @@ v1.44 Phase 1 Fix — 知识库(KB)检索路由
 """
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 import logging
 
 logger = logging.getLogger(__name__)
@@ -17,6 +17,13 @@ class KBSearchRequest(BaseModel):
     query: str
     top_k: int = 5
     mode: str = "semantic"
+
+    @field_validator("top_k")
+    @classmethod
+    def validate_top_k(cls, v: int) -> int:
+        """v1.44 安全修复: top_k 上限验证"""
+        from src.services.prompt_guard import clamp_top_k
+        return clamp_top_k(v)
 
 
 @router.post("/api/kb/search")

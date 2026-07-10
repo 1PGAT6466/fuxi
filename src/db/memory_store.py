@@ -367,14 +367,19 @@ class MemoryStore:
             return []
 
 
-    def keyword_search(self, query: str, top_k: int = 20) -> list:
-        """Simple keyword search via SQLite LIKE on chunk text"""
+    def keyword_search(self, query: str, top_k: int = 20, tenant_id: str = "default") -> list:
+        """Simple keyword search via SQLite LIKE on chunk text
+        v1.44 R2: 多租户隔离 — 按 tenant_id 过滤
+        """
         import re
         terms = [t.strip() for t in re.split(r'[\s,，。、]+', query.lower()) if len(t.strip()) >= 1]
         if not terms:
             return []
         conditions = ["status = 'active'"]
         params = []
+        # v1.44 R2: 租户隔离
+        conditions.append("tenant_id = ?")
+        params.append(tenant_id)
         like_parts = []
         for term in terms[:5]:
             like_parts.append("LOWER(doc) LIKE ?")

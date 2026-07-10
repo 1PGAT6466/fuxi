@@ -14,8 +14,11 @@ def search_chunks(
     top_k: int = 5,
     mode: str = "semantic",
     score_threshold: float = 0.0,
+    tenant_id: str = "default",
 ) -> List[Dict[str, Any]]:
-    """搜索 chunks，优先使用 taiyang retrieval，失败回退到 ChromaDB 直接搜索"""
+    """搜索 chunks，优先使用 taiyang retrieval，失败回退到 ChromaDB 直接搜索
+    v1.44 R2: 多租户隔离 — 传递 tenant_id 到检索层
+    """
     results: List[Dict[str, Any]] = []
 
     # 尝试 taiyang retrieval
@@ -37,7 +40,9 @@ def search_chunks(
         from src.db.vector_store import get_vector_store
         vs = get_vector_store()
         if vs:
-            raw = vs.search(query, top_k=top_k)
+            # v1.44 R2: 租户隔离 — 使用 where 子句
+            where_filter = {"tenant_id": tenant_id} if tenant_id != "default" else None
+            raw = vs.search(query, top_k=top_k, where=where_filter)
             for r in raw:
                 results.append({
                     "id": r.get("id", ""),
@@ -56,16 +61,19 @@ async def hybrid_search(
     query: str,
     top_k: int = 15,
     granularity: str = "chunk",
+    tenant_id: str = "default",
 ) -> Dict[str, Any]:
-    """混合搜索：combines wiki + chunk results"""
+    """混合搜索：combines wiki + chunk results
+    v1.44 R2: 多租户隔离 — 传递 tenant_id 到检索层
+    """
     try:
         from src.taiyang.retrieval import hybrid_search as _taiyang_hybrid, event_search
 
         if granularity == "event":
-            event_result = await event_search(query, top_k=top_k)
+            event_result = await event_search(query, top_k=top_k, tenant_id=tenant_id)
             results = event_result.get("mapped_chunks", [])
         else:
-            results = await _taiyang_hybrid(query, top_k=top_k, granularity=granularity)
+            results = await _taiyang_hybrid(query, top_k=top_k, granularity=granularity, tenant_id=tenant_id)
 
         wiki_hits = [r for r in results if r.get("_source") == "wiki"]
         chunk_hits = [r for r in results if r.get("_source") != "wiki"]

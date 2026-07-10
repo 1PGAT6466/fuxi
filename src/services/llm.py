@@ -217,6 +217,13 @@ async def call_llm(
     v1.44 R3: 杞婚噺绾?60s 缁撴€昏秴鏃?   """
     _CHAIN_TIMEOUT = 60.0  # v1.44 R3: 缁撴€昏秴鏃?
 
+    # v1.44 安全修复: System Prompt 硬化 — 注入防御性安全约束
+    try:
+        from src.services.prompt_guard import get_hardened_system_prompt
+        system_prompt = get_hardened_system_prompt(system_prompt)
+    except ImportError:
+        pass
+
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
@@ -274,6 +281,13 @@ async def call_llm_stream(
     temperature: float = 0.3, model: str = None,
 ) -> AsyncGenerator[str, None]:
     """娴佸紡 Fallback 閾?""
+    # v1.44 安全修复: 加固 system prompt
+    try:
+        from src.services.prompt_guard import get_hardened_system_prompt
+        system_prompt = get_hardened_system_prompt(system_prompt)
+    except ImportError:
+        pass
+
     messages = []
     if system_prompt:
         messages.append({"role": "system", "content": system_prompt})
@@ -355,7 +369,7 @@ async def call_siliconflow_stream(prompt: str, model: str = "") -> AsyncGenerato
 
 async def call_mimo_async(query: str, sources: list, messages: list, api_key: str):
     """鍏煎鏃ц皟鐢?""
-    answer = await call_llm(query, system_prompt="浣犳槸浼忕静鐭ヨ瘑搴撳姪鎵?, max_tokens=2048)
+    answer = await call_llm(query, system_prompt="你是伏羲知识库助手", max_tokens=2048)
     if answer:
         async with _ai_cache_lock:
             _ai_cache[query] = answer
@@ -491,8 +505,8 @@ class TokenBudgetExceeded(Exception):
         self.consumed = consumed
         self.budget = budget
         super().__init__(
-            f"[TokenBudget] Session={session_id} 棰勭畻鐔旀柇锛?
-            f"宸叉秷鑰?楼{consumed:.4f} / 楼{budget:.2f}"
+            f"[TokenBudget] Session={session_id} 预算熔断:"
+            f"已消费 ¥{consumed:.4f} / ¥{budget:.2f}"
         )
 
 
