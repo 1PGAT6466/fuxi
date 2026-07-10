@@ -1,0 +1,220 @@
+E:\easyclaw\伏羲-v1.44\repo\src\config.py:68: RuntimeWarning: [Config] FUXI_JWT_SECRET 未设置，已自动生成随机密钥。服务重启后所有已有 Token 将失效。生产环境请设置环境变量 FUXI_JWT_SECRET。
+  warnings.warn(
+E:\easyclaw\伏羲-v1.44\repo\src\config.py:108: RuntimeWarning: ⚠️  MIMO_API_KEY 未设置！LLM 服务将不可用。请在 .env 或系统环境变量中设置 MIMO_API_KEY。
+  warnings.warn(
+2026-07-10 12:26:04 [INFO] src.api.auth: [Auth] 生产环境: OpenAPI/Swagger 文档需要认证
+2026-07-10 12:26:04 [INFO] server: [RateLimit] slowapi 限流已启用: 60 req/min (default)
+2026-07-10 12:26:04 [INFO] 伏羲·内世界: [ErrorHandler] 全局异常处理器已注册 — {detail} → {status, message}
+INFO:     Started server process [16988]
+INFO:     Waiting for application startup.
+2026-07-10 12:26:05 [INFO] src.api.auth: [RateLimit] 已启用: 60 req/60s (全局), 登录 5/min, 注册 3/hour
+C:\Users\Feng Shaoxuan\AppData\Local\easyclaw\ai\tool_cache\resources\tools\win\python-3.11.9\Lib\site-packages\jieba\_compat.py:18: UserWarning: pkg_resources is deprecated as an API. See https://setuptools.pypa.io/en/latest/pkg_resources.html. The pkg_resources package is slated for removal as early as 2025-11-30. Refrain from using this package or pin to Setuptools<81.
+  import pkg_resources
+2026-07-10 12:26:06 [INFO] src.taiyang.synonym_loader: [Synonyms] Loaded 18 synonym groups
+2026-07-10 12:26:07 [INFO] bagua.intent_bus: [IntentBus] 全局实例已创建
+2026-07-10 12:26:07 [INFO] bagua.base_gua: ☰ [乾] 启动 — 意识中枢 — 意图决策、调度协调、最终答案生成
+2026-07-10 12:26:07 [INFO] bagua.intent_bus: [IntentBus] 卦注册成功: 乾 (乾)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [乾] 已注册到 IntentBus (name=乾, trigram=乾)
+2026-07-10 12:26:07 [INFO] bagua.qian: ☰ [乾] 健康心跳已启动 (interval=10.0s)
+2026-07-10 12:26:07 [INFO] server: [Fuxi] 引擎: v2 (Bagua) | intent_mode: rule_based
+2026-07-10 12:26:07 [INFO] server: [Fuxi] 伏羲八卦体系已苏醒 ☰
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [kun] 注册依赖 wiki_engine (breaker_threshold=3, timeout=30.0s)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: ☷ [kun] 启动 — 记忆存储与管理 — 短期记忆/Wiki知识库/用户偏好
+2026-07-10 12:26:07 [INFO] bagua.intent_bus: [IntentBus] 卦注册成功: kun (坤)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [kun] 已注册到 IntentBus (name=kun, trigram=坤)
+2026-07-10 12:26:07 [INFO] bagua.intent_bus: [IntentBus] 卦注册成功: 坤 (坤)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [kun] 已注册到 IntentBus (name=坤, trigram=坤)
+2026-07-10 12:26:07 [INFO] server: [Bagua] 坤 已注册到 IntentBus
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [zhen] 注册依赖 file_io (breaker_threshold=5, timeout=30.0s)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [zhen] 注册依赖 vector_store (breaker_threshold=3, timeout=60.0s)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [zhen] 注册依赖 embedder_server (breaker_threshold=3, timeout=60.0s)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [zhen] 注册依赖 kun_store (breaker_threshold=3, timeout=30.0s)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: ☳ [zhen] 启动 — 主动推送与通知 — WebSocket、消息、事件广播
+2026-07-10 12:26:07 [INFO] bagua.intent_bus: [IntentBus] 卦注册成功: zhen (震)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [zhen] 已注册到 IntentBus (name=zhen, trigram=震)
+2026-07-10 12:26:07 [INFO] bagua.intent_bus: [IntentBus] 卦注册成功: 震(zhen) (震)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [zhen] 已注册到 IntentBus (name=震(zhen), trigram=震)
+2026-07-10 12:26:07 [INFO] server: [Bagua] 震(zhen) 已注册到 IntentBus
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [xun] 注册依赖 brave_search_api (breaker_threshold=3, timeout=60.0s)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [xun] 注册依赖 network (breaker_threshold=5, timeout=30.0s)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: ☴ [xun] 启动 — 数据接入与管道 — 文档导入、ETL、多模态、外部搜索
+2026-07-10 12:26:07 [INFO] bagua.intent_bus: [IntentBus] 卦注册成功: xun (巽)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [xun] 已注册到 IntentBus (name=xun, trigram=巽)
+2026-07-10 12:26:07 [INFO] bagua.intent_bus: [IntentBus] 卦注册成功: 巽(xun) (巽)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [xun] 已注册到 IntentBus (name=巽(xun), trigram=巽)
+2026-07-10 12:26:07 [INFO] server: [Bagua] 巽(xun) 已注册到 IntentBus
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [kan] 注册依赖 data_store (breaker_threshold=3, timeout=30.0s)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [kan] 注册依赖 llm (breaker_threshold=5, timeout=60.0s)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [kan] 注册依赖 vector_store (breaker_threshold=3, timeout=60.0s)
+2026-07-10 12:26:07 [INFO] bagua.kan: [坎卦] 加载 0 条免疫记忆
+2026-07-10 12:26:07 [INFO] bagua.base_gua: ☵ [kan] 启动 — 风险控制与数据精炼 — 质量评分、薄弱检测、免疫过滤
+2026-07-10 12:26:07 [INFO] bagua.intent_bus: [IntentBus] 卦注册成功: kan (坎)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [kan] 已注册到 IntentBus (name=kan, trigram=坎)
+2026-07-10 12:26:07 [INFO] bagua.intent_bus: [IntentBus] 卦注册成功: 坎(kan) (坎)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [kan] 已注册到 IntentBus (name=坎(kan), trigram=坎)
+2026-07-10 12:26:07 [INFO] server: [Bagua] 坎(kan) 已注册到 IntentBus
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [li] 注册依赖 llm (breaker_threshold=3, timeout=30.0s)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [li] 注册依赖 vectordb (breaker_threshold=5, timeout=30.0s)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: ☲ [li] 启动 — 知识蒸馏与推理 — LLM、蒸馏、生成、后处理
+2026-07-10 12:26:07 [INFO] bagua.intent_bus: [IntentBus] 卦注册成功: li (离)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [li] 已注册到 IntentBus (name=li, trigram=离)
+2026-07-10 12:26:07 [INFO] bagua.intent_bus: [IntentBus] 卦注册成功: 离(li) (离)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [li] 已注册到 IntentBus (name=离(li), trigram=离)
+2026-07-10 12:26:07 [INFO] server: [Bagua] 离(li) 已注册到 IntentBus
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [gen] 注册依赖 search_db (breaker_threshold=5, timeout=30.0s)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: ☶ [gen] 启动 — 稳定性与自我修复 — 健康检查、断路器、回滚、异常嗅探
+2026-07-10 12:26:07 [INFO] bagua.intent_bus: [IntentBus] 卦注册成功: gen (艮)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [gen] 已注册到 IntentBus (name=gen, trigram=艮)
+2026-07-10 12:26:07 [INFO] bagua.intent_bus: [IntentBus] 卦注册成功: 艮(gen) (艮)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [gen] 已注册到 IntentBus (name=艮(gen), trigram=艮)
+2026-07-10 12:26:07 [INFO] server: [Bagua] 艮(gen) 已注册到 IntentBus
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [dui] 注册依赖 llm (breaker_threshold=3, timeout=30.0s)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [dui] 注册依赖 output_formatter (breaker_threshold=5, timeout=30.0s)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: ☱ [dui] 启动 — 对话与交互 — 对话管理、意图识别、多轮上下文
+2026-07-10 12:26:07 [INFO] bagua.intent_bus: [IntentBus] 卦注册成功: dui (兑)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [dui] 已注册到 IntentBus (name=dui, trigram=兑)
+2026-07-10 12:26:07 [INFO] bagua.intent_bus: [IntentBus] 卦注册成功: 兑(dui) (兑)
+2026-07-10 12:26:07 [INFO] bagua.base_gua: [dui] 已注册到 IntentBus (name=兑(dui), trigram=兑)
+2026-07-10 12:26:07 [INFO] server: [Bagua] 兑(dui) 已注册到 IntentBus
+2026-07-10 12:26:07 [INFO] bagua.shutdown: 优雅关机 handler 已注册 — 超时配置: STOP=5.0s, CANCEL=10.0s, DRAIN=5.0s
+2026-07-10 12:26:07 [INFO] server: [Shutdown] 优雅关机 handler 已注册 (STOP→CANCEL→DRAIN)
+2026-07-10 12:26:07 [WARNING] auto_discovery: [AutoDiscovery] 跳过 admin.py（导入失败）: invalid character '〃' (U+3003) (admin.py, line 40)
+2026-07-10 12:26:07 [INFO] src.data_service: [data_service] Data service layer loaded
+2026-07-10 12:26:07 [INFO] src.data_service: [data_service] loaded 0 sessions from SQLite
+2026-07-10 12:26:07 [INFO] src.api.chat: 已从 SQLite 加载 0 个会话
+2026-07-10 12:26:07 [INFO] auto_discovery: [AutoDiscovery] ✓ chat.py::router → prefix='/api/chat'
+2026-07-10 12:26:07 [INFO] auto_discovery: [AutoDiscovery] ✓ dashboard.py::router → prefix='/api/dashboard'
+2026-07-10 12:26:07 [INFO] auto_discovery: [AutoDiscovery] ✓ documents.py::router → prefix='/api/documents'
+2026-07-10 12:26:07 [WARNING] auto_discovery: [AutoDiscovery] 跳过 feedback.py（导入失败）: expected an indented block after 'with' statement on line 36 (feedback.py, line 37)
+2026-07-10 12:26:07 [WARNING] auto_discovery: [AutoDiscovery] 跳过 files_alias.py（导入失败）: 'await' outside async function (files_alias.py, line 81)
+2026-07-10 12:26:07 [INFO] auto_discovery: [AutoDiscovery] ✓ files_view.py::router → prefix=''
+2026-07-10 12:26:07 [INFO] auto_discovery: [AutoDiscovery] ✓ graph.py::router → prefix='/api/graph'
+2026-07-10 12:26:07 [INFO] auto_discovery: [AutoDiscovery] ✓ metadata.py::router → prefix='/api/metadata'
+2026-07-10 12:26:07 [INFO] auto_discovery: [AutoDiscovery] ✓ path_aliases.py::router → prefix='/api/path_aliases'
+2026-07-10 12:26:07 [INFO] auto_discovery: [AutoDiscovery] ✓ search.py::router → prefix='/api/search'
+2026-07-10 12:26:07 [INFO] auto_discovery: [AutoDiscovery] ✓ synthesis.py::router → prefix='/api/synthesis'
+2026-07-10 12:26:07 [INFO] auto_discovery: [AutoDiscovery] ✓ system_routes.py::router → prefix='/api/system'
+2026-07-10 12:26:07 [INFO] auto_discovery: [AutoDiscovery] ✓ v2_routes.py::router → prefix=''
+2026-07-10 12:26:07 [INFO] auto_discovery: [AutoDiscovery] ✓ wiki.py::router → prefix='/api/wiki'
+2026-07-10 12:26:07 [INFO] auto_discovery: [AutoDiscovery] ✓ worldtree.py::router → prefix='/api/worldtree'
+2026-07-10 12:26:07 [INFO] auto_discovery: [AutoDiscovery] 自动发现完成: 12/12 个路由已注册
+2026-07-10 12:26:08 [INFO] server: MCP 工具注册完成: 24/24 个可用
+2026-07-10 12:26:08 [INFO] server: 静态资源挂载（安全模式）: E:\easyclaw\伏羲-v1.44\repo\frontend
+2026-07-10 12:26:08 [INFO] server: [Routes] 所有路由注册完成
+INFO:     Application startup complete.
+INFO:     Uvicorn running on http://0.0.0.0:8080 (Press CTRL+C to quit)
+2026-07-10 12:26:19 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:26:19 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:26:19 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:26:20 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:26:20 [INFO] bagua.qian: ☰ [乾] 健康检查 #1: 15 卦, 0 异常
+2026-07-10 12:26:30 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:26:30 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:26:30 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:26:30 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:26:30 [INFO] bagua.qian: ☰ [乾] 健康检查 #2: 15 卦, 0 异常
+2026-07-10 12:26:40 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:26:40 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:26:40 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:26:40 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:26:40 [INFO] bagua.qian: ☰ [乾] 健康检查 #3: 15 卦, 0 异常
+2026-07-10 12:26:50 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:26:50 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:26:50 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:26:50 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:26:50 [INFO] bagua.qian: ☰ [乾] 健康检查 #4: 15 卦, 0 异常
+2026-07-10 12:27:00 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:27:00 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:27:00 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:27:00 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:27:00 [INFO] bagua.qian: ☰ [乾] 健康检查 #5: 15 卦, 0 异常
+2026-07-10 12:27:10 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:27:10 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:27:10 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:27:10 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:27:10 [INFO] bagua.qian: ☰ [乾] 健康检查 #6: 15 卦, 0 异常
+2026-07-10 12:27:20 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:27:20 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:27:20 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:27:20 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:27:20 [INFO] bagua.qian: ☰ [乾] 健康检查 #7: 15 卦, 0 异常
+2026-07-10 12:27:30 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:27:30 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:27:30 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:27:30 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:27:30 [INFO] bagua.qian: ☰ [乾] 健康检查 #8: 15 卦, 0 异常
+2026-07-10 12:27:40 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:27:40 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:27:40 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:27:40 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:27:40 [INFO] bagua.qian: ☰ [乾] 健康检查 #9: 15 卦, 0 异常
+2026-07-10 12:27:50 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:27:50 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:27:50 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:27:50 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:27:50 [INFO] bagua.qian: ☰ [乾] 健康检查 #10: 15 卦, 0 异常
+2026-07-10 12:28:00 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:28:00 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:28:00 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:28:00 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:28:00 [INFO] bagua.qian: ☰ [乾] 健康检查 #11: 15 卦, 0 异常
+2026-07-10 12:28:10 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:28:10 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:28:10 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:28:10 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:28:10 [INFO] bagua.qian: ☰ [乾] 健康检查 #12: 15 卦, 0 异常
+2026-07-10 12:28:20 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:28:20 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:28:20 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:28:20 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:28:20 [INFO] bagua.qian: ☰ [乾] 健康检查 #13: 15 卦, 0 异常
+2026-07-10 12:28:30 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:28:30 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:28:30 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:28:30 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:28:30 [INFO] bagua.qian: ☰ [乾] 健康检查 #14: 15 卦, 0 异常
+2026-07-10 12:28:40 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:28:40 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:28:40 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:28:40 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:28:40 [INFO] bagua.qian: ☰ [乾] 健康检查 #15: 15 卦, 0 异常
+2026-07-10 12:28:50 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:28:50 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:28:50 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:28:50 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:28:50 [INFO] bagua.qian: ☰ [乾] 健康检查 #16: 15 卦, 0 异常
+2026-07-10 12:29:00 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:29:00 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:29:00 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:29:00 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:29:00 [INFO] bagua.qian: ☰ [乾] 健康检查 #17: 15 卦, 0 异常
+2026-07-10 12:29:10 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:29:10 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:29:10 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:29:10 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:29:10 [INFO] bagua.qian: ☰ [乾] 健康检查 #18: 15 卦, 0 异常
+2026-07-10 12:29:20 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:29:20 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:29:20 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:29:20 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:29:20 [INFO] bagua.qian: ☰ [乾] 健康检查 #19: 15 卦, 0 异常
+2026-07-10 12:29:30 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:29:30 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:29:30 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:29:30 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:29:30 [INFO] bagua.qian: ☰ [乾] 健康检查 #20: 15 卦, 0 异常
+2026-07-10 12:29:40 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:29:40 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:29:40 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:29:40 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:29:40 [INFO] bagua.qian: ☰ [乾] 健康检查 #21: 15 卦, 0 异常
+2026-07-10 12:29:50 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:29:50 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:29:50 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:29:50 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:29:50 [INFO] bagua.qian: ☰ [乾] 健康检查 #22: 15 卦, 0 异常
+2026-07-10 12:30:00 [WARNING] src.db.vector_store: [ChromaDB] 目录 data\chromadb 对其他用户可写 (mode=0o40777)，建议执行: chmod o-w data\chromadb
+2026-07-10 12:30:00 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对其他用户可读写 (mode=0o100666)，建议执行: chmod o-rw data\chromadb\chroma.sqlite3
+2026-07-10 12:30:00 [WARNING] src.db.vector_store: [ChromaDB] 数据库文件 data\chromadb\chroma.sqlite3 对组用户可写 (mode=0o100666)，建议执行: chmod g-w data\chromadb\chroma.sqlite3
+2026-07-10 12:30:00 [ERROR] chromadb.telemetry.product.posthog: Failed to send telemetry event ClientStartEvent: capture() takes 1 positional argument but 3 were given
+2026-07-10 12:30:00 [INFO] bagua.qian: ☰ [乾] 健康检查 #23: 15 卦, 0 异常

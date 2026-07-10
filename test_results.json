@@ -1,0 +1,260 @@
+[
+  {
+    "test": "1.1 健康检查",
+    "method": "GET",
+    "endpoint": "/api/health",
+    "status_code": 200,
+    "expected_status": 200,
+    "status_ok": true,
+    "response_size": 65,
+    "response": {
+      "status": "unhealthy",
+      "checks": {},
+      "timestamp": 1783658261.5182292
+    }
+  },
+  {
+    "test": "2.1 登录-无效凭据",
+    "method": "POST",
+    "endpoint": "/api/auth/login",
+    "status_code": 422,
+    "expected_status": 401,
+    "status_ok": false,
+    "response_size": 57,
+    "response": {
+      "status": "error",
+      "message": "请求参数验证失败",
+      "status_code": 422
+    }
+  },
+  {
+    "test": "2.2 登录-有效凭据",
+    "method": "POST",
+    "endpoint": "/api/auth/login",
+    "status_code": 401,
+    "expected_status": null,
+    "status_ok": true,
+    "response_size": 39,
+    "response": {
+      "status": "error",
+      "message": "用户名或密码错误"
+    }
+  },
+  {
+    "test": "2.3 获取当前用户",
+    "method": "GET",
+    "endpoint": "/api/auth/me",
+    "status_code": 401,
+    "expected_status": 200,
+    "status_ok": false,
+    "response_size": 16,
+    "response": {
+      "detail": "未登录"
+    }
+  },
+  {
+    "test": "2.5 注册新用户",
+    "method": "POST",
+    "endpoint": "/api/auth/register",
+    "status_code": 200,
+    "expected_status": null,
+    "status_ok": true,
+    "response_size": 37,
+    "response": {
+      "ok": true,
+      "username": "testuser2026"
+    }
+  },
+  {
+    "test": "2.6 搜索",
+    "method": "GET",
+    "endpoint": "/api/search?q=test",
+    "status_code": 401,
+    "expected_status": null,
+    "status_ok": true,
+    "response_size": 16,
+    "response": {
+      "detail": "未登录"
+    }
+  },
+  {
+    "test": "2.7 获取会话列表",
+    "method": "GET",
+    "endpoint": "/api/chat/sessions",
+    "status_code": 401,
+    "expected_status": null,
+    "status_ok": true,
+    "response_size": 16,
+    "response": {
+      "detail": "未登录"
+    }
+  },
+  {
+    "test": "2.8 发送消息",
+    "method": "POST",
+    "endpoint": "/api/chat/send",
+    "status_code": 401,
+    "expected_status": null,
+    "status_ok": true,
+    "response_size": 16,
+    "response": {
+      "detail": "未登录"
+    }
+  },
+  {
+    "test": "2.9 文档列表",
+    "method": "GET",
+    "endpoint": "/api/documents",
+    "status_code": 401,
+    "expected_status": null,
+    "status_ok": true,
+    "response_size": 16,
+    "response": {
+      "detail": "未登录"
+    }
+  },
+  {
+    "test": "2.10 Wiki页面",
+    "method": "GET",
+    "endpoint": "/api/wiki",
+    "status_code": 401,
+    "expected_status": null,
+    "status_ok": true,
+    "response_size": 16,
+    "response": {
+      "detail": "未登录"
+    }
+  },
+  {
+    "test": "2.11 知识图谱",
+    "method": "GET",
+    "endpoint": "/api/graph",
+    "status_code": 401,
+    "expected_status": null,
+    "status_ok": true,
+    "response_size": 16,
+    "response": {
+      "detail": "未登录"
+    }
+  },
+  {
+    "test": "2.12 RAG搜索",
+    "method": "POST",
+    "endpoint": "/api/rag/search",
+    "status_code": 401,
+    "expected_status": null,
+    "status_ok": true,
+    "response_size": 16,
+    "response": {
+      "detail": "未登录"
+    }
+  },
+  {
+    "test": "2.13 评测概览",
+    "method": "GET",
+    "endpoint": "/api/evaluation/overview",
+    "status_code": 401,
+    "expected_status": null,
+    "status_ok": true,
+    "response_size": 16,
+    "response": {
+      "detail": "未登录"
+    }
+  },
+  {
+    "test": "2.14 功能开关",
+    "method": "GET",
+    "endpoint": "/api/feature-flags",
+    "status_code": 401,
+    "expected_status": null,
+    "status_ok": true,
+    "response_size": 16,
+    "response": {
+      "detail": "未登录"
+    }
+  },
+  {
+    "test": "2.15 服务列表",
+    "method": "GET",
+    "endpoint": "/api/services",
+    "status_code": 401,
+    "expected_status": null,
+    "status_ok": true,
+    "response_size": 16,
+    "response": {
+      "detail": "未登录"
+    }
+  },
+  {
+    "test": "3.1 未认证访问",
+    "method": "GET",
+    "endpoint": "/api/auth/me",
+    "status_code": 401,
+    "expected_status": 401,
+    "status_ok": true,
+    "response_size": 16,
+    "response": {
+      "detail": "未登录"
+    }
+  },
+  {
+    "test": "3.2 不存在端点",
+    "method": "GET",
+    "endpoint": "/api/nonexistent",
+    "status_code": 401,
+    "expected_status": 404,
+    "status_ok": false,
+    "response_size": 16,
+    "response": {
+      "detail": "未登录"
+    }
+  },
+  {
+    "test": "3.3 无效输入",
+    "method": "POST",
+    "endpoint": "/api/auth/login",
+    "status_code": 422,
+    "expected_status": null,
+    "status_ok": true,
+    "response_size": 57,
+    "response": {
+      "status": "error",
+      "message": "请求参数验证失败",
+      "status_code": 422
+    }
+  },
+  {
+    "test": "3.4 空输入",
+    "method": "POST",
+    "endpoint": "/api/auth/login",
+    "status_code": 422,
+    "expected_status": null,
+    "status_ok": true,
+    "response_size": 57,
+    "response": {
+      "status": "error",
+      "message": "请求参数验证失败",
+      "status_code": 422
+    }
+  },
+  {
+    "test": "4.1 feedback_loop",
+    "status_ok": false,
+    "error": "No module named 'src.evolution'"
+  },
+  {
+    "test": "4.2 knowledge_lifecycle",
+    "status_ok": false,
+    "error": "No module named 'src.evolution'"
+  },
+  {
+    "test": "4.3 feature_flags",
+    "status_ok": false,
+    "error": "No module named 'src.evolution'"
+  },
+  {
+    "test": "4.4 wiki_engine",
+    "status_ok": false,
+    "error": "No module named 'src.evoution'"
+  }
+]
