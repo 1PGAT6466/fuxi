@@ -38,8 +38,8 @@ def setup_middleware(app: FastAPI) -> None:
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         csp_policy = (
             "default-src 'self'; "
-            "script-src 'self' 'unsafe-inline'; "
-            "style-src 'self' 'unsafe-inline'; "
+            "script-src 'self'; "
+            "style-src 'self'; "
             "img-src 'self' data: blob: https:; "
             "font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com; "
             "connect-src 'self' http://localhost:* ws://localhost:* https:; "

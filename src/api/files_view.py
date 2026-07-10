@@ -21,11 +21,10 @@ KB_IMAGES_DIR = Path(CONFIG_DATA_DIR) / "kb-images"
 async def view_document(file_hash: str, request: Request):
     """查看文档（根据 file_hash 在 uploads 目录中查找）(v1.50: requires auth)"""
     try:
-        # v1.50 security fix: 认证检查（安全降级）
-        # request.state.user 未设置时（如通过白名单路径进入），允许匿名查看
+        # v1.50 security fix: 认证检查 — 未认证用户禁止访问
         user = getattr(request.state, "user", None)
         if user is None:
-            user = "anonymous"  # 安全降级：允许未认证访问
+            raise HTTPException(401, "未认证，请先登录")
 
         # Search in uploads directory
         if UPLOAD_DIR.exists():
@@ -60,11 +59,10 @@ async def view_document(file_hash: str, request: Request):
 async def download_document(file_hash: str, request: Request):
     """下载文档 (v1.50: requires auth)"""
     try:
-        # v1.50 security fix: 认证检查（安全降级）
-        # request.state.user 未设置时（如通过白名单路径进入），允许匿名查看
+        # v1.50 security fix: 认证检查 — 未认证用户禁止访问
         user = getattr(request.state, "user", None)
         if user is None:
-            user = "anonymous"  # 安全降级：允许未认证访问
+            raise HTTPException(401, "未认证，请先登录")
 
         # Same search logic as view but with Content-Disposition header
         if UPLOAD_DIR.exists():

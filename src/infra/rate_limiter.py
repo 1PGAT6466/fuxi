@@ -48,10 +48,12 @@ class SlidingWindowRateLimiter:
         self.max_requests = max_requests
         self.window_seconds = window_seconds
         self._requests = deque()
+        self._last_access = time.time()  # 用于过期清理
 
     def acquire(self) -> bool:
         """获取许可"""
         now = time.time()
+        self._last_access = now
 
         # 清理过期请求
         while self._requests and self._requests[0] < now - self.window_seconds:
@@ -66,17 +68,40 @@ class SlidingWindowRateLimiter:
     def get_remaining(self) -> int:
         """获取剩余许可数"""
         now = time.time()
+        self._last_access = now
         while self._requests and self._requests[0] < now - self.window_seconds:
             self._requests.popleft()
         return max(0, self.max_requests - len(self._requests))
 
+    @property
+    def is_expired(self) -> bool:
+        """判断限流器是否过期（超过 2 个窗口未访问）"""
+        return time.time() - self._last_access > self.window_seconds * 2
+
 
 # 全局限速器
 _rate_limiters: Dict[str, SlidingWindowRateLimiter] = {}
+_RATE_LIMITER_TTL = 300  # 5 分钟未访问则清理
+_last_cleanup = time.time()
+
+
+def _cleanup_expired_limiters():
+    """清理过期的限流器实例，防止内存泄漏"""
+    global _last_cleanup
+    now = time.time()
+    if now - _last_cleanup < _RATE_LIMITER_TTL:
+        return
+    _last_cleanup = now
+    expired_keys = [k for k, v in _rate_limiters.items() if v.is_expired]
+    for k in expired_keys:
+        del _rate_limiters[k]
+    if expired_keys:
+        logger.debug("清理过期限流器 %d 个", len(expired_keys))
 
 
 def get_rate_limiter(name: str, max_requests: int = 60, window_seconds: int = 60) -> SlidingWindowRateLimiter:
     """获取限速器"""
+    _cleanup_expired_limiters()
     if name not in _rate_limiters:
         _rate_limiters[name] = SlidingWindowRateLimiter(max_requests, window_seconds)
     return _rate_limiters[name]
