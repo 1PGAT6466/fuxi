@@ -27,11 +27,28 @@ export interface UploadRequest {
 // API 响应类型
 // ============================
 
-/** 通用 API 响应格式 */
+/** 通用 API 响应格式（v2 统一格式）
+ * 后端 response.py 定义:
+ *   成功: {"status": "success", "message": "ok", "data": {...}}
+ *   错误: {"status": "error", "message": "错误描述", "detail": "..."}
+ *   分页: {"status": "success", "message": "ok", "data": {"items": [...], "total": N, ...}}
+ *
+ * 注意: 后端默认使用 v1 兼容模式（直接返回 data 字段内容），
+ *       需要请求头 X-API-Format: v2 或查询参数 ?format=v2 才返回此格式。
+ *       前端 api/index.ts 的响应拦截器已自动解包 axios 的 response.data，
+ *       因此此处的 T 应匹配后端 data 字段的结构。
+ */
 export interface ApiResponse<T = unknown> {
-  code: number;
+  /** 状态: "success" | "error" */
+  status: 'success' | 'error';
+  /** 提示信息 */
   message: string;
-  data: T;
+  /** 业务数据（成功时存在） */
+  data?: T;
+  /** 错误详情（失败时存在） */
+  detail?: string;
+  /** HTTP 状态码（失败时存在） */
+  status_code?: number;
 }
 
 /** 登录响应 */

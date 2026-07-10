@@ -9,6 +9,7 @@ import type {
   ChatSessionListResponse,
   ChatSendRequest,
   ChatStreamChunk,
+  ChatMessage,
 } from '@/types';
 
 const logger = createLogger('ChatAPI');
