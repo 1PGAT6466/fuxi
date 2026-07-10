@@ -27,6 +27,17 @@ from src.config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_MODEL, DEEP
 _ai_cache: dict = {}
 _ai_cache_lock = asyncio.Lock()
 
+# ============ 全局连接池 ============
+_aiohttp_session: Optional[aiohttp.ClientSession] = None
+
+async def _get_session() -> aiohttp.ClientSession:
+    """获取全局 aiohttp 连接池（避免每次请求新建 Session）"""
+    global _aiohttp_session
+    if _aiohttp_session is None or _aiohttp_session.closed:
+        connector = aiohttp.TCPConnector(limit=20, limit_per_host=10)
+        _aiohttp_session = aiohttp.ClientSession(connector=connector)
+    return _aiohttp_session
+
 # ============ 重试配置 ============
 MAX_RETRIES = 2
 RETRY_DELAY = 1.0
@@ -73,8 +84,8 @@ async def _call_api(
             payload["tool_choice"] = tool_choice
 
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
+            session = await _get_session()
+            async with session.post(
                     f"{base_url}/chat/completions",
                     json=payload, headers=headers,
                     timeout=aiohttp.ClientTimeout(total=timeout),
