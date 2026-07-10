@@ -18,11 +18,16 @@ MAX_CACHE_SIZE = 200
 MAX_CACHE_AGE_SECONDS = 3600  # 1小时
 SIMILARITY_THRESHOLD = 0.92   # 语义匹配阈值
 
+# v1.44 R2: 缓存穿透防护 — 空值缓存 TTL（比正常缓存短，避免长期缓存空结果）
+EMPTY_CACHE_TTL = 300  # 5 分钟
+_EMPTY_SENTINEL = "__EMPTY__"  # 空值标记
+
 _l1_cache: OrderedDict = OrderedDict()  # exact match
 _l2_cache: list = []  # semantic match: [(embedding, results, timestamp)]
 _cache_lock = asyncio.Lock()
 _cache_hits = 0
 _cache_misses = 0
+_cache_penetration_blocked = 0  # 缓存穿透拦截计数
 
 
 def _make_key(query: str, category: str, top_k: int) -> str:
@@ -31,16 +36,26 @@ def _make_key(query: str, category: str, top_k: int) -> str:
 
 
 async def get_cache(query: str, category: str = "", top_k: int = 15) -> Optional[list]:
-    """查询缓存 — L1 精确 → L2 语义"""
-    global _cache_hits, _cache_misses
+    """查询缓存 — L1 精确 → L2 语义
+    
+    v1.44 R2: 缓存穿透防护 — 检查空值缓存标记
+    """
+    global _cache_hits, _cache_misses, _cache_penetration_blocked
     
     async with _cache_lock:
         # L1: 精确匹配
         key = _make_key(query, category, top_k)
         if key in _l1_cache:
             entry = _l1_cache[key]
-            if time.time() - entry["ts"] < MAX_CACHE_AGE_SECONDS:
+            # v1.44 R2: 空值缓存使用更短的 TTL
+            ttl = EMPTY_CACHE_TTL if entry["results"] is _EMPTY_SENTINEL else MAX_CACHE_AGE_SECONDS
+            if time.time() - entry["ts"] < ttl:
                 _l1_cache.move_to_end(key)
+                if entry["results"] is _EMPTY_SENTINEL:
+                    # 缓存穿透拦截：返回空列表而非 None，避免回源查询
+                    _cache_penetration_blocked += 1
+                    logger.debug(f"[Cache] 空值缓存命中: '{query[:40]}...'")
+                    return []
                 _cache_hits += 1
                 logger.info(f"[Cache] L1 hit: '{query[:40]}...'")
                 return entry["results"]
@@ -77,12 +92,18 @@ async def get_cache(query: str, category: str = "", top_k: int = 15) -> Optional
 
 
 async def set_cache(query: str, results: list, category: str = "", top_k: int = 15):
-    """写入缓存"""
+    """写入缓存
+    
+    v1.44 R2: 缓存穿透防护 — 空结果也缓存（使用空值标记和较短 TTL）
+    """
     async with _cache_lock:
         key = _make_key(query, category, top_k)
         
+        # v1.44 R2: 空结果缓存为标记值，防止缓存穿透
+        cache_value = _EMPTY_SENTINEL if not results else results
+        
         # L1 写入
-        _l1_cache[key] = {"ts": time.time(), "results": results}
+        _l1_cache[key] = {"ts": time.time(), "results": cache_value}
         _l1_cache.move_to_end(key)
         
         # 淘汰最旧的
@@ -124,13 +145,15 @@ def get_cache_stats() -> dict:
         "hits": _cache_hits,
         "misses": _cache_misses,
         "hit_rate": round(_cache_hits / max(1, _cache_hits + _cache_misses), 3),
+        "penetration_blocked": _cache_penetration_blocked,  # v1.44 R2
     }
 
 
 def clear_cache():
-    global _l1_cache, _l2_cache, _cache_hits, _cache_misses
+    global _l1_cache, _l2_cache, _cache_hits, _cache_misses, _cache_penetration_blocked
     _l1_cache = OrderedDict()
     _l2_cache = []
     _cache_hits = 0
     _cache_misses = 0
+    _cache_penetration_blocked = 0
     logger.info("[Cache] cleared")

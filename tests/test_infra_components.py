@@ -52,8 +52,35 @@ class TestValidation:
 
     def test_sanitize_input(self):
         from src.infra.validation import sanitize_input
+        # 测试正常文本
         assert sanitize_input("normal text") == "normal text"
+        
+        # 测试 script 标签拦截
         assert "<script>" not in sanitize_input("<script>alert(1)</script>")
+        
+        # 测试事件处理器拦截
+        result = sanitize_input('<img src=x onerror=alert(1)>')
+        assert 'onerror' not in result.lower()
+        assert 'alert' not in result.lower()
+        
+        result = sanitize_input('<div onclick=alert(1)>test</div>')
+        assert 'onclick' not in result.lower()
+        
+        # 测试 javascript: 协议拦截
+        result = sanitize_input('<a href="javascript:alert(1)">click</a>')
+        assert 'javascript:' not in result.lower()
+        
+        # 测试 data: 协议拦截
+        result = sanitize_input('<img src="data:text/html,<script>alert(1)</script>">')
+        assert 'data:' not in result.lower()
+        
+        # 测试 SVG/XSS 拦截
+        result = sanitize_input('<svg onload=alert(1)>')
+        assert 'svg' not in result.lower()
+        
+        # 测试 CSS 表达式拦截
+        result = sanitize_input('<div style="background:expression(alert(1))">')
+        assert 'expression' not in result.lower()
 
 
 class TestCacheStats:

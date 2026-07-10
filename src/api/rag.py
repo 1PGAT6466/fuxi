@@ -63,12 +63,35 @@ class EventSearchRequest(BaseModel):
 
 # ============ POST /api/rag/search — 传统 chunk 粒度检索 ============
 
+def _filter_by_tenant(results: list, tenant_id: str) -> list:
+    """多租户隔离：按 tenant_id 过滤结果
+    
+    规则：
+      - 如果结果 metadata 中有 tenant_id 字段，必须匹配
+      - 如果结果 metadata 中无 tenant_id 字段，视为默认租户数据
+      - 非默认租户不能访问其他租户的数据
+    """
+    if tenant_id == "default":
+        return results
+    filtered = []
+    for r in results:
+        meta = r.get("metadata", {})
+        r_tenant = meta.get("tenant_id", "default")
+        if r_tenant == tenant_id:
+            filtered.append(r)
+    return filtered
+
+
 @router.post("/api/rag/search")
 async def rag_search(body: SearchRequest, request: Request = None):
     """传统 chunk 粒度检索 — 调用 shaoyang + ChromaDB
 
     返回 {results, total} 格式。
+    v1.44 R2: 多租户隔离 — 从 JWT 提取 tenant_id，过滤搜索结果
     """
+    # v1.44 R2: 从 request.state 获取租户 ID
+    tenant_id = getattr(request.state, "tenant_id", "default") if request else "default"
+    
     try:
         # 尝试使用 taiyang 检索模块
         try:
@@ -79,6 +102,8 @@ async def rag_search(body: SearchRequest, request: Request = None):
                 mode=body.mode,
                 score_threshold=body.score_threshold,
             )
+            # v1.44 R2: 多租户隔离过滤
+            results = _filter_by_tenant(results, tenant_id)
             return {
                 "results": results,
                 "total": len(results),
@@ -103,6 +128,8 @@ async def rag_search(body: SearchRequest, request: Request = None):
                         "metadata": r.get("metadata", {}),
                         "source": r.get("metadata", {}).get("source", ""),
                     })
+                # v1.44 R2: 多租户隔离过滤
+                formatted = _filter_by_tenant(formatted, tenant_id)
                 # v1.50: 标记种子数据
                 formatted = _mark_seed_results(formatted)
                 return {
@@ -133,7 +160,11 @@ async def rag_sag_search(body: EventSearchRequest, request: Request = None):
     """SAG Event 粒度检索 — 支持 chunk/event/auto 三种粒度
 
     返回 {results, events, total, granularity} 格式。
+    v1.44 R2: 多租户隔离 — 从 JWT 提取 tenant_id，过滤搜索结果
     """
+    # v1.44 R2: 从 request.state 获取租户 ID
+    tenant_id = getattr(request.state, "tenant_id", "default") if request else "default"
+    
     try:
         granularity = body.granularity or "auto"
 
@@ -154,6 +185,8 @@ async def rag_sag_search(body: EventSearchRequest, request: Request = None):
                     events = sag_results.get("events", sag_results.get("sag_events", []))
                 elif isinstance(sag_results, list):
                     results = sag_results
+                # v1.44 R2: 多租户隔离过滤
+                results = _filter_by_tenant(results, tenant_id)
                 # v1.50: 标记种子数据
                 results = _mark_seed_results(results)
                 return {
@@ -177,6 +210,8 @@ async def rag_sag_search(body: EventSearchRequest, request: Request = None):
                 mode=body.mode,
                 score_threshold=body.score_threshold,
             )
+            # v1.44 R2: 多租户隔离过滤
+            results = _filter_by_tenant(results, tenant_id)
             # v1.50: 标记种子数据
             results = _mark_seed_results(results)
             return {

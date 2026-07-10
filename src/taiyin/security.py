@@ -78,11 +78,85 @@ INJECTION_PATTERNS = [
     r'DAN\s|jailbreak|越狱',
 ]
 
+# ============ XSS 防御 (v1.44 R2) ============
+# 事件处理器拦截
+_EVENT_HANDLER_PATTERN = re.compile(
+    r'\b(?:on(?:error|click|load|mouseover|mouseout|mousedown|mouseup|keydown|keyup|keypress|focus|blur|change|submit|reset|select|abort|beforeunload|error|hashchange|message|offline|online|pagehide|pageshow|popstate|resize|scroll|storage|unload|animationend|animationiteration|animationstart|transitionend|contextmenu|drag|dragend|dragenter|dragleave|dragover|dragstart|drop|input|invalid|search|touchcancel|touchend|touchmove|touchstart|wheel|copy|cut|paste)\b)\s*=',
+    re.IGNORECASE
+)
+# javascript: 协议拦截
+_JS_PROTOCOL_PATTERN = re.compile(
+    r'(?:javascript|vbscript|livescript|data)\s*:',
+    re.IGNORECASE
+)
+# HTML 标签拦截（script, iframe, object, embed, form 等危险标签）
+_DANGEROUS_TAG_PATTERN = re.compile(
+    r'<\s*(?:script|iframe|object|embed|applet|form|input|textarea|button|select|link|meta|base|style|svg|math|marquee|details|dialog|template|slot|portal|fencedframe)\b[^>]*>',
+    re.IGNORECASE
+)
+# data: URI 中的 HTML/JS 内容
+_DATA_URI_PATTERN = re.compile(
+    r'data\s*:\s*(?:text/html|application/javascript|text/javascript|image/svg\+xml)\s*[;,]',
+    re.IGNORECASE
+)
+
+
+def sanitize_xss(input_str: str) -> str:
+    """v1.44 R2: XSS 防御 — 净化输入中的 XSS 攻击向量
+    
+    检测并移除：
+      - 事件处理器 (onerror, onclick, onload 等)
+      - javascript: / vbscript: / data: 协议
+      - 危险 HTML 标签 (script, iframe, object 等)
+      - data: URI 中的 HTML/JS 内容
+    
+    Args:
+        input_str: 用户输入
+    
+    Returns:
+        净化后的字符串
+    """
+    if not input_str:
+        return input_str
+    
+    result = input_str
+    
+    # 拦截事件处理器
+    if _EVENT_HANDLER_PATTERN.search(result):
+        logger.warning(f"[Security] XSS: 事件处理器拦截, input_len={len(result)}")
+        result = _EVENT_HANDLER_PATTERN.sub('', result)
+    
+    # 拦截 javascript: 等协议
+    if _JS_PROTOCOL_PATTERN.search(result):
+        logger.warning(f"[Security] XSS: 危险协议拦截, input_len={len(result)}")
+        result = _JS_PROTOCOL_PATTERN.sub('', result)
+    
+    # 拦截危险 HTML 标签
+    if _DANGEROUS_TAG_PATTERN.search(result):
+        logger.warning(f"[Security] XSS: 危险标签拦截, input_len={len(result)}")
+        result = _DANGEROUS_TAG_PATTERN.sub('', result)
+    
+    # 拦截 data: URI 中的 HTML/JS
+    if _DATA_URI_PATTERN.search(result):
+        logger.warning(f"[Security] XSS: data: URI 危险内容拦截, input_len={len(result)}")
+        result = _DATA_URI_PATTERN.sub('', result)
+    
+    return result
+
+
 def sanitize_user_input(query: str) -> Optional[str]:
-    """检测并拦截 Prompt 注入，返回 None 表示拦截"""
+    """检测并拦截 Prompt 注入 + XSS 攻击，返回 None 表示拦截
+    
+    v1.44 R2: 增加 XSS 防御层
+    """
+    # 1. Prompt 注入检测
     for pat in INJECTION_PATTERNS:
         if re.search(pat, query, re.IGNORECASE):
             pat_name = pat[:40].replace('\n', ' ')
             logger.warning(f"[Security] Prompt injection detected: pattern={pat_name}, query_len={len(query)}")
             return None
-    return query.strip()
+    
+    # 2. XSS 净化
+    sanitized = sanitize_xss(query)
+    
+    return sanitized.strip()

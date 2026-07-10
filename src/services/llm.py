@@ -1,16 +1,16 @@
 ﻿"""
 llm.py 鈥?LLM 璋冪敤鏈嶅姟锛坴1.43 MiMo 2.5 Pro + Fallback 閾撅級
 
-璋冪敤閾撅細MiMo 2.5 Pro 鈫?DeepSeek 鈫?鏈湴锛堥€愮骇闄嶇骇锛?
+璋冪敤閾撅細MiMo 2.5 Pro 鈫?DeepSeek 鈫?鏈湴锛堥€愮骇闄嶇骇锛?
 
 妯″潡缁撴瀯璇存槑锛?
-  褰撳墠 src/services/llm 鏄竴涓崟浣?.py 鏂囦欢鑰岄潪鍖呯洰褰曘€?
+  褰撳墠 src/services/llm 鏄竴涓崟浣?.py 鏂囦欢鑰岄潪鍖呯洰褰曘€?
   鎵€鏈?callers 浣跨敤 `from src.services.llm import ...` 瀵煎叆銆?
-  鏈潵濡傞渶鎷嗗垎涓?llm/__init__.py + llm/provider_a.py 绛夊瓙妯″潡锛?
+  鏈潵濡傞渶鎷嗗垎涓?llm/__init__.py + llm/provider_a.py 绛夊瓙妯″潡锛?
   闇€淇濇寔 `src/services/llm/__init__.py` 閲嶆柊瀵煎嚭褰撳墠 API
   锛坈all_ai, call_ai_raw, call_deepseek, call_llm, call_llm_fast, _call_api锛夛紝
-  纭繚鐜版湁 from 瀵煎叆涓嶅彈褰卞搷銆?
-  灞婃椂鍒犻櫎鏈枃浠讹紝鍒涘缓鍚屽悕鍖呯洰褰曟浛浠ｃ€?
+  纭繚鐜版湁 from 瀵煎叆涓嶅彈褰卞搷銆?
+  灞婃椂鍒犻櫎鏈枃浠讹紝鍒涘缓鍚屽悕鍖呯洰褰曟浛浠ｃ€?
 """
 import os, json, logging, asyncio
 from typing import Optional, AsyncGenerator, Dict, Any
@@ -50,7 +50,7 @@ async def _get_session() -> aiohttp.ClientSession:
 
 
 async def close_session():
-    """鍏抽棴鍏ㄥ眬杩炴帴姹狅紙搴旂敤鍏抽棴鏃惰皟鐢級"""
+    """(see original source)"""
     global _global_session
     if _global_session and not _global_session.closed:
         await _global_session.close()
@@ -69,14 +69,14 @@ async def _call_api(
     tools: Optional[list] = None,
     tool_choice: Optional[str] = None,
 ) -> Optional[str]:
-    """閫氱敤 OpenAI 鍏煎 API 璋冪敤 鈥?甯﹂噸璇?閫愭鏀惧ぇ+绌哄唴瀹规娴?
+    """閫氱敤 OpenAI 鍏煎 API 璋冪敤 鈥?甯﹂噸璇?閫愭鏀惧ぇ+绌哄唴瀹规娴?
 
     Args:
         tools:       Function calling tools 瀹氫箟鍒楄〃 [{"type":"function","function":{...}}]
         tool_choice: 宸ュ叿閫夋嫨绛栫暐 "auto"|"none"|"required"|"function_name"
     """
     # MiMo reasoning 妯″瀷锛歳easoning token 鍜?output token 鍏变韩 max_tokens 棰勭畻
-    # 澶皬 = 鎬濊€冨畬娌＄┖闂磋緭鍑猴紝鎵€浠ュ熀纭€鍊艰澶?
+    # 澶皬 = 鎬濊€冨畬娌＄┖闂磋緭鍑猴紝鎵€浠ュ熀纭€鍊艰澶?
     base_max = max(max_tokens, 4096)
 
     for attempt in range(3):
@@ -108,7 +108,7 @@ async def _call_api(
                 ) as resp:
                     if resp.status != 200:
                         text = await resp.text()
-                        # v1.50 R4: 鑴辨晱 API 绔偣锛岄槻姝㈡棩蹇楁硠闇叉晱鎰?URL
+                        # v1.50 R4: 鑴辨晱 API 绔偣锛岄槻姝㈡棩蹇楁硠闇叉晱鎰?URL
                         masked_url = base_url.split("//")[0] + "//***" if "//" in base_url else "***"
                         logger.warning(f"API {masked_url} {resp.status} (attempt {attempt+1}): {text[:200]}")
                         if attempt < 2:
@@ -130,18 +130,18 @@ async def _call_api(
                         )
                         return json.dumps({"tool_calls": tool_calls}, ensure_ascii=False)
 
-                    # 妫€鏌ョ┖鍐呭
+                    # 妫€鏌ョ┖鍐呭
                     if content and content.strip():
                         return content
 
-                    # 鎬濊€冧簡浣嗘病杈撳嚭 鈫?max_tokens 涓嶅锛岄噸璇曟斁澶?
+                    # 鎬濊€冧簡浣嗘病杈撳嚭 鈫?max_tokens 涓嶅锛岄噸璇曟斁澶?
                     if reasoning and not content:
                         logger.warning(f"MiMo attempt {attempt+1}: reasoning鏈?{len(reasoning)}瀛?浣哻ontent涓虹┖, max_tokens={current_max}, 閲嶈瘯...")
                         if attempt < 2:
                             await asyncio.sleep(1 * (attempt + 1))
                             continue
 
-                    # 鏃?reasoning 涔熸棤 content 鈫?鍙兘鏄?prompt 闂
+                    # 鏃?reasoning 涔熸棤 content 鈫?鍙兘鏄?prompt 闂
                     if not content:
                         logger.warning(f"MiMo attempt {attempt+1}: 绌哄搷搴? max_tokens={current_max}")
                         if attempt < 2:
@@ -151,7 +151,7 @@ async def _call_api(
                     return content if content else None
 
         except (aiohttp.ClientError, OSError, asyncio.TimeoutError) as e:
-            # 鑴辨晱 API 绔偣
+            # 鑴辨晱 API 绔偣
             masked_url = base_url.split("//")[0] + "//***" if "//" in base_url else "***"
             logger.warning(f"API {masked_url} attempt {attempt+1} 寮傚父: {e}")
             if attempt < 2:
@@ -162,7 +162,7 @@ async def _call_api(
     return None
 
 
-# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def _call_api_stream(
     base_url: str, api_key: str, model: str,
     messages: list, max_tokens: int = 2048,
@@ -221,7 +221,7 @@ async def call_llm(
 
     # Level 1: MiMo 2.5 Pro
     if not MIMO_API_KEY:
-        logger.warning("MiMo API Key 鏈厤缃紝璺宠繃 MiMo 鐩存帴灏濊瘯 DeepSeek")
+        logger.warning("MiMo API Key 鏈厤缃紝璺宠繃 MiMo 鐩存帴灏濊瘯 DeepSeek")
     else:
         for attempt in range(MAX_RETRIES):
             result = await _call_api(
@@ -233,7 +233,7 @@ async def call_llm(
                 return result
             if attempt < MAX_RETRIES - 1:
                 await asyncio.sleep(RETRY_DELAY)
-        logger.warning("MiMo 澶辫触锛屽皾璇?DeepSeek")
+        logger.warning("MiMo 失败，尝试 DeepSeek")
 
     # Level 2: DeepSeek
     if DEEPSEEK_API_KEY:
@@ -255,10 +255,10 @@ async def call_llm_fast(
     prompt: str, system_prompt: str = None, max_tokens: int = 500,
     temperature: float = 0.1,
 ) -> str:
-    """杞婚噺浠诲姟锛堝垎绫?鍏抽敭璇嶆彁鍙?绠€鍗曞垽鏂級鐢?MiMo-fast锛屾垚鏈綆閫熷害蹇?""
+    """杞婚噺浠诲姟锛堝垎绫?鍏抽敭璇嶆彁鍙?绠€鍗曞垽鏂級鐢?MiMo-fast锛屾垚鏈綆閫熷害蹇?""
     return await call_llm(prompt, system_prompt, max_tokens, temperature, model="mimo-v2.5-turbo")
 
-# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def call_llm_stream(
     prompt: str, system_prompt: str = None, max_tokens: int = 2048,
     temperature: float = 0.3, model: str = None,
@@ -276,15 +276,15 @@ async def call_llm_stream(
         yield chunk
 
 
-# ============ 鍏煎鏃ф帴鍙?============
+# ============ 鍏煎鏃ф帴鍙?============
 
 async def call_ai_raw(prompt: str, max_tokens: int = 300) -> str:
-    """鍏煎鏃ц皟鐢?""
+    """鍏煎鏃ц皟鐢?""
     return await call_llm(prompt, max_tokens=max_tokens)
 
 
 async def call_ai(prompt: str, max_tokens: int = 300) -> str:
-    """鍏煎鏃ц皟鐢?""
+    """鍏煎鏃ц皟鐢?""
     return await call_llm(prompt, max_tokens=max_tokens)
 
 
@@ -292,28 +292,28 @@ async def call_deepseek(
     prompt: str, system_prompt: str = None, max_tokens: int = 2048,
     temperature: float = 0.3, model: str = None,
 ) -> str:
-    """鍏煎鏃ц皟鐢紝閲嶅畾鍚戝埌 call_llm"""
+    """(see original source)"""
     return await call_llm(prompt, system_prompt, max_tokens, temperature, model)
 
 
-# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def call_deepseek_stream(
     prompt: str, system_prompt: str = None, max_tokens: int = 2048,
     temperature: float = 0.3, model: str = None,
 ) -> AsyncGenerator[str, None]:
-    """鍏煎鏃ф祦寮忚皟鐢?""
+    """鍏煎鏃ф祦寮忚皟鐢?""
     async for chunk in call_llm_stream(prompt, system_prompt, max_tokens, temperature, model):
         yield chunk
 
 
 async def call_ollama(prompt_text: str, model: str = None, max_tokens: int = 300) -> Optional[str]:
-    """宸插純鐢細閲嶅畾鍚戝埌 MiMo API"""
+    """(see original source)"""
     return await call_llm(prompt_text, max_tokens=max_tokens)
 
 
-# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def call_ollama_stream(prompt_text: str) -> AsyncGenerator[str, None]:
-    """宸插純鐢細閲嶅畾鍚戝埌 MiMo 娴佸紡"""
+    """(see original source)"""
     async for chunk in call_llm_stream(prompt_text):
         yield chunk
 
@@ -329,7 +329,7 @@ async def call_siliconflow(prompt: str, model: str = "") -> str:
     return await _call_api(sf_url, sf_key, sf_model, [{"role": "user", "content": prompt}], 500) or ""
 
 
-# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
+# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
 async def call_siliconflow_stream(prompt: str, model: str = "") -> AsyncGenerator[str, None]:
     """SiliconFlow 娴佸紡"""
     from src.config import SILICONFLOW_API_KEY, SILICONFLOW_BASE_URL
@@ -337,14 +337,14 @@ async def call_siliconflow_stream(prompt: str, model: str = "") -> AsyncGenerato
     sf_url = SILICONFLOW_BASE_URL
     sf_model = model or "Qwen/Qwen2.5-7B-Instruct"
     if not sf_key:
-        yield "[SiliconFlow Key 鏈厤缃甝"
+        yield "[SiliconFlow Key 鏈厤缃甝"
         return
     async for chunk in _call_api_stream(sf_url, sf_key, sf_model, [{"role": "user", "content": prompt}]):
         yield chunk
 
 
 async def call_mimo_async(query: str, sources: list, messages: list, api_key: str):
-    """鍏煎鏃ц皟鐢?""
+    """鍏煎鏃ц皟鐢?""
     answer = await call_llm(query, system_prompt="浣犳槸浼忕静鐭ヨ瘑搴撳姪鎵?, max_tokens=2048)
     if answer:
         async with _ai_cache_lock:
@@ -413,7 +413,7 @@ async def call_llm_by_task(
 
     kwargs["max_tokens"] = kwargs.get("max_tokens", max_tokens_kw)
 
-    # 濡傛灉鎻愪緵浜?tools锛岀洿鎺ヨ皟鐢?_call_api 浠ョ‘淇濆弬鏁版纭紶閫?
+    # 濡傛灉鎻愪緵浜?tools锛岀洿鎺ヨ皟鐢?_call_api 浠ョ‘淇濆弬鏁版纭紶閫?
     if tools:
         from src.config import MIMO_API_KEY, MIMO_BASE_URL, MIMO_TIMEOUT
         messages = []
@@ -441,7 +441,7 @@ def get_cached_answer(query: str) -> Optional[str]:
     return _ai_cache.pop(query, None)
 
 
-# ============ TokenBudget 鈥?鎴愭湰浠ょ墝棰勭畻鐔旀柇鍣紙v1.50 鏂规绗?3鏉★級 ============
+# ============ TokenBudget 鈥?鎴愭湰浠ょ墝棰勭畻鐔旀柇鍣紙v1.50 鏂规绗?3鏉★級 ============
 
 # Token 浠锋牸鍙傝€冿紙CNY / 1M tokens锛?
 # MiMo v2.5 Pro: 杈撳叆 楼4, 杈撳嚭 楼16
@@ -465,7 +465,7 @@ MODEL_PRICE_PER_MTOK_OUT = {
     "4o-mini":         0.6,
 }
 
-# 浼氳瘽棰勭畻榛樿鍊?楼0.15锛堢害 15 涓?Mimo 鏅€?token锛夛紝鍙€氳繃 FUXI_SESSION_BUDGET 閰嶇疆
+# 浼氳瘽棰勭畻榛樿鍊?楼0.15锛堢害 15 涓?Mimo 鏅€?token锛夛紝鍙€氳繃 FUXI_SESSION_BUDGET 閰嶇疆
 _DEFAULT_SESSION_BUDGET: float = float(os.getenv("FUXI_SESSION_BUDGET", "0.15"))
 # 璀﹀憡闃堝€硷細80% 棰勭畻
 _BUDGET_WARN_THRESHOLD: float = 0.80
@@ -487,12 +487,12 @@ class TokenBudgetExceeded(Exception):
 
 
 class TokenBudget:
-    """Token 鎴愭湰棰勭畻璺熻釜鍣?鈥?浼氳瘽绾ф垚鏈啍鏂?
+    """Token 鎴愭湰棰勭畻璺熻釜鍣?鈥?浼氳瘽绾ф垚鏈啍鏂?
 
     璺熻釜鍗曚釜 session 鐨勭疮璁?token 娑堣€楋紙鎸夋ā鍨嬩环鏍兼姌绠?RMB锛夛紝
-    鎻愪緵棰勭畻鍛婅鍜岀啍鏂満鍒躲€?
+    鎻愪緵棰勭畻鍛婅鍜岀啍鏂満鍒躲€?
 
-    浠锋牸妯″瀷锛氭寜瀛楃鏁颁及绠?token 鏁帮紙涓枃 ~1.5 char/token锛岃嫳鏂?~4 char/token锛夛紝
+    浠锋牸妯″瀷锛氭寜瀛楃鏁颁及绠?token 鏁帮紙涓枃 ~1.5 char/token锛岃嫳鏂?~4 char/token锛夛紝
     鍐嶄箻浠ユā鍨嬪崟浠枫€?
 
     Usage::
@@ -513,7 +513,7 @@ class TokenBudget:
         session_id:   浼氳瘽鏍囪瘑
         budget_cny:   棰勭畻涓婇檺锛堜汉姘戝竵鍏冿級
         consumed_cny: 宸叉秷鑰楅噾棰?
-        call_count:   绱璋冪敤娆℃暟
+        call_count:   绱璋冪敤娆℃暟
     """
 
     def __init__(
@@ -539,7 +539,7 @@ class TokenBudget:
         """
         if not text:
             return 0
-        # 缁熻涓枃瀛楃鏁?
+        # 缁熻涓枃瀛楃鏁?
         chinese_chars = sum(1 for c in text if '\u4e00' <= c <= '\u9fff')
         other_chars = len(text) - chinese_chars
         return max(1, int(chinese_chars / 1.5 + other_chars / 4.0))
@@ -557,14 +557,14 @@ class TokenBudget:
         input_tokens: Optional[int] = None,
         output_tokens: Optional[int] = None,
     ) -> float:
-        """浼扮畻鍗曟璋冪敤鎴愭湰锛圕NY锛?
+        """浼扮畻鍗曟璋冪敤鎴愭湰锛圕NY锛?
 
         Args:
             model:        妯″瀷鍚?
-            input_chars:  杈撳叆瀛楃鏁帮紙鑻ユ湭鎻愪緵 input_tokens锛?
-            output_chars: 杈撳嚭瀛楃鏁帮紙鑻ユ湭鎻愪緵 output_tokens锛?
-            input_tokens: 绮剧‘杈撳叆 token 鏁帮紙鍙€夛級
-            output_tokens: 绮剧‘杈撳嚭 token 鏁帮紙鍙€夛級
+            input_chars:  杈撳叆瀛楃鏁帮紙鑻ユ湭鎻愪緵 input_tokens锛?
+            output_chars: 杈撳嚭瀛楃鏁帮紙鑻ユ湭鎻愪緵 output_tokens锛?
+            input_tokens: 绮剧‘杈撳叆 token 鏁帮紙鍙€夛級
+            output_tokens: 绮剧‘杈撳嚭 token 鏁帮紙鍙€夛級
 
         Returns:
             鎴愭湰浼扮畻锛堝厓锛?
@@ -594,13 +594,13 @@ class TokenBudget:
 
         Args:
             model:         妯″瀷鍚?
-            input_chars:   杈撳叆瀛楃鏁?
-            output_chars:  杈撳嚭瀛楃鏁?
-            input_tokens:  绮剧‘杈撳叆 token 鏁帮紙鍙€夛級
-            output_tokens: 绮剧‘杈撳嚭 token 鏁帮紙鍙€夛級
+            input_chars:   杈撳叆瀛楃鏁?
+            output_chars:  杈撳嚭瀛楃鏁?
+            input_tokens:  绮剧‘杈撳叆 token 鏁帮紙鍙€夛級
+            output_tokens: 绮剧‘杈撳嚭 token 鏁帮紙鍙€夛級
 
         Returns:
-            鏈璋冪敤鎴愭湰锛堝厓锛?
+            鏈璋冪敤鎴愭湰锛堝厓锛?
 
         Raises:
             TokenBudgetExceeded: 瓒呭嚭棰勭畻鏃舵姏鍑?
@@ -639,7 +639,7 @@ class TokenBudget:
         actual_input_tokens: int,
         actual_output_tokens: int,
     ) -> float:
-        """浣跨敤 API 杩斿洖鐨勫疄闄?token 鏁拌褰曟秷鑰楋紙浼樺厛浣跨敤姝ゆ柟娉曪級
+        """浣跨敤 API 杩斿洖鐨勫疄闄?token 鏁拌褰曟秷鑰楋紙浼樺厛浣跨敤姝ゆ柟娉曪級
 
         Args:
             model:                妯″瀷鍚?
@@ -655,7 +655,7 @@ class TokenBudget:
             output_tokens=actual_output_tokens,
         )
 
-    # ---- 鏌ヨ鏂规硶 ----
+    # ---- 鏌ヨ鏂规硶 ----
 
     @property
     def is_tripped(self) -> bool:
@@ -671,14 +671,14 @@ class TokenBudget:
 
     @property
     def should_warn(self) -> bool:
-        """鏄惁杈惧埌鍛婅闃堝€硷紙80%锛?""
+        """鏄惁杈惧埌鍛婅闃堝€硷紙80%锛?""
         return self.usage_ratio >= _BUDGET_WARN_THRESHOLD
 
     def warn_if_near_limit(self) -> Optional[str]:
-        """鎺ヨ繎棰勭畻鏃惰繑鍥炶鍛婁俊鎭?
+        """鎺ヨ繎棰勭畻鏃惰繑鍥炶鍛婁俊鎭?
 
         Returns:
-            璀﹀憡瀛楃涓叉垨 None
+            璀﹀憡瀛楃涓叉垨 None
         """
         ratio = self.usage_ratio
         if ratio >= _BUDGET_CIRCUIT_THRESHOLD:
@@ -690,19 +690,19 @@ class TokenBudget:
             self._warned = True
             remaining = self.budget_cny - self.consumed_cny
             logger.warning(
-                "[TokenBudget] Session=%s 棰勭畻鍛婅: "
+                "[TokenBudget] Session=%s 棰勭畻鍛婅: "
                 "宸蹭娇鐢?%.1f%% (楼%.4f/楼%.2f), 鍓╀綑 楼%.4f",
                 self.session_id, ratio * 100,
                 self.consumed_cny, self.budget_cny, remaining,
             )
             return (
-                f"鈿狅笍 TokenBudget 棰勭畻鍛婅: 宸蹭娇鐢?{ratio*100:.0f}% "
+                f"鈿狅笍 TokenBudget 棰勭畻鍛婅: 宸蹭娇鐢?{ratio*100:.0f}% "
                 f"(楼{self.consumed_cny:.4f}/楼{self.budget_cny:.2f})"
             )
         return None
 
     def get_stats(self) -> Dict[str, Any]:
-        """鑾峰彇棰勭畻缁熻鎽樿"""
+        """(see original source)"""
         return {
             "session_id": self.session_id,
             "budget_cny": self.budget_cny,
@@ -732,7 +732,7 @@ class TokenBudget:
 
 
 # ============================================================================
-# 浼氳瘽绾?TokenBudget 娉ㄥ唽琛紙绾跨▼瀹夊叏锛岀敱 dispatch_llm 浣跨敤锛?
+# 浼氳瘽绾?TokenBudget 娉ㄥ唽琛紙绾跨▼瀹夊叏锛岀敱 dispatch_llm 浣跨敤锛?
 # ============================================================================
 
 _budget_lock = asyncio.Lock()

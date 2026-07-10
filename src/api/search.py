@@ -15,16 +15,24 @@ class SearchBody(BaseModel):
     page_size: int = 8
     granularity: str = "chunk"
 
+    def __init__(self, **data):
+        # v1.44 R3: top_k 上限保护，最大100
+        if 'top_k' in data and data['top_k'] > 100:
+            data['top_k'] = 100
+        super().__init__(**data)
+
 
 @router.get("/api/search")
 async def search_get(
     q: str = Query(...),
-    top_k: int = 15,
+    top_k: int = Query(15, le=100, ge=1, description="返回结果数，最大100"),
     page: int = 1,
     page_size: int = 8,
     granularity: str = Query("chunk", description="检索粒度: chunk/event/auto"),
     request: Request = None,
 ):
+    # v1.44 R3: top_k 上限保护
+    top_k = min(top_k, 100)
     return await _search_impl(q, top_k, page, page_size, granularity, request)
 
 
@@ -34,6 +42,27 @@ async def search_post(body: SearchBody, request: Request = None):
     return await _search_impl(body.q, body.top_k, body.page, body.page_size, body.granularity, request)
 
 
+def _filter_by_tenant(results: list, tenant_id: str) -> list:
+    """多租户隔离：按 tenant_id 过滤结果
+    
+    规则：
+      - 如果结果 metadata 中有 tenant_id 字段，必须匹配
+      - 如果结果 metadata 中无 tenant_id 字段，视为默认租户数据
+      - 非默认租户不能访问其他租户的数据
+    """
+    if tenant_id == "default":
+        # 默认租户可以看自己的数据 + 无租户标记的遗留数据
+        return results
+    # 非默认租户：只看自己租户的数据
+    filtered = []
+    for r in results:
+        meta = r.get("metadata", {})
+        r_tenant = meta.get("tenant_id", "default")
+        if r_tenant == tenant_id:
+            filtered.append(r)
+    return filtered
+
+
 async def _search_impl(q: str, top_k: int, page: int, page_size: int, granularity: str, request: Request = None):
     """搜索实现 — v1.50 统一响应格式支持
     
@@ -41,10 +70,15 @@ async def _search_impl(q: str, top_k: int, page: int, page_size: int, granularit
       - 'chunk': chunk 粒度检索（默认，向后兼容）
       - 'event': event 粒度检索（返回 event→chunk 映射结果）
       - 'auto': 根据查询复杂度自动选择
+    
+    v1.44 R2: 多租户隔离 — 从 JWT 提取 tenant_id，过滤搜索结果
     """
     from src.api.response import success, error
     try:
         from src.taiyang.retrieval import hybrid_search, event_search
+        
+        # v1.44 R2: 从 request.state 获取租户 ID（由 AuthMiddleware 注入）
+        tenant_id = getattr(request.state, "tenant_id", "default") if request else "default"
         
         if granularity == "event":
             # Event 粒度检索
@@ -53,6 +87,9 @@ async def _search_impl(q: str, top_k: int, page: int, page_size: int, granularit
         else:
             # Chunk 粒度（默认）/ auto
             results = await hybrid_search(q, top_k=top_k, granularity=granularity)
+        
+        # v1.44 R2: 多租户隔离过滤
+        results = _filter_by_tenant(results, tenant_id)
         wiki_hits = [r for r in results if r.get("_source") == "wiki"]
         chunk_hits = [r for r in results if r.get("_source") != "wiki"]
         

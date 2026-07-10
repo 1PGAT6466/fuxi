@@ -72,6 +72,27 @@ if not _JWT_SECRET_FROM_ENV:
         RuntimeWarning
     )
 JWT_SECRET = _JWT_SECRET_FROM_ENV
+
+# v1.44 R2: 检测弱密钥，拒绝已知默认值
+_WEAK_SECRETS = {
+    "fuxi-v1.50-jwt-production-key-change-in-prod",
+    "fuxi-v1.44-jwt-secret",
+    "change-me",
+    "secret",
+    "jwt-secret",
+    "your-secret-key",
+    "super-secret",
+}
+if JWT_SECRET in _WEAK_SECRETS:
+    import warnings
+    _JWT_SECRET_FROM_ENV = _secrets.token_hex(32)
+    JWT_SECRET = _JWT_SECRET_FROM_ENV
+    warnings.warn(
+        "[Config] 检测到弱 JWT 密钥，已自动替换为随机密钥。"
+        "生产环境请设置 FUXI_JWT_SECRET 环境变量。",
+        RuntimeWarning
+    )
+
 JWT_EXPIRY_HOURS = int(os.getenv("JWT_EXPIRY_HOURS", "24"))
 
 ADMIN_TOKEN = os.getenv("KB_ADMIN_TOKEN", "")
