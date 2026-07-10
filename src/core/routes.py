@@ -14,7 +14,7 @@ from src.config import LOADER_URL
 
 logger = logging.getLogger("server")
 
-STATIC_DIR = Path(__file__).parent.parent.parent / "frontend"
+STATIC_DIR = Path(__file__).parent.parent.parent / "frontend" / "vue3-migration" / "dist"
 _is_production = __import__('os').environ.get("FUXI_ENV", "production").lower() == "production"
 
 
@@ -272,11 +272,8 @@ def _register_static_routes(app: FastAPI) -> None:
     from fastapi.staticfiles import StaticFiles
     from starlette.staticfiles import StaticFiles as _StaticFiles
 
-    _static_dist = STATIC_DIR / "dist"
-    if _static_dist.exists():
-        app.mount("/static", StaticFiles(directory=str(_static_dist)), name="static")
-        logger.info(f"静态资源挂载: {_static_dist}")
-    else:
+    # v1.44: 静态资源指向 Vue3 构建产物
+    if STATIC_DIR.exists():
         class _SafeStaticFiles(_StaticFiles):
             _BLOCKED_EXTS = {".vue", ".ts", ".tsx", ".jsx", ".json", ".lock", ".md"}
             _BLOCKED_NAMES = {"package.json", "package-lock.json", "vite.config.js", "vite.config.ts", "yarn.lock", "pnpm-lock.yaml"}
@@ -289,4 +286,6 @@ def _register_static_routes(app: FastAPI) -> None:
                     return None
                 return super().lookup_path(path)
         app.mount("/static", _SafeStaticFiles(directory=str(STATIC_DIR)), name="static")
-        logger.info(f"静态资源挂载（安全模式）: {STATIC_DIR}")
+        logger.info(f"静态资源挂载: {STATIC_DIR}")
+    else:
+        logger.warning(f"静态资源目录不存在: {STATIC_DIR}")

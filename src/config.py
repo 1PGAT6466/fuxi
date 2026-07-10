@@ -16,7 +16,7 @@ FEEDBACK_DIR = BASE_DIR / "feedback_data"
 UPLOAD_DIR = BASE_DIR / "uploads"
 LOG_DIR = BASE_DIR / "logs"
 BACKUP_DIR = BASE_DIR / "backups"
-STATIC_DIR = _project_root / "frontend"
+STATIC_DIR = _project_root / "frontend" / "vue3-migration" / "dist"
 ADMIN_DIR = STATIC_DIR / "admin"
 CONFIG_HISTORY_DIR = DATA_DIR / "config_history"
 

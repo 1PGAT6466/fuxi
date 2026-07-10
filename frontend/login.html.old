@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>伏羲 · 登录</title>
+<!-- CSP 策略由 HTTP 响应头设置，此处不再重复定义 -->
+<link rel="stylesheet" href="/static/css/login.css">
+</head>
+<body>
+<div class="login-container">
+    <div class="logo">
+        <div class="logo-icon">☰</div>
+        <h1>伏 羲</h1>
+        <p>企业知识认知体系</p>
+    </div>
+    <form id="loginForm">
+        <div class="form-group">
+            <label>用户名</label>
+            <input type="text" id="loginUser" placeholder="请输入用户名" autocomplete="username" required>
+        </div>
+        <div class="form-group">
+            <label>密码</label>
+            <input type="password" id="loginPass" placeholder="请输入密码" autocomplete="current-password" required>
+        </div>
+        <button type="submit" class="btn" id="submitBtn">登 录</button>
+        <div class="error" id="error"></div>
+    </form>
+    <div class="toggle">
+        <span id="toggleText">没有账号？</span>
+        <a id="toggleLink" onclick="toggleMode()">注册新账号</a>
+    </div>
+    <div class="version">伏羲体系 · v1.44</div>
+</div>
+<script>
+// 登录页 API 请求封装（轻量版，兼容独立页面无 api-client.js）
+var _loginApiBase = '';
+var _loginTimeout = 15000;
+function _loginFetch(url, opt) {
+  if (!opt) opt = {};
+  if (!opt.headers) opt.headers = {};
+  if (opt.body && typeof opt.body === 'object' && !opt.headers['Content-Type']) {
+    opt.headers['Content-Type'] = 'application/json';
+    opt.body = JSON.stringify(opt.body);
+  }
+  var controller = new AbortController();
+  var timer = setTimeout(function() { controller.abort(); }, _loginTimeout);
+  var fetchOpts = Object.assign({}, opt, { signal: controller.signal });
+  return fetch(url, fetchOpts).then(function(r) {
+    clearTimeout(timer);
+    if (!r.ok) {
+      return r.json().then(function(d) {
+        throw new Error(d.detail || d.error || (r.status === 401 ? '用户名或密码错误' : '操作失败 (' + r.status + ')'));
+      }).catch(function(e) { if (e.message) throw e; throw new Error('操作失败 (' + r.status + ')'); });
+    }
+    return r.json();
+  }).catch(function(e) {
+    clearTimeout(timer);
+    if (e.name === 'AbortError') throw new Error('请求超时，请检查网络后重试');
+    throw e;
+  });
+}
+
+// Token 格式校验（仅允许 Base64URL 字符集，防注入）
+var _TOKEN_RE = /^[A-Za-z0-9._~+\/=-]+$/;
+function _isValidToken(t) {
+  return typeof t === 'string' && t.length > 0 && t.length < 4096 && _TOKEN_RE.test(t);
+}
+
+var isLogin = true;
+function toggleMode() {
+  isLogin = !isLogin;
+  document.getElementById('submitBtn').textContent = isLogin ? '登 录' : '注 册';
+  document.getElementById('toggleText').textContent = isLogin ? '没有账号？' : '已有账号？';
+  document.getElementById('toggleLink').textContent = isLogin ? '注册新账号' : '去登录';
+  document.getElementById('error').textContent = '';
+}
+
+document.getElementById('loginForm').addEventListener('submit', function(e) {
+  e.preventDefault();
+  var u = document.getElementById('loginUser').value.trim();
+  var p = document.getElementById('loginPass').value;
+  var el = document.getElementById('error');
+  var btn = document.getElementById('submitBtn');
+  if (!u || !p) { el.textContent = '请填写用户名和密码'; return; }
+  if (u.length > 64) { el.textContent = '用户名过长'; return; }
+  btn.disabled = true;
+  btn.textContent = isLogin ? '登录中...' : '注册中...';
+  el.textContent = '';
+
+  var ep = isLogin ? '/api/auth/login' : '/api/auth/register';
+  _loginFetch(ep, { method: 'POST', body: { username: u, password: p } })
+    .then(function(d) {
+      if (isLogin) {
+        if (!d.token || !_isValidToken(d.token)) {
+          el.textContent = '服务器返回的 Token 格式异常，请重试';
+          return;
+        }
+        try {
+          sessionStorage.setItem('fuxi_token', _encodeToken(d.token));
+          sessionStorage.setItem('fuxi_user', JSON.stringify({
+            username: d.username, role: d.role, display_name: d.display_name
+          }));
+        } catch (storageErr) {
+          el.textContent = '浏览器存储不可用，请检查隐私设置';
+          return;
+        }
+        window.location.href = '/';
+      } else {
+        el.style.color = '#2ecc71';
+        el.textContent = '注册成功，请登录';
+        isLogin = true;
+        document.getElementById('submitBtn').textContent = '登 录';
+        setTimeout(function() { el.style.color = ''; }, 3000);
+      }
+    })
+    .catch(function(err) {
+      el.textContent = err.message || '网络错误，请检查连接后重试';
+    })
+    .finally(function() {
+      btn.disabled = false;
+      if (btn.textContent.indexOf('中') >= 0) btn.textContent = isLogin ? '登 录' : '注 册';
+    });
+});
+
+// XOR+base64 混淆存储 token（与主应用 api-client.js fallback 一致）
+var _STORAGE_SALT = 'fuxi_v1.44_salt_2026';
+function _encodeToken(s) {
+  var key = _STORAGE_SALT;
+  var result = '';
+  for (var i = 0; i < s.length; i++) {
+    result += String.fromCharCode(s.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+  }
+  return btoa(unescape(encodeURIComponent(result)));
+}
+
+// 已登录则直接跳转主应用（也校验 token 格式）
+(function() {
+  var savedToken = sessionStorage.getItem('fuxi_token');
+  if (savedToken) {
+    // 尝试解码（token 可能是加密存储的）
+    var decoded = '';
+    try { decoded = decodeURIComponent(escape(atob(savedToken))); } catch(e) {}
+    var plain = decoded ? (function() {
+      var key = _STORAGE_SALT; var r = '';
+      for (var i = 0; i < decoded.length; i++) r += String.fromCharCode(decoded.charCodeAt(i) ^ key.charCodeAt(i % key.length));
+      return r;
+    })() : savedToken;
+    if (_isValidToken(plain)) {
+      window.location.href = '/';
+    } else {
+      sessionStorage.removeItem('fuxi_token');
+      sessionStorage.removeItem('fuxi_user');
+    }
+  }
+})();
+</script>
+</body>
+</html>
