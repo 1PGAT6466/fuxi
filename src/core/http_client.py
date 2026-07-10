@@ -1,20 +1,27 @@
 """
 Async HTTP client helper.
 Replaces sync urllib.request.urlopen() in async functions.
+Uses global aiohttp session with connection pool.
 """
 import aiohttp
 import logging
 
 logger = logging.getLogger(__name__)
 
-# Shared session (reused across requests)
+# Shared session (reused across requests) with connection pool
 _session = None
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+
 
 async def get_session():
     global _session
     if _session is None or _session.closed:
-        _session = aiohttp.ClientSession()
+        connector = aiohttp.TCPConnector(
+            limit=100,
+            limit_per_host=20,
+            ttl_dns_cache=300,
+            enable_cleanup_closed=True,
+        )
+        _session = aiohttp.ClientSession(connector=connector)
     return _session
 
 async def fetch(url: str, timeout: int = 15, headers: dict = None) -> bytes:

@@ -203,7 +203,12 @@ async def admin_create_user(request: Request):
         import time
         from src.config import DATA_DIR as CONFIG_DATA_DIR
         users_file = Path(CONFIG_DATA_DIR) / "users.json"
-        users = json.loads(users_file.read_text(encoding="utf-8")) if users_file.exists() else {}
+        import asyncio as _aio
+        def _rd():
+            import asyncio as _aio
+            result = await _aio.to_thread(lambda: json.loads(users_file.read_text(encoding="utf-8")) if users_file.exists() else {})
+            return result
+        users = await _aio.to_thread(_rd)
 
         if username in users:
             return JSONResponse(
@@ -247,7 +252,12 @@ async def admin_update_user(user_id: str, request: Request):
         if not users_file.exists():
             return JSONResponse(status_code=404, content={"error": "鐢ㄦ埛鏈壘鍒?})
 
-        users = json.loads(users_file.read_text(encoding="utf-8"))
+        import asyncio as _aio
+        def _rd():
+            import asyncio as _aio
+            result = await _aio.to_thread(lambda: json.loads(users_file.read_text(encoding="utf-8")))
+            return result
+        users = await _aio.to_thread(_rd)
         if user_id not in users:
             return JSONResponse(status_code=404, content={"error": "鐢ㄦ埛鏈壘鍒?, "detail": f"鐢ㄦ埛 {user_id} 涓嶅瓨鍦?})
 
@@ -267,7 +277,9 @@ async def admin_update_user(user_id: str, request: Request):
             from src.api.auth_routes import _hash_password
             users[user_id]["password"] = _hash_password(new_pw)
 
-        users_file.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8")
+        def _wr():
+            await _aio.to_thread(lambda: users_file.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8"))
+        await _aio.to_thread(_wr)
 
         _wants_v2 = request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
         if _wants_v2:
@@ -290,12 +302,17 @@ async def admin_delete_user(user_id: str, request: Request = None):
         if not users_file.exists():
             return JSONResponse(status_code=404, content={"error": "鐢ㄦ埛鏈壘鍒?})
 
-        users = json.loads(users_file.read_text(encoding="utf-8"))
+        import asyncio as _aio
+        def _rd():
+            import asyncio as _aio
+            result = await _aio.to_thread(lambda: json.loads(users_file.read_text(encoding="utf-8")))
+            return result
+        users = await _aio.to_thread(_rd)
         if user_id not in users:
             return JSONResponse(status_code=404, content={"error": "鐢ㄦ埛鏈壘鍒?, "detail": f"鐢ㄦ埛 {user_id} 涓嶅瓨鍦?})
 
         del users[user_id]
-        users_file.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8")
+        await _aio.to_thread(lambda: users_file.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8"))
 
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
         if _wants_v2:

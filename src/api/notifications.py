@@ -167,7 +167,8 @@ async def list_notifications(
       2. 系统状态自动生成（审计日志、数据状态、评测状态）
     """
     try:
-        notifications = _load_notifications()
+        import asyncio as _aio
+        notifications = await _aio.to_thread(_load_notifications)
 
         if unread_only:
             notifications = [n for n in notifications if not n.get("read", False)]
@@ -202,7 +203,8 @@ async def list_notifications(
 async def mark_notification_read(notification_id: str, request: Request = None):
     """标记通知已读 — 持久化状态"""
     try:
-        notifications = _load_notifications()
+        import asyncio as _aio
+        notifications = await _aio.to_thread(_load_notifications)
         found = False
         for n in notifications:
             if n.get("id") == notification_id:
@@ -212,7 +214,7 @@ async def mark_notification_read(notification_id: str, request: Request = None):
                 break
 
         if found:
-            _save_notifications(notifications)
+            await _aio.to_thread(_save_notifications, notifications)
 
         return {"ok": True, "id": notification_id, "read": found}
     except Exception as e:  # TODO: Narrow exception type
@@ -227,7 +229,8 @@ async def mark_notification_read(notification_id: str, request: Request = None):
 async def mark_all_notifications_read(request: Request = None):
     """标记全部已读 — 持久化状态"""
     try:
-        notifications = _load_notifications()
+        import asyncio as _aio
+        notifications = await _aio.to_thread(_load_notifications)
         now = time.time()
         count = 0
         for n in notifications:
@@ -237,7 +240,7 @@ async def mark_all_notifications_read(request: Request = None):
                 count += 1
 
         if count > 0:
-            _save_notifications(notifications)
+            await _aio.to_thread(_save_notifications, notifications)
 
         return {"ok": True, "read_all": True, "marked_count": count}
     except Exception as e:  # TODO: Narrow exception type

@@ -280,20 +280,29 @@ def route_entity_with_neighbors(query: str, max_entities: int = 5) -> dict:
         if WORLDTREE_DB_PATH.exists():
             import sqlite3 as _sqlite
             conn = _sqlite.connect(wiki_db)
-            for e in top:
-                entity_name = e["entity"]
-                cur = conn.execute(
-                    "SELECT id, title FROM wiki_pages WHERE title LIKE ? OR content LIKE ? LIMIT 3",
-                    ("%" + entity_name + "%", "%" + entity_name + "%")
-                )
-                rows = cur.fetchall()
-                for row in rows:
-                    wiki_links.append({
-                        "entity": entity_name,
-                        "wiki_id": row[0],
-                        "wiki_title": row[1],
-                        "auto_linked": True
-                    })
+            # Batch: 用单条 SQL 替代 N+1 循环查询
+            entity_names = [e["entity"] for e in top]
+            if entity_names:
+                conditions = []
+                params = []
+                for name in entity_names:
+                    conditions.append("(title LIKE ? OR content LIKE ?)")
+                    params.extend([f"%{name}%", f"%{name}%"])
+                sql = f"SELECT id, title FROM wiki_pages WHERE {' OR '.join(conditions)} LIMIT {len(entity_names) * 3}"
+                cur = conn.execute(sql, params)
+                # 建立 title -> entity_name 映射
+                title_to_entity = {}
+                for row in cur.fetchall():
+                    row_title = (row[1] or "").lower()
+                    for name in entity_names:
+                        if name.lower() in row_title:
+                            wiki_links.append({
+                                "entity": name,
+                                "wiki_id": row[0],
+                                "wiki_title": row[1],
+                                "auto_linked": True
+                            })
+                            break
             conn.close()
     except Exception as e:  # TODO: Narrow exception type
         import logging; logging.getLogger(__name__).warning(f"[Graph wiki-link] {e}")
@@ -328,14 +337,22 @@ def route_entity_with_neighbors(query: str, max_entities: int = 5) -> dict:
         conn = sqlite3.connect(str(WORLDTREE_DB_PATH), timeout=10)
         conn.execute("PRAGMA journal_mode=WAL")
         conn.execute("PRAGMA busy_timeout=5000")
-        for e in top:
-            entity_name = e["entity"]
-            cur = conn.execute(
-                "SELECT id, title FROM wiki_pages WHERE title LIKE ? OR content LIKE ? LIMIT 3",
-                (f"%{entity_name}%", f"%{entity_name}%")
-            )
+        # Batch: 用单条 SQL 替代 N+1 循环查询
+        entity_names = [e["entity"] for e in top]
+        if entity_names:
+            conditions = []
+            params = []
+            for name in entity_names:
+                conditions.append("(title LIKE ? OR content LIKE ?)")
+                params.extend([f"%{name}%", f"%{name}%"])
+            sql = f"SELECT id, title FROM wiki_pages WHERE {' OR '.join(conditions)} LIMIT {len(entity_names) * 3}"
+            cur = conn.execute(sql, params)
             for row in cur.fetchall():
-                wiki_links.append({"entity": entity_name, "wiki_id": row[0], "wiki_title": row[1]})
+                row_title = (row[1] or "").lower()
+                for name in entity_names:
+                    if name.lower() in row_title:
+                        wiki_links.append({"entity": name, "wiki_id": row[0], "wiki_title": row[1]})
+                        break
         conn.close()
     except Exception as e:  # TODO: Narrow exception type
         import logging; logging.getLogger(__name__).warning(f"[Graph wiki-link] {e}")

@@ -126,7 +126,7 @@ async def _call_api(
                     if tool_calls and not content:
                         logger.info(
                             f"_call_api: 鏀跺埌 {len(tool_calls)} 涓?tool_calls, "
-                            f"搴忓垪鍖栬繑鍥?
+                            f"序列化返回"
                         )
                         return json.dumps({"tool_calls": tool_calls}, ensure_ascii=False)
 
@@ -244,7 +244,7 @@ async def call_llm(
         if result:
             logger.info(f"DeepSeek fallback OK ({len(result)} chars)")
             return result
-    logger.warning("DeepSeek 涔熷け璐?)
+    logger.warning("DeepSeek 也失败")
 
     return ""
 

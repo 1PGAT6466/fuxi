@@ -240,27 +240,27 @@ def _register_inline_routes(app: FastAPI) -> None:
     # ── 代理路由 ──
     @app.get("/api/proxy/loader/files")
     async def proxy_loader_files():
-        import aiohttp
+        from src.core.http_client import get_session
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.get(f"{LOADER_URL}/api/files", timeout=aiohttp.ClientTimeout(total=10)) as resp:
-                    return await resp.json()
+            session = await get_session()
+            async with session.get(f"{LOADER_URL}/api/files", timeout=aiohttp.ClientTimeout(total=10)) as resp:
+                return await resp.json()
         except (OSError, RuntimeError, ValueError) as e:
             return error(f"代理加载器请求失败: {str(e)}", status_code=502, detail=str(e))
 
     @app.post("/api/proxy/loader/upload")
     async def proxy_loader_upload(request: Request):
-        import aiohttp
+        from src.core.http_client import get_session
         body = await request.body()
         try:
-            async with aiohttp.ClientSession() as session:
-                async with session.post(
-                    f"{LOADER_URL}/api/upload",
-                    data=body,
-                    timeout=aiohttp.ClientTimeout(total=30),
-                    headers={"Content-Type": request.headers.get("Content-Type", "multipart/form-data")}
-                ) as resp:
-                    return await resp.json()
+            session = await get_session()
+            async with session.post(
+                f"{LOADER_URL}/api/upload",
+                data=body,
+                timeout=aiohttp.ClientTimeout(total=30),
+                headers={"Content-Type": request.headers.get("Content-Type", "multipart/form-data")}
+            ) as resp:
+                return await resp.json()
         except (OSError, RuntimeError, ValueError) as e:
             return error(f"代理加载器上传失败: {str(e)}", status_code=502, detail=str(e))
 

@@ -111,16 +111,18 @@ async def build_relations_from_chunks(chunks: list, batch_size: int = 50) -> dic
                 db.execute("PRAGMA journal_mode=WAL")
                 db.execute("PRAGMA busy_timeout=5000")
                 
+                # Batch: executemany 替代循环 INSERT
+                rel_rows = [(r["from_id"], r["to_id"], r["relation_type"]) for r in relations]
                 count = 0
-                for r in relations:
+                if rel_rows:
                     try:
-                        db.execute(
+                        db.executemany(
                             "INSERT OR IGNORE INTO entity_relations (from_id, to_id, relation_type) VALUES (?, ?, ?)",
-                            (r["from_id"], r["to_id"], r["relation_type"])
+                            rel_rows
                         )
-                        count += 1
+                        count = len(rel_rows)
                     except Exception as e:
-                        logger.warning(f"插入关系失败: {e}")
+                        logger.warning(f"批量插入关系失败: {e}")
                 db.commit()
                 db.close()
                 return count

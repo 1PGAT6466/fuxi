@@ -142,7 +142,7 @@ class EvalAutomation:
         report["recommendations"] = self._generate_recommendations(report)
 
         # 6. 保存报告
-        self._save_report(report)
+        await self._save_report(report)
 
         logger.info(f"[EvalAutomation] 每日评测完成: {len(report['issues'])} 个问题")
         return report
@@ -249,24 +249,28 @@ class EvalAutomation:
 
         return recommendations
 
-    def _save_report(self, report: Dict):
+    async def _save_report(self, report: Dict):
         """保存评测报告"""
         try:
             date = report.get("date", datetime.now().strftime("%Y-%m-%d"))
             report_file = REPORT_DIR / f"eval_report_{date}.json"
-            with open(report_file, "w", encoding="utf-8") as f:
-                json.dump(report, f, ensure_ascii=False, indent=2)
+            def _wr():
+                with open(report_file, "w", encoding="utf-8") as f:
+                    json.dump(report, f, ensure_ascii=False, indent=2)
+            await asyncio.to_thread(_wr)
 
             # 同时追加到历史记录
             history_file = EVAL_DIR / "eval_history.jsonl"
-            with open(history_file, "a", encoding="utf-8") as f:
-                f.write(json.dumps({
+            def _append():
+                with open(history_file, "a", encoding="utf-8") as f:
+                    f.write(json.dumps({
                     "date": date,
                     "total_queries": report["metrics"].get("search", {}).get("total_queries", 0),
                     "avg_latency_ms": report["metrics"].get("search", {}).get("avg_latency_ms", 0),
                     "error_rate": report["metrics"].get("performance", {}).get("error_rate", 0),
                     "degradation_detected": report["degradation"].get("detected", False),
                 }, ensure_ascii=False) + "\n")
+            await asyncio.to_thread(_append)
 
             logger.info(f"[EvalAutomation] 报告已保存: {report_file}")
         except Exception as e:  # TODO: Narrow exception type

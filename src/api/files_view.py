@@ -18,7 +18,7 @@ KB_IMAGES_DIR = Path(CONFIG_DATA_DIR) / "kb-images"
 
 
 @router.get("/api/view/{file_hash}")
-def view_document(file_hash: str, request: Request):
+async def view_document(file_hash: str, request: Request):
     """查看文档（根据 file_hash 在 uploads 目录中查找）(v1.50: requires auth)"""
     try:
         # v1.50 security fix: 认证检查（安全降级）
@@ -34,8 +34,7 @@ def view_document(file_hash: str, request: Request):
                     import hashlib
                     fpath = Path(root) / fname
                     try:
-                        with open(fpath, "rb") as f:
-                            content = f.read()
+                        content = await asyncio.to_thread(lambda: open(fpath, "rb").read())
                         computed_hash = hashlib.sha256(content).hexdigest()[:16]
                         if computed_hash == file_hash[:16] or file_hash in str(fpath):
                             return FileResponse(str(fpath))
@@ -58,7 +57,7 @@ def view_document(file_hash: str, request: Request):
 
 
 @router.get("/api/download/{file_hash}")
-def download_document(file_hash: str, request: Request):
+async def download_document(file_hash: str, request: Request):
     """下载文档 (v1.50: requires auth)"""
     try:
         # v1.50 security fix: 认证检查（安全降级）
@@ -74,8 +73,7 @@ def download_document(file_hash: str, request: Request):
                     fpath = Path(root) / fname
                     import hashlib
                     try:
-                        with open(fpath, "rb") as f:
-                            content = f.read()
+                        content = await asyncio.to_thread(lambda: open(fpath, "rb").read())
                         computed_hash = hashlib.sha256(content).hexdigest()[:16]
                         if computed_hash == file_hash[:16] or file_hash in str(fpath):
                             return FileResponse(

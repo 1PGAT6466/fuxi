@@ -240,30 +240,42 @@ class WriteProxy:
         import json
         try:
             cur = self.pg.cursor()
+            # Batch: executemany 替代循环 INSERT
+            chunk_rows = []
             for c in chunks:
                 emb_str = self._embedding_to_str(c.embedding) if c.embedding else None
-                cur.execute(
+                chunk_rows.append((c.chunk_id, c.document_id, c.document_name, c.content,
+                     c.chunk_index, c.token_count, json.dumps(c.metadata), emb_str))
+            if chunk_rows:
+                cur.executemany(
                     """INSERT INTO chunks (chunk_id, document_id, document_name, content,
                        chunk_index, token_count, metadata, embedding)
                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                        ON CONFLICT (chunk_id) DO UPDATE SET content=EXCLUDED.content, updated_at=now()""",
-                    (c.chunk_id, c.document_id, c.document_name, c.content,
-                     c.chunk_index, c.token_count, json.dumps(c.metadata), emb_str),
-                )
+                    chunk_rows)
+            # Batch: executemany 替代循环 INSERT
+            event_rows = []
             for e in events:
                 emb_str = self._embedding_to_str(e.embedding) if e.embedding else None
-                cur.execute(
+                event_rows.append((e.event_id, e.chunk_id, e.content, e.event_type,
+                     json.dumps(e.entities_json), e.confidence, e.status,
+                     json.dumps(e.metadata), emb_str))
+            if event_rows:
+                cur.executemany(
                     """INSERT INTO events (event_id, chunk_id, content, event_type,
                        entities_json, confidence, status, metadata, embedding)
                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
                        ON CONFLICT (event_id) DO UPDATE SET content=EXCLUDED.content, updated_at=now()""",
-                    (e.event_id, e.chunk_id, e.content, e.event_type,
-                     json.dumps(e.entities_json), e.confidence, e.status,
-                     json.dumps(e.metadata), emb_str),
-                )
+                    event_rows)
+            # Batch: executemany 替代循环 INSERT
+            ent_rows = []
             for ent in entities:
                 emb_str = self._embedding_to_str(ent.embedding) if ent.embedding else None
-                cur.execute(
+                ent_rows.append((ent.entity_id, ent.name, ent.normalized_name, ent.type,
+                     json.dumps(ent.aliases), json.dumps(ent.chunk_ids),
+                     json.dumps(ent.metadata), emb_str))
+            if ent_rows:
+                cur.executemany(
                     """INSERT INTO entities (entity_id, name, normalized_name, type,
                        aliases_json, chunk_ids_json, metadata, embedding)
                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
@@ -271,17 +283,15 @@ class WriteProxy:
                        SET aliases_json = entities.aliases_json || EXCLUDED.aliases_json,
                            chunk_ids_json = entities.chunk_ids_json || EXCLUDED.chunk_ids_json,
                            updated_at = now()""",
-                    (ent.entity_id, ent.name, ent.normalized_name, ent.type,
-                     json.dumps(ent.aliases), json.dumps(ent.chunk_ids),
-                     json.dumps(ent.metadata), emb_str),
-                )
-            for link in links:
-                cur.execute(
+                    ent_rows)
+            # Batch: executemany 替代循环 INSERT
+            link_rows = [(link.event_id, link.entity_id, link.role, link.confidence) for link in links]
+            if link_rows:
+                cur.executemany(
                     """INSERT INTO event_entities (event_id, entity_id, role, confidence)
                        VALUES (%s,%s,%s,%s)
                        ON CONFLICT (event_id, entity_id) DO NOTHING""",
-                    (link.event_id, link.entity_id, link.role, link.confidence),
-                )
+                    link_rows)
             self.pg.commit()
             return True
         except Exception as e:  # TODO: Narrow exception type

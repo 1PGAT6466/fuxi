@@ -42,19 +42,17 @@ def build_adjacency():
     conn = _get_conn()
     conn.execute("DELETE FROM graph_adjacency")
 
+    # Batch: executemany 替代循环 INSERT
+    adj_rows = []
     for e in edges:
         src = e.get("source", "")
         tgt = e.get("target", "")
         rel = e.get("relation", "related_to")
         if src and tgt:
-            conn.execute(
-                "INSERT OR IGNORE INTO graph_adjacency VALUES (?,?,?,?,1.0)",
-                (src, tgt, rel, "out")
-            )
-            conn.execute(
-                "INSERT OR IGNORE INTO graph_adjacency VALUES (?,?,?,?,1.0)",
-                (tgt, src, rel, "in")
-            )
+            adj_rows.append((src, tgt, rel, "out", 1.0))
+            adj_rows.append((tgt, src, rel, "in", 1.0))
+    if adj_rows:
+        conn.executemany("INSERT OR IGNORE INTO graph_adjacency VALUES (?,?,?,?,1.0)", adj_rows)
 
     conn.commit()
     count = conn.execute("SELECT COUNT(*) FROM graph_adjacency").fetchone()[0]

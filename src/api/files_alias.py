@@ -78,8 +78,7 @@ async def files_delete(file_id: str, request: Request):
                     for fname in files:
                         fpath = Path(root) / fname
                         try:
-                            with open(fpath, "rb") as f:
-                                content = f.read()
+                            content = await asyncio.to_thread(lambda: open(fpath, "rb").read())
                             computed_hash = hashlib.sha256(content).hexdigest()[:16]
                             if computed_hash == file_id[:16] or file_id in str(fpath):
                                 fpath.unlink()

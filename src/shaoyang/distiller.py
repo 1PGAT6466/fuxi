@@ -366,41 +366,61 @@ def save_batch(results: List[Tuple[str, dict]]) -> dict:
                         (wid,title,wp.get("summary",""),wp["content"],path,wp.get("quality_score",0.7),now,now))
             stats["wiki"] += 1
         
+        # Batch: executemany 替代循环 INSERT
+        entity_rows = []
         for e in result.get("entities",[]):
             name = e["name"].strip()
             if not name: continue
             eid = make_id("ent", name)
-            conn.execute("INSERT OR IGNORE INTO entities (id,name,type,category_path,created_at) VALUES (?,?,?,?,?)",
-                        (eid,name,e.get("type","concept"),path,now))
+            entity_rows.append((eid, name, e.get("type","concept"), path, now))
             emap[name] = eid
             stats["ent"] += 1
+        if entity_rows:
+            conn.executemany("INSERT OR IGNORE INTO entities (id,name,type,category_path,created_at) VALUES (?,?,?,?,?)", entity_rows)
         
+        # Batch: 批量插入关系
+        rel_ent_rows = []
+        rel_rows = []
         for r in result.get("relations", []):
             fn, tn, rt = r.get("from","").strip(), r.get("to","").strip(), r.get("type","related_to")
             if not fn or not tn: continue
             fid = emap.get(fn) or make_id("ent", fn)
             tid = emap.get(tn) or make_id("ent", tn)
-            conn.execute("INSERT OR IGNORE INTO entities (id,name,type,created_at) VALUES (?,?,?,'concept',?)", (fid, fn, now))
-            conn.execute("INSERT OR IGNORE INTO entities (id,name,type,created_at) VALUES (?,?,?,'concept',?)", (tid, tn, now))
-            conn.execute("INSERT OR IGNORE INTO entity_relations (from_id,to_id,relation_type) VALUES (?,?,?)", (fid, tid, rt))
+            rel_ent_rows.append((fid, fn, "concept", now))
+            rel_ent_rows.append((tid, tn, "concept", now))
+            rel_rows.append((fid, tid, rt))
             stats["rel"] += 1
+        if rel_ent_rows:
+            conn.executemany("INSERT OR IGNORE INTO entities (id,name,type,created_at) VALUES (?,?,?,?)", rel_ent_rows)
+        if rel_rows:
+            conn.executemany("INSERT OR IGNORE INTO entity_relations (from_id,to_id,relation_type) VALUES (?,?,?)", rel_rows)
         
+        # Batch: executemany 替代循环 INSERT
+        term_rows = []
         for t in result.get("terms",[]):
             tn, td = t["term"].strip(), t.get("definition","").strip()
             if not tn or len(td)<8: continue
             tid = make_id("term", tn)
-            conn.execute("INSERT OR IGNORE INTO terms (id,term,definition,category,created_at) VALUES (?,?,?,?,?)",
-                        (tid,tn,td,path,now))
+            term_rows.append((tid, tn, td, path, now))
             tmap[tn] = tid
             stats["term"] += 1
+        if term_rows:
+            conn.executemany("INSERT OR IGNORE INTO terms (id,term,definition,category,created_at) VALUES (?,?,?,?,?)", term_rows)
         
+        # Batch: 批量插入 cross_links
         cl = result.get("cross_links",{})
+        we_rows = []
+        wt_rows = []
         for wn, en in cl.get("wiki_entity_pairs",[]):
             wid = make_id("wiki", f"{wn}{path}"); eid = emap.get(en)
-            if wid and eid: conn.execute("INSERT OR IGNORE INTO wiki_entity_links (wiki_id,entity_id) VALUES (?,?)",(wid,eid))
+            if wid and eid: we_rows.append((wid, eid))
         for wn, tn in cl.get("wiki_term_pairs",[]):
             wid = make_id("wiki", f"{wn}{path}"); tid = tmap.get(tn)
-            if wid and tid: conn.execute("INSERT OR IGNORE INTO wiki_term_links (wiki_id,term_id) VALUES (?,?)",(wid,tid))
+            if wid and tid: wt_rows.append((wid, tid))
+        if we_rows:
+            conn.executemany("INSERT OR IGNORE INTO wiki_entity_links (wiki_id,entity_id) VALUES (?,?)", we_rows)
+        if wt_rows:
+            conn.executemany("INSERT OR IGNORE INTO wiki_term_links (wiki_id,term_id) VALUES (?,?)", wt_rows)
     
     conn.commit()
     conn.close()

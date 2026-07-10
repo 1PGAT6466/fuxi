@@ -76,7 +76,8 @@ async def get_user_preferences(request: Request = None):
     """获取当前用户偏好 — 从持久化文件读取"""
     try:
         username = getattr(request.state, "user", "anonymous") if request else "anonymous"
-        prefs = _load_preferences(username)
+        import asyncio as _aio
+        prefs = await _aio.to_thread(_load_preferences, username)
 
         # v1.50 R5: 统一返回格式 {status: "ok", data: {...}}
         return {"status": "ok", "data": {"preferences": prefs}}
@@ -103,7 +104,7 @@ async def update_user_preferences(request: Request):
             if key in allowed_keys:
                 current[key] = value
 
-        _save_preferences(username, current)
+        await _aio.to_thread(_save_preferences, username, current)
         logger.info(f"[user_preferences] {username} 更新偏好: {list(body.keys())}")
 
         return {"preferences": current, "ok": True, "message": "偏好已保存"}

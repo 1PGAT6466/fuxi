@@ -320,16 +320,17 @@ class VectorStore:
             ids = results["ids"]
             metadatas = results.get("metadatas", [])
 
-            # 针对每个匹配的向量，更新其 metadata
+            # Batch: 一次性更新所有 metadata
+            batch_ids = []
+            batch_metas = []
             for i, chunk_id in enumerate(ids):
                 current_meta = metadatas[i] if i < len(metadatas) else {}
                 updated_meta = {**current_meta, **metadata_updates}
                 clean_meta = self._clean_metadata(updated_meta)
-
-                self._collection.update(
-                    ids=[chunk_id],
-                    metadatas=[clean_meta],
-                )
+                batch_ids.append(chunk_id)
+                batch_metas.append(clean_meta)
+            if batch_ids:
+                self._collection.update(ids=batch_ids, metadatas=batch_metas)
 
             self._mark_success()
             logger.info(

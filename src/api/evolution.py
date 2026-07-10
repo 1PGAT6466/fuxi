@@ -66,7 +66,7 @@ async def evolution_overview(request: Request = None):
             pass
 
         # Dream Cycle 状态
-        dream_status = _get_dream_cycle_status()
+        dream_status = await _get_dream_cycle_status()
 
         data = {
             "evolution": {
@@ -96,7 +96,7 @@ async def evolution_overview(request: Request = None):
         )
 
 
-def _get_dream_cycle_status() -> dict:
+async def _get_dream_cycle_status() -> dict:
     """获取 Dream Cycle 的实际运行状态"""
     report_files = list(_DREAM_REPORT_DIR.glob("dream_data_*.json"))
     report_count = len(report_files)
@@ -112,7 +112,7 @@ def _get_dream_cycle_status() -> dict:
     # 读取最新报告
     latest = sorted(report_files, reverse=True)[0]
     try:
-        data = json.loads(latest.read_text(encoding="utf-8"))
+        data = await asyncio.to_thread(lambda: json.loads(latest.read_text(encoding="utf-8")))
         timestamp = data.get("timestamp", "")
         results = data.get("results", {})
 
@@ -201,7 +201,7 @@ async def get_latest_report():
             }
 
         latest_report = report_files[0]
-        report_content = latest_report.read_text(encoding="utf-8")
+        report_content = await asyncio.to_thread(latest_report.read_text, encoding="utf-8")
 
         response = {
             "ok": True,
@@ -213,7 +213,7 @@ async def get_latest_report():
 
         if data_files:
             try:
-                data = json.loads(data_files[0].read_text(encoding="utf-8"))
+                data = await asyncio.to_thread(lambda: json.loads(data_files[0].read_text(encoding="utf-8")))
                 response["metadata"] = {
                     k: v for k, v in data.items()
                     if k not in ("results", "report_path")
@@ -267,7 +267,7 @@ async def get_report_history(limit: int = 30):
         history = []
         for df in data_files[:limit]:
             try:
-                data = json.loads(df.read_text(encoding="utf-8"))
+                data = await asyncio.to_thread(lambda _df=df: json.loads(_df.read_text(encoding="utf-8")))
                 timestamp = data.get("timestamp", "")
                 results = data.get("results", {})
 

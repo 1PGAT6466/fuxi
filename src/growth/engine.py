@@ -178,8 +178,9 @@ class GrowthEngine:
         for log_file in GROWTH_DIR.glob("*_quality.jsonl"):
             symbol = log_file.stem.replace("_quality", "")
             try:
-                with open(log_file, "r", encoding="utf-8") as f:
-                    lines = f.readlines()
+                def _rd():
+                    with open(log_file, "r", encoding="utf-8") as f:
+                        lines = f.readlines()
                 stats[symbol] = {"events": len(lines)}
             except Exception as e:  # TODO: Narrow exception type
                 logger.warning("读取成长统计失败 [%s]: %s", symbol, e, exc_info=True)

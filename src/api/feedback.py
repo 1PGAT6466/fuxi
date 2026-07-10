@@ -31,7 +31,9 @@ def _load_feedback_files(days: int = 7) -> List[Dict]:
             continue
         fpath = os.path.join(FEEDBACK_DIR, fname)
         try:
-            with open(fpath, "r", encoding="utf-8") as f:
+            import asyncio as _aio
+            def _rd():
+                with open(fpath, "r", encoding="utf-8") as f:
                 for line in f:
                     line = line.strip()
                     if not line:

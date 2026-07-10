@@ -204,8 +204,7 @@ async def delete_document(file_hash: str, request: Request = None):
                     for fname in files:
                         fpath = _Path(root) / fname
                         try:
-                            with open(fpath, "rb") as f:
-                                content = f.read()
+                            content = await asyncio.to_thread(lambda: open(fpath, "rb").read())
                             computed_hash = hashlib.sha256(content).hexdigest()[:16]
                             if computed_hash == file_hash[:16] or file_hash in str(fpath):
                                 fpath.unlink()
