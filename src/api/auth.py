@@ -192,6 +192,25 @@ class AuthMiddleware(BaseHTTPMiddleware):
             token = auth[7:]
 
         if not token:
+            # v1.44 fix: 检查是否是已知API路径，不存在的路径返回404
+            if path.startswith("/api/"):
+                # 检查路由是否存在
+                from starlette.routing import Match
+                scope = request.scope.copy()
+                scope["path"] = path
+                for route in request.app.routes:
+                    match, _ = route.matches(scope)
+                    if match == Match.FULL:
+                        return JSONResponse(
+                            status_code=401,
+                            content={"detail": "未登录"}
+                        )
+                # 路由不存在，返回404
+                return JSONResponse(
+                    status_code=404,
+                    content={"detail": "接口不存在"}
+                )
+            # 非API路径，返回401
             return JSONResponse(
                 status_code=401,
                 content={"detail": "未登录"}
