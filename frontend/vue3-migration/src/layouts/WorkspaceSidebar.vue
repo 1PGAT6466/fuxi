@@ -228,6 +228,7 @@ import {
   TrendCharts,
   Switch,
   Guide,
+  Timer,
 } from '@element-plus/icons-vue';
 import { h } from 'vue';
 
@@ -460,9 +461,8 @@ const personalItems = computed<MenuItem[]>(() => [
   {
     label: '历史',
     route: '/personal/history',
-    icon: Search,
+    icon: Timer,
     iconColor: '#5b8c5a',
-    construction: true,
   },
   {
     label: '设置',

@@ -1,0 +1,82 @@
+﻿[
+    {
+        "Name":  "健康检查",
+        "Status":  "PASS",
+        "Code":  200
+    },
+    {
+        "Name":  "获取当前用户",
+        "Status":  "PASS",
+        "Code":  200
+    },
+    {
+        "Name":  "搜索功能",
+        "Status":  "PASS",
+        "Code":  200
+    },
+    {
+        "Name":  "文档列表",
+        "Status":  "PASS",
+        "Code":  200
+    },
+    {
+        "Name":  "Wiki页面",
+        "Status":  "PASS",
+        "Code":  200
+    },
+    {
+        "Name":  "知识图谱",
+        "Status":  "PASS",
+        "Code":  200
+    },
+    {
+        "Name":  "RAG搜索",
+        "Status":  "PASS",
+        "Code":  200
+    },
+    {
+        "Name":  "会话列表",
+        "Status":  "PASS",
+        "Code":  200
+    },
+    {
+        "Name":  "功能开关",
+        "Status":  "PROTECTED",
+        "Code":  403
+    },
+    {
+        "Name":  "服务列表",
+        "Status":  "PROTECTED",
+        "Code":  403
+    },
+    {
+        "Name":  "四象状态",
+        "Status":  "PASS",
+        "Code":  200
+    },
+    {
+        "Name":  "成长概览",
+        "Status":  "PASS",
+        "Code":  200
+    },
+    {
+        "Name":  "用户偏好",
+        "Status":  "PASS",
+        "Code":  200
+    },
+    {
+        "Name":  "MCP工具",
+        "Status":  "PROTECTED",
+        "Code":  403
+    },
+    {
+        "Name":  "管理统计",
+        "Status":  "PASS",
+        "Code":  200
+    },
+    {
+        "Name":  "服务器状态",
+        "Status":  "FAIL",
+        "Code":  404
+    }
+]

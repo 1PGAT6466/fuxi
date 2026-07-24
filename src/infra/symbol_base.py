@@ -22,8 +22,8 @@ class SymbolBase:
         self._last_activity = time.time()
         self._metrics: Dict[str, Any] = {}
 
-        # 注册到经络
-        meridian.register_symbol(symbol_id, name, self)
+        # 注册到经络（Meridian.register_symbol 接受 symbol_id 和 instance 两个参数）
+        meridian.register_symbol(symbol_id, self)
         logger.info(f"[{symbol_id}] {emoji} {name} 已注册")
     # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 

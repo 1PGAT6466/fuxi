@@ -1,0 +1,31 @@
+{
+  "id": "notification-center",
+  "name": "通知中心",
+  "icon": "Bell",
+  "description": "系统通知中心，支持推送订阅、通知列表、已读/未读管理、通知偏好设置",
+  "version": "2.1.0",
+  "category": "personal",
+  "guaAffinity": {
+    "primary": "qian",
+    "secondary": "kun"
+  },
+  "route": "/notification-center",
+  "apiBase": "/api/notifications",
+  "endpoints": [
+    { "method": "GET",  "path": "/api/notifications",          "description": "获取通知列表" },
+    { "method": "PUT",  "path": "/api/notifications/:id/read", "description": "标记单条已读" },
+    { "method": "PUT",  "path": "/api/notifications/read-all", "description": "全部标记已读" },
+    { "method": "POST", "path": "/api/notifications/subscribe","description": "订阅推送" },
+    { "method": "POST", "path": "/api/notifications/unsubscribe","description": "取消订阅" },
+    { "method": "POST", "path": "/api/notifications/send",     "description": "发送通知" }
+  ],
+  "requiredRole": "user",
+  "featureFlag": "notification-center-enabled",
+  "windowMode": "tab",
+  "defaultSize": {
+    "width": 750,
+    "height": 620
+  },
+  "singleton": true,
+  "tags": ["通知", "推送", "消息", "提醒"]
+}

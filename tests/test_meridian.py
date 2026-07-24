@@ -6,7 +6,7 @@ import pytest
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.hypothalamus.meridian import Meridian, Signal, SignalPriority
+from src.hypothalamus import Meridian, Signal, SignalPriority
 
 
 @pytest.fixture

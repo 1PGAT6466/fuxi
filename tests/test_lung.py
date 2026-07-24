@@ -3,7 +3,7 @@ tests/test_lung.py — 肺 v4.1 单元测试
 """
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
-from src.hypothalamus.meridian import Meridian
+from src.hypothalamus import Meridian, Signal
 from src.hypothalamus.organs.lung import LungAgent
 
 class TestLungInit:
@@ -38,7 +38,7 @@ class TestLungDirtyMark:
         m = Meridian()
         lung = LungAgent(m)
         lung._dirty = False
-        from src.hypothalamus.meridian import Signal
+        from src.hypothalamus import Signal
         # mock _exhale to avoid calling distiller
         with patch.object(lung, '_exhale', return_value={"ok": True}):
             await lung._handle_new_nutrition(Signal(

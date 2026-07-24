@@ -4,6 +4,7 @@
  * 注册全局键盘快捷键：
  * - Cmd/Ctrl+K：打开伏羲令
  * - Cmd/Ctrl+/：打开快捷键帮助面板
+ * - Cmd/Ctrl+Shift+V：打开剪贴板面板（跨窗口剪贴板）
  * - Cmd/Ctrl+1~9：切换九宫格宫位
  *
  * 使用 useEventListener 模式，组件卸载时自动清理
@@ -38,6 +39,8 @@ export function useShortcuts(options?: {
   onOpenFuxiLing?: () => void;
   /** 打开快捷键帮助面板的回调 */
   onOpenHelp?: () => void;
+  /** 打开剪贴板面板的回调 */
+  onOpenClipboard?: () => void;
 }) {
   const router = useRouter();
 
@@ -69,6 +72,13 @@ export function useShortcuts(options?: {
       return;
     }
 
+    // Cmd/Ctrl+Shift+V — 剪贴板面板
+    if (isCtrl && e.shiftKey && e.key === 'V') {
+      e.preventDefault();
+      options?.onOpenClipboard?.();
+      return;
+    }
+
     // Cmd/Ctrl+1~9 — 切换宫位
     if (isCtrl && /^[1-9]$/.test(e.key)) {
       e.preventDefault();
@@ -97,6 +107,7 @@ export function useShortcuts(options?: {
 export const SHORTCUT_LIST: { keys: string; description: string }[] = [
   { keys: '⌘/Ctrl + K', description: '打开伏羲令全局搜索' },
   { keys: '⌘/Ctrl + /', description: '打开/关闭快捷键帮助' },
+  { keys: '⌘/Ctrl + Shift + V', description: '打开剪贴板面板（历史/收藏/同步）' },
   { keys: '⌘/Ctrl + 1~9', description: '切换九宫格宫位' },
   { keys: 'Esc', description: '关闭弹窗/面板' },
   { keys: '↑↓', description: '伏羲令结果选择' },

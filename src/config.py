@@ -52,10 +52,24 @@ for d in [DATA_DIR, UPLOAD_DIR, LOG_DIR, BACKUP_DIR, STATIC_DIR, CONFIG_HISTORY_
 # ============ 网络 ============
 HOST = os.getenv("KB_HOST", "0.0.0.0")
 PORT = int(os.getenv("KB_PORT", "8080"))
-EMBEDDER_URL = os.getenv("KB_EMBEDDER_URL", "http://localhost:8081")
+# 内嵌 embedder 模式，默认不连接外部 embedder 服务（避免端口 8081 冲突）
+EMBEDDER_URL = os.getenv("KB_EMBEDDER_URL", "")
 RERANK_URL = os.getenv("KB_RERANK_PROXY", "")
-_default_cors = f"http://localhost:{PORT},http://127.0.0.1:{PORT}"
-CORS_ORIGINS: List[str] = os.getenv("KB_CORS_ORIGINS", _default_cors).split(",")
+_default_cors = f"http://localhost:{PORT},http://127.0.0.1:{PORT},http://localhost:3000,http://127.0.0.1:3000"
+_raw_cors = os.getenv("KB_CORS_ORIGINS", _default_cors).split(",")
+# v1.50 R5: 拒绝通配符 *，防止 CORS 保护完全绕过
+CORS_ORIGINS: List[str] = [
+    o.strip() for o in _raw_cors
+    if o.strip() and o.strip() != "*"
+]
+if "*" in [o.strip() for o in _raw_cors]:
+    logger = logging.getLogger(__name__)
+    logger.warning(
+        "[Config] KB_CORS_ORIGINS 包含通配符 '*', 已拒绝。"
+        "生产环境请明确配置允许的域名。"
+    )
+if not CORS_ORIGINS:
+    CORS_ORIGINS = [f"http://localhost:{PORT}"]
 
 # ============ 安全 ============
 # JWT 配置 (安全相关)
@@ -141,6 +155,34 @@ SILICONFLOW_API_KEY = os.getenv("SILICONFLOW_API_KEY", "")
 SILICONFLOW_BASE_URL = os.getenv("SILICONFLOW_BASE_URL", "https://api.siliconflow.cn/v1")
 
 
+# ============ 智能模型路由配置 ============
+# 启用智能路由（自动选择Pro/非Pro模型）
+SMART_ROUTER_ENABLED = os.getenv("SMART_ROUTER_ENABLED", "true").lower() == "true"
+
+# Pro模型配置
+MIMO_PRO_MODEL = os.getenv("MIMO_PRO_MODEL", "mimo-v2.5-pro")
+MIMO_PRO_MAX_TOKENS = int(os.getenv("MIMO_PRO_MAX_TOKENS", "4096"))
+MIMO_PRO_TEMPERATURE = float(os.getenv("MIMO_PRO_TEMPERATURE", "0.3"))
+
+# 标准模型配置
+MIMO_STANDARD_MODEL = os.getenv("MIMO_STANDARD_MODEL", "mimo-v2.5")
+MIMO_STANDARD_MAX_TOKENS = int(os.getenv("MIMO_STANDARD_MAX_TOKENS", "4096"))
+MIMO_STANDARD_TEMPERATURE = float(os.getenv("MIMO_STANDARD_TEMPERATURE", "0.3"))
+
+# 成本控制
+LLM_DAILY_LIMIT = float(os.getenv("LLM_DAILY_LIMIT", "10.0"))  # 每日限额（元）
+LLM_PER_REQUEST_LIMIT = float(os.getenv("LLM_PER_REQUEST_LIMIT", "0.1"))  # 单次限额（元）
+
+# 缓存配置
+LLM_CACHE_ENABLED = os.getenv("LLM_CACHE_ENABLED", "true").lower() == "true"
+LLM_CACHE_TTL = int(os.getenv("LLM_CACHE_TTL", "3600"))  # 缓存时间（秒）
+LLM_CACHE_MAX_SIZE = int(os.getenv("LLM_CACHE_MAX_SIZE", "1000"))  # 最大缓存条数
+
+# 降级配置
+LLM_FALLBACK_ENABLED = os.getenv("LLM_FALLBACK_ENABLED", "true").lower() == "true"
+LLM_MAX_RETRIES = int(os.getenv("LLM_MAX_RETRIES", "2"))  # 最大重试次数
+
+
 # ============ 模型 ============
 
 # ============ 评测自动化 ============
@@ -174,7 +216,7 @@ ALLOWED_EXTENSIONS = {
     ".cfg", ".log", ".ini", ".conf", ".json", ".xml", ".html", ".htm",
     ".zip", ".wps", ".dwg", ".dxf", ".stp", ".step", ".igs", ".iges",
     ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg",
-    ".py", ".js", ".ts", ".java", ".c", ".cpp", ".h", ".sh", ".bat", ".ps1",
+    ".py", ".js", ".ts", ".java", ".c", ".cpp", ".h",
     ".yaml", ".yml",
     ".7z", ".rar", ".tar", ".gz",
 }
@@ -257,6 +299,12 @@ SEED_SCORE_TEST_CONFIG = {
         },
     },
 }
+
+# ============ Tavily 联网搜索配置 ============
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
+# Tavily API Key 未配置时静默降级，不打印警告（服务可选）
+TAVILY_MAX_RESULTS = int(os.getenv("TAVILY_MAX_RESULTS", "5"))
+TAVILY_TIMEOUT = int(os.getenv("TAVILY_TIMEOUT", "10"))
 
 # ============ 影子模式配置 (Shadow Mode) ============
 # 通过环境变量 FUXI_SHADOW_ENABLED=true 启用

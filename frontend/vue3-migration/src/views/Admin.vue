@@ -38,6 +38,15 @@
           <span class="admin-summary__label">模块启用/禁用</span>
         </div>
       </div>
+      <div class="admin-summary__card">
+        <div class="admin-summary__icon admin-summary__icon--dev">
+          <el-icon :size="22"><Key /></el-icon>
+        </div>
+        <div class="admin-summary__body">
+          <span class="admin-summary__value">开发者设置</span>
+          <span class="admin-summary__label">API Key · 密钥管理</span>
+        </div>
+      </div>
     </div>
 
     <!-- 功能开关快速面板 -->
@@ -57,6 +66,46 @@
             :active-color="feature.activeColor || '#34C759'"
             @change="(val: boolean | string | number) => handleToggle(feature.key, val)"
           />
+        </div>
+      </div>
+    </section>
+
+    <!-- 开发者设置入口 -->
+    <section class="admin-dev-tools">
+      <h3 class="admin-dev-tools__title">
+        <el-icon><Key /></el-icon>
+        开发者设置
+      </h3>
+      <div class="admin-dev-tools__grid">
+        <div class="admin-dev-tools__card" @click="goToApiKeys">
+          <div class="admin-dev-tools__card-icon">
+            <el-icon :size="28"><Key /></el-icon>
+          </div>
+          <div class="admin-dev-tools__card-body">
+            <span class="admin-dev-tools__card-name">API Key 管理</span>
+            <span class="admin-dev-tools__card-desc">创建和管理开发者 API 密钥，设置权限范围与过期时间</span>
+          </div>
+          <el-icon class="admin-dev-tools__card-arrow"><ArrowRight /></el-icon>
+        </div>
+        <div class="admin-dev-tools__card" @click="goToWebhooks">
+          <div class="admin-dev-tools__card-icon">
+            <el-icon :size="28"><Link /></el-icon>
+          </div>
+          <div class="admin-dev-tools__card-body">
+            <span class="admin-dev-tools__card-name">Webhook 配置</span>
+            <span class="admin-dev-tools__card-desc">配置事件订阅回调，支持签名验证、重试机制与投递记录</span>
+          </div>
+          <el-icon class="admin-dev-tools__card-arrow"><ArrowRight /></el-icon>
+        </div>
+        <div class="admin-dev-tools__card" @click="goToDeveloperPortal">
+          <div class="admin-dev-tools__card-icon">
+            <el-icon :size="28"><Platform /></el-icon>
+          </div>
+          <div class="admin-dev-tools__card-body">
+            <span class="admin-dev-tools__card-name">开发者门户</span>
+            <span class="admin-dev-tools__card-desc">API 文档浏览、SDK 下载、OAuth 2.0 认证配置与开发者社区</span>
+          </div>
+          <el-icon class="admin-dev-tools__card-arrow"><ArrowRight /></el-icon>
         </div>
       </div>
     </section>
@@ -81,14 +130,28 @@
 
 <script setup lang="ts">
 import { ref, reactive } from 'vue';
+import { useRouter } from 'vue-router';
 import { ElMessage } from 'element-plus';
-import { Monitor, User, DataAnalysis, Switch } from '@element-plus/icons-vue';
+import { Monitor, User, DataAnalysis, Switch, Key, ArrowRight, Link, Platform } from '@element-plus/icons-vue';
 import SystemStatus from '@/components/admin/SystemStatus.vue';
 import EvaluationPanel from '@/components/admin/EvaluationPanel.vue';
 import KnowledgePanel from '@/components/admin/KnowledgePanel.vue';
 import UserPanel from '@/components/admin/UserPanel.vue';
 
 const activeTab = ref<string>('status');
+const router = useRouter();
+
+function goToApiKeys(): void {
+  router.push('/admin/api-keys');
+}
+
+function goToWebhooks(): void {
+  router.push('/admin/webhooks');
+}
+
+function goToDeveloperPortal(): void {
+  router.push('/admin/developer-portal');
+}
 
 // ────── 功能开关 ──────
 interface FeatureToggle {
@@ -162,7 +225,7 @@ defineExpose({ activeTab, featureToggles });
 /* ────── 摘要卡片 ────── */
 .admin-summary {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(5, 1fr);
   gap: 16px;
   margin-bottom: 28px;
 }
@@ -213,6 +276,11 @@ defineExpose({ activeTab, featureToggles });
 .admin-summary__icon--toggle {
   background: var(--li-color-light);
   color: var(--li-color);
+}
+
+.admin-summary__icon--dev {
+  background: var(--qian-color-light);
+  color: var(--qian-color);
 }
 
 .admin-summary__body {
@@ -291,6 +359,88 @@ defineExpose({ activeTab, featureToggles });
   font-size: 12px;
   color: var(--text-tertiary);
   line-height: 1.4;
+}
+
+/* ────── 开发者设置入口 ────── */
+.admin-dev-tools {
+  background: var(--bg-card);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  padding: 20px 24px;
+  margin-bottom: 28px;
+}
+
+.admin-dev-tools__title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 16px;
+}
+
+.admin-dev-tools__grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+}
+
+.admin-dev-tools__card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 16px;
+  background: var(--bg-subtle);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition:
+    background var(--duration-fast) var(--ease-out),
+    border-color var(--duration-fast) var(--ease-out),
+    transform var(--duration-fast) var(--ease-out);
+}
+
+.admin-dev-tools__card:hover {
+  background: var(--bg-hover);
+  border-color: var(--brand);
+  transform: translateX(4px);
+}
+
+.admin-dev-tools__card-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: var(--radius-sm);
+  background: var(--brand-soft);
+  color: var(--brand);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.admin-dev-tools__card-body {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  flex: 1;
+}
+
+.admin-dev-tools__card-name {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.admin-dev-tools__card-desc {
+  font-size: 13px;
+  color: var(--text-tertiary);
+  line-height: 1.4;
+}
+
+.admin-dev-tools__card-arrow {
+  color: var(--text-tertiary);
+  flex-shrink: 0;
 }
 
 /* ────── Tabs ────── */

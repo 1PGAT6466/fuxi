@@ -1,0 +1,29 @@
+{
+  "id": "recent-visits",
+  "name": "最近访问",
+  "icon": "Timer",
+  "description": "最近访问的历史记录，支持对话、文档、知识库三种类型筛选和快速跳转",
+  "version": "2.1.0",
+  "category": "personal",
+  "guaAffinity": {
+    "primary": "qian",
+    "secondary": "li"
+  },
+  "route": "/personal/history",
+  "apiBase": "/api/history",
+  "endpoints": [
+    { "method": "POST",   "path": "/api/history/visit",           "description": "记录访问" },
+    { "method": "GET",    "path": "/api/history/recent",           "description": "获取最近访问列表" },
+    { "method": "DELETE", "path": "/api/history/clear",            "description": "清除所有历史" },
+    { "method": "DELETE", "path": "/api/history/:id",              "description": "删除单条历史" }
+  ],
+  "requiredRole": "user",
+  "featureFlag": "recent-visits-enabled",
+  "windowMode": "tab",
+  "defaultSize": {
+    "width": 750,
+    "height": 620
+  },
+  "singleton": true,
+  "tags": ["历史", "访问记录", "最近"]
+}

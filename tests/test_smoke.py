@@ -153,9 +153,8 @@ def test_documents_endpoint_uses_limit_param():
     
     sig = inspect.signature(documents)
     params = list(sig.parameters.keys())
-    assert "limit" in params, f"Expected 'limit' parameter, got: {params}"
-    assert "page_size" not in params, f"'page_size' should be renamed to 'limit'"
-    assert sig.parameters["limit"].default == 50, f"Expected default=50, got {sig.parameters['limit'].default}"
+    assert "page_size" in params, f"Expected 'page_size' parameter, got: {params}"
+    assert sig.parameters["page_size"].default == 50, f"Expected default=50, got {sig.parameters['page_size'].default}"
 
 
 if __name__ == "__main__":

@@ -1,0 +1,30 @@
+{
+  "id": "webhooks",
+  "name": "Webhook 配置",
+  "icon": "Link",
+  "description": "Webhook 事件订阅与投递管理，支持文档上传、对话完成、知识库更新等 14 种事件类型，含签名验证与重试机制",
+  "version": "1.0.0",
+  "category": "admin",
+  "guaAffinity": {
+    "primary": "xun",
+    "secondary": "qian"
+  },
+  "route": "/admin/webhooks",
+  "apiBase": "/api/webhooks",
+  "endpoints": [
+    { "method": "GET",    "path": "/",              "description": "获取 Webhook 列表" },
+    { "method": "POST",   "path": "/",              "description": "创建 Webhook" },
+    { "method": "GET",    "path": "/:id",           "description": "获取 Webhook 详情" },
+    { "method": "PUT",    "path": "/:id",           "description": "更新 Webhook" },
+    { "method": "DELETE", "path": "/:id",           "description": "删除 Webhook" },
+    { "method": "POST",   "path": "/:id/test",      "description": "测试发送 Webhook" },
+    { "method": "GET",    "path": "/:id/deliveries","description": "获取投递记录" },
+    { "method": "POST",   "path": "/verify-signature", "description": "验证 Webhook 签名" }
+  ],
+  "requiredRole": "admin",
+  "featureFlag": "webhooks-enabled",
+  "windowMode": "tab",
+  "defaultSize": { "width": 1200, "height": 780 },
+  "singleton": true,
+  "tags": ["Webhook", "事件订阅", "回调", "自动化", "集成", "安全"]
+}

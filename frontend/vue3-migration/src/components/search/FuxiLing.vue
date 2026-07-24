@@ -81,6 +81,8 @@ import { ref, watch, nextTick } from 'vue';
 import { useRouter } from 'vue-router';
 import { unifiedSearch } from '@/api/symbols';
 import type { UnifiedSearchResult } from '@/api/symbols';
+import { federatedSearch } from '@/api/federated-search';
+import type { FederatedSearchResult, ResultCategory } from '@/types/federated-search';
 import { BAGUA_GRID } from '@/constants/bagua';
 
 const props = defineProps<{
@@ -89,14 +91,17 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   (e: 'close'): void;
+  (e: 'navigate', url: string): void;
 }>();
 
 const router = useRouter();
 const query = ref('');
 const results = ref<UnifiedSearchResult[]>([]);
+const federatedResults = ref<FederatedSearchResult[]>([]);
 const activeIndex = ref(0);
 const loading = ref(false);
 const inputRef = ref<HTMLInputElement | null>(null);
+const useFederated = ref(true); // 优先使用联邦搜索
 
 let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -191,16 +196,47 @@ async function handleInput(): void {
     return;
   }
 
-  // 防抖搜索
+  // 防抖搜索 — 优先使用联邦搜索，降级到统一搜索
   debounceTimer = setTimeout(async () => {
     loading.value = true;
     try {
-      const res = await unifiedSearch(q);
-      results.value = res.data.matches;
+      if (useFederated.value) {
+        // 尝试联邦搜索
+        const fedRes = await federatedSearch({
+          query: q,
+          limit: 15,
+          deduplicate: true,
+          sortBy: 'relevance',
+        });
+        // 将联邦搜索结果转换为统一格式
+        results.value = fedRes.results.map((r) => ({
+          type: mapFederatedCategory(r.category),
+          title: r.title,
+          url: r.url || '',
+          description: r.snippet,
+          icon: r.sourceIcon,
+          score: r.score,
+        }));
+        federatedResults.value = fedRes.results;
+      } else {
+        // 降级到统一搜索
+        const res = await unifiedSearch(q);
+        results.value = res.data.matches;
+        federatedResults.value = [];
+      }
       activeIndex.value = 0;
     } catch {
-      // 后端 API 不可用，显示空结果
-      results.value = [];
+      // 联邦搜索失败，降级到统一搜索
+      try {
+        const res = await unifiedSearch(q);
+        results.value = res.data.matches;
+        federatedResults.value = [];
+        useFederated.value = false;
+      } catch {
+        results.value = [];
+        federatedResults.value = [];
+      }
+      activeIndex.value = 0;
     } finally {
       loading.value = false;
     }
@@ -234,8 +270,22 @@ function handleKeydown(e: KeyboardEvent): void {
   }
 }
 
+function mapFederatedCategory(cat: ResultCategory): UnifiedSearchResult['type'] {
+  const map: Record<ResultCategory, UnifiedSearchResult['type']> = {
+    document: 'document',
+    wiki: 'wiki',
+    chat: 'chat',
+    tool: 'tool',
+    file: 'document',
+    database: 'document',
+    external: 'tool',
+  };
+  return map[cat] || 'document';
+}
+
 function selectItem(item: UnifiedSearchResult): void {
   close();
+  emit('navigate', item.url);
   router.push(item.url);
 }
 </script>

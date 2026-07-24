@@ -1,0 +1,177 @@
+﻿[
+    {
+        "Test":  "健康检查",
+        "Status":  "FAIL",
+        "Code":  null
+    },
+    {
+        "Test":  "系统状态",
+        "Status":  "FAIL",
+        "Code":  null
+    },
+    {
+        "Test":  "获取当前用户",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "刷新Token",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "搜索",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "搜索历史",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "文档列表",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "Wiki页面",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "知识图谱",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "图谱节点",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "RAG搜索",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "AI对话",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "会话列表",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "评测概览",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "功能开关",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "服务列表",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "四象系统状态",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "成长概览",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "工具列表",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "FAQ列表",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "用户偏好",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "MCP工具列表",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "管理统计",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "服务器状态",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "上传趋势",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "最近活动",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "搜索日志",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "搜索分析",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "热门搜索",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "工具管理",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "FAQ管理",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "术语管理",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "反馈统计",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "配置管理",
+        "Status":  "FAIL",
+        "Code":  401
+    },
+    {
+        "Test":  "图谱统计",
+        "Status":  "FAIL",
+        "Code":  401
+    }
+]

@@ -1,0 +1,206 @@
+{
+  "test_time": "2026-07-23 09:02:21",
+  "total_score": 8.5,
+  "rating": "良好",
+  "detailed_scores": {
+    "search_accuracy": 2.55,
+    "chinese_encoding": 1.7,
+    "duplicate_detection": 1.7,
+    "boundary_conditions": 1.7,
+    "overall_experience": 0.85
+  },
+  "test_results": {
+    "search_quality": [
+      {
+        "query": "端子压接工艺要求",
+        "category": "Foxconn",
+        "result_count": 0,
+        "status": "success",
+        "results": []
+      },
+      {
+        "query": "连接器设计规范",
+        "category": "Foxconn",
+        "result_count": 0,
+        "status": "success",
+        "results": []
+      },
+      {
+        "query": "自动化产线检测流程",
+        "category": "Mini-fakraTE",
+        "result_count": 0,
+        "status": "success",
+        "results": []
+      },
+      {
+        "query": "装配工艺控制要点",
+        "category": "Mini-fakraTE",
+        "result_count": 0,
+        "status": "success",
+        "results": []
+      },
+      {
+        "query": "轴承型号大全",
+        "category": "标准件",
+        "result_count": 0,
+        "status": "success",
+        "results": []
+      },
+      {
+        "query": "标准件采购清单",
+        "category": "标准件",
+        "result_count": 0,
+        "status": "success",
+        "results": []
+      },
+      {
+        "query": "齿轮设计计算",
+        "category": "非标准机械",
+        "result_count": 0,
+        "status": "success",
+        "results": []
+      },
+      {
+        "query": "机械零件强度校核",
+        "category": "非标准机械",
+        "result_count": 0,
+        "status": "success",
+        "results": []
+      }
+    ],
+    "chinese_encoding": [
+      {
+        "query": "连接器设计",
+        "status": "success",
+        "has_garbled": false,
+        "result_count": 0
+      },
+      {
+        "query": "压接工艺",
+        "status": "success",
+        "has_garbled": false,
+        "result_count": 0
+      },
+      {
+        "query": "轴承型号",
+        "status": "success",
+        "has_garbled": false,
+        "result_count": 0
+      },
+      {
+        "query": "齿轮计算",
+        "status": "success",
+        "has_garbled": false,
+        "result_count": 0
+      },
+      {
+        "query": "强度校核",
+        "status": "success",
+        "has_garbled": false,
+        "result_count": 0
+      },
+      {
+        "query": "自动化产线",
+        "status": "success",
+        "has_garbled": false,
+        "result_count": 0
+      },
+      {
+        "query": "装配工艺",
+        "status": "success",
+        "has_garbled": false,
+        "result_count": 0
+      },
+      {
+        "query": "标准件",
+        "status": "success",
+        "has_garbled": false,
+        "result_count": 0
+      }
+    ],
+    "duplicate_detection": {
+      "total_results": 0,
+      "unique_results": 0,
+      "duplicates": 0,
+      "duplicate_ratio": 0,
+      "score": 2.0
+    },
+    "boundary_conditions": [
+      {
+        "test": "空查询",
+        "query": "",
+        "status": "success",
+        "result_count": 0,
+        "handled_correctly": true
+      },
+      {
+        "test": "单字符",
+        "query": "a",
+        "status": "success",
+        "result_count": 0,
+        "handled_correctly": true
+      },
+      {
+        "test": "特殊字符",
+        "query": "!@#$%^&*()",
+        "status": "success",
+        "result_count": 0,
+        "handled_correctly": true
+      },
+      {
+        "test": "超长查询",
+        "query": "连接连接连接连接连接连接连接连接连接连接连接连接连接连接连接连接连接连接连接连接连接连接连接连接连接...",
+        "status": "success",
+        "result_count": 0,
+        "handled_correctly": true
+      },
+      {
+        "test": "混合字符",
+        "query": "test测试123",
+        "status": "success",
+        "result_count": 0,
+        "handled_correctly": true
+      },
+      {
+        "test": "SQL注入",
+        "query": "'; DROP TABLE users; --",
+        "status": "success",
+        "result_count": 0,
+        "handled_correctly": true
+      },
+      {
+        "test": "HTML标签",
+        "query": "<script>alert('test')</script>",
+        "status": "success",
+        "result_count": 0,
+        "handled_correctly": true
+      },
+      {
+        "test": "Unicode",
+        "query": "你好",
+        "status": "success",
+        "result_count": 0,
+        "handled_correctly": true
+      }
+    ],
+    "overall_experience": [
+      {
+        "test": "响应时间",
+        "value": "0.02s",
+        "passed": true
+      },
+      {
+        "test": "结果格式",
+        "value": "0 条结果",
+        "passed": true
+      },
+      {
+        "test": "错误处理",
+        "value": "状态码: 422",
+        "passed": true
+      }
+    ]
+  },
+  "issues_found": [],
+  "recommendations": []
+}

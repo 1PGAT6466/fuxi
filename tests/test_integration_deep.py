@@ -14,7 +14,7 @@ class TestDeepIntegration:
 
     def test_taiyin_init(self):
         """测试太阴初始化"""
-        from src.hypothalamus.meridian import Meridian
+        from src.hypothalamus import Meridian
         from src.taiyin.server import TaiyinServer
 
         m = Meridian()
@@ -57,7 +57,7 @@ class TestDeepIntegration:
         from src.taiyin.mcp_protocol import get_mcp_server
 
         server = get_mcp_server()
-        assert len(server.tools) == 4
+        assert len(server.tools) >= 20  # v1.50 R4: tools expanded to 24
         assert len(server.resources) == 3
 
     def test_eval_automation_init(self):
@@ -117,7 +117,7 @@ class TestDeepIntegration:
 
     def test_feature_flags(self):
         """测试Feature Flags"""
-        from src.taiyin.flags import load_flags
+        from src.services.feature_flags import load_flags
 
         flags = load_flags()
         assert len(flags) >= 9

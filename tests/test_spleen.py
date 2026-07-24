@@ -3,7 +3,7 @@ tests/test_spleen.py — 🩸 脾单元测试
 P5: 器官测试覆盖补充
 """
 import pytest
-from src.hypothalamus.meridian import Meridian
+from src.hypothalamus import Meridian
 from src.hypothalamus.organs.spleen import SpleenAgent
 
 

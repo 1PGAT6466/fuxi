@@ -18,26 +18,31 @@ class RateLimiter:
         self.period_seconds = period_seconds
         self._requests: list = []
         self._lock = asyncio.Lock()
+        # v1.50 R4: 同步锁，用于保护 get_remaining() 的 read/cull 操作
+        import threading
+        self._sync_lock = threading.Lock()
     # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def acquire(self) -> bool:
-        """获取许可"""
+        """获取许可 — v1.50 R4: 双重锁保护"""
         async with self._lock:
-            now = time.time()
-            # 清理过期请求
-            self._requests = [t for t in self._requests if t > now - self.period_seconds]
+            with self._sync_lock:
+                now = time.time()
+                # 清理过期请求
+                self._requests = [t for t in self._requests if t > now - self.period_seconds]
 
-            if len(self._requests) >= self.max_requests:
-                return False
+                if len(self._requests) >= self.max_requests:
+                    return False
 
-            self._requests.append(now)
-            return True
+                self._requests.append(now)
+                return True
 
     def get_remaining(self) -> int:
-        """获取剩余许可数"""
-        now = time.time()
-        self._requests = [t for t in self._requests if t > now - self.period_seconds]
-        return max(0, self.max_requests - len(self._requests))
+        """获取剩余许可数 — v1.50 R4: threading.Lock 保护"""
+        with self._sync_lock:
+            now = time.time()
+            self._requests = [t for t in self._requests if t > now - self.period_seconds]
+            return max(0, self.max_requests - len(self._requests))
 
 
 class ConcurrencyManager:

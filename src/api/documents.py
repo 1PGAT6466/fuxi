@@ -68,6 +68,12 @@ async def upload(file: UploadFile = File(...), request: Request = None):
         safe_name = os.path.basename(file.filename)
         if not safe_name or safe_name in ('.', '..'):
             raise HTTPException(400, "无效的文件名")
+        # v1.50 R5: 检测 null byte 注入
+        if '\x00' in safe_name or '\0' in safe_name:
+            raise HTTPException(400, "文件名包含非法字符")
+        # v1.50 R5: 文件名 HTML 实体编码（防止前端 XSS）
+        import html as _html
+        display_name = _html.escape(safe_name, quote=True)
         # v1.44 R1: 检查文件扩展名
         file_ext = os.path.splitext(safe_name)[1].lower()
         if file_ext in BLOCKED_EXTENSIONS:
@@ -298,7 +304,12 @@ async def update_document_visibility(doc_id: str, request: Request):
         if not isinstance(doc_owner_id, str):
             doc_owner_id = ""
 
-        if not pm.check_write(user_id, doc_owner_id or ""):
+        # v1.50 R3: 如果文档没有 owner_id 且当前用户不是 admin，拒绝修改
+        # 防止空 owner 导致任意用户修改文档可见性
+        is_admin = getattr(request.state, "role", "user") == "admin" if request else False
+        if not doc_owner_id and not is_admin:
+            return unauthorized("无权修改此文档的可见性", "仅文档所有者和管理员可执行此操作")
+        if doc_owner_id and not pm.check_write(user_id, doc_owner_id):
             return unauthorized("无权修改此文档的可见性", "仅文档所有者和管理员可执行此操作")
 
         # 更新 chunks.db 中文档的 metadata

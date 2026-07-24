@@ -152,7 +152,7 @@ class TestFeatureFlags:
     """Feature Flags测试"""
 
     def test_load_flags(self):
-        from src.taiyin.flags import load_flags
+        from src.services.feature_flags import load_flags
         flags = load_flags()
         assert len(flags) >= 9
 

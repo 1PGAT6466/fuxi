@@ -661,9 +661,9 @@ def test_cache_stats():
     resp = client.get(endpoint, headers=headers)
     rt = (time.time() - t0) * 1000
     if resp.status_code == 200:
-        add_result(method, endpoint, "缓存统计", "PASS", f"{rt:.0f}ms")
+        add_result(method, endpoint, "缓存统计", "PASS", resp.status_code, rt, "OK")
     else:
-        add_result(method, endpoint, "缓存统计", "FAIL", f"HTTP {resp.status_code}")
+        add_result(method, endpoint, "缓存统计", "FAIL", resp.status_code, rt, f"HTTP {resp.status_code}")
 
 
 # ============ Main ============

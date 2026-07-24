@@ -1,0 +1,196 @@
+# LLM配置文件
+# 伏羲系统智能模型路由配置
+
+# ============ 模型配置 ============
+models:
+  # Pro模型（推理更强，适合对话、问答、代码生成）
+  pro:
+    name: mimo-v2.5-pro
+    max_tokens: 4096
+    temperature: 0.3
+    use_cases:
+      - simple_chat      # 简单对话
+      - knowledge_qa     # 知识问答
+      - code_generation  # 代码生成
+      - summarization    # 摘要生成
+      - translation      # 翻译
+    cost_per_1k_tokens: 0.02  # 每1000token成本（元）
+  
+  # 标准模型（输出稳定，适合JSON、结构化数据）
+  standard:
+    name: mimo-v2.5
+    max_tokens: 4096
+    temperature: 0.3
+    use_cases:
+      - complex_json     # 复杂JSON输出
+      - structured_data  # 结构化数据提取
+    cost_per_1k_tokens: 0.01  # 每1000token成本（元）
+
+# ============ 路由配置 ============
+router:
+  # 启用智能路由
+  enabled: true
+  
+  # 自动检测查询类型
+  auto_detect: true
+  
+  # 降级配置
+  fallback:
+    enabled: true
+    max_retries: 2
+    retry_delay: 1.0
+  
+  # 查询类型检测规则
+  detection_rules:
+    # JSON输出的关键词
+    json_patterns:
+      - "提取.*实体"
+      - "分析.*结构"
+      - "生成.*JSON"
+      - "返回.*格式"
+      - "表格.*数据"
+      - "分类.*标签"
+      - "解析.*数据"
+      - "转换.*格式"
+      - "输出.*列表"
+      - "返回.*数组"
+    
+    # 简单对话的关键词
+    simple_patterns:
+      - "^你好"
+      - "^hi"
+      - "^hello"
+      - "^什么是"
+      - "^介绍一下"
+      - "^帮我"
+      - "^请问"
+      - "^谢谢"
+      - "^好的"
+      - "^明白"
+    
+    # 代码生成的关键词
+    code_patterns:
+      - "写.*代码"
+      - "编写.*程序"
+      - "实现.*函数"
+      - "写.*脚本"
+      - "编程"
+      - "python.*代码"
+      - "java.*代码"
+      - "sql.*查询"
+    
+    # 摘要生成的关键词
+    summary_patterns:
+      - "总结"
+      - "摘要"
+      - "概括"
+      - "提炼"
+      - "归纳"
+    
+    # 翻译的关键词
+    translate_patterns:
+      - "翻译"
+      - "translate"
+      - "转换成.*文"
+      - "译成"
+
+# ============ 成本控制 ============
+budget:
+  # 每日限额（元）
+  daily_limit: 10.0
+  
+  # 单次请求限额（元）
+  per_request_limit: 0.1
+  
+  # 告警阈值（0-1）
+  warning_threshold: 0.8
+  
+  # 超限处理方式：warn（告警）、block（阻断）、log（仅记录）
+  over_limit_action: warn
+
+# ============ 缓存配置 ============
+cache:
+  # 启用缓存
+  enabled: true
+  
+  # 缓存时间（秒）
+  ttl: 3600
+  
+  # 最大缓存条数
+  max_size: 1000
+  
+  # 缓存清理间隔（秒）
+  cleanup_interval: 300
+
+# ============ 日志配置 ============
+logging:
+  # 日志级别
+  level: INFO
+  
+  # 记录成功调用
+  log_success: true
+  
+  # 记录失败调用
+  log_failure: true
+  
+  # 记录路由决策
+  log_routing: true
+  
+  # 记录成本
+  log_cost: true
+
+# ============ 监控配置 ============
+monitoring:
+  # 启用监控
+  enabled: true
+  
+  # 监控间隔（秒）
+  interval: 60
+  
+  # 告警规则
+  alerts:
+    # 成功率低于阈值
+    success_rate_threshold: 0.95
+    
+    # 响应时间超过阈值（秒）
+    response_time_threshold: 5.0
+    
+    # 成本超过阈值（元）
+    cost_threshold: 5.0
+
+# ============ 降级策略 ============
+degradation:
+  # 降级触发条件
+  triggers:
+    # 连续失败次数
+    consecutive_failures: 3
+    
+    # 错误率超过阈值
+    error_rate_threshold: 0.5
+    
+    # 响应时间超过阈值（秒）
+    response_time_threshold: 10.0
+  
+  # 降级动作
+  actions:
+    # 切换到备用模型
+    switch_model: true
+    
+    # 使用缓存结果
+    use_cache: true
+    
+    # 返回默认响应
+    return_default: true
+  
+  # 恢复策略
+  recovery:
+    # 恢复检查间隔（秒）
+    check_interval: 30
+    
+    # 恢复所需成功次数
+    success_count: 5
+
+# ============ 版本信息 ============
+version: "1.0.0"
+last_updated: "2026-07-11"
+author: "feng-shaoxuan"

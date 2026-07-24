@@ -1,0 +1,31 @@
+{
+  "id": "service-market",
+  "name": "服务市场",
+  "icon": "Shop",
+  "description": "伏羲服务市场，提供服务的浏览、搜索、安装、卸载与版本管理能力",
+  "version": "1.0.0",
+  "category": "workspace",
+  "guaAffinity": {
+    "primary": "qian",
+    "secondary": "kun"
+  },
+  "route": "/workspace/service-market",
+  "apiBase": "/api/market",
+  "endpoints": [
+    { "method": "GET",  "path": "/services",     "description": "获取服务列表（支持分类、搜索、排序）" },
+    { "method": "GET",  "path": "/services/:id", "description": "获取服务详情" },
+    { "method": "POST", "path": "/install",      "description": "安装服务" },
+    { "method": "POST", "path": "/uninstall",    "description": "卸载服务" },
+    { "method": "GET",  "path": "/installed",    "description": "获取已安装服务列表" },
+    { "method": "GET",  "path": "/versions/:id", "description": "获取服务版本列表" }
+  ],
+  "requiredRole": "user",
+  "featureFlag": "service-market-enabled",
+  "windowMode": "tab",
+  "defaultSize": {
+    "width": 1100,
+    "height": 750
+  },
+  "singleton": true,
+  "tags": ["market", "plugin", "install", "services", "app-store"]
+}

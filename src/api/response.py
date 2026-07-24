@@ -42,6 +42,10 @@ from fastapi.responses import JSONResponse
 
 logger = logging.getLogger("api.response")
 
+# v1.50 R5: 生产环境控制 — 隐藏内部错误详情
+import os as _os
+_IS_PRODUCTION = _os.getenv("FUXI_ENV", "production").lower() == "production"
+
 # —— 公共常量 ——
 STATUS_SUCCESS = "success"
 STATUS_ERROR = "error"
@@ -150,10 +154,13 @@ def error(
     """
     构建统一错误响应。
 
+    v1.50 R5: 生产环境自动隐藏 5xx 错误的 detail，防止内部信息泄露。
+
     Args:
         message:     用户可读的错误描述
         status_code: HTTP 状态码 (4xx / 5xx)
         detail:      可选的详细错误信息 (含调试/排障细节)
+                     生产环境仅 4xx 错误显示；5xx 错误自动隐藏
         data:        可选的附加数据 (如验证错误列表)
         extra:       附加字段
 
@@ -169,7 +176,11 @@ def error(
         "message": message,
     }
     if detail is not None:
-        body["detail"] = detail
+        # v1.50 R5: 生产环境隐藏 5xx 错误的 detail，防止内部信息泄露
+        if _IS_PRODUCTION and status_code >= 500:
+            logger.warning(f"[Response] 生产环境隐藏 5xx 错误详情: {detail[:200]}")
+        else:
+            body["detail"] = detail
     if data is not None:
         body["data"] = data
     if extra:

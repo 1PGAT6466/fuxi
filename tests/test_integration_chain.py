@@ -18,7 +18,7 @@ class TestIntegrationChain:
         from src.taiyin.server import TaiyinServer
         from src.shaoyin.brain import ShaoyinBrain
         from src.taiyang.retrieval import hybrid_search
-        from src.hypothalamus.meridian import Meridian
+        from src.hypothalamus import Meridian
 
         m = Meridian()
         taiyin = TaiyinServer(m)
@@ -41,7 +41,7 @@ class TestIntegrationChain:
     def test_chain_taiyin_shaoyang_ingest(self):
         """链路3：太阴→少阳（入库）"""
         from src.shaoyang.pipeline import ShaoyangPipeline
-        from src.hypothalamus.meridian import Meridian
+        from src.hypothalamus import Meridian
 
         m = Meridian()
         pipeline = ShaoyangPipeline(m)
@@ -147,7 +147,7 @@ class TestIntegrationChain:
 
     def test_feature_flags(self):
         """Feature Flags：3+1"""
-        from src.taiyin.flags import load_flags
+        from src.services.feature_flags import load_flags
 
         flags = load_flags()
 

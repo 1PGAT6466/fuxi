@@ -89,7 +89,7 @@ from starlette.exceptions import HTTPException as StarletteHTTPException
 
 
 @app.exception_handler(StarletteHTTPException)
-async def global_http_exception_handler(request: Request, exc: StarletteHTTPException):
+def global_http_exception_handler(request: Request, exc: StarletteHTTPException):
     """全局 HTTP 异常处理器 — 统一错误格式"""
     if _is_production:
         message = "请求处理失败" if exc.status_code >= 500 else "请求参数错误"
@@ -100,7 +100,7 @@ async def global_http_exception_handler(request: Request, exc: StarletteHTTPExce
 
 
 @app.exception_handler(HTTPException)
-async def global_fastapi_exception_handler(request: Request, exc: HTTPException):
+def global_fastapi_exception_handler(request: Request, exc: HTTPException):
     """FastAPI HTTPException 处理器 — 统一错误格式"""
     headers = getattr(exc, "headers", None)
     if _is_production:
@@ -112,7 +112,7 @@ async def global_fastapi_exception_handler(request: Request, exc: HTTPException)
 
 
 @app.exception_handler(RequestValidationError)
-async def validation_exception_handler(request: Request, exc: RequestValidationError):
+def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Pydantic 验证错误处理器 — 生产环境隐藏内部结构"""
     if _is_production:
         body = {"status": "error", "message": "请求参数验证失败", "status_code": 422}
@@ -141,8 +141,9 @@ if __name__ == "__main__":
         host=HOST,
         port=PORT,
         log_level="info",
-        timeout_keep_alive=120,
-        h11_max_incomplete_event_size=524288000,
-        workers=1,
+        timeout_keep_alive=5,
+        limit_concurrency=50,
+        h11_max_incomplete_event_size=10485760,  # v1.50 R5: 10MB (from 500MB)
+        workers=int(os.getenv("FUXI_WORKERS", "1")),
         server_header=False,
     )

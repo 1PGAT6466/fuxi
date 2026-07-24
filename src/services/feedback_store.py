@@ -4,6 +4,7 @@ feedback_store.py — 反馈闭环服务（v1.50 新增）
   1. 用户反馈去重（基于 MD5 签名）
   2. 批量学习触发（buffer 满时自动调用 learner）
   3. 反馈统计
+  4. P1 优化：批量写入缓冲 + 定时 flush
 """
 import hashlib
 import time
@@ -29,6 +30,13 @@ MAX_DEDUP_CACHE = 2000
 # 批量失败最大重试次数
 MAX_RETRY = 3
 
+# ── P1: 批量写入缓冲 ──
+_WRITE_BUFFER_MAX_SIZE = 100     # 最大缓冲条数
+_WRITE_BUFFER_FLUSH_INTERVAL = 5.0  # 每5秒 flush
+_write_buffer: List[Dict] = []
+_write_buffer_lock = threading.Lock()
+_flush_task: Optional[asyncio.Task] = None
+
 # 模块级去重缓存（TTLCache 自动过期 + maxsize 限制，threadsafe）
 if TTLCache is not None:
     _feedback_dedup = TTLCache(maxsize=MAX_DEDUP_CACHE, ttl=DEDUP_WINDOW)
@@ -39,6 +47,122 @@ else:
 _feedback_dedup_lock = threading.Lock()
 _learn_buffer: deque = deque()
 _learn_buffer_lock = threading.Lock()
+
+
+# ── P1: 批量写入缓冲 ──
+
+async def _start_flush_scheduler():
+    """启动定时 flush 调度器"""
+    global _flush_task
+    if _flush_task is not None:
+        return
+    
+    async def _scheduler():
+        while True:
+            try:
+                await asyncio.sleep(_WRITE_BUFFER_FLUSH_INTERVAL)
+                await _flush_write_buffer()
+            except asyncio.CancelledError:
+                logger.info("[反馈闭环] 定时 flush 调度器已停止")
+                break
+            except Exception as e:
+                logger.error(f"[反馈闭环] 定时 flush 异常: {e}", exc_info=True)
+    
+    _flush_task = asyncio.create_task(_scheduler())
+    logger.info(
+        f"[反馈闭环] 批量写入缓冲已启动 "
+        f"(max_buffer={_WRITE_BUFFER_MAX_SIZE}, flush_interval={_WRITE_BUFFER_FLUSH_INTERVAL}s)"
+    )
+
+
+async def _stop_flush_scheduler():
+    """停止定时 flush 调度器"""
+    global _flush_task
+    if _flush_task:
+        # 最终 flush
+        await _flush_write_buffer()
+        _flush_task.cancel()
+        try:
+            await _flush_task
+        except asyncio.CancelledError:
+            pass
+        _flush_task = None
+
+
+async def _flush_write_buffer():
+    """将缓冲区中的条目批量写入文件"""
+    global _write_buffer
+    with _write_buffer_lock:
+        if not _write_buffer:
+            return
+        batch = _write_buffer[:]
+        _write_buffer.clear()
+    
+    if not batch:
+        return
+    
+    try:
+        import json, os
+        from src.config import FEEDBACK_DIR
+        
+        # 按日期分组
+        entries_by_day: Dict[str, list] = {}
+        for entry in batch:
+            day = time.strftime("%Y-%m-%d", time.localtime(entry.get("timestamp", time.time())))
+            if day not in entries_by_day:
+                entries_by_day[day] = []
+            entries_by_day[day].append({
+                "user_id": entry["user_id"],
+                "query": entry["query"],
+                "action": entry["action"],
+                "timestamp": entry["timestamp"],
+                "results_count": len(entry.get("results", [])),
+                "metadata": entry.get("metadata"),
+            })
+        
+        # 批量写入
+        for day, day_entries in entries_by_day.items():
+            os.makedirs(FEEDBACK_DIR, exist_ok=True)
+            log_path = os.path.join(FEEDBACK_DIR, f"feedback_{day}.jsonl")
+            with open(log_path, 'a', encoding='utf-8') as f:
+                for entry in day_entries:
+                    f.write(json.dumps(entry, ensure_ascii=False) + '\n')
+        
+        logger.debug(f"[反馈闭环] 批量写入 {len(batch)} 条反馈")
+    except Exception as e:
+        logger.warning(f"[反馈闭环] 批量写入失败: {e}", exc_info=True)
+        # 失败时放回缓冲区（最多重试）
+        with _write_buffer_lock:
+            for entry in batch:
+                entry["_write_retry"] = entry.get("_write_retry", 0) + 1
+            still_retry = [e for e in batch if e.get("_write_retry", 0) < MAX_RETRY]
+            _write_buffer = still_retry + _write_buffer
+
+
+def _add_to_write_buffer(user_id: str, query: str, action: str,
+                         results: Optional[List], metadata: Optional[Dict],
+                         timestamp: float):
+    """添加条目到写入缓冲区（P1: 批量缓冲替代直接写入）"""
+    with _write_buffer_lock:
+        _write_buffer.append({
+            "user_id": user_id,
+            "query": query,
+            "action": action,
+            "results": results,
+            "metadata": metadata,
+            "timestamp": timestamp,
+        })
+        
+        buffer_size = len(_write_buffer)
+    
+    # 如果缓冲区满，触发异步 flush
+    if buffer_size >= _WRITE_BUFFER_MAX_SIZE:
+        try:
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.create_task(_flush_write_buffer())
+        except RuntimeError:
+            pass  # 事件循环未运行，下次定时 flush 时写入
 
 
 def _make_feedback_key(user_id: str, query: str, action: str) -> str:
@@ -82,11 +206,11 @@ async def log_feedback_unified(user_id: str, query: str, action: str,
     if is_dup:
         return {"ok": True, "dedup": True, "learn_triggered": False}
 
-    # 2. 写入反馈文件
+    # 2. 写入反馈缓冲区（P1: 批量缓冲替代直接写入）
     try:
-        _write_feedback_log(user_id, query, action, results, metadata, now)
-    except Exception:  # TODO: Narrow exception type
-        logger.warning("写反馈日志失败", exc_info=True)
+        _add_to_write_buffer(user_id, query, action, results, metadata, now)
+    except Exception:
+        logger.warning("添加反馈到缓冲区失败", exc_info=True)
 
     # 3. 积累学习 buffer
     learn_triggered = False

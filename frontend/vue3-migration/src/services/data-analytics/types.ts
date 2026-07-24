@@ -83,7 +83,7 @@ export interface ReportSection {
 
 // ───── 导出 ─────
 
-export type ExportFormat = 'csv' | 'excel';
+export type ExportFormat = 'pdf' | 'excel' | 'csv' | 'json';
 
 export interface ExportConfig {
   format: ExportFormat;
@@ -92,6 +92,10 @@ export interface ExportConfig {
     start?: string;
     end?: string;
   };
+  /** 报表模板 ID（可选，使用模板预设字段） */
+  template_id?: string;
+  /** 导出标题 */
+  title?: string;
 }
 
 export interface ExportResponse {
@@ -99,4 +103,59 @@ export interface ExportResponse {
   filename: string;
   format: ExportFormat;
   size: number;
+}
+
+// ───── 报表模板 ─────
+
+export interface ReportTemplate {
+  id: string;
+  name: string;
+  description: string;
+  /** 预设字段 */
+  default_fields: string[];
+  /** 预设格式 */
+  default_format: ExportFormat;
+  created_at: string;
+  updated_at: string;
+}
+
+// ───── 报表分享 ─────
+
+export type SharePermission = 'view' | 'edit' | 'download';
+
+export interface ShareConfig {
+  /** 报表 ID */
+  report_id: string;
+  /** 分享权限 */
+  permissions: SharePermission[];
+  /** 过期时间（ISO 格式，可选） */
+  expires_at?: string;
+  /** 密码保护（可选） */
+  password?: string;
+  /** 备注 */
+  note?: string;
+}
+
+export interface ShareResponse {
+  /** 分享链接 */
+  share_url: string;
+  /** 访问令牌 */
+  token: string;
+  /** 过期时间 */
+  expires_at: string;
+  /** 权限列表 */
+  permissions: SharePermission[];
+  created_at: string;
+}
+
+export interface SharedReport {
+  report_id: string;
+  title: string;
+  type: ReportType;
+  generated_at: string;
+  permissions: SharePermission[];
+  sections: ReportSection[];
+  owner_name: string;
+  /** 是否密码保护 */
+  password_protected: boolean;
 }

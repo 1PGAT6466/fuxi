@@ -12,7 +12,7 @@ class SearchBody(BaseModel):
     q: str
     top_k: int = 15
     page: int = 1
-    page_size: int = 8
+    page_size: int = 8  # v1.50 R5: 通过 SearchBody.__init__ 中 clamp_top_k 间接限制
     granularity: str = "chunk"
 
     def __init__(self, **data):
@@ -44,25 +44,8 @@ async def search_post(body: SearchBody, request: Request = None):
     return await _search_impl(body.q, body.top_k, body.page, body.page_size, body.granularity, request)
 
 
-def _filter_by_tenant(results: list, tenant_id: str) -> list:
-    """多租户隔离：按 tenant_id 过滤结果
-    
-    规则：
-      - 如果结果 metadata 中有 tenant_id 字段，必须匹配
-      - 如果结果 metadata 中无 tenant_id 字段，视为默认租户数据
-      - 非默认租户不能访问其他租户的数据
-    """
-    if tenant_id == "default":
-        # 默认租户可以看自己的数据 + 无租户标记的遗留数据
-        return results
-    # 非默认租户：只看自己租户的数据
-    filtered = []
-    for r in results:
-        meta = r.get("metadata", {})
-        r_tenant = meta.get("tenant_id", "default")
-        if r_tenant == tenant_id:
-            filtered.append(r)
-    return filtered
+# Round 5: 使用共享 tenant_utils 模块消除重复代码
+from src.api.tenant_utils import filter_results_by_tenant as _filter_by_tenant
 
 
 async def _search_impl(q: str, top_k: int, page: int, page_size: int, granularity: str, request: Request = None):

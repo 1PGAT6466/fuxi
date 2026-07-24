@@ -1,7 +1,12 @@
 """
-kb-embedder v10.1 — 多 worker 文本向量化
-端口 8081，仅内网访问
-改进：ThreadPoolExecutor 多线程并发编码 + 批量排队
+Embedder 客户端 SDK (services/embedder.py)
+===================================
+向量嵌入服务客户端 — 调用 embedder 微服务的 HTTP API
+
+职责：通过 aiohttp 调用 infra/embedder.py 提供的 /embed 和 /rerank 端点
+用途：为 API 层提供 embed_text() 和 batch_embed() 异步接口
+
+注意：此模块是客户端 SDK，依赖 EMBEDDER_URL 环境变量指向 embedder 服务地址。
 """
 import os
 os.environ["HF_HUB_OFFLINE"] = "1"

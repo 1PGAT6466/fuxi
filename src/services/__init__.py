@@ -86,3 +86,8 @@ from src.models import Chunk, Event, Entity, Relation
 
 # Pipeline
 from src.pipeline.unified import UnifiedPipeline
+
+# 智能LLM路由
+from src.services.smart_llm import SmartLLM, get_smart_llm, smart_call
+from src.services.model_router import ModelRouter, get_router, QueryType
+from src.services.llm import call_llm_smart, call_llm_smart_stream, get_llm_stats, reset_llm_stats

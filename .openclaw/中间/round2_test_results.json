@@ -1,0 +1,839 @@
+{
+  "test_time": "2026-07-12T10:27:43.745223",
+  "total": 73,
+  "passed": 24,
+  "failed": 49,
+  "pass_rate": "32.9%",
+  "categories": {
+    "认证": {
+      "total": 5,
+      "passed": 5,
+      "failed": 0
+    },
+    "系统": {
+      "total": 6,
+      "passed": 3,
+      "failed": 3
+    },
+    "搜索": {
+      "total": 3,
+      "passed": 2,
+      "failed": 1
+    },
+    "文档": {
+      "total": 2,
+      "passed": 0,
+      "failed": 2
+    },
+    "Wiki": {
+      "total": 2,
+      "passed": 0,
+      "failed": 2
+    },
+    "图谱": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1
+    },
+    "聊天": {
+      "total": 3,
+      "passed": 2,
+      "failed": 1
+    },
+    "仪表盘": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1
+    },
+    "元数据": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1
+    },
+    "服务": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1
+    },
+    "世界树": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1
+    },
+    "Feature Flags": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1
+    },
+    "评测": {
+      "total": 2,
+      "passed": 2,
+      "failed": 0
+    },
+    "反馈": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "租户": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1
+    },
+    "通知": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "偏好": {
+      "total": 1,
+      "passed": 1,
+      "failed": 0
+    },
+    "代理": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1
+    },
+    "评估": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1
+    },
+    "进化": {
+      "total": 1,
+      "passed": 0,
+      "failed": 1
+    },
+    "前端": {
+      "total": 6,
+      "passed": 6,
+      "failed": 0
+    },
+    "安全": {
+      "total": 13,
+      "passed": 0,
+      "failed": 13
+    },
+    "错误处理": {
+      "total": 4,
+      "passed": 0,
+      "failed": 4
+    },
+    "格式": {
+      "total": 14,
+      "passed": 1,
+      "failed": 13
+    }
+  },
+  "inconsistent_formats": [
+    {
+      "path": "/api/health",
+      "keys": [
+        "status",
+        "checks",
+        "timestamp"
+      ]
+    },
+    {
+      "path": "/api/documents",
+      "keys": [
+        "files",
+        "total",
+        "page",
+        "page_size"
+      ]
+    },
+    {
+      "path": "/api/wiki",
+      "keys": [
+        "ok",
+        "title",
+        "description",
+        "pages",
+        "total",
+        "categories"
+      ]
+    },
+    {
+      "path": "/api/graph",
+      "keys": [
+        "nodes",
+        "edges"
+      ]
+    },
+    {
+      "path": "/api/chat/sessions",
+      "keys": [
+        "sessions",
+        "total"
+      ]
+    },
+    {
+      "path": "/api/metadata",
+      "keys": [
+        "metadata",
+        "total"
+      ]
+    }
+  ],
+  "details": [
+    {
+      "category": "认证",
+      "name": "注册新用户",
+      "method": "POST",
+      "url": "/api/auth/register",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "认证",
+      "name": "用户登录",
+      "method": "POST",
+      "url": "/api/auth/login",
+      "status": 200,
+      "passed": true,
+      "detail": "role=user"
+    },
+    {
+      "category": "认证",
+      "name": "获取当前用户",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "认证",
+      "name": "刷新Token",
+      "method": "POST",
+      "url": "/api/auth/refresh",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "认证",
+      "name": "登出",
+      "method": "POST",
+      "url": "/api/auth/logout",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "系统",
+      "name": "健康检查",
+      "method": "GET",
+      "url": "/api/health",
+      "status": 200,
+      "passed": true,
+      "detail": "status=healthy"
+    },
+    {
+      "category": "系统",
+      "name": "V2健康检查",
+      "method": "GET",
+      "url": "/api/v2/health",
+      "status": "N/A",
+      "passed": false,
+      "detail": "连接失败"
+    },
+    {
+      "category": "系统",
+      "name": "Prometheus指标",
+      "method": "GET",
+      "url": "/api/metrics",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "系统",
+      "name": "指标摘要",
+      "method": "GET",
+      "url": "/api/admin/metrics-summary",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "搜索",
+      "name": "搜索接口",
+      "method": "GET",
+      "url": "/api/search?q=test",
+      "status": 200,
+      "passed": false,
+      "detail": "缺少 status 字段: ['wiki_results', 'chunk_results', 'results', 'query', 'page', 'page_size', 'total']"
+    },
+    {
+      "category": "搜索",
+      "name": "RAG搜索",
+      "method": "POST",
+      "url": "/api/rag/search",
+      "status": 200,
+      "passed": true,
+      "detail": "200"
+    },
+    {
+      "category": "搜索",
+      "name": "统一搜索",
+      "method": "GET",
+      "url": "/api/unified-search?q=test",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "文档",
+      "name": "文档列表",
+      "method": "GET",
+      "url": "/api/documents",
+      "status": 200,
+      "passed": false,
+      "detail": "缺少 status 字段: ['files', 'total', 'page', 'page_size']"
+    },
+    {
+      "category": "文档",
+      "name": "文档详情(不存在)",
+      "method": "GET",
+      "url": "/api/documents/nonexistent",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Wiki",
+      "name": "Wiki列表",
+      "method": "GET",
+      "url": "/api/wiki",
+      "status": 200,
+      "passed": false,
+      "detail": "缺少 status 字段: ['ok', 'title', 'description', 'pages', 'total', 'categories']"
+    },
+    {
+      "category": "Wiki",
+      "name": "Wiki详情",
+      "method": "GET",
+      "url": "/api/wiki/1",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "图谱",
+      "name": "知识图谱",
+      "method": "GET",
+      "url": "/api/graph",
+      "status": 200,
+      "passed": false,
+      "detail": "缺少 status 字段: ['nodes', 'edges']"
+    },
+    {
+      "category": "聊天",
+      "name": "会话列表",
+      "method": "GET",
+      "url": "/api/chat/sessions",
+      "status": 200,
+      "passed": false,
+      "detail": "缺少 status 字段: ['sessions', 'total']"
+    },
+    {
+      "category": "聊天",
+      "name": "创建会话",
+      "method": "POST",
+      "url": "/api/chat/sessions",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "聊天",
+      "name": "发送消息",
+      "method": "POST",
+      "url": "/api/chat/send",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "仪表盘",
+      "name": "统计信息",
+      "method": "GET",
+      "url": "/api/dashboard/stats",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "元数据",
+      "name": "元数据列表",
+      "method": "GET",
+      "url": "/api/metadata",
+      "status": 200,
+      "passed": false,
+      "detail": "缺少 status 字段: ['metadata', 'total']"
+    },
+    {
+      "category": "服务",
+      "name": "服务列表",
+      "method": "GET",
+      "url": "/api/services",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "世界树",
+      "name": "世界树查询",
+      "method": "GET",
+      "url": "/api/worldtree",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Feature Flags",
+      "name": "Flag列表",
+      "method": "GET",
+      "url": "/api/feature-flags",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "系统",
+      "name": "四象状态",
+      "method": "GET",
+      "url": "/api/symbols/status",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "系统",
+      "name": "成长概览",
+      "method": "GET",
+      "url": "/api/growth/overview",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "评测",
+      "name": "最新报告",
+      "method": "GET",
+      "url": "/api/eval/report",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "评测",
+      "name": "评测历史",
+      "method": "GET",
+      "url": "/api/eval/history",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "反馈",
+      "name": "提交反馈",
+      "method": "POST",
+      "url": "/api/feedback",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "租户",
+      "name": "租户列表",
+      "method": "GET",
+      "url": "/api/tenants",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "通知",
+      "name": "通知列表",
+      "method": "GET",
+      "url": "/api/notifications",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "偏好",
+      "name": "用户偏好",
+      "method": "GET",
+      "url": "/api/user/preferences",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "代理",
+      "name": "加载器文件列表",
+      "method": "GET",
+      "url": "/api/proxy/loader/files",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "评估",
+      "name": "评估概览",
+      "method": "GET",
+      "url": "/api/evaluation/overview",
+      "status": 200,
+      "passed": false,
+      "detail": "status=never_run, message="
+    },
+    {
+      "category": "进化",
+      "name": "进化状态",
+      "method": "GET",
+      "url": "/api/evolution/status",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "前端",
+      "name": "首页",
+      "method": "GET",
+      "url": "/",
+      "status": 200,
+      "passed": true,
+      "detail": "html=True"
+    },
+    {
+      "category": "前端",
+      "name": "登录页",
+      "method": "GET",
+      "url": "/login",
+      "status": 200,
+      "passed": true,
+      "detail": "html=True"
+    },
+    {
+      "category": "前端",
+      "name": "管理页",
+      "method": "GET",
+      "url": "/admin",
+      "status": 200,
+      "passed": true,
+      "detail": "html=True"
+    },
+    {
+      "category": "前端",
+      "name": "静态资源main-SNeLOof5.js",
+      "method": "GET",
+      "url": "/assets/main-SNeLOof5.js",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "前端",
+      "name": "静态资源vue-vendor-CcM843_T.js",
+      "method": "GET",
+      "url": "/assets/vue-vendor-CcM843_T.js",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "前端",
+      "name": "静态资源main-DJwpn9wY.css",
+      "method": "GET",
+      "url": "/assets/main-DJwpn9wY.css",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "安全",
+      "name": "无认证/api/search?q=test",
+      "method": "GET",
+      "url": "/api/search?q=test",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "安全",
+      "name": "无认证/api/documents",
+      "method": "GET",
+      "url": "/api/documents",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "安全",
+      "name": "无认证/api/wiki",
+      "method": "GET",
+      "url": "/api/wiki",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "安全",
+      "name": "无认证/api/graph",
+      "method": "GET",
+      "url": "/api/graph",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "安全",
+      "name": "无认证/api/chat/sessions",
+      "method": "GET",
+      "url": "/api/chat/sessions",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "安全",
+      "name": "无认证/api/dashboard/stats",
+      "method": "GET",
+      "url": "/api/dashboard/stats",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "安全",
+      "name": "无认证/api/services",
+      "method": "GET",
+      "url": "/api/services",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "安全",
+      "name": "无认证/api/worldtree",
+      "method": "GET",
+      "url": "/api/worldtree",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "安全",
+      "name": "无认证/api/metadata",
+      "method": "GET",
+      "url": "/api/metadata",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "安全",
+      "name": "无认证/api/evaluation/overview",
+      "method": "GET",
+      "url": "/api/evaluation/overview",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "安全",
+      "name": "无认证/api/feature-flags",
+      "method": "GET",
+      "url": "/api/feature-flags",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "安全",
+      "name": "无认证/api/symbols/status",
+      "method": "GET",
+      "url": "/api/symbols/status",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "安全",
+      "name": "无认证/api/growth/overview",
+      "method": "GET",
+      "url": "/api/growth/overview",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "错误处理",
+      "name": "不存在的路由",
+      "method": "GET",
+      "url": "/api/nonexistent",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "错误处理",
+      "name": "缺少必填字段",
+      "method": "POST",
+      "url": "/api/auth/login",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "错误处理",
+      "name": "SQL注入防护",
+      "method": "GET",
+      "url": "/api/search?q=...",
+      "status": 200,
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "错误处理",
+      "name": "XSS防护",
+      "method": "GET",
+      "url": "/api/search?q=...",
+      "status": 200,
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "格式",
+      "name": "格式检查/api/health",
+      "method": "GET",
+      "url": "/api/health",
+      "status": 200,
+      "passed": false,
+      "detail": "keys=['status', 'checks', 'timestamp']"
+    },
+    {
+      "category": "格式",
+      "name": "格式检查/api/documents",
+      "method": "GET",
+      "url": "/api/documents",
+      "status": 200,
+      "passed": false,
+      "detail": "keys=['files', 'total', 'page', 'page_size']"
+    },
+    {
+      "category": "格式",
+      "name": "格式检查/api/wiki",
+      "method": "GET",
+      "url": "/api/wiki",
+      "status": 200,
+      "passed": false,
+      "detail": "keys=['ok', 'title', 'description', 'pages', 'total', 'categories']"
+    },
+    {
+      "category": "格式",
+      "name": "格式检查/api/graph",
+      "method": "GET",
+      "url": "/api/graph",
+      "status": 200,
+      "passed": false,
+      "detail": "keys=['nodes', 'edges']"
+    },
+    {
+      "category": "格式",
+      "name": "格式检查/api/chat/sessions",
+      "method": "GET",
+      "url": "/api/chat/sessions",
+      "status": 200,
+      "passed": false,
+      "detail": "keys=['sessions', 'total']"
+    },
+    {
+      "category": "格式",
+      "name": "格式检查/api/dashboard/stats",
+      "method": "GET",
+      "url": "/api/dashboard/stats",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "格式",
+      "name": "格式检查/api/services",
+      "method": "GET",
+      "url": "/api/services",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "格式",
+      "name": "格式检查/api/worldtree",
+      "method": "GET",
+      "url": "/api/worldtree",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "格式",
+      "name": "格式检查/api/metadata",
+      "method": "GET",
+      "url": "/api/metadata",
+      "status": 200,
+      "passed": false,
+      "detail": "keys=['metadata', 'total']"
+    },
+    {
+      "category": "格式",
+      "name": "格式检查/api/symbols/status",
+      "method": "GET",
+      "url": "/api/symbols/status",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "格式",
+      "name": "格式检查/api/growth/overview",
+      "method": "GET",
+      "url": "/api/growth/overview",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "格式",
+      "name": "格式检查/api/eval/report",
+      "method": "GET",
+      "url": "/api/eval/report",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "格式",
+      "name": "格式检查/api/eval/history",
+      "method": "GET",
+      "url": "/api/eval/history",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "格式",
+      "name": "格式检查/api/evaluation/overview",
+      "method": "GET",
+      "url": "/api/evaluation/overview",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    }
+  ]
+}

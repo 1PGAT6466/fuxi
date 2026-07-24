@@ -4,7 +4,7 @@ P5: 器官测试覆盖补充
 """
 import pytest
 import time
-from src.hypothalamus.meridian import Meridian
+from src.hypothalamus import Meridian
 from src.hypothalamus.organs.nose import NoseAgent
 
 

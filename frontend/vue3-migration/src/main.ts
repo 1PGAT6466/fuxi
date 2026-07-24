@@ -7,6 +7,7 @@ import { createPinia } from 'pinia';
 import App from './App.vue';
 import router from './router';
 import i18n from './locales';
+import { initOfflineMode } from './services/offline/__init__';
 import './styles/variables.css';
 import './assets/styles/main.scss';
 import './assets/styles/animations.scss';
@@ -25,5 +26,10 @@ app.config.errorHandler = (err, _instance, info) => {
   console.error('[伏羲 全局异常]', err, info);
   // 可扩展：上报到监控服务
 };
+
+// 初始化离线模式（非阻塞）
+initOfflineMode({ initServiceWorker: true }).catch((err) => {
+  console.warn('[伏羲] 离线模式初始化失败，降级运行', err);
+});
 
 app.mount('#app');

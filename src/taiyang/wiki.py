@@ -226,6 +226,13 @@ class WikiEngine:
             logger.warning(f"[wiki] suppressed exception", exc_info=True)
             pass
         
+        # v1.50 R5: 白名单验证列名，防止 SQL 注入
+        ALLOWED_COLS = {"updated_at", "content", "summary", "quality_score", "version"}
+        for k in updates:
+            if k not in ALLOWED_COLS:
+                logger.warning(f"[Wiki] 拒绝更新未知列: {k}")
+                conn.close()
+                return False
         set_clause = ", ".join(f"{k}=?" for k in updates)
         values = list(updates.values()) + [page_id]
         conn.execute(f"UPDATE wiki_pages SET {set_clause} WHERE id=?", values)

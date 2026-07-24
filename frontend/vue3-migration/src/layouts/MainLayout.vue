@@ -10,8 +10,14 @@
       <div v-if="!isOnline" class="offline-banner">
         <el-icon :size="16"><WarningFilled /></el-icon>
         <span>网络连接已断开，部分功能不可用</span>
+        <span v-if="offlineState.pendingCount > 0" class="offline-banner-pending">
+          ({{ offlineState.pendingCount }} 项待同步)
+        </span>
       </div>
     </Transition>
+
+    <!-- 离线状态指示器（浮动底部） -->
+    <OfflineIndicator :dismissible="true" position="bottom" :show-details="true" />
 
     <!-- ========== 顶栏 56px ========== -->
     <header class="v2-header">
@@ -62,8 +68,22 @@
           </button>
         </el-tooltip>
 
+        <el-tooltip content="窗口布局管理" placement="bottom">
+          <button
+            class="header-action-btn"
+            aria-label="窗口布局管理"
+            @click="showLayoutManager = true"
+          >
+            <el-icon :size="20"><Grid /></el-icon>
+          </button>
+        </el-tooltip>
+
         <el-tooltip content="通知中心" placement="bottom">
-          <button class="header-action-btn" aria-label="通知中心">
+          <button
+            class="header-action-btn"
+            aria-label="通知中心"
+            @click="handleOpenNotificationCenter"
+          >
             <el-badge :value="notificationCount" :hidden="notificationCount === 0" :max="99">
               <el-icon :size="20"><Bell /></el-icon>
             </el-badge>
@@ -165,6 +185,46 @@
          Phase 1: 快捷键帮助面板 (Cmd+/)
          ══════════════════════════════════════ -->
     <ShortcutHelp :visible="showShortcutHelp" @close="showShortcutHelp = false" />
+
+    <!-- ══════════════════════════════════════
+         P2: 通知中心抽屉
+         ══════════════════════════════════════ -->
+    <el-drawer
+      v-model="showNotificationCenter"
+      title=""
+      direction="rtl"
+      size="420px"
+      :close-on-click-modal="true"
+      :with-header="false"
+      destroy-on-close
+      @closed="showNotificationCenter = false"
+    >
+      <NotificationCenter />
+    </el-drawer>
+
+    <!-- ══════════════════════════════════════
+         P3: 布局管理器抽屉
+         ══════════════════════════════════════ -->
+    <el-drawer
+      v-model="showLayoutManager"
+      title="窗口布局"
+      direction="rtl"
+      size="440px"
+      :close-on-click-modal="true"
+      destroy-on-close
+      @closed="handleLayoutManagerClosed"
+    >
+      <template #header>
+        <div class="layout-drawer-header">
+          <el-icon :size="20" color="#ff6700"><Grid /></el-icon>
+          <span>窗口布局管理</span>
+        </div>
+      </template>
+      <LayoutManager
+        @apply-snapshots="handleApplySnapshots"
+        @close="showLayoutManager = false"
+      />
+    </el-drawer>
   </div>
 </template>
 
@@ -184,10 +244,13 @@ import {
   House,
   Document,
   WarningFilled,
+  Grid,
 } from '@element-plus/icons-vue';
 
 import { useAuthStore } from '@/stores/auth';
 import { useWindowManager } from '@/stores/windowManager';
+import { useOfflineStore } from '@/services/offline/store';
+import OfflineIndicator from '@/services/offline/OfflineIndicator.vue';
 import { useTheme } from '@/composables/useTheme';
 import { useNetwork } from '@/composables/useNetwork';
 import { useShortcuts } from '@/composables/useShortcuts';
@@ -198,6 +261,10 @@ import ServiceWindowShell from '@/services/_registry/ServiceWindowShell.vue';
 import MiniBaguaCompass from '@/components/bagua/MiniBaguaCompass.vue';
 import FuxiLing from '@/components/search/FuxiLing.vue';
 import ShortcutHelp from '@/components/common/ShortcutHelp.vue';
+import NotificationCenter from '@/services/notification-center/NotificationCenter.vue';
+import LayoutManager from '@/services/layout-store/LayoutManager.vue';
+import { useLayoutIntegration } from '@/composables/useLayoutIntegration';
+import type { WindowSnapshot } from '@/types/layout';
 
 // ============================
 // Stores & Composables
@@ -207,14 +274,39 @@ const route = useRoute();
 const router = useRouter();
 const authStore = useAuthStore();
 const windowManager = useWindowManager();
+const offlineStore = useOfflineStore();
 const { isDark, toggleTheme } = useTheme();
 const { isOnline } = useNetwork();
+
+// 离线状态
+const offlineState = computed(() => offlineStore.state);
 
 // ============================
 // Phase 1: 伏羲令 & 快捷键
 // ============================
 
 const showFuxiLing = ref(false);
+const showNotificationCenter = ref(false);
+const showLayoutManager = ref(false);
+
+// ============================
+// 布局集成
+// ============================
+
+const { applyLayoutSnapshots, autoSaveOnClose, autoRestoreLastSession, watchDisplayChanges } =
+  useLayoutIntegration();
+
+function handleApplySnapshots(snapshots: WindowSnapshot[]): void {
+  applyLayoutSnapshots(snapshots);
+}
+
+function handleLayoutManagerClosed(): void {
+  // 布局管理器关闭时不需额外处理
+}
+
+// ============================
+// Phase 1: 快捷键
+// ============================
 
 const { showHelp: showShortcutHelp } = useShortcuts({
   onOpenFuxiLing: () => {
@@ -245,6 +337,10 @@ function handleTaijiToggle(): void {
 
 const sidebarCollapsed = ref(false);
 const notificationCount = ref(3);
+
+function handleOpenNotificationCenter(): void {
+  showNotificationCenter.value = true;
+}
 
 // ============================
 // Tab 管理
@@ -328,7 +424,9 @@ function handleTabReorder(fromId: string, toId: string) {
   }
 }
 
-function handleWindowClosed(): void {}
+function handleWindowClosed(windowId: string): void {
+  autoSaveOnClose(windowId);
+}
 
 // ============================
 // KeepAlive
@@ -397,12 +495,18 @@ async function handleLogout() {
 // 初始化
 // ============================
 
-onMounted(() => {
+onMounted(async () => {
   tabList.value = [
     { id: '/', title: '首页', icon: House, pinned: true, route: '/' },
     { id: '/workspace/chat', title: 'AI 对话', icon: ChatDotRound, pinned: true, route: '/workspace/chat' },
     { id: '/knowledge', title: '知识库', icon: Document, route: '/knowledge' },
   ];
+
+  // P3: 自动恢复上次会话的窗口布局
+  await autoRestoreLastSession();
+
+  // P3: 监听显示器变化
+  watchDisplayChanges();
 });
 </script>
 
@@ -665,6 +769,11 @@ onMounted(() => {
   z-index: 110;
 }
 
+.offline-banner-pending {
+  font-size: 12px;
+  color: #b88230;
+}
+
 .banner-slide-enter-active,
 .banner-slide-leave-active { transition: all 0.3s ease; }
 .banner-slide-enter-from,
@@ -681,5 +790,17 @@ onMounted(() => {
 @media (max-width: 479px) {
   .header-user .header-user-name { display: none; }
   .header-fuxiling-btn { width: 100px; }
+}
+
+/* ============================
+   布局管理器抽屉样式
+   ============================ */
+.layout-drawer-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 16px;
+  font-weight: 600;
+  color: var(--fuxi-text, #333333);
 }
 </style>

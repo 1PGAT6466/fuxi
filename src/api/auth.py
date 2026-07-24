@@ -119,6 +119,7 @@ def verify_jwt_token(token: str) -> dict:
 # 生产环境下 OpenAPI/Swagger UI 需要认证
 _AUTH_WHITELIST = {
     "/api/health",
+    "/health",
     "/api/auth/login",
     "/api/auth/register",
     "/api/v2/status",

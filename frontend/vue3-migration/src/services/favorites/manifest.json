@@ -1,0 +1,30 @@
+{
+  "id": "favorites",
+  "name": "收藏夹",
+  "icon": "StarFilled",
+  "description": "收藏夹管理，支持收藏对话/文档/知识库，置顶标记，快速访问",
+  "version": "2.1.0",
+  "category": "personal",
+  "guaAffinity": {
+    "primary": "li",
+    "secondary": "kan"
+  },
+  "route": "/favorites",
+  "apiBase": "/api/favorites",
+  "endpoints": [
+    { "method": "GET",    "path": "/api/favorites",               "description": "获取收藏列表" },
+    { "method": "POST",   "path": "/api/favorites",               "description": "添加收藏" },
+    { "method": "DELETE", "path": "/api/favorites/:itemId",       "description": "取消收藏" },
+    { "method": "PUT",    "path": "/api/favorites/toggle-pin",    "description": "切换置顶" },
+    { "method": "PATCH",  "path": "/api/favorites/:itemId",       "description": "更新收藏信息" }
+  ],
+  "requiredRole": "user",
+  "featureFlag": "favorites-enabled",
+  "windowMode": "tab",
+  "defaultSize": {
+    "width": 650,
+    "height": 580
+  },
+  "singleton": true,
+  "tags": ["收藏", "置顶", "快速访问", "个人"]
+}

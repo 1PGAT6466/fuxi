@@ -1,0 +1,34 @@
+{
+  "id": "workflow-engine",
+  "name": "工作流引擎",
+  "icon": "Connection",
+  "description": "可视化工作流编排引擎，支持拖拽式流程设计、多节点类型、执行追踪与版本管理",
+  "version": "2.1.0",
+  "category": "engineering",
+  "guaAffinity": {
+    "primary": "xun",
+    "secondary": "li"
+  },
+  "route": "/workspace/workflow-engine",
+  "apiBase": "/api/workflows",
+  "endpoints": [
+    { "method": "GET",    "path": "/",               "description": "获取工作流列表" },
+    { "method": "GET",    "path": "/:id",             "description": "获取工作流详情" },
+    { "method": "POST",   "path": "/",               "description": "创建工作流" },
+    { "method": "PUT",    "path": "/:id",             "description": "更新工作流" },
+    { "method": "DELETE", "path": "/:id",             "description": "删除工作流" },
+    { "method": "POST",   "path": "/:id/execute",    "description": "执行工作流" },
+    { "method": "GET",    "path": "/:id/executions", "description": "获取执行历史" },
+    { "method": "GET",    "path": "/:id/versions",   "description": "获取版本历史" },
+    { "method": "POST",   "path": "/:id/versions/:versionId/rollback", "description": "回滚到指定版本" }
+  ],
+  "requiredRole": "user",
+  "featureFlag": "workflow-engine-enabled",
+  "windowMode": "tab",
+  "defaultSize": {
+    "width": 1280,
+    "height": 860
+  },
+  "singleton": true,
+  "tags": ["工作流", "自动化", "编排", "流程", "低代码"]
+}

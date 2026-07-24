@@ -65,13 +65,15 @@ class MemoryStore:
         self._json_cache_max = 500
 
     def _ensure_db(self):
-        """确保数据库和表存在"""
+        """确保数据库和表存在 — v1.50 R3: 添加写入锁保护"""
         self._db_conn = sqlite3.connect(self._db_path, check_same_thread=False, timeout=10)
         self._db_conn.row_factory = sqlite3.Row  # L-11: 启用按名称访问
         self._db_conn.execute("PRAGMA journal_mode=WAL")
         self._db_conn.execute("PRAGMA synchronous=NORMAL")
         self._db_conn.execute("PRAGMA cache_size=-64000")  # 64MB SQLite cache
         self._db_conn.execute("PRAGMA busy_timeout=5000")  # v1.50 R5: 添加 busy_timeout
+        # v1.50 R3: 写入锁，防止多线程并发写入导致 SQLITE_BUSY/数据损坏
+        self._write_lock = threading.Lock()
         self._db_conn.execute("""
             CREATE TABLE IF NOT EXISTS chunks (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -215,10 +217,17 @@ class MemoryStore:
             logger.warning(f"[MemoryStore] 迁移 events/entities 表失败: {e}")
 
     def _migrate_add_tenant_id(self):
-        """v1.44 Phase 1: 为现有表添加 tenant_id 列（如果不存在）"""
+        """v1.44 Phase 1: 为现有表添加 tenant_id 列（如果不存在）
+        v1.50 R5: 添加表名白名单验证，防止 SQL 注入
+        """
+        # v1.50 R5: 白名单验证表名
+        ALLOWED_TABLES = {'chunks', 'events', 'entities'}
         try:
             tables = ['chunks', 'events', 'entities']
             for table_name in tables:
+                if table_name not in ALLOWED_TABLES:
+                    logger.warning(f"[MemoryStore] 跳过未知表迁移: {table_name}")
+                    continue
                 # 检查表是否存在
                 exists = self._db_conn.execute(
                     "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
@@ -516,28 +525,31 @@ class MemoryStore:
     def add(self, chunk: dict) -> int:
         """添加单个 chunk
         v1.44 Phase 1: 多租户 — 自动附加 tenant_id
+        v1.50 R4: 使用 _write_lock 保护并发写入
         """
         tenant_id = chunk.get("tenant_id", "default")
-        with self._db_conn:
-            cur = self._db_conn.execute(
-                "INSERT INTO chunks (doc, file_hash, file_name, category, chunk_index, status, created_at, loader_path, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                (
-                    json.dumps(chunk, ensure_ascii=False),
-                    chunk.get("file_hash", ""),
-                    chunk.get("file_name", ""),
-                    chunk.get("category", ""),
-                    chunk.get("chunk_index", 0),
-                    "active",
-                    chunk.get("created_at", ""),
-                    chunk.get("loader_path", ""),
-                    tenant_id,
+        with self._write_lock:
+            with self._db_conn:
+                cur = self._db_conn.execute(
+                    "INSERT INTO chunks (doc, file_hash, file_name, category, chunk_index, status, created_at, loader_path, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (
+                        json.dumps(chunk, ensure_ascii=False),
+                        chunk.get("file_hash", ""),
+                        chunk.get("file_name", ""),
+                        chunk.get("category", ""),
+                        chunk.get("chunk_index", 0),
+                        "active",
+                        chunk.get("created_at", ""),
+                        chunk.get("loader_path", ""),
+                        tenant_id,
+                    )
                 )
-            )
-            return cur.lastrowid
+                return cur.lastrowid
 
     def add_batch(self, chunks: list) -> int:
         """批量添加 chunks
         v1.44 Phase 1: 多租户 — 自动附加 tenant_id
+        v1.50 R4: 使用 _write_lock 保护并发写入
         """
         rows = []
         for c in chunks:
@@ -553,11 +565,12 @@ class MemoryStore:
                 c.get("loader_path", ""),
                 tenant_id,
             ))
-        with self._db_conn:
-            self._db_conn.executemany(
-                "INSERT INTO chunks (doc, file_hash, file_name, category, chunk_index, status, created_at, loader_path, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                rows
-            )
+        with self._write_lock:
+            with self._db_conn:
+                self._db_conn.executemany(
+                    "INSERT INTO chunks (doc, file_hash, file_name, category, chunk_index, status, created_at, loader_path, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    rows
+                )
         return len(rows)
 
     # ===== v1.50 兼容别名 =====

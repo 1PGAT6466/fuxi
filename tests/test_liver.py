@@ -5,7 +5,7 @@ import pytest
 import sys, os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 
-from src.hypothalamus.meridian import Meridian
+from src.hypothalamus import Meridian
 from src.hypothalamus.organs.liver import LiverAgent
 
 

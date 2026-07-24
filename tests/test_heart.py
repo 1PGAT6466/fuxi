@@ -5,7 +5,7 @@ P5: 器官测试覆盖补充
 import pytest
 import time
 from unittest.mock import MagicMock, AsyncMock, patch
-from src.hypothalamus.meridian import Meridian
+from src.hypothalamus import Meridian
 from src.hypothalamus.organs.heart import HeartAgent
 
 

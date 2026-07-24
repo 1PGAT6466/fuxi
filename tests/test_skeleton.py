@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from src.hypothalamus.meridian import Meridian, Signal
+from src.hypothalamus import Meridian, Signal
 from src.hypothalamus.organs.skeleton import SkeletonAgent
 
 

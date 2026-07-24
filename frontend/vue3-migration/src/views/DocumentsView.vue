@@ -174,39 +174,72 @@
     <!-- 预览对话框 -->
     <FilePreview v-model="previewVisible" :file="previewFile" @download="handleDownload" />
 
-    <!-- 在线编辑对话框 -->
+    <!-- 在线编辑对话框（支持实时协作） -->
     <el-dialog
       v-model="editDialogVisible"
       :title="`在线编辑 - ${editingFile?.filename || ''}`"
-      width="900px"
+      width="1100px"
       destroy-on-close
       :close-on-click-modal="false"
+      @close="handleEditClose"
     >
-      <div class="edit-toolbar">
-        <el-radio-group v-model="editMode" size="small">
-          <el-radio-button value="text">纯文本</el-radio-button>
-          <el-radio-button value="markdown">Markdown</el-radio-button>
-        </el-radio-group>
-        <div class="edit-actions">
-          <el-button size="small" @click="handleRevertEdit" :disabled="!editContentModified">
-            还原
-          </el-button>
+      <div class="edit-layout">
+        <!-- 左侧：编辑区 -->
+        <div class="edit-main">
+          <div class="edit-toolbar">
+            <div class="edit-toolbar-left">
+              <el-radio-group v-model="editMode" size="small">
+                <el-radio-button value="text">纯文本</el-radio-button>
+                <el-radio-button value="markdown">Markdown</el-radio-button>
+              </el-radio-group>
+              <el-divider direction="vertical" />
+              <el-switch
+                v-model="collabEnabled"
+                size="small"
+                active-text="协作"
+                @change="handleCollabToggle"
+              />
+            </div>
+            <div class="edit-actions">
+              <el-button size="small" @click="handleRevertEdit" :disabled="!editContentModified">
+                还原
+              </el-button>
+            </div>
+          </div>
+          <div class="edit-content-area">
+            <el-input
+              v-model="editContent"
+              type="textarea"
+              :rows="20"
+              :placeholder="editMode === 'markdown' ? '输入 Markdown 内容...' : '输入文本内容...'"
+              class="edit-textarea"
+              @keydown="handleEditKeydown"
+              @mouseup="handleEditMouseUp"
+              ref="editTextareaRef"
+            />
+            <div v-if="editMode === 'markdown'" class="edit-preview">
+              <div class="preview-header">预览</div>
+              <div class="preview-body markdown-body" v-html="renderedMarkdown" />
+            </div>
+          </div>
         </div>
-      </div>
-      <div class="edit-content-area">
-        <el-input
-          v-model="editContent"
-          type="textarea"
-          :rows="20"
-          :placeholder="editMode === 'markdown' ? '输入 Markdown 内容...' : '输入文本内容...'"
-          class="edit-textarea"
-        />
-        <div v-if="editMode === 'markdown'" class="edit-preview">
-          <div class="preview-header">预览</div>
-          <div class="preview-body markdown-body" v-html="renderedMarkdown" />
+        <!-- 右侧：协作面板 -->
+        <div v-if="collabEnabled && editingFile" class="edit-collab-panel">
+          <CollaborationPanel
+            :document-id="editingFile.id"
+            :user-id="currentUserId"
+            :user-name="currentUserName"
+            @leave="collabEnabled = false"
+            @connection-change="handleCollabConnectionChange"
+          />
         </div>
       </div>
       <template #footer>
+        <template v-if="collabEnabled && collabConnected">
+          <el-tag type="success" size="small" effect="plain" style="margin-right: auto">
+            协作中 · {{ collabUserCount }} 人在线
+          </el-tag>
+        </template>
         <el-button @click="editDialogVisible = false">取消</el-button>
         <el-button type="primary" :loading="saving" @click="handleSaveEdit">保存</el-button>
       </template>
@@ -215,7 +248,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, onMounted } from 'vue';
+import { ref, computed, onMounted, nextTick } from 'vue';
 import { ElMessage } from 'element-plus';
 import {
   Plus,
@@ -234,13 +267,18 @@ import { marked } from 'marked';
 import DOMPurify from 'dompurify';
 import { formatSize, formatDate } from '@/utils/helpers';
 import { useFileStore } from '@/stores/files';
+import { useAuthStore } from '@/stores/auth';
 import apiClient from '@/api';
 import UploadZone from '@/components/files/UploadZone.vue';
 import FileCard from '@/components/files/FileCard.vue';
 import FilePreview from '@/components/files/FilePreview.vue';
+import { useCollaborationStore } from '@/services/collaboration/store';
+import CollaborationPanel from '@/services/collaboration/CollaborationPanel.vue';
 import type { FileInfo } from '@/types';
+import type { ConnectionStatus } from '@/services/collaboration';
 
 const fileStore = useFileStore();
+const authStore = useAuthStore();
 
 // ============================
 // 视图状态
@@ -263,6 +301,15 @@ const editOriginalContent = ref('');
 const editMode = ref<'text' | 'markdown'>('text');
 const saving = ref(false);
 const editContentModified = ref(false);
+const editTextareaRef = ref<InstanceType<typeof import('element-plus')['ElInput']> | null>(null);
+
+// 实时协作
+const collabEnabled = ref(false);
+const collabConnected = ref(false);
+const collabUserCount = ref(0);
+const collabStore = useCollaborationStore();
+const currentUserId = computed(() => String(authStore.user?.id ?? 'anonymous'));
+const currentUserName = computed(() => authStore.user?.username ?? authStore.user?.display_name ?? '匿名用户');
 
 // ============================
 // 计算属性
@@ -425,12 +472,90 @@ async function handleSaveEdit(): Promise<void> {
     ElMessage.success('保存成功');
     editOriginalContent.value = editContent.value;
     editContentModified.value = false;
+    // 同步协作内容
+    if (collabEnabled.value) {
+      collabStore.replaceText(0, collabStore.documentContent.length, editContent.value);
+    }
     editDialogVisible.value = false;
   } catch {
     ElMessage.error('保存失败，请重试');
   } finally {
     saving.value = false;
   }
+}
+
+// ============================
+// 实时协作
+// ============================
+
+function handleCollabToggle(enabled: boolean): void {
+  if (enabled && editingFile.value) {
+    // 加入协作房间
+    collabStore.joinRoom(
+      editingFile.value.id,
+      currentUserId.value,
+      currentUserName.value,
+    );
+  } else {
+    collabStore.leaveRoom();
+    collabConnected.value = false;
+    collabUserCount.value = 0;
+  }
+}
+
+function handleCollabConnectionChange(status: ConnectionStatus): void {
+  collabConnected.value = status === 'connected';
+  if (collabConnected.value) {
+    collabUserCount.value = collabStore.onlineCount;
+  }
+}
+
+function handleEditClose(): void {
+  if (collabEnabled.value) {
+    collabStore.leaveRoom();
+    collabEnabled.value = false;
+    collabConnected.value = false;
+  }
+}
+
+function handleEditKeydown(): void {
+  // 标记内容已修改
+  editContentModified.value = true;
+
+  if (!collabEnabled.value || !collabConnected.value) return;
+
+  // 将本地编辑同步到协作文档
+  nextTick(() => {
+    const textarea = getTextareaElement();
+    if (textarea) {
+      const cursorPos = textarea.selectionStart;
+      // 简单同步：全文替换（生产环境建议使用差分同步或 Y.Text binding）
+      collabStore.replaceText(0, collabStore.documentContent.length, editContent.value);
+    }
+  });
+}
+
+function handleEditMouseUp(): void {
+  if (!collabEnabled.value || !collabConnected.value) return;
+
+  const textarea = getTextareaElement();
+  if (textarea) {
+    const text = textarea.value || '';
+    const beforeCursor = text.slice(0, textarea.selectionStart);
+    const lines = beforeCursor.split('\n');
+    const line = lines.length;
+    const column = lines[lines.length - 1].length + 1;
+
+    collabStore.sendCursorPosition({
+      line,
+      column,
+    });
+  }
+}
+
+function getTextareaElement(): HTMLTextAreaElement | null {
+  const dialog = document.querySelector('.edit-textarea');
+  return dialog?.querySelector('textarea') ?? null;
 }
 
 // ============================
@@ -632,6 +757,34 @@ gap: 12px;
 }
 }
 
+/* ───── 协作布局 ───── */
+.edit-layout {
+  display: flex;
+  gap: 0;
+  min-height: 480px;
+}
+
+.edit-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.edit-toolbar-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.edit-collab-panel {
+  width: 280px;
+  flex-shrink: 0;
+  border-left: 1px solid var(--fuxi-border, #eee);
+  background: var(--fuxi-bg-card, #ffffff);
+  overflow: hidden;
+}
+
 .edit-preview {
 flex: 1;
 border: 1px solid var(--fuxi-border, #eee);
@@ -685,6 +838,17 @@ flex-direction: column;
 @media (max-width: 767px) {
 .edit-content-area {
   flex-direction: column;
+}
+
+.edit-layout {
+  flex-direction: column;
+}
+
+.edit-collab-panel {
+  width: 100%;
+  max-height: 320px;
+  border-left: none;
+  border-top: 1px solid var(--fuxi-border, #eee);
 }
 }
 

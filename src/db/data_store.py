@@ -85,12 +85,12 @@ def load_chunks(filter_junk: bool = True, limit: int = None, offset: int = 0) ->
 
 
 def invalidate_chunk_cache():
-    """在数据写入/删除后调用，清除缓存"""
+    """在数据写入/删除后调用，清除缓存 — v1.50 R3: 锁保护完整操作"""
     with _chunk_cache_lock:
         _CHUNK_CACHE["data"] = None
         _CHUNK_CACHE["ts"] = 0
-    _CHUNK_CACHE["access_count"] = 0
-    _CHUNK_CACHE["last_access"] = 0
+        _CHUNK_CACHE["access_count"] = 0
+        _CHUNK_CACHE["last_access"] = 0
 
 
 def save_chunks(chunks: list):
@@ -98,22 +98,46 @@ def save_chunks(chunks: list):
     
     调用方期望：提供完整的 chunk 列表，完全替换数据库中的现有数据。
     实现：通过 MemoryStore 先清空再批量插入，保证原子性。
+    v1.50 R3: 使用 write_lock 保护 atomic delete+insert 操作
+    v1.50 R4: DELETE + INSERT 包装在同一事务中，防止中间状态被读取
     """
     store = get_store()
-    # 1) 先清空现有数据
-    with store._db_conn:
-        store._db_conn.execute("DELETE FROM chunks")
-        # 重置自增计数器，避免 id 无限增长
-        store._db_conn.execute("DELETE FROM sqlite_sequence WHERE name='chunks'")
-    # 2) 清除内存缓存
-    store._cache_hash.clear()
-    store._cache_name.clear()
-    store._json_cache.clear()
-    store._files_cache = None
-    store._files_cache_time = 0
-    # 3) 批量写入新数据
-    if chunks:
-        store.add_batch(chunks)
+    # v1.50 R3: 加写入锁防止并发 save_chunks 调用交错
+    with store._write_lock:
+        # v1.50 R4: DELETE + INSERT 在同一事务中
+        with store._db_conn:
+            store._db_conn.execute("BEGIN IMMEDIATE")
+            # 1) 先清空现有数据
+            store._db_conn.execute("DELETE FROM chunks")
+            # 重置自增计数器，避免 id 无限增长
+            store._db_conn.execute("DELETE FROM sqlite_sequence WHERE name='chunks'")
+            # 2) 批量写入新数据（在同一事务中）
+            if chunks:
+                rows = []
+                for c in chunks:
+                    tenant_id = c.get("tenant_id", "default")
+                    rows.append((
+                        json.dumps(c, ensure_ascii=False),
+                        c.get("file_hash", ""),
+                        c.get("file_name", ""),
+                        c.get("category", ""),
+                        c.get("chunk_index", 0),
+                        "active",
+                        c.get("created_at", ""),
+                        c.get("loader_path", ""),
+                        tenant_id,
+                    ))
+                store._db_conn.executemany(
+                    "INSERT INTO chunks (doc, file_hash, file_name, category, chunk_index, status, created_at, loader_path, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    rows
+                )
+            store._db_conn.commit()
+        # 3) 清除内存缓存
+        store._cache_hash.clear()
+        store._cache_name.clear()
+        store._json_cache.clear()
+        store._files_cache = None
+        store._files_cache_time = 0
     # 4) 同步清理 data_store 模块级缓存
     invalidate_chunk_cache()
     logger.info(f"save_chunks: 已保存 {len(chunks)} 条记录")
@@ -184,7 +208,11 @@ def search_history(days: int = 7) -> list:
                         except Exception:
                             logger.debug(f"[data_store] 搜索日志行解析失败，跳过", exc_info=True)
     except Exception:
-        logger.warning(f"[data_store] search_history 读取失败", exc_info=True)(hist, key=lambda x: x.get("time", ""), reverse=True)[:30]
+        logger.warning(f"[data_store] search_history 读取失败", exc_info=True)
+    
+    # v1.50 R4: 修复语法错误 — sorted 调用必须在 except 之外且需要赋值
+    hist.sort(key=lambda x: x.get("time", ""), reverse=True)
+    return hist[:30]
 
 
 # ============ 知识图谱 ============

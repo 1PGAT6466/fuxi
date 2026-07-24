@@ -1,0 +1,16 @@
+{
+  "id": "offline",
+  "name": "离线模式",
+  "icon": "Connection",
+  "description": "提供离线状态检测、数据缓存、操作队列和同步冲突解决功能",
+  "version": "1.0.0",
+  "category": "workspace",
+  "route": "/offline",
+  "apiBase": "/api/offline",
+  "endpoints": [],
+  "requiredRole": "user",
+  "windowMode": "modal",
+  "tags": ["offline", "queue", "sync", "cache"],
+  "dependencies": [],
+  "author": "伏羲团队"
+}

@@ -127,6 +127,14 @@ const STATIC_MANIFESTS: Record<string, () => Promise<{ default: unknown }>> = {
   'data-analytics': () => import('@/services/data-analytics/manifest.json'),
   'doc-tools': () => import('@/services/doc-tools/manifest.json'),
   'dxf-viewer': () => import('@/services/dxf-viewer/manifest.json'),
+  'recent-visits': () => import('@/services/recent-visits/manifest.json'),
+  'notification-center': () => import('@/services/notification-center/manifest.json'),
+  'favorites': () => import('@/services/favorites/manifest.json'),
+  'collaboration': () => import('@/services/collaboration/manifest.json'),
+  'api-keys': () => import('@/services/api-keys/manifest.json'),
+  'service-market': () => import('@/services/service-market/manifest.json'),
+  'webhooks': () => import('@/services/webhooks/manifest.json'),
+  'developer-portal': () => import('@/services/developer-portal/manifest.json'),
 };
 
 // ============================

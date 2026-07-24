@@ -29,6 +29,11 @@ from src.data_service import (
 _sessions_store: dict = {}
 _messages_store: dict = {}
 
+# v1.50 R4: 会话和消息存储的线程安全锁
+import asyncio as _asyncio
+_sessions_lock = _asyncio.Lock()
+_messages_lock = _asyncio.Lock()
+
 
 def _load_sessions_from_db():
     """从 SQLite 加载所有会话到内存缓存"""
@@ -133,9 +138,20 @@ async def _chat_v1(body: ChatRequest, request: Optional[Request] = None):
         # v2.1: Meridian 已废弃，v1 fallback 使用 IntentBus 兼容接口
         from src.bagua.intent_bus import IntentBus
 
+        # P2 指代消解：在多轮对话中消解代词和省略
+        resolved_query = body.query
+        if body.history and len(body.history) > 0:
+            try:
+                from src.services.coreference_resolver import resolve_coreference
+                resolved_query = await resolve_coreference(body.query, body.history)
+                if resolved_query != body.query:
+                    logger.info(f"[coref] v1 指代消解: '{body.query[:40]}...' → '{resolved_query[:60]}...'")
+            except Exception as e:
+                logger.warning(f"[coref] v1 指代消解失败，使用原始查询: {e}")
+
         intent_bus = IntentBus()
         brain = ShaoyinBrain(intent_bus)
-        result = await brain.think(body.query, body.history)
+        result = await brain.think(resolved_query, body.history)
 
         answer_data = {
             "answer": result.get("answer", ""),
@@ -153,13 +169,15 @@ async def _chat_v1(body: ChatRequest, request: Optional[Request] = None):
             return success(data=answer_data, message="对话完成")
         return answer_data
     except (ImportError, ModuleNotFoundError) as e:
+        logger.exception(f"_chat_v1 失败: {e}")
+        # v1.50 R3: 生产环境不暴露内部错误详情
         _wants_v2 = request and (
             request.query_params.get("format") == "v2"
             or request.headers.get("X-API-Format", "").lower() == "v2"
         )
         if _wants_v2:
-            return error("对话失败", status_code=500, detail=str(e))
-        return {"answer": f"处理失败: {str(e)}", "sources": [], "mode": "error"}
+            return error("对话失败", status_code=500, detail="服务异常，请稍后重试")
+        return {"answer": "对话服务暂时不可用，请稍后重试", "sources": [], "mode": "error"}
 
 
 async def _chat_v2(body: ChatRequest, request: Optional[Request] = None):
@@ -172,12 +190,23 @@ async def _chat_v2(body: ChatRequest, request: Optional[Request] = None):
         from src.bagua.qian import QianGua
         from src.bagua.intent_bus import get_intent_bus
 
+        # P2 指代消解：在多轮对话中消解代词和省略
+        resolved_query = body.query
+        if body.history and len(body.history) > 0:
+            try:
+                from src.services.coreference_resolver import resolve_coreference
+                resolved_query = await resolve_coreference(body.query, body.history)
+                if resolved_query != body.query:
+                    logger.info(f"[coref] v2 指代消解: '{body.query[:40]}...' → '{resolved_query[:60]}...'")
+            except Exception as e:
+                logger.warning(f"[coref] v2 指代消解失败，使用原始查询: {e}")
+
         bus = get_intent_bus()
         qian = QianGua(intent_bus=bus)
         qian.start()
 
         result = await qian.think(
-            query=body.query,
+            query=resolved_query,
             history=body.history,
             session_id=str(uuid.uuid4()),
         )
@@ -189,8 +218,10 @@ async def _chat_v2(body: ChatRequest, request: Optional[Request] = None):
             "confidence": _compute_qian_confidence(result),
         }
     except (ImportError, ModuleNotFoundError, ValueError, TypeError) as e:
+        logger.exception(f"_chat_v2 失败: {e}")
+        # v1.50 R3: 生产环境不暴露内部错误详情
         return {
-            "answer": f"乾卦路径处理失败: {str(e)}",
+            "answer": "对话服务暂时不可用，请稍后重试",
             "sources": [],
             "mode": "qian-error",
             "confidence": 0,
@@ -413,13 +444,24 @@ async def chat_send(body: ChatSendRequest, request: Request):
             if session_id in _sessions_store:
                 await asyncio.to_thread(_save_session_to_db, _sessions_store[session_id])
 
+        # P2 指代消解预处理
+        resolved_query = body.query
+        if body.history and len(body.history) > 0:
+            try:
+                from src.services.coreference_resolver import resolve_coreference
+                resolved_query = await resolve_coreference(body.query, body.history)
+                if resolved_query != body.query:
+                    logger.info(f"[coref] send 指代消解: '{body.query[:40]}...' → '{resolved_query[:60]}...'")
+            except Exception as e:
+                logger.warning(f"[coref] send 指代消解失败，使用原始查询: {e}")
+
         # 如果请求流式响应
         if body.stream:
             async def sse_generator():
                 try:
                     # 调用实际的对话逻辑
                     chat_body = ChatRequest(
-                        query=body.query,
+                        query=resolved_query,
                         history=body.history,
                         granularity=body.granularity
                     )
@@ -475,9 +517,9 @@ async def chat_send(body: ChatSendRequest, request: Request):
                 }
             )
         else:
-            # 非流式：直接复用现有 /api/chat 逻辑
+            # 非流式：直接复用现有 /api/chat 逻辑（已做指代消解）
             chat_body = ChatRequest(
-                query=body.query,
+                query=resolved_query,
                 history=body.history,
                 granularity=body.granularity
             )

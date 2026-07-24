@@ -1,0 +1,494 @@
+{
+  "time": "2026-07-12T10:33:13.563940",
+  "total": 44,
+  "passed": 23,
+  "failed": 21,
+  "categories": {
+    "Auth": {
+      "p": 5,
+      "f": 0
+    },
+    "System": {
+      "p": 3,
+      "f": 2
+    },
+    "Search": {
+      "p": 3,
+      "f": 0
+    },
+    "Docs": {
+      "p": 1,
+      "f": 1
+    },
+    "Wiki": {
+      "p": 1,
+      "f": 1
+    },
+    "Graph": {
+      "p": 1,
+      "f": 0
+    },
+    "Chat": {
+      "p": 0,
+      "f": 2
+    },
+    "Dashboard": {
+      "p": 0,
+      "f": 1
+    },
+    "Metadata": {
+      "p": 1,
+      "f": 0
+    },
+    "Services": {
+      "p": 0,
+      "f": 1
+    },
+    "WorldTree": {
+      "p": 0,
+      "f": 1
+    },
+    "Flags": {
+      "p": 0,
+      "f": 1
+    },
+    "Eval": {
+      "p": 3,
+      "f": 0
+    },
+    "Feedback": {
+      "p": 1,
+      "f": 0
+    },
+    "Tenants": {
+      "p": 0,
+      "f": 1
+    },
+    "Notify": {
+      "p": 1,
+      "f": 0
+    },
+    "Prefs": {
+      "p": 1,
+      "f": 0
+    },
+    "Proxy": {
+      "p": 0,
+      "f": 1
+    },
+    "Evolution": {
+      "p": 0,
+      "f": 1
+    },
+    "Security": {
+      "p": 0,
+      "f": 6
+    },
+    "Error": {
+      "p": 0,
+      "f": 2
+    },
+    "Frontend": {
+      "p": 2,
+      "f": 0
+    }
+  },
+  "details": [
+    {
+      "category": "Auth",
+      "name": "Register",
+      "method": "POST",
+      "url": "/api/auth/register",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Auth",
+      "name": "Login",
+      "method": "POST",
+      "url": "/api/auth/login",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Auth",
+      "name": "Me",
+      "method": "GET",
+      "url": "/api/auth/me",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Auth",
+      "name": "Refresh",
+      "method": "POST",
+      "url": "/api/auth/refresh",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Auth",
+      "name": "Logout",
+      "method": "POST",
+      "url": "/api/auth/logout",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "System",
+      "name": "Health",
+      "method": "GET",
+      "url": "/api/health",
+      "status": 200,
+      "passed": true,
+      "detail": "keys=['status', 'checks', 'timestamp']"
+    },
+    {
+      "category": "System",
+      "name": "V2 Health",
+      "method": "GET",
+      "url": "/api/v2/health",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "System",
+      "name": "Metrics",
+      "method": "GET",
+      "url": "/api/metrics",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "System",
+      "name": "Symbols Status",
+      "method": "GET",
+      "url": "/api/symbols/status",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "System",
+      "name": "Growth Overview",
+      "method": "GET",
+      "url": "/api/growth/overview",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Search",
+      "name": "Search",
+      "method": "GET",
+      "url": "/api/search?q=test",
+      "status": 200,
+      "passed": true,
+      "detail": "unified_format=False, keys=['wiki_results', 'chunk_results', 'results', 'query', 'page', 'page_size']"
+    },
+    {
+      "category": "Search",
+      "name": "RAG Search",
+      "method": "POST",
+      "url": "/api/rag/search",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Search",
+      "name": "Unified Search",
+      "method": "GET",
+      "url": "/api/unified-search",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Docs",
+      "name": "Doc List",
+      "method": "GET",
+      "url": "/api/documents",
+      "status": 200,
+      "passed": true,
+      "detail": "unified_format=False, keys=['files', 'total', 'page', 'page_size']"
+    },
+    {
+      "category": "Docs",
+      "name": "Doc Detail 404",
+      "method": "GET",
+      "url": "/api/documents/nonexistent",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Wiki",
+      "name": "Wiki List",
+      "method": "GET",
+      "url": "/api/wiki",
+      "status": 200,
+      "passed": true,
+      "detail": "unified_format=False, keys=['ok', 'title', 'description', 'pages', 'total', 'categories']"
+    },
+    {
+      "category": "Wiki",
+      "name": "Wiki Detail",
+      "method": "GET",
+      "url": "/api/wiki/1",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Graph",
+      "name": "Graph",
+      "method": "GET",
+      "url": "/api/graph",
+      "status": 200,
+      "passed": true,
+      "detail": "unified_format=False, keys=['nodes', 'edges']"
+    },
+    {
+      "category": "Chat",
+      "name": "Sessions",
+      "method": "GET",
+      "url": "/api/chat/sessions",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Chat",
+      "name": "Create Session",
+      "method": "POST",
+      "url": "/api/chat/sessions",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Dashboard",
+      "name": "Stats",
+      "method": "GET",
+      "url": "/api/dashboard/stats",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Metadata",
+      "name": "Metadata",
+      "method": "GET",
+      "url": "/api/metadata",
+      "status": 200,
+      "passed": true,
+      "detail": "unified_format=False, keys=['metadata', 'total']"
+    },
+    {
+      "category": "Services",
+      "name": "Service List",
+      "method": "GET",
+      "url": "/api/services",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "WorldTree",
+      "name": "WorldTree",
+      "method": "GET",
+      "url": "/api/worldtree",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Flags",
+      "name": "Flag List",
+      "method": "GET",
+      "url": "/api/feature-flags",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Eval",
+      "name": "Report",
+      "method": "GET",
+      "url": "/api/eval/report",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Eval",
+      "name": "History",
+      "method": "GET",
+      "url": "/api/eval/history",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Eval",
+      "name": "Overview",
+      "method": "GET",
+      "url": "/api/evaluation/overview",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Feedback",
+      "name": "Submit",
+      "method": "POST",
+      "url": "/api/feedback",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Tenants",
+      "name": "Tenant List",
+      "method": "GET",
+      "url": "/api/tenants",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Notify",
+      "name": "Notifications",
+      "method": "GET",
+      "url": "/api/notifications",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Prefs",
+      "name": "Preferences",
+      "method": "GET",
+      "url": "/api/user/preferences",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Proxy",
+      "name": "Loader Files",
+      "method": "GET",
+      "url": "/api/proxy/loader/files",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Evolution",
+      "name": "Status",
+      "method": "GET",
+      "url": "/api/evolution/status",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Security",
+      "name": "401 /api/search?q=test",
+      "method": "GET",
+      "url": "/api/search?q=test",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Security",
+      "name": "401 /api/documents",
+      "method": "GET",
+      "url": "/api/documents",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Security",
+      "name": "401 /api/wiki",
+      "method": "GET",
+      "url": "/api/wiki",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Security",
+      "name": "401 /api/graph",
+      "method": "GET",
+      "url": "/api/graph",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Security",
+      "name": "401 /api/chat/sessions",
+      "method": "GET",
+      "url": "/api/chat/sessions",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Security",
+      "name": "401 /api/dashboard/stats",
+      "method": "GET",
+      "url": "/api/dashboard/stats",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Error",
+      "name": "404 Route",
+      "method": "GET",
+      "url": "/api/nonexistent",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Error",
+      "name": "Validation",
+      "method": "POST",
+      "url": "/api/auth/login",
+      "status": "N/A",
+      "passed": false,
+      "detail": ""
+    },
+    {
+      "category": "Frontend",
+      "name": "Index",
+      "method": "GET",
+      "url": "/",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "category": "Frontend",
+      "name": "Login",
+      "method": "GET",
+      "url": "/login",
+      "status": 200,
+      "passed": true,
+      "detail": ""
+    }
+  ]
+}

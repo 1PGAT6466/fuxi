@@ -1,7 +1,14 @@
 """
-kb-embedder v10.1 — 多 worker 文本向量化
-端口 8081，仅内网访问
-改进：ThreadPoolExecutor 多线程并发编码 + 批量排队
+Embedder 服务端模块 (infra/embedder.py)
+===============================
+kb-embedder v10.1 — 独立的向量化微服务 (FastAPI 服务端)
+
+职责：提供 /embed 和 /rerank HTTP API
+端口：8081（仅内网访问）
+依赖：sentence_transformers (BAAI/bge-small-zh-v1.5)
+
+注意：此模块是服务端实现，不应被直接 import 使用。
+      API 层应使用 src/services/embedder.py（客户端 SDK）来调用此服务。
 """
 import os
 os.environ["HF_HUB_OFFLINE"] = "1"

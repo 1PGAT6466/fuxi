@@ -65,6 +65,15 @@ const DocToolsPage = () => import('@/services/doc-tools/DocToolsPage.vue');
 // Phase 3 — DXF 查看器
 const DxfViewerPage = () => import('@/services/dxf-viewer/DxfViewerPage.vue');
 
+// Phase 4 — 工作流引擎
+const WorkflowEnginePage = () => import('@/services/workflow-engine/WorkflowEnginePage.vue');
+
+// P2 — 最近访问/历史记录
+const HistoryView = () => import('@/views/personal/HistoryView.vue');
+
+// Phase 2 — 任务仪表板（日常监控视图）
+const TaskDashboardView = () => import('@/views/DashboardView.vue');
+
 // Phase 4 — 管理中心
 const DashboardView = () => import('@/views/admin/DashboardView.vue');
 const EvaluationView = () => import('@/views/admin/EvaluationView.vue');
@@ -79,6 +88,18 @@ const FeedbackView = () => import('@/views/admin/FeedbackView.vue');
 
 // 管理
 const AdminView = () => import('@/views/Admin.vue');
+
+// Phase 5 — API Key 管理
+const ApiKeyManager = () => import('@/services/api-keys/ApiKeyManager.vue');
+
+// Phase 6 — 开发者门户
+const DeveloperPortal = () => import('@/services/developer-portal/DeveloperPortal.vue');
+
+// Phase 5 — 服务市场
+const ServiceMarketPage = () => import('@/services/service-market/ServiceMarket.vue');
+
+// 联邦搜索
+const FederatedSearchView = () => import('@/views/FederatedSearchView.vue');
 
 // 404
 const NotFound = () => import('@/views/NotFound.vue');
@@ -179,6 +200,14 @@ const routes: RouteRecordRaw[] = [
         meta: { title: '文档工具' },
       },
 
+      // ─── 任务仪表板（日常监控） ───
+      {
+        path: 'dashboard',
+        name: 'TaskDashboard',
+        component: TaskDashboardView,
+        meta: { title: '任务仪表板' },
+      },
+
       // ─── 兼容路由（旧版） ───
       {
         path: 'chat',
@@ -239,6 +268,43 @@ const routes: RouteRecordRaw[] = [
         meta: { title: 'DXF 工程浏览器' },
       },
 
+      // ─── 服务市场 ───
+      {
+        path: 'workspace/service-market',
+        name: 'ServiceMarket',
+        component: ServiceMarketPage,
+        meta: { title: '服务市场' },
+      },
+      {
+        path: 'workspace/federated-search',
+        name: 'FederatedSearch',
+        component: FederatedSearchView,
+        meta: { title: '联邦搜索' },
+      },
+
+      // ─── 工作流引擎 ───
+      {
+        path: 'workspace/workflow-engine',
+        name: 'WorkflowEngine',
+        component: WorkflowEnginePage,
+        meta: { title: '工作流引擎' },
+      },
+
+      // ─── P2: 个人中心路由 ───
+      {
+        path: 'personal/history',
+        name: 'PersonalHistory',
+        component: HistoryView,
+        meta: { title: '最近访问' },
+      },
+      // 个人收藏
+      {
+        path: 'personal/favorites',
+        name: 'PersonalFavorites',
+        component: () => import('@/services/favorites/FavoritesPanel.vue'),
+        meta: { title: '收藏夹' },
+      },
+
       // ─── 管理中心 ───
       {
         path: 'admin',
@@ -293,6 +359,18 @@ const routes: RouteRecordRaw[] = [
         name: 'AdminFeedback',
         component: FeedbackView,
         meta: { requiresAdmin: true, title: '用户反馈' },
+      },
+      {
+        path: 'admin/api-keys',
+        name: 'AdminApiKeys',
+        component: ApiKeyManager,
+        meta: { requiresAdmin: true, title: 'API Key 管理' },
+      },
+      {
+        path: 'admin/developer-portal',
+        name: 'AdminDeveloperPortal',
+        component: DeveloperPortal,
+        meta: { requiresAdmin: true, title: '开发者门户' },
       },
       {
         path: 'admin/:section',

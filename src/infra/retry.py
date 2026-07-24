@@ -1,9 +1,10 @@
 """
 retry.py — 重试机制
-指数退避 + 条件重试
+指数退避 + 条件重试 + jitter（防雷鸣羊群效应）
 """
 import asyncio
 import logging
+import random
 from typing import Callable, Any, Optional
 
 logger = logging.getLogger("infra.retry")
@@ -28,10 +29,12 @@ async def retry_async(
         except exceptions as e:
             last_exception = e
             if attempt < max_retries:
-                logger.warning(f"[Retry] 尝试 {attempt + 1}/{max_retries} 失败: {e}, 等待 {current_delay:.1f}s")
+                # v1.50 R4: 添加 jitter 防止雷鸣羊群效应
+                jittered = current_delay * (0.5 + random.random())
+                logger.warning(f"[Retry] 尝试 {attempt + 1}/{max_retries} 失败: {e}, 等待 {jittered:.1f}s")
                 if on_retry:
                     on_retry(attempt, e)
-                await asyncio.sleep(current_delay)
+                await asyncio.sleep(jittered)
                 current_delay *= backoff
             else:
                 logger.error(f"[Retry] 所有 {max_retries} 次重试失败: {e}")
@@ -57,8 +60,10 @@ def retry_sync(
         except exceptions as e:
             last_exception = e
             if attempt < max_retries:
-                logger.warning(f"[Retry] 尝试 {attempt + 1}/{max_retries} 失败: {e}, 等待 {current_delay:.1f}s")
-                time.sleep(current_delay)
+                # v1.50 R4: 添加 jitter 防止雷鸣羊群效应
+                jittered = current_delay * (0.5 + random.random())
+                logger.warning(f"[Retry] 尝试 {attempt + 1}/{max_retries} 失败: {e}, 等待 {jittered:.1f}s")
+                time.sleep(jittered)
                 current_delay *= backoff
             else:
                 logger.error(f"[Retry] 所有 {max_retries} 次重试失败: {e}")

@@ -85,6 +85,11 @@
             <el-icon><Download /></el-icon>
             导出 Excel
           </el-button>
+          <el-divider direction="vertical" />
+          <el-button size="small" type="success" plain @click="handleShare">
+            <el-icon><Share /></el-icon>
+            分享
+          </el-button>
         </div>
       </div>
 
@@ -107,13 +112,14 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import { DataAnalysis, Printer, Download } from '@element-plus/icons-vue';
+import { DataAnalysis, Printer, Download, Share } from '@element-plus/icons-vue';
 import * as analyticsApi from './api';
 import { useDataAnalyticsStore } from './store';
 import type { ReportResponse, ReportType, ReportDimension } from './types';
 
-defineEmits<{
+const emit = defineEmits<{
   (e: 'export', format: 'pdf' | 'excel'): void;
+  (e: 'share', reportId: string): void;
 }>();
 
 const store = useDataAnalyticsStore();
@@ -160,6 +166,14 @@ async function handleGenerate() {
     ElMessage.error('报表生成失败');
   } finally {
     generating.value = false;
+  }
+}
+
+function handleShare() {
+  if (report.value) {
+    emit('share', report.value.id);
+  } else {
+    ElMessage.warning('请先生成报表');
   }
 }
 </script>

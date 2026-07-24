@@ -2,8 +2,8 @@
   "id": "data-analytics",
   "name": "数据分析",
   "icon": "DataAnalysis",
-  "description": "数据看板与分析工具，提供统计概览、趋势分析、报表生成和数据导出",
-  "version": "2.1.0",
+  "description": "数据看板与分析工具，提供统计概览、趋势分析、报表生成、多格式导出和分享协作",
+  "version": "2.2.0",
   "category": "analytics",
   "guaAffinity": {
     "primary": "li",
@@ -12,18 +12,25 @@
   "route": "/workspace/analytics",
   "apiBase": "/api/analytics",
   "endpoints": [
-    { "method": "GET",  "path": "/health",    "description": "健康检查" },
-    { "method": "GET",  "path": "/stats",     "description": "统计数据概览" },
-    { "method": "POST", "path": "/stats",     "description": "按条件查询统计" },
-    { "method": "GET",  "path": "/trends",    "description": "趋势分析数据" },
-    { "method": "GET",  "path": "/report",    "description": "生成分析报告" },
-    { "method": "GET",  "path": "/storage",   "description": "存储分布分析" },
-    { "method": "POST", "path": "/export",    "description": "数据导出" }
+    { "method": "GET",    "path": "/health",          "description": "健康检查" },
+    { "method": "GET",    "path": "/stats",           "description": "统计数据概览" },
+    { "method": "POST",   "path": "/stats",           "description": "按条件查询统计" },
+    { "method": "GET",    "path": "/trends",          "description": "趋势分析数据" },
+    { "method": "POST",   "path": "/report",          "description": "生成分析报告" },
+    { "method": "GET",    "path": "/storage",         "description": "存储分布分析" },
+    { "method": "POST",   "path": "/export",          "description": "数据导出（PDF/Excel/CSV/JSON）" },
+    { "method": "GET",    "path": "/templates",       "description": "获取报表模板列表" },
+    { "method": "POST",   "path": "/templates",       "description": "创建报表模板" },
+    { "method": "PUT",    "path": "/templates/:id",   "description": "更新报表模板" },
+    { "method": "DELETE", "path": "/templates/:id",   "description": "删除报表模板" },
+    { "method": "POST",   "path": "/reports/share",   "description": "生成报表分享链接" },
+    { "method": "GET",    "path": "/reports/:token",  "description": "访问分享报表" },
+    { "method": "DELETE", "path": "/reports/share/:token", "description": "撤销分享" }
   ],
   "requiredRole": "user",
   "featureFlag": "analytics-enabled",
   "windowMode": "tab",
   "defaultSize": { "width": 1200, "height": 800 },
   "singleton": true,
-  "tags": ["数据", "分析", "看板", "报表", "可视化"]
+  "tags": ["数据", "分析", "看板", "报表", "可视化", "导出", "分享", "协作"]
 }

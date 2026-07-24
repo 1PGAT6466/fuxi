@@ -167,6 +167,50 @@ def delete_session_from_db(session_id: str, db_path: str = None):
         logger.warning("[data_service] delete session failed: %s", e)
 
 
+# v1.50 R4: 原子保存会话和消息（在同一事务中）
+def save_session_with_messages(
+    session: dict,
+    messages: list,
+    db_path: str = None,
+) -> None:
+    """Atomically save a session and all its messages in a single transaction.
+    
+    替代分别调用 save_session_to_db() + save_message_to_db() 多次，
+    确保不会出现孤立的 session 或 message。
+    
+    Args:
+        session: 会话字典 {id, title, user_id, last_message, created_at, updated_at, message_count}
+        messages: 消息列表 [{role, content, sources, timestamp}, ...]
+        db_path:  可选的 SQLite 路径
+    """
+    db_path = db_path or str(CHAT_SESSIONS_DB)
+    ensure_chat_tables(db_path)
+    try:
+        with _connect(db_path) as conn:
+            conn.execute("""
+                INSERT OR REPLACE INTO sessions
+                (id, title, user_id, last_message, created_at, updated_at, message_count)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+            """, (
+                session["id"], session.get("title", ""), session.get("user_id", ""),
+                session.get("last_message", ""), session.get("created_at", 0),
+                session.get("updated_at", 0), session.get("message_count", 0)
+            ))
+            for msg in messages:
+                sources_json = json.dumps(msg.get("sources", []), ensure_ascii=False)
+                conn.execute("""
+                    INSERT INTO messages (session_id, role, content, sources, timestamp)
+                    VALUES (?, ?, ?, ?, ?)
+                """, (
+                    session["id"], msg.get("role", ""), msg.get("content", ""),
+                    sources_json, msg.get("timestamp", 0)
+                ))
+            conn.commit()
+    except Exception as e:  # TODO: Narrow exception type
+        logger.warning("[data_service] save_session_with_messages failed: %s", e)
+        raise  # v1.50 R4: 向上传播，让调用方可以回滚内存状态
+
+
 # ============ 登录限流 (login_rate.db) ============
 
 _MAX_LOGIN_ATTEMPTS = 5
@@ -174,7 +218,8 @@ _LOGIN_WINDOW_SEC = 60
 
 
 def ensure_login_rate_table(db_path: str = None):
-    """Ensure login rate-limit table exists (idempotent)"""
+    """Ensure login rate-limit table exists (idempotent)
+    v1.50 R4: 每次建表时执行 WAL checkpoint，防止 WAL 文件无限增长"""
     db_path = db_path or str(LOGIN_RATE_DB)
     with _connect(db_path, row_factory=False) as conn:
         conn.execute("""
@@ -184,6 +229,8 @@ def ensure_login_rate_table(db_path: str = None):
             )
         """)
         conn.execute("CREATE INDEX IF NOT EXISTS idx_login_ip ON login_attempts(ip)")
+        # v1.50 R4: 定期执行 WAL checkpoint（被动模式，不阻塞写入）
+        conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
         conn.commit()
 
 
@@ -244,12 +291,18 @@ def load_users() -> dict:
 
 
 def save_users(users: dict):
-    """Save user data to users.json"""
+    """Save user data to users.json — v1.50 R4: 原子写入"""
+    import os as _os
+    import tempfile as _tempfile
     users_file = Path(USERS_FILE)
     users_file.parent.mkdir(parents=True, exist_ok=True)
-    users_file.write_text(
-        json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    # v1.50 R4: 原子写入（先写临时文件，再 rename）
+    fd, tmp_path = _tempfile.mkstemp(suffix=".json", dir=str(users_file.parent))
+    try:
+        _os.write(fd, json.dumps(users, ensure_ascii=False, indent=2).encode("utf-8"))
+    finally:
+        _os.close(fd)
+    _os.replace(tmp_path, str(users_file))
 
 
 # ============ 用户偏好 ============
@@ -331,3 +384,38 @@ def log_audit(entry: dict, db_path: str = None):
 
 
 logger.info("[data_service] Data service layer loaded")
+
+
+# ============ v1.50 R4: 定期 WAL Checkpoint ============
+
+def _periodic_wal_checkpoint():
+    """后台线程：定期对所有 SQLite 数据库执行 WAL checkpoint
+    
+    防止 WAL 文件在频繁写入下无限增长。
+    使用 PASSIVE 模式，不阻塞正常读写操作。
+    """
+    import threading as _thr
+    db_paths = [
+        str(CHUNKS_DB),
+        str(LOGIN_RATE_DB),
+        str(CHAT_SESSIONS_DB),
+        str(AUDIT_DB),
+    ]
+    
+    def _run():
+        while True:
+            time.sleep(600)  # 每 10 分钟执行一次
+            for db_path in db_paths:
+                if not Path(db_path).exists():
+                    continue
+                try:
+                    conn = sqlite3.connect(db_path, timeout=10)
+                    conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
+                    conn.close()
+                except Exception:
+                    pass  # checkpoint 失败不影响业务
+    
+    _thr.Thread(target=_run, daemon=True, name="wal-checkpoint").start()
+    logger.info("[data_service] WAL checkpoint 后台任务已启动（每10分钟）")
+
+_periodic_wal_checkpoint()

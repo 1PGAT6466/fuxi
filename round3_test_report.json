@@ -1,0 +1,144 @@
+{
+  "test_time": "2026-07-23 09:17:30",
+  "test_round": 3,
+  "total_score": 2.0,
+  "rating": "不及格 ⭐",
+  "scores": {
+    "search_accuracy": 0.0,
+    "chinese_encoding": 2.0,
+    "duplicate_detection": 0.0,
+    "response_performance": 0.0
+  },
+  "statistics": {
+    "total_queries": 8,
+    "successful_queries": 8,
+    "queries_with_results": 0,
+    "relevant_queries": 0,
+    "encoding_issues": 0,
+    "duplicate_stats": {
+      "total": 0,
+      "unique": 0,
+      "duplicates": 0,
+      "duplicate_ratio": 0
+    },
+    "performance": {
+      "avg_ms": 15.65,
+      "max_ms": 25.67,
+      "min_ms": 10.51
+    }
+  },
+  "query_results": [
+    {
+      "query": "端子压接工艺要求",
+      "category": "Foxconn",
+      "status_code": 200,
+      "elapsed_ms": 15.76,
+      "success": true,
+      "result_count": 0,
+      "results": []
+    },
+    {
+      "query": "连接器设计规范",
+      "category": "Foxconn",
+      "status_code": 200,
+      "elapsed_ms": 24.65,
+      "success": true,
+      "result_count": 0,
+      "results": []
+    },
+    {
+      "query": "自动化产线检测流程",
+      "category": "Mini-fakraTE",
+      "status_code": 200,
+      "elapsed_ms": 25.67,
+      "success": true,
+      "result_count": 0,
+      "results": []
+    },
+    {
+      "query": "装配工艺控制要点",
+      "category": "Mini-fakraTE",
+      "status_code": 200,
+      "elapsed_ms": 10.51,
+      "success": true,
+      "result_count": 0,
+      "results": []
+    },
+    {
+      "query": "轴承型号大全",
+      "category": "标准件",
+      "status_code": 200,
+      "elapsed_ms": 16.03,
+      "success": true,
+      "result_count": 0,
+      "results": []
+    },
+    {
+      "query": "标准件采购清单",
+      "category": "标准件",
+      "status_code": 200,
+      "elapsed_ms": 10.52,
+      "success": true,
+      "result_count": 0,
+      "results": []
+    },
+    {
+      "query": "齿轮设计计算",
+      "category": "非标准机械",
+      "status_code": 200,
+      "elapsed_ms": 10.52,
+      "success": true,
+      "result_count": 0,
+      "results": []
+    },
+    {
+      "query": "机械零件强度校核",
+      "category": "非标准机械",
+      "status_code": 200,
+      "elapsed_ms": 11.52,
+      "success": true,
+      "result_count": 0,
+      "results": []
+    }
+  ],
+  "issues_found": [
+    "⚠️ 8 个查询全部返回 0 条结果",
+    "⚠️ 服务器 172.25.30.200 不可达，embedder 服务无法访问",
+    "⚠️ ChromaDB 向量数据库为空（0 条向量）",
+    "⚠️ chunks.db 中只有 1 条测试数据，文档未正确导入",
+    "⚠️ EMBEDDER_URL 未配置，向量检索功能不可用"
+  ],
+  "root_cause_analysis": {
+    "primary_issue": "服务器 172.25.30.200 不可达",
+    "impact": [
+      "embedder 服务（8081端口）无法访问，无法生成查询向量",
+      "ChromaDB 数据在服务器上，本地只有空数据库",
+      "文档未正确导入到本地 chunks.db"
+    ],
+    "secondary_issues": [
+      "KB_EMBEDDER_URL 环境变量未配置",
+      "文档导入流程可能存在问题",
+      "本地 ChromaDB 与服务器数据不同步"
+    ]
+  },
+  "recommendations": [
+    "🔧 检查服务器 172.25.30.200 的网络连接和 SSH 访问",
+    "🔧 在 .env 文件中配置 KB_EMBEDDER_URL=http://172.25.30.200:8081",
+    "🔧 重新导入文档数据到本地 chunks.db",
+    "🔧 同步服务器 ChromaDB 数据到本地",
+    "🔧 或者在本地部署 embedder 服务",
+    "🔧 检查文档导入脚本和流程"
+  ],
+  "test_environment": {
+    "server_url": "http://localhost:8080",
+    "server_status": "healthy",
+    "server_version": "1.44",
+    "server_uptime": "0h 46m",
+    "documents_loaded": 4,
+    "total_chunks_expected": 29415,
+    "total_chunks_actual": 1,
+    "chromadb_vectors": 0,
+    "embedder_url": "not configured",
+    "target_server_reachable": false
+  }
+}

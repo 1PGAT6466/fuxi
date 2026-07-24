@@ -33,7 +33,12 @@ def setup_middleware(app: FastAPI) -> None:
             return response
         response.headers["X-Content-Type-Options"] = "nosniff"
         response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+        # v1.50 R2 第二轮修复: HSTS 仅在 HTTPS 或明确要求时添加
+        # 内网 HTTP 环境下 HSTS 会导致浏览器拒绝后续连接
+        _forwarded_proto = request.headers.get("X-Forwarded-Proto", "")
+        _force_hsts = os.getenv("FUXI_FORCE_HSTS", "").lower() == "true"
+        if _forwarded_proto == "https" or _force_hsts:
+            response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
         csp_policy = (

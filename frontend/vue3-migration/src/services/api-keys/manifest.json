@@ -1,0 +1,28 @@
+{
+  "id": "api-keys",
+  "name": "API Key 管理",
+  "icon": "Key",
+  "description": "开发者 API Key 管理与使用统计，支持 Key 创建、权限范围设置、过期时间管理及用量监控",
+  "version": "1.0.0",
+  "category": "admin",
+  "guaAffinity": {
+    "primary": "qian",
+    "secondary": "li"
+  },
+  "route": "/admin/api-keys",
+  "apiBase": "/api/api-keys",
+  "endpoints": [
+    { "method": "GET",    "path": "/",              "description": "获取 API Key 列表" },
+    { "method": "POST",   "path": "/",              "description": "创建 API Key" },
+    { "method": "GET",    "path": "/:id",           "description": "获取 API Key 详情" },
+    { "method": "PUT",    "path": "/:id",           "description": "更新 API Key" },
+    { "method": "DELETE", "path": "/:id",           "description": "删除 API Key" },
+    { "method": "GET",    "path": "/:id/usage",     "description": "获取 API Key 使用量统计" }
+  ],
+  "requiredRole": "admin",
+  "featureFlag": "api-keys-enabled",
+  "windowMode": "tab",
+  "defaultSize": { "width": 1100, "height": 750 },
+  "singleton": true,
+  "tags": ["API", "密钥", "开发者", "统计", "安全"]
+}

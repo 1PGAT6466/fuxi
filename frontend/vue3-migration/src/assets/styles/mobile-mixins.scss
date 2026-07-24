@@ -1,0 +1,311 @@
+// ========================================
+// 伏羲前端 - 移动端专用样式 Mixins
+// 基于 SCSS，提供可复用的移动端样式模式
+// ========================================
+
+// ═══ 安全区域变量 ═══
+$safe-top: env(safe-area-inset-top, 0px);
+$safe-bottom: env(safe-area-inset-bottom, 0px);
+$safe-left: env(safe-area-inset-left, 0px);
+$safe-right: env(safe-area-inset-right, 0px);
+
+// ═══ 触摸反馈 Mixin ═══
+@mixin touch-feedback {
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+  user-select: none;
+
+  &:active {
+    opacity: 0.7;
+    transition: opacity 0.1s ease;
+  }
+}
+
+// ═══ 弹性滚动混入 ═══
+@mixin momentum-scroll {
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  scroll-behavior: smooth;
+}
+
+// ═══ 安全区域 Padding ═══
+@mixin safe-area-padding($side: 'bottom') {
+  @if $side == 'top' {
+    padding-top: $safe-top;
+  } @else if $side == 'bottom' {
+    padding-bottom: $safe-bottom;
+  } @else if $side == 'left' {
+    padding-left: $safe-left;
+  } @else if $side == 'right' {
+    padding-right: $safe-right;
+  }
+}
+
+// ═══ 移动端卡片样式 ═══
+@mixin mobile-card {
+  background: var(--fuxi-bg-card, #ffffff);
+  border-radius: var(--radius-card, 12px);
+  box-shadow: var(--fuxi-shadow-sm, 0 1px 6px rgba(0, 0, 0, 0.04));
+  padding: 16px;
+  margin-bottom: 12px;
+}
+
+// ═══ 移动端按钮基础 ═══
+@mixin mobile-btn($bg: var(--fuxi-primary, #ff6700), $color: #fff) {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 10px 20px;
+  border: none;
+  background: $bg;
+  color: $color;
+  font-size: 14px;
+  font-weight: 600;
+  border-radius: var(--radius-input, 8px);
+  cursor: pointer;
+  @include touch-feedback;
+}
+
+// ═══ 移动端输入框 ═══
+@mixin mobile-input {
+  width: 100%;
+  height: 44px;
+  padding: 0 12px;
+  font-size: 15px;
+  border: 1px solid var(--fuxi-border, #eeeeee);
+  border-radius: var(--radius-input, 8px);
+  background: var(--fuxi-input-bg, #ffffff);
+  color: var(--fuxi-text, #333333);
+  outline: none;
+  -webkit-appearance: none;
+  appearance: none;
+
+  &:focus {
+    border-color: var(--fuxi-primary, #ff6700);
+    box-shadow: 0 0 0 2px rgba(255, 103, 0, 0.1);
+  }
+}
+
+// ═══ 移动端分割线 ═══
+@mixin mobile-divider {
+  height: 1px;
+  background: var(--fuxi-border, #eeeeee);
+  margin: 8px 0;
+}
+
+// ═══ 移动端列表项 ═══
+@mixin mobile-list-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 16px;
+  min-height: 48px;
+  border-bottom: 1px solid var(--fuxi-border, #eeeeee);
+  cursor: pointer;
+  transition: background 0.15s ease;
+
+  &:hover {
+    background: var(--fuxi-bg-hover, #fffcf9);
+  }
+
+  &:last-child {
+    border-bottom: none;
+  }
+}
+
+// ═══ 移动端顶部栏 ═══
+@mixin mobile-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  height: 44px;
+  padding: 0 16px;
+  background: var(--fuxi-bg-card, #ffffff);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid var(--fuxi-border, #eeeeee);
+}
+
+// ═══ 移动端底部导航间距 ═══
+@mixin mobile-bottom-spacing {
+  padding-bottom: calc(56px + $safe-bottom);
+}
+
+// ═══ 虚拟滚动容器 ═══
+@mixin virtual-scroll-container {
+  position: relative;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+
+  &::-webkit-scrollbar {
+    width: 0;
+    height: 0;
+  }
+}
+
+// ═══ 下拉刷新区域 ═══
+@mixin pull-refresh-zone {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 0;
+  overflow: hidden;
+  transition: height 0.2s ease;
+  color: var(--fuxi-text-secondary, #999999);
+  font-size: 13px;
+}
+
+// ========================================
+// 移动端响应式断点 Mixins
+// ========================================
+
+// 小屏手机 (xs: < 480px)
+@mixin xs {
+  @media (max-width: 479px) {
+    @content;
+  }
+}
+
+// 大屏手机 (sm: 480px - 575px)
+@mixin sm {
+  @media (min-width: 480px) and (max-width: 575px) {
+    @content;
+  }
+}
+
+// 移动端 (xs + sm: < 576px)
+@mixin mobile-only {
+  @media (max-width: 575px) {
+    @content;
+  }
+}
+
+// 平板 (md + lg: 576px - 991px)
+@mixin tablet-only {
+  @media (min-width: 576px) and (max-width: 991px) {
+    @content;
+  }
+}
+
+// 移动端和平板 (< 992px)
+@mixin mobile-and-tablet {
+  @media (max-width: 991px) {
+    @content;
+  }
+}
+
+// 桌面端 (>= 992px)
+@mixin desktop {
+  @media (min-width: 992px) {
+    @content;
+  }
+}
+
+// ═══ 仅在移动端显示 ═══
+.show-on-mobile {
+  display: none;
+
+  @include mobile-only {
+    display: initial;
+  }
+}
+
+// ═══ 仅在桌面端显示 ═══
+.show-on-desktop {
+  display: initial;
+
+  @include mobile-only {
+    display: none;
+  }
+}
+
+// ═══ 仅在平板端显示 ═══
+.show-on-tablet {
+  display: none;
+
+  @include tablet-only {
+    display: initial;
+  }
+}
+
+// ========================================
+// 移动端动画 Mixins
+// ========================================
+
+// 列表项入场动画（交错延迟）
+@mixin list-stagger-animation($count: 10, $delay: 50ms) {
+  @for $i from 1 through $count {
+    &:nth-child(#{$i}) {
+      animation-delay: #{$i * $delay};
+    }
+  }
+}
+
+// 移动端页面过渡
+@mixin mobile-page-transition {
+  &-enter-active,
+  &-leave-active {
+    transition:
+      opacity 0.25s ease,
+      transform 0.25s ease;
+  }
+
+  &-enter-from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+
+  &-leave-to {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+}
+
+// ========================================
+// 移动端暗色模式调整
+// ========================================
+
+@mixin mobile-dark-mode {
+  [data-theme='yin'] &,
+  [data-theme='dark'] & {
+    @content;
+  }
+}
+
+// ========================================
+// 无障碍：减少动画
+// ========================================
+
+@mixin reduce-motion {
+  @media (prefers-reduced-motion: reduce) {
+    animation: none !important;
+    transition: none !important;
+    @content;
+  }
+}
+
+// ========================================
+// 实用工具类
+// ========================================
+
+// 安全区域 padding 工具类
+.safe-padding-top {
+  padding-top: $safe-top;
+}
+
+.safe-padding-bottom {
+  padding-bottom: $safe-bottom;
+}
+
+// 触摸反馈工具类
+.touch-feedback {
+  @include touch-feedback;
+}
+
+// 弹性滚动工具类
+.momentum-scroll {
+  @include momentum-scroll;
+}

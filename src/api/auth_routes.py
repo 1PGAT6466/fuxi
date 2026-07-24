@@ -7,6 +7,7 @@ from pydantic import BaseModel, field_validator
 import bcrypt
 import logging
 import time
+import threading
 from collections import defaultdict
 
 logger = logging.getLogger(__name__)
@@ -72,6 +73,7 @@ def _is_username_blocked(username: str) -> bool:
 _MAX_LOGIN_ATTEMPTS = 10
 _LOGIN_WINDOW_SEC = 300
 _login_attempts: dict = defaultdict(list)  # 内存缓存，用于快速检查
+_login_attempts_lock = threading.Lock()  # v1.50 R4: 保护回退路径并发安全
 
 # v1.50 R3 Blue: 账号锁定机制 — 防止暴力破解
 _MAX_ACCOUNT_ATTEMPTS = 5  # 同一账号5次失败后锁定
@@ -107,15 +109,16 @@ def _check_login_rate(ip: str) -> bool:
         )
     except Exception as e:
         logger.warning(f"登录限流存储异常，回退到内存模式: {e}")
-        # 回退：内存模式
+        # 回退：内存模式（v1.50 R4: 添加锁保护并发访问）
         now = time.time()
-        attempts = _login_attempts[ip]
-        attempts = [t for t in attempts if now - t < _LOGIN_WINDOW_SEC]
-        _login_attempts[ip] = attempts
-        if len(attempts) >= _MAX_LOGIN_ATTEMPTS:
-            return False
-        attempts.append(now)
-        return True
+        with _login_attempts_lock:
+            attempts = _login_attempts[ip]
+            attempts = [t for t in attempts if now - t < _LOGIN_WINDOW_SEC]
+            _login_attempts[ip] = attempts
+            if len(attempts) >= _MAX_LOGIN_ATTEMPTS:
+                return False
+            attempts.append(now)
+            return True
 
 
 def _check_account_lockout(username: str) -> tuple[bool, int]:
@@ -241,6 +244,7 @@ def login(body: LoginRequest, request: Request = None):
     try:
         from src.api.auth import create_jwt_token
         import json
+        import os as _os, tempfile as _tempfile
         from pathlib import Path
         
         # v2.1: 登录速率限制检查（IP维度）
@@ -264,6 +268,8 @@ def login(body: LoginRequest, request: Request = None):
         if not user:
             # v1.50 R3 Blue: 记录失败尝试（即使用户不存在也记录，防止用户名枚举）
             _record_failed_attempt(body.username)
+            # v1.50 R3: 对不存在用户执行 dummy bcrypt 以消除时序侧信道
+            _verify_password(body.password, "$2b$12$LJ3m4ys3GZf0Z5K8wHqG1eJ8z5X6dAbCdEfGhIjKlMnOpQrStUvW")
             return unauthorized("用户名或密码错误")
         
         stored = user.get("password", "")
@@ -275,9 +281,29 @@ def login(body: LoginRequest, request: Request = None):
         # v1.50 R3 Blue: 登录成功，清除失败记录
         _clear_failed_attempts(body.username)
         
+        # v1.50 R3: 审计日志 - 登录成功
+        try:
+            from src.data_service import log_audit
+            log_audit({
+                "event_type": "login_success",
+                "user_id": body.username,
+                "ip": client_ip,
+                "details": {"role": user.get("role", "user")},
+            })
+        except Exception:
+            pass
+        
         if not stored.startswith("$2b$"):
             user["password"] = _hash_password(body.password)
-            users_file.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8")
+            # v1.50 R4: 原子写入 + 文件锁，防止密码迁移与注册/删除并发覆盖
+            from src.api.admin import _users_file_lock
+            with _users_file_lock:
+                fd, tmp_path = _tempfile.mkstemp(suffix=".json", dir=str(users_file.parent))
+                try:
+                    _os.write(fd, json.dumps(users, ensure_ascii=False, indent=2).encode("utf-8"))
+                finally:
+                    _os.close(fd)
+                _os.replace(tmp_path, str(users_file))
         
         # v1.44 Phase 1: 多租户 — 从用户配置中获取 tenant_id
         user_tenant_id = user.get("tenant_id", "default")
@@ -313,7 +339,7 @@ def register(body: RegisterRequest, request: Request = None):
     """用户注册 — v1.50 R2: 添加邮箱字段和敏感用户名检查"""
     from src.api.response import success, error, server_error
     try:
-        import json, time
+        import json, time, os as _os, tempfile as _tempfile
         from pathlib import Path
         
         # v1.50 R2 Blue: 注册速率限制检查
@@ -348,7 +374,27 @@ def register(body: RegisterRequest, request: Request = None):
         }
         
         users_file.parent.mkdir(parents=True, exist_ok=True)
-        users_file.write_text(json.dumps(users, ensure_ascii=False, indent=2), encoding="utf-8")
+        # v1.50 R4: 使用 admin.py 的全局文件锁，防止注册/登录迁移/管理操作并发覆盖
+        from src.api.admin import _users_file_lock
+        with _users_file_lock:
+            fd, tmp_path = _tempfile.mkstemp(suffix=".json", dir=str(users_file.parent))
+            try:
+                _os.write(fd, json.dumps(users, ensure_ascii=False, indent=2).encode("utf-8"))
+            finally:
+                _os.close(fd)
+            _os.replace(tmp_path, str(users_file))
+        
+        # v1.50 R3: 审计日志 - 注册成功
+        try:
+            from src.data_service import log_audit
+            log_audit({
+                "event_type": "user_registered",
+                "user_id": body.username,
+                "ip": client_ip,
+                "details": {"email": body.email or "", "tenant_id": tenant_id},
+            })
+        except Exception:
+            pass
         
         # 向后兼容: 默认返回旧格式 {ok, username}
         _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
@@ -454,8 +500,9 @@ async def auth_logout(request: Request = None):
                 token = auth[7:]
                 try:
                     import jwt as _jwt
-                    # 解码但不验证签名（因为中间件已验证过）
-                    payload = _jwt.decode(token, options={"verify_signature": False})
+                    from src.config import JWT_SECRET as _JWT_SECRET_CFG
+                    # v1.50 R3: 必须验证签名，防止攻击者伪造 jti 黑名单他人 token
+                    payload = _jwt.decode(token, _JWT_SECRET_CFG, algorithms=["HS256"])
                     jti = payload.get("jti")
                     exp = payload.get("exp")
                     if jti and exp:

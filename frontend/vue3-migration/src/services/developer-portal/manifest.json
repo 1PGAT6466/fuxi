@@ -1,0 +1,30 @@
+{
+  "id": "developer-portal",
+  "name": "开发者门户",
+  "icon": "Platform",
+  "description": "伏羲平台开发者门户，提供 API 文档浏览（OpenAPI/Swagger）、SDK 下载（Python/JavaScript/Java）、OAuth2.0 认证流程指引与开发者社区入口",
+  "version": "1.0.0",
+  "category": "admin",
+  "guaAffinity": {
+    "primary": "qian",
+    "secondary": "xun"
+  },
+  "route": "/admin/developer-portal",
+  "apiBase": "/api/developer",
+  "endpoints": [
+    { "method": "GET",  "path": "/docs",              "description": "获取 API 文档 (OpenAPI/Swagger)" },
+    { "method": "GET",  "path": "/docs/:version",     "description": "获取指定版本 API 文档" },
+    { "method": "GET",  "path": "/sdk",               "description": "获取 SDK 列表及下载链接" },
+    { "method": "GET",  "path": "/sdk/:language",     "description": "获取指定语言 SDK 详情" },
+    { "method": "POST", "path": "/oauth/register-app","description": "注册 OAuth2.0 应用" },
+    { "method": "GET",  "path": "/oauth/apps",        "description": "获取已注册 OAuth2.0 应用列表" },
+    { "method": "GET",  "path": "/community/posts",   "description": "获取开发者社区帖子" },
+    { "method": "GET",  "path": "/community/posts/:id","description": "获取社区帖子详情"}
+  ],
+  "requiredRole": "admin",
+  "featureFlag": "developer-portal-enabled",
+  "windowMode": "tab",
+  "defaultSize": { "width": 1200, "height": 800 },
+  "singleton": true,
+  "tags": ["开发者", "API 文档", "SDK", "OAuth", "社区", "OpenAPI", "Swagger"]
+}

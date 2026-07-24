@@ -55,6 +55,7 @@ _PREFIX_OVERRIDES: Dict[str, str] = {
     "v2_routes.py": "/api",
     "files_alias.py": "/api-files",
     "files_view.py": "/api",
+    "health.py": "",  # /health 顶层端点
 }
 
 # 跳过列表 — 不自动注册

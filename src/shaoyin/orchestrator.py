@@ -16,13 +16,13 @@ class Orchestrator:
 
     async def run(self, query: str, strategy: str = "deep") -> Dict:
         """执行 Plan→Execute→Reflect 循环"""
-        plan = await self._plan(query, strategy)
+        plan = self._plan(query, strategy)
         result = await self._execute(plan)
-        reflection = await self._reflect(query, result)
+        reflection = self._reflect(query, result)
 
         if not reflection["passed"] and reflection.get("should_retry"):
             result = await self._execute(plan)
-            reflection = await self._reflect(query, result)
+            reflection = self._reflect(query, result)
 
         return {
             "answer": result.get("answer", ""),
@@ -30,18 +30,16 @@ class Orchestrator:
             "sources": result.get("sources", []),
             "loops": 1,
         }
-    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
-    async def _plan(self, query: str, strategy: str) -> Dict:
+    def _plan(self, query: str, strategy: str) -> Dict:
         return {"query": query, "strategy": strategy, "steps": ["search", "compose", "validate"]}
 
     async def _execute(self, plan: Dict) -> Dict:
         from src.taiyang.retrieval import hybrid_search
         results = await hybrid_search(plan["query"], top_k=10)
         return {"answer": "", "sources": results, "results": results}
-    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
-    async def _reflect(self, query: str, result: Dict) -> Dict:
+    def _reflect(self, query: str, result: Dict) -> Dict:
         sources = result.get("sources", [])
         if not sources:
             return {"passed": False, "confidence": 0.0, "should_retry": True}

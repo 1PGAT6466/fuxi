@@ -1,7 +1,7 @@
 <template>
   <!--
-    伏羲 v2.1 — 数据分析窗口
-    布局：顶部统计卡片行 + 下方图表区（可切换 Tab）
+    伏羲 v2.1 — 数据分析窗口（增强版）
+    布局：顶部统计卡片行 + 下方图表区（可切换 Tab） + 导出/分享集成
   -->
   <div class="data-analytics-page">
     <!-- 页面头 -->
@@ -10,7 +10,7 @@
         <el-icon :size="24" class="header-icon"><DataAnalysis /></el-icon>
         <h2 class="header-title">数据分析</h2>
       </div>
-      <p class="header-desc">实时数据看板 · 趋势分析 · 报表生成 · 数据导出</p>
+      <p class="header-desc">实时数据看板 · 趋势分析 · 报表生成 · 数据导出 · 分享协作</p>
     </div>
 
     <!-- 加载态 -->
@@ -60,16 +60,23 @@
             <StorageDistribution />
           </el-tab-pane>
           <el-tab-pane label="报表生成" name="report">
-            <ReportPanel @export="handleReportExport" />
+            <ReportPanel
+              @export="handleReportExport"
+              @share="handleReportShare"
+            />
           </el-tab-pane>
         </el-tabs>
       </div>
 
-      <!-- 导出弹窗 -->
+      <!-- 导出/分享弹窗 -->
       <ExportDialog
         v-model="showExportDialog"
-        :default-format="exportFormat"
+        :default-format="selectedExportFormat"
+        :report-id="currentReportId"
+        :show-mode-switch="true"
+        :default-mode="dialogDefaultMode"
         @exported="handleExported"
+        @shared="handleShared"
       />
     </template>
   </div>
@@ -100,8 +107,12 @@ const statsData = ref<StatItem[]>([]);
 const statsLoading = ref(false);
 const statsError = ref(false);
 const activeTab = ref('trends');
+
+// 导出/分享弹窗状态
 const showExportDialog = ref(false);
-const exportFormat = ref<ExportFormat>('csv');
+const selectedExportFormat = ref<ExportFormat>('csv');
+const dialogDefaultMode = ref<'export' | 'share'>('export');
+const currentReportId = ref<string>();
 
 // ───── 页面级数据加载 ─────
 async function loadPageData() {
@@ -146,19 +157,36 @@ async function loadStats() {
   }
 }
 
-// 报表导出按钮回调
+// ───── 导出/分享回调 ─────
+
+/** 报表导出按钮回调（来自 ReportPanel） */
 function handleReportExport(format: 'pdf' | 'excel') {
   if (format === 'pdf') {
-    ElMessage.info('PDF 导出功能开发中，请使用 Excel 导出');
-    return;
+    selectedExportFormat.value = 'pdf';
+  } else {
+    selectedExportFormat.value = 'excel';
   }
-  exportFormat.value = 'excel';
+  dialogDefaultMode.value = 'export';
   showExportDialog.value = true;
 }
 
-// 导出完成回调
-function handleExported() {
-  // 导出已由 ExportDialog 处理
+/** 报表分享按钮回调（来自 ReportPanel） */
+function handleReportShare(reportId: string) {
+  currentReportId.value = reportId;
+  dialogDefaultMode.value = 'share';
+  showExportDialog.value = true;
+}
+
+/** 导出完成回调 */
+function handleExported(res: { download_url: string; filename: string; format: ExportFormat }) {
+  // 导出已由 ExportDialog 处理（含下载触发和消息提示）
+  console.info('[DataAnalyticsPage] 导出完成:', res.filename);
+}
+
+/** 分享完成回调 */
+function handleShared() {
+  // 分享结果已由 ExportDialog 展示
+  console.info('[DataAnalyticsPage] 分享链接已生成');
 }
 
 onMounted(() => {

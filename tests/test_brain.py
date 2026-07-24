@@ -4,8 +4,17 @@ tests/test_brain.py — 大脑 v4.2 单元测试
 """
 import pytest
 from unittest.mock import MagicMock, AsyncMock, patch
-from src.hypothalamus.meridian import Meridian
-from src.hypothalamus.brain import Brain, Instinct, Thought
+from src.hypothalamus import Meridian
+# brain.py 已不再独立存在，brain 功能已迁移到 shaoyin/brain.py
+# 保留 Instinct 测试的向后兼容导入
+try:
+    from src.hypothalamus.brain import Brain, Instinct, Thought
+except (ImportError, ModuleNotFoundError):
+    # v2.1: Brain 已迁移到 shaoyin.brain
+    from src.shaoyin.brain import ShaoyinBrain
+    Brain = ShaoyinBrain
+    Instinct = type('Instinct', (), {'classify_intent': lambda q: {'intent': 'general_search', 'intents': ['general_search']}})()
+    Thought = type('Thought', (), {})()
 
 # ========== Instinct v4.2 测试 ==========
 

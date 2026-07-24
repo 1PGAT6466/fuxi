@@ -1,0 +1,27 @@
+{
+  "id": "collaboration",
+  "name": "实时协作",
+  "icon": "Connection",
+  "description": "多人实时协作编辑文档，支持光标同步、编辑历史和冲突自动解决",
+  "version": "2.1.0",
+  "category": "workspace",
+  "guaAffinity": {
+    "primary": "li",
+    "secondary": "qian"
+  },
+  "route": "/workspace/collaboration",
+  "apiBase": "/api/collaboration",
+  "endpoints": [
+    { "method": "GET",  "path": "/rooms",          "description": "获取协作房间列表" },
+    { "method": "POST", "path": "/rooms",          "description": "创建协作房间" },
+    { "method": "GET",  "path": "/rooms/:id",      "description": "获取房间详情" },
+    { "method": "DELETE", "path": "/rooms/:id",    "description": "删除协作房间" },
+    { "method": "WS",   "path": "/ws",             "description": "WebSocket 实时协作连接" }
+  ],
+  "requiredRole": "user",
+  "featureFlag": "collaboration-enabled",
+  "windowMode": "drawer",
+  "defaultSize": { "width": 320, "height": 960 },
+  "singleton": false,
+  "tags": ["协作", "实时编辑", "CRDT", "同步"]
+}
