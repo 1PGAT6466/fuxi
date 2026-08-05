@@ -23,7 +23,7 @@
     <!-- 用户表格 -->
     <div class="table-wrapper">
       <el-table
-        :data="filteredUsers"
+        :data="Array.isArray(filteredUsers) ? filteredUsers : []"
         style="width: 100%"
         size="small"
         :default-sort="{ prop: 'registered_at', order: 'descending' }"
@@ -259,7 +259,8 @@ function avatarColor(username: string): string {
 async function fetchUsers(): Promise<void> {
   loading.value = true;
   try {
-    users.value = (await apiClient.get('/api/admin/users')) as UserInfo[];
+    const resp = await apiClient.get('/api/admin/users') as { data?: { users?: UserInfo[] } };
+    users.value = resp?.data?.users || resp?.users || (Array.isArray(resp) ? resp : []);
   } catch {
     console.warn('[UserManagement] API 不可用，使用 mock 数据');
     users.value = mockUsers;

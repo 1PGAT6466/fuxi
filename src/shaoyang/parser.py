@@ -2,9 +2,10 @@
 parser.py — 少阳·文档解析器
 PDF/DOCX/XLSX/TXT/HTML/CSV/PPTX
 """
+
 import logging
-from typing import Dict
 from pathlib import Path
+from typing import Dict
 
 logger = logging.getLogger("shaoyang.parser")
 
@@ -62,6 +63,7 @@ class DocumentParser:
 
     def _parse_html(self, path: Path) -> Dict:
         import re
+
         text = path.read_text(encoding="utf-8", errors="ignore")
         text = re.sub(r"<[^>]+>", "", text)
         text = re.sub(r"\s+", " ", text).strip()
@@ -69,6 +71,7 @@ class DocumentParser:
 
     def _parse_csv(self, path: Path) -> Dict:
         import csv
+
         rows = []
         with open(path, "r", encoding="utf-8", errors="ignore") as f:
             reader = csv.reader(f)
@@ -79,6 +82,7 @@ class DocumentParser:
     def _parse_pdf(self, path: Path) -> Dict:
         try:
             import fitz
+
             doc = fitz.open(str(path))
             text = ""
             for page in doc:
@@ -90,6 +94,7 @@ class DocumentParser:
     def _parse_docx(self, path: Path) -> Dict:
         try:
             import docx
+
             doc = docx.Document(str(path))
             text = "\n".join([p.text for p in doc.paragraphs])
             return {"text": text, "file_type": "docx", "pages": 1}
@@ -99,6 +104,7 @@ class DocumentParser:
     def _parse_xlsx(self, path: Path) -> Dict:
         try:
             import openpyxl
+
             wb = openpyxl.load_workbook(str(path), read_only=True)
             text = ""
             for sheet in wb:
@@ -111,6 +117,7 @@ class DocumentParser:
     def _parse_pptx(self, path: Path) -> Dict:
         try:
             from pptx import Presentation
+
             prs = Presentation(str(path))
             text = ""
             for slide in prs.slides:

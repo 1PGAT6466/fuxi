@@ -215,7 +215,7 @@ class KanGua(GuaBase):
         try:
             from src.db.data_store import load_chunks
             return True
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             return False
 
     @staticmethod

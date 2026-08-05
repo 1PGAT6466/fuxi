@@ -19,8 +19,8 @@
 
 import logging
 from dataclasses import dataclass, field
-from typing import List, Dict, Optional, Any
 from datetime import datetime
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -111,16 +111,16 @@ class WriteProxy:
                     f"  累计丢弃: {self._pending_dropped}"
                 )
 
-            self._pending_pg.append({
-                "chunk": chunk,
-                "events": events,
-                "entities": entities,
-                "links": links,
-                "queued_at": datetime.utcnow().isoformat(),
-            })
-            logger.warning(
-                f"[WriteProxy] PG 不可用，{len(self._pending_pg)}/{MAX_PENDING_PG} 条待回放"
+            self._pending_pg.append(
+                {
+                    "chunk": chunk,
+                    "events": events,
+                    "entities": entities,
+                    "links": links,
+                    "queued_at": datetime.utcnow().isoformat(),
+                }
             )
+            logger.warning(f"[WriteProxy] PG 不可用，{len(self._pending_pg)}/{MAX_PENDING_PG} 条待回放")
 
         return result
 
@@ -134,14 +134,17 @@ class WriteProxy:
         """批量写入"""
         results = {
             "chroma": {"chunks": 0, "events": 0, "failures": 0},
-            "pg": None, "errors": [],
+            "pg": None,
+            "errors": [],
         }
 
         for chunk in chunks:
             chunk_events = [e for e in (events or []) if e.chunk_id == chunk.chunk_id]
             r = await self.write(
-                chunk=chunk, events=chunk_events or None,
-                entities=entities, links=links,
+                chunk=chunk,
+                events=chunk_events or None,
+                entities=entities,
+                links=links,
             )
             if r["chroma"].get("ok"):
                 results["chroma"]["chunks"] += 1
@@ -168,8 +171,10 @@ class WriteProxy:
         for item in self._pending_pg:
             try:
                 await self._write_pg_batch(
-                    [item["chunk"]], item.get("events") or [],
-                    item.get("entities") or [], item.get("links") or [],
+                    [item["chunk"]],
+                    item.get("events") or [],
+                    item.get("entities") or [],
+                    item.get("links") or [],
                 )
                 replayed += 1
             except Exception as e:  # TODO: Narrow exception type
@@ -196,8 +201,10 @@ class WriteProxy:
                 }
                 emb = chunk.embedding or self._dummy_embedding()
                 self.chroma.add(
-                    ids=[chunk.chunk_id], embeddings=[emb],
-                    documents=[chunk.content], metadatas=[metadata],
+                    ids=[chunk.chunk_id],
+                    embeddings=[emb],
+                    documents=[chunk.content],
+                    metadatas=[metadata],
                 )
 
                 events_count = 0
@@ -207,11 +214,13 @@ class WriteProxy:
                             ids=[evt.event_id],
                             embeddings=[evt.embedding or self._dummy_embedding()],
                             documents=[evt.content],
-                            metadatas=[{
-                                "chunk_id": evt.chunk_id,
-                                "event_type": evt.event_type,
-                                "confidence": evt.confidence,
-                            }],
+                            metadatas=[
+                                {
+                                    "chunk_id": evt.chunk_id,
+                                    "event_type": evt.event_type,
+                                    "confidence": evt.confidence,
+                                }
+                            ],
                         )
                         events_count += 1
 
@@ -225,8 +234,12 @@ class WriteProxy:
             logger.error(f"[WriteProxy] ChromaDB 写入失败: {e}")
 
     async def _write_pg(
-        self, chunk: ChunkData, events: List[EventData],
-        entities: List[EntityData], links: List[EventEntityLink], result: Dict,
+        self,
+        chunk: ChunkData,
+        events: List[EventData],
+        entities: List[EntityData],
+        links: List[EventEntityLink],
+        result: Dict,
     ) -> bool:
         if not self.pg or not self._pg_ok:
             result["pg"] = "skipped (pg not available)"
@@ -234,46 +247,81 @@ class WriteProxy:
         return await self._write_pg_batch([chunk], events, entities, links)
 
     async def _write_pg_batch(
-        self, chunks: List[ChunkData], events: List[EventData],
-        entities: List[EntityData], links: List[EventEntityLink],
+        self,
+        chunks: List[ChunkData],
+        events: List[EventData],
+        entities: List[EntityData],
+        links: List[EventEntityLink],
     ) -> bool:
         import json
+
         try:
             cur = self.pg.cursor()
             # Batch: executemany 替代循环 INSERT
             chunk_rows = []
             for c in chunks:
                 emb_str = self._embedding_to_str(c.embedding) if c.embedding else None
-                chunk_rows.append((c.chunk_id, c.document_id, c.document_name, c.content,
-                     c.chunk_index, c.token_count, json.dumps(c.metadata), emb_str))
+                chunk_rows.append(
+                    (
+                        c.chunk_id,
+                        c.document_id,
+                        c.document_name,
+                        c.content,
+                        c.chunk_index,
+                        c.token_count,
+                        json.dumps(c.metadata),
+                        emb_str,
+                    )
+                )
             if chunk_rows:
                 cur.executemany(
                     """INSERT INTO chunks (chunk_id, document_id, document_name, content,
                        chunk_index, token_count, metadata, embedding)
                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s)
                        ON CONFLICT (chunk_id) DO UPDATE SET content=EXCLUDED.content, updated_at=now()""",
-                    chunk_rows)
+                    chunk_rows,
+                )
             # Batch: executemany 替代循环 INSERT
             event_rows = []
             for e in events:
                 emb_str = self._embedding_to_str(e.embedding) if e.embedding else None
-                event_rows.append((e.event_id, e.chunk_id, e.content, e.event_type,
-                     json.dumps(e.entities_json), e.confidence, e.status,
-                     json.dumps(e.metadata), emb_str))
+                event_rows.append(
+                    (
+                        e.event_id,
+                        e.chunk_id,
+                        e.content,
+                        e.event_type,
+                        json.dumps(e.entities_json),
+                        e.confidence,
+                        e.status,
+                        json.dumps(e.metadata),
+                        emb_str,
+                    )
+                )
             if event_rows:
                 cur.executemany(
                     """INSERT INTO events (event_id, chunk_id, content, event_type,
                        entities_json, confidence, status, metadata, embedding)
                        VALUES (%s,%s,%s,%s,%s,%s,%s,%s,%s)
                        ON CONFLICT (event_id) DO UPDATE SET content=EXCLUDED.content, updated_at=now()""",
-                    event_rows)
+                    event_rows,
+                )
             # Batch: executemany 替代循环 INSERT
             ent_rows = []
             for ent in entities:
                 emb_str = self._embedding_to_str(ent.embedding) if ent.embedding else None
-                ent_rows.append((ent.entity_id, ent.name, ent.normalized_name, ent.type,
-                     json.dumps(ent.aliases), json.dumps(ent.chunk_ids),
-                     json.dumps(ent.metadata), emb_str))
+                ent_rows.append(
+                    (
+                        ent.entity_id,
+                        ent.name,
+                        ent.normalized_name,
+                        ent.type,
+                        json.dumps(ent.aliases),
+                        json.dumps(ent.chunk_ids),
+                        json.dumps(ent.metadata),
+                        emb_str,
+                    )
+                )
             if ent_rows:
                 cur.executemany(
                     """INSERT INTO entities (entity_id, name, normalized_name, type,
@@ -283,7 +331,8 @@ class WriteProxy:
                        SET aliases_json = entities.aliases_json || EXCLUDED.aliases_json,
                            chunk_ids_json = entities.chunk_ids_json || EXCLUDED.chunk_ids_json,
                            updated_at = now()""",
-                    ent_rows)
+                    ent_rows,
+                )
             # Batch: executemany 替代循环 INSERT
             link_rows = [(link.event_id, link.entity_id, link.role, link.confidence) for link in links]
             if link_rows:
@@ -291,14 +340,15 @@ class WriteProxy:
                     """INSERT INTO event_entities (event_id, entity_id, role, confidence)
                        VALUES (%s,%s,%s,%s)
                        ON CONFLICT (event_id, entity_id) DO NOTHING""",
-                    link_rows)
+                    link_rows,
+                )
             self.pg.commit()
             return True
         except Exception as e:  # TODO: Narrow exception type
             self._pg_ok = False
             try:
                 self.pg.rollback()
-            except Exception:  # TODO: Narrow exception type
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
                 pass
             logger.error(f"[WriteProxy] PostgreSQL 写入失败: {e}")
             return False

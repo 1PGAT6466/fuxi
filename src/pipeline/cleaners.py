@@ -2,6 +2,7 @@
 cleaners.py — 统一清洗器
 处理文本清洗逻辑。集成 chunker_quality.py 的语义清洗和敏感信息脱敏。
 """
+
 import re
 from typing import Dict, List, Tuple
 
@@ -9,22 +10,22 @@ from src.pipeline.errors import CleanError
 
 # 来自 chunker_quality.py 的版权声明/免责声明正则
 NOISE_PATTERNS = [
-    r'版权归.*所有',
-    r'Copyright\s+©?\s*\d{4}',
-    r'All\s+Rights?\s+Reserved',
-    r'未经许可.*不得.*(?:复制|转载|传播)',
-    r'免责声明.*',
-    r'以上内容仅供参考',
-    r'本文件.*最终解释权',
-    r'如.*侵权.*请联系',
-    r'声明：.*不承担.*责任',
-    r'温馨提示：.*投资有风险',
+    r"版权归.*所有",
+    r"Copyright\s+©?\s*\d{4}",
+    r"All\s+Rights?\s+Reserved",
+    r"未经许可.*不得.*(?:复制|转载|传播)",
+    r"免责声明.*",
+    r"以上内容仅供参考",
+    r"本文件.*最终解释权",
+    r"如.*侵权.*请联系",
+    r"声明：.*不承担.*责任",
+    r"温馨提示：.*投资有风险",
 ]
 
 SENSITIVE_PATTERNS = [
-    (r'1[3-9]\d{9}', '手机号'),
-    (r'\d{17}[\dXx]', '身份证号'),
-    (r'\d{16,19}', '银行卡号'),
+    (r"1[3-9]\d{9}", "手机号"),
+    (r"\d{17}[\dXx]", "身份证号"),
+    (r"\d{16,19}", "银行卡号"),
 ]
 
 
@@ -47,63 +48,85 @@ class UnifiedCleaner:
             raise CleanError(f"清洗失败: {e}")
 
     def _clean_text(self, text: str) -> str:
-        """统一清洗逻辑 — 包含语义清洗 + Prompt Injection 净化"""
+        """统一清洗逻辑 — 包含语义清洗 + Prompt Injection 净化
+
+        任务3 P0修复：正确步骤顺序
+        1. 控制字符移除（最先，避免干扰后续匹配）
+        2. 空格合并（在内容清洗之前统一空白）
+        3. 内容清洗：注入防护 → HTML/URL/邮箱 → 页眉页脚 → 版权 → 去重 → 全角 → 脱敏
+        """
         if not text or not isinstance(text, str):
             return ""
 
-        # 0. v1.44 安全修复: Prompt Injection 净化
+        # ---- 阶段1：控制字符移除（最先执行） ----
+        text = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", text)
+
+        # ---- 阶段2：空格合并 ----
+        text = re.sub(r"[ \t]+", " ", text)
+        text = re.sub(r"\n{3,}", "\n\n", text)
+
+        # ---- 阶段3：内容清洗 ----
+
+        # 3a. v1.44 安全修复: Prompt Injection 净化
         try:
             from src.services.prompt_guard import sanitize_document_content
+
             text, injection_detected = sanitize_document_content(text)
             if injection_detected:
                 import logging as _log
-                _log.getLogger("pipeline.cleaners").warning(
-                    "[Security] 文档内容中检测到 Prompt Injection 模式，已净化"
-                )
+
+                _log.getLogger("pipeline.cleaners").warning("[Security] 文档内容中检测到 Prompt Injection 模式，已净化")
         except ImportError:
             pass  # prompt_guard 模块不可用时降级为无净化
 
-        # 1. 去除HTML标签
-        text = re.sub(r'<[^>]+>', '', text)
+        # 3b. 去除HTML标签
+        text = re.sub(r"<[^>]+>", "", text)
 
-        # 2. 去除URL
-        text = re.sub(r'https?://\S+', '', text)
+        # 3c. 去除URL
+        text = re.sub(r"https?://\S+", "", text)
 
-        # 3. 去除邮箱
-        text = re.sub(r'\S+@\S+\.\S+', '', text)
+        # 3d. 去除邮箱
+        text = re.sub(r"\S+@\S+\.\S+", "", text)
 
-        # 4. 去除页眉页脚（数字/页码）
-        text = re.sub(r'^\s*\d+\s*$', '', text, flags=re.MULTILINE)
+        # 3e. 去除页眉页脚（数字/页码）— 任务6 P0修复：只匹配纯数字且长度<=5
+        text = self._strip_header_footer_numbers(text)
 
-        # 5. 版权声明去除（来自 chunker_quality.py）
+        # 3f. 版权声明去除（来自 chunker_quality.py）
         if self._enable_semantic:
             text = self._strip_noise(text)
             text = self._deduplicate_paragraphs(text)
             text = self._normalize_width(text)
 
-        # 6. 敏感信息脱敏（来自 chunker_quality.py）
+        # 3g. 敏感信息脱敏（来自 chunker_quality.py）
         if self._enable_sensitive_mask:
             text, _ = self._detect_and_mask_sensitive(text)
 
-        # 7. 去除控制字符
-        text = re.sub(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]', '', text)
-
-        # 8. 去除多余空白
-        text = re.sub(r' +', ' ', text)
-        text = re.sub(r'\n{3,}', '\n\n', text)
-        text = re.sub(r'\s+', ' ', text)
+        # 最终多余空白合并
+        text = re.sub(r"\s+", " ", text)
 
         return text.strip()
+
+    def _strip_header_footer_numbers(self, text: str) -> str:
+        """任务6 P0修复：页眉页脚去除 — 只匹配行首行尾纯数字且长度<=5"""
+        lines = text.split("\n")
+        cleaned = []
+        for line in lines:
+            stripped = line.strip()
+            # 只匹配纯数字行，且长度 <= 5（避免误杀合法数据行如年份、数量）
+            if stripped.isdigit() and len(stripped) <= 5:
+                continue
+            cleaned.append(line)
+        return "\n".join(cleaned)
 
     def _strip_noise(self, text: str) -> str:
         """去除版权/声明行"""
         for pattern in NOISE_PATTERNS:
-            text = re.sub(pattern, '', text, flags=re.IGNORECASE)
+            text = re.sub(pattern, "", text, flags=re.IGNORECASE)
         return text
 
     def _deduplicate_paragraphs(self, text: str) -> str:
         """去除重复段落"""
-        paragraphs = text.split('\n\n')
+        paragraphs = text.split("\n\n")
         seen = set()
         cleaned = []
         for p in paragraphs:
@@ -116,13 +139,13 @@ class UnifiedCleaner:
                 continue
             seen.add(key)
             cleaned.append(p)
-        return '\n\n'.join(cleaned)
+        return "\n\n".join(cleaned)
 
     def _normalize_width(self, text: str) -> str:
         """全角字母数字 → 半角"""
-        text = re.sub(r'[Ａ-Ｚ]', lambda m: chr(ord(m.group()) - 0xFEE0), text)
-        text = re.sub(r'[ａ-ｚ]', lambda m: chr(ord(m.group()) - 0xFEE0), text)
-        text = re.sub(r'[０-９]', lambda m: chr(ord(m.group()) - 0xFEE0), text)
+        text = re.sub(r"[Ａ-Ｚ]", lambda m: chr(ord(m.group()) - 0xFEE0), text)
+        text = re.sub(r"[ａ-ｚ]", lambda m: chr(ord(m.group()) - 0xFEE0), text)
+        text = re.sub(r"[０-９]", lambda m: chr(ord(m.group()) - 0xFEE0), text)
         return text
 
     def _detect_and_mask_sensitive(self, text: str) -> Tuple[str, List[str]]:
@@ -131,7 +154,7 @@ class UnifiedCleaner:
         for pattern, label in SENSITIVE_PATTERNS:
             matches = re.findall(pattern, text)
             if matches:
-                issues.append(f'发现 {len(matches)} 个{label}')
+                issues.append(f"发现 {len(matches)} 个{label}")
                 for m in matches:
-                    text = text.replace(m, m[:3] + '*' * (len(m) - 6) + m[-3:])
+                    text = text.replace(m, m[:3] + "*" * (len(m) - 6) + m[-3:])
         return text, issues

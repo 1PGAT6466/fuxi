@@ -8,19 +8,20 @@ manager.py — ConnectorManager 连接器管理器
 - 健康检查
 - 事件回调
 """
+
 import asyncio
 import logging
 import time
 from typing import Any, Callable, Dict, List, Optional
 
 from .base import (
-    DataSource,
-    ConnectorConfig,
-    UnifiedDocument,
-    ConnectorStatus,
     ConnectionError,
+    ConnectorConfig,
+    ConnectorStatus,
+    DataSource,
     FetchError,
     TransformError,
+    UnifiedDocument,
 )
 
 logger = logging.getLogger(__name__)
@@ -88,10 +89,7 @@ class ConnectorManager:
             raise ValueError(f"连接器 '{connector.name}' 已注册")
 
         self._connectors[connector.name] = connector
-        logger.info(
-            "[ConnectorManager] 注册连接器: %s (类型: %s)",
-            connector.name, connector.source_type.value
-        )
+        logger.info("[ConnectorManager] 注册连接器: %s (类型: %s)", connector.name, connector.source_type.value)
 
     def unregister(self, name: str) -> Optional[DataSource]:
         """
@@ -143,9 +141,7 @@ class ConnectorManager:
         """注册错误回调"""
         self._on_error.append(callback)
 
-    async def _trigger_callbacks(
-        self, callbacks: List[Callable], *args, **kwargs
-    ) -> None:
+    async def _trigger_callbacks(self, callbacks: List[Callable], *args, **kwargs) -> None:
         """触发回调链"""
         for cb in callbacks:
             try:
@@ -154,9 +150,7 @@ class ConnectorManager:
                 else:
                     cb(*args, **kwargs)
             except Exception as e:
-                logger.error(
-                    "[ConnectorManager] 回调异常: %s", str(e)
-                )
+                logger.error("[ConnectorManager] 回调异常: %s", str(e))
 
     # ========== 接入操作 ==========
 
@@ -167,10 +161,7 @@ class ConnectorManager:
         Returns:
             Dict[str, bool]: {连接器名称: 是否连接成功}
         """
-        logger.info(
-            "[ConnectorManager] 开始并行连接 %d 个数据源...",
-            self.connector_count
-        )
+        logger.info("[ConnectorManager] 开始并行连接 %d 个数据源...", self.connector_count)
 
         tasks = []
         for name, connector in self._connectors.items():
@@ -178,41 +169,22 @@ class ConnectorManager:
 
         results = dict(await asyncio.gather(*tasks))
         success_count = sum(1 for v in results.values() if v)
-        logger.info(
-            "[ConnectorManager] 连接完成: %d/%d 成功",
-            success_count, self.connector_count
-        )
+        logger.info("[ConnectorManager] 连接完成: %d/%d 成功", success_count, self.connector_count)
         return results
 
-    async def _connect_one(
-        self, name: str, connector: DataSource
-    ) -> tuple:
+    async def _connect_one(self, name: str, connector: DataSource) -> tuple:
         """连接单个连接器"""
         try:
             success = await connector.connect()
             if success:
-                await self._trigger_callbacks(
-                    self._on_connect, connector=connector
-                )
+                await self._trigger_callbacks(self._on_connect, connector=connector)
             return name, success
         except Exception as e:
-            logger.error(
-                "[ConnectorManager] 连接 '%s' 失败: %s",
-                name, str(e)
-            )
-            await self._trigger_callbacks(
-                self._on_error,
-                connector=connector,
-                error=e,
-                phase="connect"
-            )
+            logger.error("[ConnectorManager] 连接 '%s' 失败: %s", name, str(e))
+            await self._trigger_callbacks(self._on_error, connector=connector, error=e, phase="connect")
             return name, False
 
-    async def ingest(
-        self,
-        connector_name: str,
-        **kwargs
-    ) -> List[UnifiedDocument]:
+    async def ingest(self, connector_name: str, **kwargs) -> List[UnifiedDocument]:
         """
         使用指定连接器执行接入流程。
 
@@ -236,11 +208,7 @@ class ConnectorManager:
             self._total_ingestions += 1
             self._total_documents += len(docs)
 
-            await self._trigger_callbacks(
-                self._on_ingest_complete,
-                connector=connector,
-                document_count=len(docs)
-            )
+            await self._trigger_callbacks(self._on_ingest_complete, connector=connector, document_count=len(docs))
             return docs
 
         except (ConnectionError, FetchError, TransformError):
@@ -248,19 +216,10 @@ class ConnectorManager:
             raise
         except Exception as e:
             self._total_errors += 1
-            await self._trigger_callbacks(
-                self._on_error,
-                connector=connector,
-                error=e,
-                phase="ingest"
-            )
+            await self._trigger_callbacks(self._on_error, connector=connector, error=e, phase="ingest")
             raise
 
-    async def ingest_all(
-        self,
-        parallel: bool = True,
-        **kwargs
-    ) -> Dict[str, List[UnifiedDocument]]:
+    async def ingest_all(self, parallel: bool = True, **kwargs) -> Dict[str, List[UnifiedDocument]]:
         """
         批量接入：对所有已注册连接器执行接入。
 
@@ -278,6 +237,7 @@ class ConnectorManager:
 
     async def _ingest_parallel(self, **kwargs) -> Dict[str, List[UnifiedDocument]]:
         """并行接入（通过信号量控制并发数）"""
+
         async def _do_ingest(name: str, connector: DataSource):
             async with self._semaphore:
                 try:
@@ -287,16 +247,10 @@ class ConnectorManager:
                     return name, docs
                 except Exception as e:
                     self._total_errors += 1
-                    logger.error(
-                        "[ConnectorManager] 接入 '%s' 失败: %s",
-                        name, str(e)
-                    )
+                    logger.error("[ConnectorManager] 接入 '%s' 失败: %s", name, str(e))
                     return name, []
 
-        tasks = [
-            _do_ingest(name, connector)
-            for name, connector in self._connectors.items()
-        ]
+        tasks = [_do_ingest(name, connector) for name, connector in self._connectors.items()]
         results = dict(await asyncio.gather(*tasks))
         return results
 
@@ -310,10 +264,7 @@ class ConnectorManager:
                 self._total_ingestions += 1
                 self._total_documents += len(docs)
             except Exception as e:
-                logger.error(
-                    "[ConnectorManager] 接入 '%s' 失败: %s",
-                    name, str(e)
-                )
+                logger.error("[ConnectorManager] 接入 '%s' 失败: %s", name, str(e))
                 results[name] = []
                 self._total_errors += 1
         return results
@@ -327,6 +278,7 @@ class ConnectorManager:
         Returns:
             Dict[str, Dict]: {连接器名称: {healthy: bool, detail: str}}
         """
+
         async def _check(name: str, connector: DataSource):
             try:
                 healthy = await connector.health_check()
@@ -335,10 +287,7 @@ class ConnectorManager:
             except Exception as e:
                 return name, {"healthy": False, "detail": str(e)}
 
-        tasks = [
-            _check(name, connector)
-            for name, connector in self._connectors.items()
-        ]
+        tasks = [_check(name, connector) for name, connector in self._connectors.items()]
         return dict(await asyncio.gather(*tasks))
 
     # ========== 状态统计 ==========
@@ -361,49 +310,32 @@ class ConnectorManager:
             "total_errors": self._total_errors,
             "uptime_seconds": time.time() - self._started_at,
             "connectors": connectors_detail,
-            "connected_count": sum(
-                1 for c in self._connectors.values()
-                if c.is_connected
-            ),
-            "error_count": sum(
-                1 for c in self._connectors.values()
-                if c.status == ConnectorStatus.ERROR
-            ),
+            "connected_count": sum(1 for c in self._connectors.values() if c.is_connected),
+            "error_count": sum(1 for c in self._connectors.values() if c.status == ConnectorStatus.ERROR),
         }
 
     # ========== 生命周期 ==========
 
     async def disconnect_all(self) -> None:
         """断开所有连接器的连接并释放资源"""
-        logger.info(
-            "[ConnectorManager] 断开 %d 个连接器...",
-            self.connector_count
-        )
+        logger.info("[ConnectorManager] 断开 %d 个连接器...", self.connector_count)
 
         async def _disconnect(name: str, connector: DataSource):
             try:
                 await connector.disconnect()
                 return name, True
             except Exception as e:
-                logger.error(
-                    "[ConnectorManager] 断开 '%s' 时出错: %s",
-                    name, str(e)
-                )
+                logger.error("[ConnectorManager] 断开 '%s' 时出错: %s", name, str(e))
                 return name, False
 
-        tasks = [
-            _disconnect(name, connector)
-            for name, connector in self._connectors.items()
-        ]
+        tasks = [_disconnect(name, connector) for name, connector in self._connectors.items()]
         await asyncio.gather(*tasks)
 
         self._connectors.clear()
         logger.info("[ConnectorManager] 所有连接器已断开")
 
     def __repr__(self) -> str:
-        connected = sum(
-            1 for c in self._connectors.values() if c.is_connected
-        )
+        connected = sum(1 for c in self._connectors.values() if c.is_connected)
         return (
             f"<ConnectorManager("
             f"registered={self.connector_count}, "

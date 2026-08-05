@@ -16,7 +16,7 @@
           </el-button>
         </div>
 
-        <el-table :data="rules" style="width: 100%" size="small">
+        <el-table :data="Array.isArray(rules) ? rules : []" style="width: 100%" size="small">
           <el-table-column prop="name" label="规则名称" min-width="140" />
           <el-table-column prop="trigger" label="触发条件" min-width="180">
             <template #default="{ row }">
@@ -204,7 +204,14 @@ import { TooltipComponent, LegendComponent, GridComponent } from 'echarts/compon
 import { CanvasRenderer } from 'echarts/renderers';
 
 echarts.use([BarChart, TooltipComponent, LegendComponent, GridComponent, CanvasRenderer]);
-import apiClient from '@/api';
+import {
+  getEvolutionRules,
+  createEvolutionRule,
+  updateEvolutionRule,
+  deleteEvolutionRule,
+  getEvolutionOverview,
+  getEvolutionLogs,
+} from '@/api/evolution';
 
 // ─── 类型 ───
 interface EvolutionRule {
@@ -262,128 +269,6 @@ const evolutionLogs = ref<EvolutionLog[]>([]);
 const feedbackChartRef = ref<HTMLDivElement | null>(null);
 let fbChart: echarts.ECharts | null = null;
 
-// ─── Mock ───
-const mockRules: EvolutionRule[] = [
-  {
-    id: '1',
-    name: '错误率自动回滚',
-    trigger: '连续错误率 > 5%',
-    action: 'auto_rollback',
-    priority: 9,
-    enabled: true,
-  },
-  {
-    id: '2',
-    name: '检索参数自适应',
-    trigger: 'MRR 下降 > 10%',
-    action: 'tune_params',
-    priority: 7,
-    enabled: true,
-  },
-  {
-    id: '3',
-    name: '索引自动重建',
-    trigger: '新增文档 > 100',
-    action: 'rebuild_index',
-    priority: 5,
-    enabled: false,
-  },
-  {
-    id: '4',
-    name: '高负载告警',
-    trigger: 'QPS > 1000',
-    action: 'send_alert',
-    priority: 6,
-    enabled: true,
-  },
-];
-
-const mockFeedback: FeedbackData = {
-  positive_count: 156,
-  negative_count: 23,
-  trend: [45, 52, 48, 58, 55, 62, 70],
-  trend_dates: ['7/1', '7/2', '7/3', '7/4', '7/5', '7/6', '7/7'],
-  recent: [
-    {
-      id: '1',
-      user: '张三',
-      type: 'positive',
-      query: '如何优化数据库查询？',
-      comment: '回答非常详细且有示例代码',
-      time: '14:30',
-    },
-    {
-      id: '2',
-      user: '李四',
-      type: 'negative',
-      query: 'Python 装饰器原理',
-      comment: '回答过于简单，缺少深度',
-      time: '13:15',
-    },
-    {
-      id: '3',
-      user: '王五',
-      type: 'positive',
-      query: '微服务架构设计模式',
-      comment: '结构清晰，图示明了',
-      time: '11:42',
-    },
-    {
-      id: '4',
-      user: '赵六',
-      type: 'positive',
-      query: 'Kubernetes Pod 调度',
-      comment: '分析到位，推荐',
-      time: '10:08',
-    },
-  ],
-};
-
-const mockLogs: EvolutionLog[] = [
-  {
-    id: '1',
-    type: 'auto_fix',
-    title: '自动修复：检索参数调优',
-    description:
-      '检测到检索质量下降，自动调整 top_k 从 5 到 8，similarity_threshold 从 0.7 到 0.65',
-    rule_name: '检索参数自适应',
-    affected: 'RAG Pipeline',
-    timestamp: '2026-07-06 12:30:00',
-    diff: {
-      old: 'top_k: 5\nsimilarity_threshold: 0.7',
-      new: 'top_k: 8\nsimilarity_threshold: 0.65',
-    },
-  },
-  {
-    id: '2',
-    type: 'optimization',
-    title: '优化：知识图谱权重更新',
-    description: '根据最近 7 天的反馈数据，自动优化知识图谱节点权重分配策略',
-    rule_name: '反馈驱动优化',
-    affected: 'Knowledge Graph',
-    timestamp: '2026-07-05 08:00:00',
-  },
-  {
-    id: '3',
-    type: 'config_change',
-    title: '配置变更：新增模型路由规则',
-    description: '为法律领域查询新增专用模型路由，自动分流到法律专精模型',
-    rule_name: '智能路由',
-    affected: 'API Gateway',
-    timestamp: '2026-07-04 16:45:00',
-    diff: { old: 'routes: [general]', new: 'routes: [general, legal_specialist]' },
-  },
-  {
-    id: '4',
-    type: 'auto_fix',
-    title: '自动修复：索引重建完成',
-    description: '检测到索引碎片化后自动触发重建，优化检索延迟 40%',
-    rule_name: '索引自动重建',
-    affected: 'Vector Store',
-    timestamp: '2026-07-03 02:15:00',
-  },
-];
-
 // ─── Helpers ───
 function logTypeLabel(type: string): string {
   const map: Record<string, string> = {
@@ -395,55 +280,115 @@ function logTypeLabel(type: string): string {
 }
 
 // ─── Fetch ───
+function normalizeArray<T>(value: unknown, fallback: T[]): T[] {
+  if (Array.isArray(value)) return value as T[];
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const candidates = [record.items, record.rules, record.logs, record.list, record.data];
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate)) return candidate as T[];
+    }
+  }
+  return fallback;
+}
+
+function extractPayload<T>(value: unknown): T {
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    if ('data' in record && record.data !== undefined) {
+      return record.data as T;
+    }
+  }
+  return value as T;
+}
+
 async function fetchRules(): Promise<void> {
   try {
-    rules.value = (await apiClient.get('/api/evolution/rules')) as EvolutionRule[];
-  } catch {
-    rules.value = mockRules;
+    const resp = await getEvolutionRules();
+    const data = extractPayload<any>(resp);
+    rules.value = normalizeArray<EvolutionRule>(data?.items || data, []);
+  } catch (error) {
+    console.error('获取进化规则失败:', error);
+    rules.value = [];
   }
 }
 
 async function fetchFeedback(): Promise<void> {
   try {
-    feedback.value = (await apiClient.get('/api/evolution/feedback')) as FeedbackData;
-  } catch {
-    feedback.value = mockFeedback;
+    const resp = await getEvolutionOverview();
+    const overview = extractPayload<any>(resp);
+    
+    // 从进化概览中提取反馈数据
+    feedback.value = {
+      positive_count: overview?.feedback?.positive_count ?? overview?.positive_count ?? 0,
+      negative_count: overview?.feedback?.negative_count ?? overview?.negative_count ?? 0,
+      trend: overview?.feedback?.trend ?? overview?.trend ?? [],
+      trend_dates: overview?.feedback?.trend_dates ?? overview?.trend_dates ?? [],
+      recent: overview?.feedback?.recent ?? overview?.recent ?? [],
+    };
+    nextTick(initFeedbackChart);
+  } catch (error) {
+    console.error('获取反馈数据失败:', error);
+    feedback.value = { positive_count: 0, negative_count: 0, trend: [], trend_dates: [], recent: [] };
     nextTick(initFeedbackChart);
   }
 }
 
 async function fetchLogs(): Promise<void> {
   try {
-    evolutionLogs.value = (await apiClient.get('/api/evolution/logs')) as EvolutionLog[];
-  } catch {
-    evolutionLogs.value = mockLogs;
+    const resp = await getEvolutionLogs();
+    const data = extractPayload<any>(resp);
+    evolutionLogs.value = normalizeArray<EvolutionLog>(data?.items || data, []);
+  } catch (error) {
+    console.error('获取进化日志失败:', error);
+    evolutionLogs.value = [];
   }
 }
 
 // ─── Actions ───
-function createRule(): void {
+async function createRule(): Promise<void> {
   if (!newRule.value.name.trim()) {
     ElMessage.warning('请输入规则名称');
     return;
   }
-  rules.value.unshift({
-    id: String(Date.now()),
-    name: newRule.value.name,
-    trigger: newRule.value.trigger,
-    action: newRule.value.action,
-    priority: newRule.value.priority,
-    enabled: true,
-  });
-  showCreateRule.value = false;
-  newRule.value = { name: '', trigger: '', action: 'tune_params', priority: 5 };
-  ElMessage.success('规则添加成功');
+
+  try {
+    const resp = await createEvolutionRule({
+      name: newRule.value.name,
+      trigger: newRule.value.trigger,
+      action: newRule.value.action,
+      priority: newRule.value.priority,
+      enabled: true,
+    });
+
+    const created = (extractPayload(resp) as EvolutionRule) ?? {
+      id: String(Date.now()),
+      name: newRule.value.name,
+      trigger: newRule.value.trigger,
+      action: newRule.value.action,
+      priority: newRule.value.priority,
+      enabled: true,
+    };
+
+    rules.value.unshift(created);
+    showCreateRule.value = false;
+    newRule.value = { name: '', trigger: '', action: 'tune_params', priority: 5 };
+    ElMessage.success('规则添加成功');
+  } catch (err) {
+    logger.error('创建进化规则失败', err);
+    ElMessage.error('创建规则失败，请稍后重试');
+  }
 }
 
 async function toggleRule(rule: EvolutionRule): Promise<void> {
+  const previous = rule.enabled;
+
   try {
+    await updateEvolutionRule(rule.id, { enabled: rule.enabled });
     ElMessage.success(`规则「${rule.name}」${rule.enabled ? '已启用' : '已禁用'}`);
-  } catch (error) {
-    logger.error('切换规则状态失败', error);
+  } catch (err) {
+    rule.enabled = previous;
+    logger.error('切换规则状态失败', err);
     ElMessage.error('操作失败，请稍后重试');
   }
 }
@@ -451,10 +396,13 @@ async function toggleRule(rule: EvolutionRule): Promise<void> {
 async function deleteRule(rule: EvolutionRule): Promise<void> {
   try {
     await ElMessageBox.confirm(`确认删除规则「${rule.name}」？`, '删除确认', { type: 'warning' });
+    await deleteEvolutionRule(rule.id);
     rules.value = rules.value.filter((r) => r.id !== rule.id);
     ElMessage.success('规则已删除');
-  } catch {
-    /* cancelled */
+  } catch (err) {
+    if (err === 'cancel' || err === 'close') return;
+    logger.error('删除进化规则失败', err);
+    ElMessage.error('删除规则失败，请稍后重试');
   }
 }
 

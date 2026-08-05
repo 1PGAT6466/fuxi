@@ -68,7 +68,7 @@ def validate_graph_relation(entity_a, entity_b, rel_type="related_to"):
         if range_types and type_b not in range_types and type_b != "unknown":
             return False, f"{entity_b}({type_b}) not in range {range_types}"
         return True, "ok"
-    except Exception:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         return True, "validation_skipped"
 
 
@@ -182,18 +182,63 @@ def route_to_categories(query: str) -> List[str]:
 
 
 def fuzzy_match_entity(query: str, node_name: str) -> float:
-    # 简并模糊匹配：精确子串 → 100%，包含任意词 → 40%
-    q = query.upper()
-    n = node_name.upper()
-    if n in q:
-        return 1.0
-    # 词匹配
-    q_words = set(q.split())
-    n_words = set(n.split())
-    if not q_words or not n_words:
+    """模糊匹配实体名称（增强版）
+    
+    匹配策略（优先级递减）：
+      1. 精确匹配 → 1.0
+      2. 节点名是查询的子串 → 0.9
+      3. 查询是节点名的子串 → 0.8
+      4. 词级重叠 → 按比例计算
+      5. 字符级相似度（中文支持）→ 0.3-0.5
+    
+    Args:
+        query:     查询文本
+        node_name: 节点名称
+        
+    Returns:
+        匹配分数 (0.0 ~ 1.0)
+    """
+    q = query.strip()
+    n = node_name.strip()
+    
+    if not q or not n:
         return 0.0
-    overlap = q_words & n_words
-    return len(overlap) / max(len(q_words), 1) * 0.4
+    
+    q_upper = q.upper()
+    n_upper = n.upper()
+    
+    # 1. 精确匹配
+    if n_upper == q_upper:
+        return 1.0
+    
+    # 2. 节点名是查询的子串
+    if n_upper in q_upper:
+        return 0.9
+    
+    # 3. 查询是节点名的子串
+    if q_upper in n_upper:
+        return 0.8
+    
+    # 4. 词级重叠（英文适用）
+    q_words = set(q_upper.split())
+    n_words = set(n_upper.split())
+    if q_words and n_words:
+        overlap = q_words & n_words
+        if overlap:
+            return len(overlap) / max(len(q_words), 1) * 0.6
+    
+    # 5. 字符级相似度（中文支持）
+    # 计算最长公共子序列长度
+    q_chars = set(q_upper)
+    n_chars = set(n_upper)
+    common = q_chars & n_chars
+    if len(common) >= 2:
+        # 公共字符占比
+        ratio = len(common) / max(len(q_chars), 1)
+        if ratio > 0.3:
+            return ratio * 0.5
+    
+    return 0.0
 
 
 
@@ -331,33 +376,6 @@ def route_entity_with_neighbors(query: str, max_entities: int = 5) -> dict:
         expanded_query += " " + " ".join(intent_kws)[:200]
     
     # Wiki 链接查询：匹配实体名到 Wiki 页面
-    wiki_links = []
-    try:
-        import sqlite3
-        from src.config import WORLDTREE_DB_PATH
-        conn = sqlite3.connect(str(WORLDTREE_DB_PATH), timeout=10)
-        conn.execute("PRAGMA journal_mode=WAL")
-        conn.execute("PRAGMA busy_timeout=5000")
-        # Batch: 用单条 SQL 替代 N+1 循环查询
-        entity_names = [e["entity"] for e in top]
-        if entity_names:
-            conditions = []
-            params = []
-            for name in entity_names:
-                conditions.append("(title LIKE ? OR content LIKE ?)")
-                params.extend([f"%{name}%", f"%{name}%"])
-            sql = f"SELECT id, title FROM wiki_pages WHERE {' OR '.join(conditions)} LIMIT {len(entity_names) * 3}"
-            cur = conn.execute(sql, params)
-            for row in cur.fetchall():
-                row_title = (row[1] or "").lower()
-                for name in entity_names:
-                    if name.lower() in row_title:
-                        wiki_links.append({"entity": name, "wiki_id": row[0], "wiki_title": row[1]})
-                        break
-        conn.close()
-    except Exception as e:  # TODO: Narrow exception type
-        import logging; logging.getLogger(__name__).warning(f"[Graph wiki-link] {e}")
-
     return {
         "entities": top,
         "neighbors": all_neighbors,
@@ -409,7 +427,7 @@ def expand_query_with_synonyms(query: str) -> str:
 def multi_hop_search(query: str, max_hops: int = 3) -> dict:
     """多跳图搜索（GraphRAG 入口）"""
     try:
-        from src.services.graph_traversal import multi_hop_traverse
+        from src.infra import multi_hop_traverse
         # 先匹配实体
         matched = fuzzy_match_entity(query, "")  # 直接找最匹配的
         if not matched:

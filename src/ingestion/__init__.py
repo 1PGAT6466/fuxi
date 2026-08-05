@@ -11,12 +11,12 @@ ingestion — 伏羲多源知识接入模块 v1.44
 """
 
 from .connectors import (
-    DataSource,
-    DatabaseConnector,
     APIConnector,
+    ConnectorManager,
+    DatabaseConnector,
+    DataSource,
     FileConnector,
     WebConnector,
-    ConnectorManager,
 )
 
 __all__ = [

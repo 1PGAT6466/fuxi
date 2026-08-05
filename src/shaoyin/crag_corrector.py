@@ -2,6 +2,7 @@
 crag_corrector.py — CRAG 纠正器
 检索质量评估 + 纠正重试
 """
+
 import logging
 from typing import Dict, List
 
@@ -28,6 +29,7 @@ class RetrievalEvaluator:
         # 检查相关性
         try:
             import jieba
+
             query_keywords = set(jieba.cut(query))
         except Exception as e:  # TODO: Narrow exception type
             logger.warning("jieba分词失败(查询): %s", e, exc_info=True)
@@ -90,6 +92,7 @@ class CRAGCorrector:
         """执行检索"""
         try:
             from src.taiyang.retrieval import hybrid_search
+
             return await hybrid_search(query, top_k=top_k)
         except Exception as e:  # TODO: Narrow exception type
             logger.error(f"[CRAG] 检索失败: {e}")

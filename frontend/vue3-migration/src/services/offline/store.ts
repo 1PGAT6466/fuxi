@@ -22,7 +22,14 @@ export const useOfflineStore = defineStore('offline', () => {
   // ========== State ==========
 
   /** 当前离线状态快照 */
-  const state = ref<OfflineState>(offlineService.getState());
+  const defaultState: OfflineState = { connectionStatus: 'online', syncStatus: 'idle', queueLength: 0, pendingCount: 0, lastSyncTime: null, lastOnlineTime: Date.now(), cacheEntryCount: 0, isInitializing: false };
+  let initialState: OfflineState;
+  try {
+    initialState = offlineService.getState() || defaultState;
+  } catch {
+    initialState = defaultState;
+  }
+  const state = ref<OfflineState>(initialState);
 
   /** 冲突列表 */
   const conflicts = ref<SyncConflict[]>([]);

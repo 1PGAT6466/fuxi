@@ -2,8 +2,9 @@
 cleaner.py — 少阳·文本清洗器
 去噪/脱敏/格式化
 """
-import re
+
 import logging
+import re
 from typing import str
 
 logger = logging.getLogger("shaoyang.cleaner")
@@ -19,7 +20,8 @@ class TextCleaner:
 
         # v1.44 安全修复: Prompt Injection 净化
         try:
-            from src.services.prompt_guard import sanitize_document_content
+            from src.infra import sanitize_document_content
+
             text, injection_detected = sanitize_document_content(text)
             if injection_detected:
                 logger.warning("[Security] 文档内容中检测到 Prompt Injection 模式，已净化")

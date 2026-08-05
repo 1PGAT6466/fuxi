@@ -19,6 +19,7 @@ def get_router() -> APIRouter:
     global _router
     if _router is None:
         from src.services.dxf_viewer.api import router
+
         _router = router
     return _router
 
@@ -31,10 +32,9 @@ def start_service() -> None:
 
     try:
         from src.services.dxf_viewer.parser import EZDXF_AVAILABLE
+
         if not EZDXF_AVAILABLE:
-            logger.warning(
-                "ezdxf not installed — service will have limited functionality"
-            )
+            logger.warning("ezdxf not installed — service will have limited functionality")
 
         Path("data/services/dxf-viewer").mkdir(parents=True, exist_ok=True)
         _service_running = True

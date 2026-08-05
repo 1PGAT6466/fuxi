@@ -2,7 +2,9 @@
 judge.py — Phase 1.3: LLM-as-Judge 评测
 用 MiMo/DeepSeek 评分（相关性/忠实性/完整性/引用准确性）
 """
-import json, logging
+
+import json
+import logging
 
 logger = logging.getLogger(__name__)
 
@@ -26,19 +28,21 @@ JUDGE_PROMPT = """你是一个知识库答案质量评审员。
 async def judge_answer(query: str, answer: str, contexts: list) -> dict:
     """LLM-as-Judge: 评估答案质量"""
     try:
-        from src.services.llm import call_deepseek
-        
-        context_text = "\n\n---\n\n".join([
-            f"[{i+1}] {c.get('text', '')[:300]}" for i, c in enumerate(contexts[:5])
-        ]) if contexts else "无检索内容"
-        
+        from src.infra import call_deepseek
+
+        context_text = (
+            "\n\n---\n\n".join([f"[{i+1}] {c.get('text', '')[:300]}" for i, c in enumerate(contexts[:5])])
+            if contexts
+            else "无检索内容"
+        )
+
         prompt = JUDGE_PROMPT.format(query=query, context=context_text[:3000], answer=answer[:2000])
         result = await call_deepseek(prompt, max_tokens=500, temperature=0.1)
-        
+
         if result:
             result = result.strip()
-            if result.startswith('```'):
-                result = result.split('\n', 1)[1].rsplit('```', 1)[0]
+            if result.startswith("```"):
+                result = result.split("\n", 1)[1].rsplit("```", 1)[0]
             try:
                 return json.loads(result)
             except json.JSONDecodeError as e:
@@ -54,7 +58,7 @@ async def judge_and_decide(answer: str, contexts: list) -> dict:
     """裁判模型质检：评估+决策"""
     query = contexts[0].get("_query", "") if contexts else ""
     result = await judge_answer(query, answer, contexts)
-    
+
     passed = result.get("passed", True) and result.get("overall", 3) >= 3
     return {
         "answer": answer,

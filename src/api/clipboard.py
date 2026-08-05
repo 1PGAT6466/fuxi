@@ -14,13 +14,15 @@ API 端点：
 
 数据存储：JSON 文件持久化在 data/clipboard/ 目录下
 """
-from fastapi import APIRouter, Request, Query
-from fastapi.responses import JSONResponse
-import logging
-import time
-import os
+
 import json
+import logging
+import os
+import time
 import uuid
+
+from fastapi import APIRouter, Query, Request
+from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
@@ -106,6 +108,7 @@ def _clean_expired_records(records: list) -> tuple:
             try:
                 # ISO format → timestamp
                 from datetime import datetime
+
                 created = datetime.fromisoformat(created.replace("Z", "+00:00")).timestamp()
             except (ValueError, AttributeError):
                 created = 0
@@ -245,7 +248,8 @@ async def get_clipboard_history(
         if search:
             q = search.lower().strip()
             filtered = [
-                r for r in filtered
+                r
+                for r in filtered
                 if q in (r.get("plainText", "") or "").lower()
                 or q in (r.get("formattedContent", "") or "").lower()
                 or q in (r.get("sourceService", "") or "").lower()
@@ -254,7 +258,7 @@ async def get_clipboard_history(
         total = len(filtered)
 
         # 分页
-        page = filtered[offset:offset + limit]
+        page = filtered[offset : offset + limit]
 
         return JSONResponse(
             content={
@@ -306,9 +310,7 @@ async def toggle_clipboard_favorite(entry_id: str, request: Request):
         if updated:
             _save_records(records)
 
-        return JSONResponse(
-            content={"success": True, "entryId": entry_id}
-        )
+        return JSONResponse(content={"success": True, "entryId": entry_id})
 
     except Exception as e:
         logger.error(f"切换收藏状态失败: {e}")
@@ -345,9 +347,7 @@ async def delete_clipboard_entry(entry_id: str):
         _save_favorites(favorites)
 
         logger.info(f"已删除剪贴板条目: {entry_id}")
-        return JSONResponse(
-            content={"success": True, "entryId": entry_id}
-        )
+        return JSONResponse(content={"success": True, "entryId": entry_id})
 
     except Exception as e:
         logger.error(f"删除剪贴板条目失败: {e}")
@@ -391,9 +391,7 @@ async def batch_delete_clipboard_entries(request: Request):
         _save_favorites(favorites)
 
         logger.info(f"批量删除剪贴板条目: {affected} 条")
-        return JSONResponse(
-            content={"success": True, "affectedCount": affected}
-        )
+        return JSONResponse(content={"success": True, "affectedCount": affected})
 
     except Exception as e:
         logger.error(f"批量删除剪贴板条目失败: {e}")
@@ -414,9 +412,7 @@ async def clear_clipboard_history():
         _save_records([])
         _save_favorites({})
         logger.info("剪贴板历史已清空")
-        return JSONResponse(
-            content={"success": True, "totalCount": 0}
-        )
+        return JSONResponse(content={"success": True, "totalCount": 0})
 
     except Exception as e:
         logger.error(f"清空剪贴板历史失败: {e}")

@@ -1,0 +1,1219 @@
+﻿"""
+safety_critic.py 鈥?骞昏妫€娴嬫満鍒?(v1.44 P1 鏍稿績淇)
+
+SafetyCritic 鎻愪緵缁嗙矑搴︾殑骞昏妫€娴嬶紝鏀寔锛?  - 缁村害 1: fabrication (鏃犱腑鐢熸湁) 鈥?鍥炵瓟澹扮О浜嗕笂涓嬫枃涓畬鍏ㄤ笉瀛樺湪鐨勪簨瀹?  - 缁村害 2: fact_distortion (浜嬪疄鎵洸) 鈥?鍥炵瓟淇敼浜嗕笂涓嬫枃涓殑鍏蜂綋鏁版嵁/鍙傛暟
+  - 缁村害 3: logic_contradiction (閫昏緫鐭涚浘) 鈥?鍥炵瓟涓庝笂涓嬫枃瀛樺湪閫昏緫鍐茬獊
+
+闆嗘垚鏂瑰紡锛?  - 琚?evaluation.py 鐨?Evaluation._eval_hallucination 璋冪敤
+  - 杩斿洖缁撴瀯鍖栧够瑙夋姤鍛婏細绫诲瀷銆佺疆淇″害銆佷綅缃爣娉?  - 涓?shaoyin.fact_check 鍗忓悓锛圫afetyCritic 澶氱淮搴?vs fact_check 浜屽厓楠岃瘉锛?
+鏋舵瀯绾︽潫锛?  - 涓嶄慨鏀圭幇鏈夋鏋朵唬鐮?  - 寮傛缂栫▼妯″紡锛坅sync/await锛?  - LLM 璋冪敤澶嶇敤 llm.call_llm_fast
+"""
+
+import asyncio
+import hashlib
+import json
+import logging
+import re
+import time
+from dataclasses import asdict, dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Set, Tuple
+
+logger = logging.getLogger(__name__)
+
+# ============ 閰嶇疆 ============
+from src.config import DATA_DIR as CONFIG_DATA_DIR
+
+CRITIC_DIR = Path(CONFIG_DATA_DIR) / "safety_critic"
+CRITIC_DIR.mkdir(parents=True, exist_ok=True)
+HALLUCINATION_LOG_PATH = CRITIC_DIR / "hallucination_events.jsonl"
+
+# 骞昏妫€娴?LLM 璋冪敤鏈€澶?token 鏁?CRITIC_MAX_TOKENS = 500
+# 骞昏妫€娴?LLM 娓╁害锛堜綆娓╁害纭繚涓€鑷存€э級
+CRITIC_TEMPERATURE = 0.1
+# 涓婁笅鏂囨埅鏂暱搴?CONTEXT_MAX_CHARS = 2500
+# 鍥炵瓟鎴柇闀垮害
+RESPONSE_MAX_CHARS = 2000
+
+# 骞昏绫诲瀷瀹氫箟
+HALLUCINATION_TYPES = {
+    "fabrication": "鏃犱腑鐢熸湁 鈥?鍥炵瓟澹扮О浜嗕笂涓嬫枃涓畬鍏ㄤ笉瀛樺湪鐨勪簨瀹炴垨鏁版嵁",
+    "fact_distortion": "浜嬪疄鎵洸 鈥?鍥炵瓟淇敼浜嗕笂涓嬫枃涓殑鍏蜂綋鏁板€笺€佸悕绉版垨灞炴€?,
+    "logic_contradiction": "閫昏緫鐭涚浘 鈥?鍥炵瓟鐨勬帹璁轰笌涓婁笅鏂囩殑閫昏緫閾炬潯鍐茬獊",
+}
+
+# 鍐呯疆鏃犲嚭澶勬ā寮忥紙鐢ㄤ簬鍚彂寮忛绛涳級
+FABRICATION_PATTERNS = [
+    (r"鏍规嵁(?:鍐呴儴|鏈€鏂皘鏉冨▉|鍙潬).{0,6}(?:鏁版嵁|鐮旂┒|鎶ュ憡|缁熻|鍒嗘瀽)鏄剧ず", "鏃犲嚭澶勬潈濞佸紩鐢?),
+    (r"(?:鎹畖鏍规嵁)(?:鍏徃|鎴戜滑|鎴戞柟|鏈钩鍙?.{0,4}(?:缁熻|娴嬬畻|浼扮畻|鐩戞祴)", "鏃犲嚭澶勫唴閮ㄦ暟鎹?),
+    (r"(?:涓撳|瀛﹁€厊涓氬唴浜哄＋).{0,4}(?:鎸囧嚭|琛ㄧず|璁や负)", "鍖垮悕鏉冨▉鑳屼功"),
+    (r"(?:鍦ㄨ繃鍘粅杩憒鏈€杩?\s*\d+\s*(?:骞磡鏈坾澶﹟鍛?.{0,10}(?:棣栨|绗竴娆鍞竴)", "鏃犲彲楠岃瘉鏃堕棿鏂█"),
+    (r"(?:瑕嗙洊|鏈嶅姟|瑙﹁揪)\s*\d+[涓囦嚎浜垮崈涓囩櫨]?\s*(?:鐢ㄦ埛|瀹㈡埛|浼佷笟|璁惧)", "澶稿ぇ瑕嗙洊鏁板瓧"),
+    (r"(?:鍑嗙‘鐜噟绮剧‘搴鍙洖鐜噟F1)\s*(?:杈惧埌|楂樿揪|瓒呰繃|涓?\s*\d{2,3}(?:\.\d+)?\s*%", "鏃犲嚭澶勬寚鏍囧０绉?),
+    (r"\d{4}\s*骞?{0,6}(?:鑽ｈ幏|鑾峰緱|琚瘎涓簗璁ゅ畾涓?", "鏃犳硶楠岃瘉鐨勮崳瑾夊０鏄?),
+    (r"(?:琛屼笟|鍏ㄧ悆|鍥藉唴)\s*(?:棣栦釜|绗竴|棰嗗厛|鐙|鍞竴)", "鏃犳硶楠岃瘉鐨勬帓鍚嶅０绉?),
+]
+
+# 浜嬪疄鎵洸妫€娴嬫ā寮忥紙鏁板瓧瀵规瘮鍚彂寮忥級
+FACT_DISTORTION_PATTERNS = [
+    # 妫€娴嬩笂涓嬫枃涓湁鏄庣‘鏁板瓧浣嗗洖绛斾娇鐢ㄤ簡涓嶅悓鏁板瓧
+    (r"(\d+(?:\.\d+)?)\s*(?:mm|cm|m|km|g|kg|t|ms|s|min|h|鍏億涓噟浜縷%|掳C|鈩?", "鏁板€煎瀷浜嬪疄"),
+    (r"(?:ADR|RFC|ISO|GB|T)\s*-?\d+", "鏍囧噯/瑙勮寖寮曠敤鍙?),
+    (r"(?:v|V|version)\s*\d+\.\d+", "鐗堟湰鍙?),
+]
+
+
+# ============ 鏁版嵁妯″瀷 ============
+
+
+@dataclass
+class HallucinationSpan:
+    """骞昏鐗囨鏍囨敞"""
+
+    type: str  # fabrication / fact_distortion / logic_contradiction
+    text: str  # 鍏蜂綋鏂囨湰鐗囨
+    start_pos: int  # 鍦ㄥ洖绛斾腑鐨勮捣濮嬩綅缃紙瀛楃鍋忕Щ锛?    end_pos: int  # 缁撴潫浣嶇疆
+    confidence: float  # 缃俊搴?0.0-1.0
+    reason: str  # 鍒ゅ畾鐞嗙敱
+    conflicting_context: str = ""  # 鍐茬獊鐨勪笂涓嬫枃鍘熸枃锛堝鏈夛級
+    severity: str = "medium"  # low / medium / high / critical
+
+
+@dataclass
+class HallucinationReport:
+    """骞昏妫€娴嬪畬鏁存姤鍛?""
+
+    report_id: str  # 鍞竴鎶ュ憡 ID
+    timestamp: float  # Unix 鏃堕棿鎴?    query: str  # 鍘熷鏌ヨ
+    response: str  # 妯″瀷鍥炵瓟锛堟埅鏂級
+    context: str  # 妫€绱笂涓嬫枃锛堟埅鏂級
+
+    # 姹囨€?    has_hallucination: bool = False  # 鏄惁瀛樺湪骞昏
+    overall_score: float = 0.0  # 骞昏绋嬪害 0=鏃犲够瑙?1=涓ラ噸骞昏
+    confidence: float = 0.0  # 鏁翠綋妫€娴嬬疆淇″害
+
+    # 涓夌淮搴?    fabrication_score: float = 0.0  # 鏃犱腑鐢熸湁寰楀垎
+    fact_distortion_score: float = 0.0  # 浜嬪疄鎵洸寰楀垎
+    logic_contradiction_score: float = 0.0  # 閫昏緫鐭涚浘寰楀垎
+
+    # 璇︾粏淇℃伅
+    spans: List[Dict] = field(default_factory=list)  # 骞昏鐗囨鍒楄〃
+    claims_verified: int = 0  # 宸查獙璇佺殑澹版槑鏁?    claims_supported: int = 0  # 鏈夊嚭澶勬敮鎸佺殑澹版槑鏁?    claims_unsupported: int = 0  # 鏃犲嚭澶勬敮鎸佺殑澹版槑鏁?
+    # 鍏冩暟鎹?    detection_method: str = "llm"  # llm / heuristic / hybrid
+    llm_calls: int = 0  # LLM 璋冪敤娆℃暟
+    latency_ms: float = 0.0  # 妫€娴嬭€楁椂
+
+    # 寤鸿
+    recommendations: List[str] = field(default_factory=list)
+    flags: List[str] = field(default_factory=list)
+
+
+# ============ 鏍稿績绫?============
+
+
+class SafetyCritic:
+    """
+    骞昏妫€娴嬪櫒 鈥?澶氱淮搴︽娴嬪洖绛斾腑鐨勫够瑙夊唴瀹广€?
+    鐢ㄦ硶:
+        critic = SafetyCritic()
+        report = await critic.detect_hallucination(
+            query="妯″叿瀵煎悜鏌辩洿寰勬爣鍑嗘槸澶氬皯锛?,
+            response="瀵煎悜鏌辩洿寰?D=25mm锛岄€傜敤浜?5050 浠ヤ笅妯¤儦",
+            context="瀵煎悜鏌辩洿寰?D=20mm锛屾ā鑳?4040 浠ヤ笅浣跨敤 A 绫?,
+        )
+        if report.has_hallucination:
+            for span in report.spans:
+                print(f"[{span['type']}] {span['text']} - {span['reason']}")
+
+    妫€娴嬬瓥鐣ワ紙涓夐樁娈电绾匡級:
+      1. 鍚彂寮忛绛?鈥?姝ｅ垯鍖归厤蹇€熻瘑鍒槑鏄炬ā寮忥紙<1ms锛?      2. LLM 娣卞害妫€娴?鈥?璇箟绾у垎鏋愬拰浣嶇疆鏍囨敞锛?00-500ms锛?      3. 浜ゅ弶楠岃瘉 鈥?缁撳悎鍚彂寮忕粨鏋滄牎鍑?LLM 杈撳嚭
+    """
+
+    # LLM 澶氱淮搴︽娴嬬殑 system prompt
+    SYSTEM_PROMPT = (
+        "浣犳槸涓€涓笓涓氱殑浜嬪疄鎬ф牎楠屼笓瀹躲€備綘鐨勪换鍔℃槸閫愬彞瀵规瘮銆屽洖绛斻€嶅拰銆屾潈濞佷笂涓嬫枃銆嶏紝"
+        "鎵惧嚭鎵€鏈夊够瑙夊唴瀹广€備綘闇€瑕佷互 JSON 鏍煎紡杈撳嚭妫€娴嬬粨鏋溿€?
+    )
+
+    # LLM 澶氱淮搴︽娴嬬殑 user prompt 妯℃澘
+    DETECTION_PROMPT_TEMPLATE = (
+        "璇蜂粩缁嗗姣斾互涓嬨€屽洖绛斻€嶅拰銆屾潈濞佷笂涓嬫枃銆嶏紝妫€娴嬫槸鍚﹀瓨鍦ㄥ够瑙夈€俓n\n"
+        "銆愭娴嬬淮搴︺€慭n"
+        "1. fabrication (鏃犱腑鐢熸湁)锛氬洖绛斾腑澹版槑浜嗕笂涓嬫枃涓畬鍏ㄤ笉瀛樺湪鐨勪簨瀹炪€佹暟鎹€佸悕绉癨n"
+        "2. fact_distortion (浜嬪疄鎵洸)锛氬洖绛斾慨鏀逛簡涓婁笅鏂囦腑鐨勫叿浣撴暟鍊笺€佸悕绉般€佸睘鎬n"
+        "3. logic_contradiction (閫昏緫鐭涚浘)锛氬洖绛旂殑鎺ㄨ涓庝笂涓嬫枃閫昏緫鍐茬獊\n\n"
+        "銆愮敤鎴烽棶棰樸€慭n{query}\n\n"
+        "銆愭潈濞佷笂涓嬫枃銆慭n{context}\n\n"
+        "銆愬緟妫€娴嬪洖绛斻€慭n{response}\n\n"
+        "銆愯緭鍑鸿姹傘€慭n"
+        "璇疯緭鍑轰弗鏍?JSON 鏍煎紡锛堜笉瑕?markdown 浠ｇ爜鍧楋級锛歕n"
+        "{{\n"
+        '  "overall_score": 0.0-1.0,\n'
+        '  "confidence": 0.0-1.0,\n'
+        '  "fabrication": {{\n'
+        '    "score": 0.0-1.0,\n'
+        '    "spans": [\n'
+        '      {{"text": "骞昏鏂囨湰鐗囨", "reason": "鍒ゅ畾鐞嗙敱", "start_pos": 0, "end_pos": 10, "confidence": 0.9, "severity": "high"}}\n'
+        "    ]\n"
+        "  }},\n"
+        '  "fact_distortion": {{\n'
+        '    "score": 0.0-1.0,\n'
+        '    "spans": [\n'
+        '      {{"text": "琚壄鏇茬殑鏂囨湰", "correct_value": "涓婁笅鏂囦腑鐨勬纭€?, "reason": "鎵洸鐞嗙敱", "start_pos": 0, "end_pos": 10, "confidence": 0.9, "severity": "high"}}\n'
+        "    ]\n"
+        "  }},\n"
+        '  "logic_contradiction": {{\n'
+        '    "score": 0.0-1.0,\n'
+        '    "spans": [\n'
+        '      {{"text": "鐭涚浘鏂囨湰", "reason": "鐭涚浘璇存槑", "start_pos": 0, "end_pos": 10, "confidence": 0.9, "severity": "high"}}\n'
+        "    ]\n"
+        "  }},\n"
+        '  "recommendations": ["寤鸿1", "寤鸿2"]\n'
+        "}}"
+    )
+
+    def __init__(self):
+        self._cache: Dict[str, HallucinationReport] = {}
+        self._cache_ttl = 300  # 5 鍒嗛挓缂撳瓨 TTL
+        self._stats = {
+            "total_detections": 0,
+            "hallucinations_found": 0,
+            "avg_latency_ms": 0.0,
+            "method_distribution": {"llm": 0, "heuristic": 0, "hybrid": 0},
+        }
+
+    # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 涓诲叆鍙?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    async def detect_hallucination(
+        self,
+        query: str,
+        response: str,
+        context: str = "",
+        sources: Optional[List[str]] = None,
+        use_llm: bool = True,
+        threshold: float = 0.3,
+    ) -> HallucinationReport:
+        """
+        瀵逛竴娆￠棶绛旇繘琛屽缁村害骞昏妫€娴嬨€?
+        Args:
+            query: 鐢ㄦ埛鍘熷鏌ヨ
+            response: 妯″瀷鐢熸垚鐨勫洖绛?            context: 妫€绱㈠埌鐨勪笂涓嬫枃鍐呭锛堟潈濞佹潵婧愶級
+            sources: 棰濆鐨勬潵婧愬垪琛?            use_llm: 鏄惁浣跨敤 LLM 杩涜娣卞害妫€娴嬶紙False 鍒欎粎浣跨敤鍚彂寮忥級
+            threshold: 骞昏鍒ゅ畾闃堝€硷紙overall_score >= threshold 瑙嗕负瀛樺湪骞昏锛?
+        Returns:
+            HallucinationReport: 鍖呭惈涓夌淮搴﹀緱鍒嗐€佺墖娈垫爣娉ㄥ拰寤鸿鐨勬娴嬫姤鍛?        """
+        t0 = time.time()
+
+        # 鐢熸垚鎶ュ憡 ID
+        report_id = self._make_report_id(query, response, t0)
+
+        # 1. 鍚彂寮忛绛涳紙濮嬬粓鎵ц锛?1ms锛?        heuristic_spans = self._heuristic_detect(query, response, context)
+
+        # 2. LLM 娣卞害妫€娴嬶紙鍙€夛級
+        llm_result = {}
+        llm_calls = 0
+        if use_llm and context and len(context.strip()) > 20:
+            try:
+                llm_result = await self._llm_detect(query, response, context, sources)
+                llm_calls = 1
+            except Exception as e:
+                logger.warning(f"[SafetyCritic] LLM 妫€娴嬪け璐ワ紝闄嶇骇涓虹函鍚彂寮? {e}")
+                llm_result = {}
+
+        # 3. 浜ゅ弶楠岃瘉锛氬悎骞跺惎鍙戝紡鍜?LLM 缁撴灉
+        spans = self._merge_spans(
+            heuristic_spans,
+            llm_result.get("fabrication", {}).get("spans", []),
+            llm_result.get("fact_distortion", {}).get("spans", []),
+            llm_result.get("logic_contradiction", {}).get("spans", []),
+            response,
+        )
+
+        # 4. 璁＄畻缁煎悎寰楀垎
+        fab_score = self._compute_dimension_score(
+            heuristic_spans.get("fabrication", []),
+            llm_result.get("fabrication", {}),
+        )
+        dist_score = self._compute_dimension_score(
+            heuristic_spans.get("fact_distortion", []),
+            llm_result.get("fact_distortion", {}),
+        )
+        logic_score = self._compute_dimension_score(
+            heuristic_spans.get("logic_contradiction", []),
+            llm_result.get("logic_contradiction", {}),
+        )
+
+        # 缁煎悎骞昏寰楀垎 = 涓夌淮搴︽渶澶у€硷紙鍙鏈変换涓€缁村害鏈夐棶棰樺氨绠楁湁骞昏锛?        overall_score = max(fab_score, dist_score, logic_score)
+
+        # 妫€娴嬬疆淇″害
+        if llm_result:
+            confidence = llm_result.get("confidence", 0.7)
+        else:
+            # 绾惎鍙戝紡缃俊搴﹁緝浣?            confidence = 0.5 if heuristic_spans else 0.9
+
+        # 鍒ゅ畾鏄惁鏈夊够瑙?        has_hallucination = overall_score >= threshold
+
+        # 5. 鐢熸垚寤鸿鍜屾爣璁?        recommendations = self._generate_recommendations(spans, fab_score, dist_score, logic_score)
+        if llm_result and "recommendations" in llm_result:
+            recommendations.extend(r for r in llm_result["recommendations"] if r not in recommendations)
+
+        flags = self._determine_flags(spans, has_hallucination, overall_score)
+
+        # 缁熻澹版槑楠岃瘉
+        claims_total = len(heuristic_spans.get("claims_checked", []))
+        claims_supported = sum(1 for c in heuristic_spans.get("claims_checked", []) if c.get("supported", False))
+
+        # 纭畾妫€娴嬫柟娉?        if llm_result and heuristic_spans:
+            method = "hybrid"
+        elif llm_result:
+            method = "llm"
+        else:
+            method = "heuristic"
+
+        # 6. 鏋勫缓鎶ュ憡
+        latency = (time.time() - t0) * 1000
+
+        report = HallucinationReport(
+            report_id=report_id,
+            timestamp=t0,
+            query=query[:500],
+            response=response[:500],
+            context=context[:500],
+            has_hallucination=has_hallucination,
+            overall_score=round(overall_score, 4),
+            confidence=round(confidence, 4),
+            fabrication_score=round(fab_score, 4),
+            fact_distortion_score=round(dist_score, 4),
+            logic_contradiction_score=round(logic_score, 4),
+            spans=[
+                {
+                    "type": s.get("type", "unknown"),
+                    "text": s.get("text", ""),
+                    "start_pos": s.get("start_pos", -1),
+                    "end_pos": s.get("end_pos", -1),
+                    "confidence": s.get("confidence", 0.0),
+                    "reason": s.get("reason", ""),
+                    "conflicting_context": s.get("conflicting_context", ""),
+                    "severity": s.get("severity", "medium"),
+                }
+                for s in spans
+            ],
+            claims_verified=claims_total,
+            claims_supported=claims_supported,
+            claims_unsupported=claims_total - claims_supported,
+            detection_method=method,
+            llm_calls=llm_calls,
+            latency_ms=round(latency, 1),
+            recommendations=recommendations,
+            flags=flags,
+        )
+
+        # 7. 鏇存柊缁熻 & 璁板綍浜嬩欢
+        self._update_stats(report)
+        if has_hallucination:
+            asyncio.create_task(self._log_event(report))
+
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                f"[SafetyCritic] {report_id[:12]} 妫€娴嬪畬鎴? "
+                f"overall={overall_score:.3f}, "
+                f"fabrication={fab_score:.2f}, "
+                f"distortion={dist_score:.2f}, "
+                f"contradiction={logic_score:.2f}, "
+                f"method={method}, "
+                f"has_hallucination={has_hallucination}, "
+                f"spans={len(spans)}, "
+                f"latency={latency:.1f}ms"
+            )
+
+        return report
+
+    # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 鍚彂寮忔娴?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    def _heuristic_detect(self, query: str, response: str, context: str) -> Dict[str, Any]:
+        """
+        鍚彂寮忓够瑙夋娴嬶細鍩轰簬姝ｅ垯妯″紡鍖归厤鍜岀畝鍗曡鍒欍€?
+        杩斿洖:
+            {
+                "fabrication": [{"text": ..., "reason": ..., "start_pos": ..., "end_pos": ...}],
+                "fact_distortion": [...],
+                "logic_contradiction": [...],
+                "claims_checked": [{"text": ..., "supported": bool}],
+            }
+        """
+        result = {
+            "fabrication": [],
+            "fact_distortion": [],
+            "logic_contradiction": [],
+            "claims_checked": [],
+        }
+
+        # 鈹€鈹€ 妫€娴?1: 鏃犱腑鐢熸湁妯″紡 鈹€鈹€
+        for pattern, reason in FABRICATION_PATTERNS:
+            for match in re.finditer(pattern, response):
+                span = {
+                    "type": "fabrication",
+                    "text": match.group(),
+                    "start_pos": match.start(),
+                    "end_pos": match.end(),
+                    "confidence": 0.6,  # 鍚彂寮忕疆淇″害涓瓑
+                    "reason": reason,
+                    "conflicting_context": "",
+                    "severity": "medium",
+                }
+                result["fabrication"].append(span)
+
+        # 鈹€鈹€ 妫€娴?2: 浜嬪疄鎵洸锛堟暟瀛楀姣旓級 鈹€鈹€
+        if context:
+            result["fact_distortion"] = self._compare_numerics(response, context)
+
+        # 鈹€鈹€ 妫€娴?3: 閫昏緫鐭涚浘 鈹€鈹€
+        if context:
+            result["logic_contradiction"] = self._check_logical_consistency(response, context)
+
+        # 鈹€鈹€ 妫€娴?4: 澹版槑鏀寔妫€娴?鈹€鈹€
+        result["claims_checked"] = self._check_claim_support(response, context)
+
+        return result
+
+    def _compare_numerics(self, response: str, context: str) -> List[Dict]:
+        """
+        瀵规瘮鍥炵瓟鍜屼笂涓嬫枃涓殑鏁板€煎瀷浜嬪疄銆?        浣跨敤姝ｅ垯鎻愬彇鏁板€硷紝瀵规瘮宸紓銆?        """
+        spans = []
+
+        # 浠庝笂涓嬫枃涓彁鍙?{鎻忚堪: 鏁板€紏 瀵?        ctx_pattern = re.compile(
+            r"([\u4e00-\u9fff\w]+(?:鐩村緞|楂樺害|瀹藉害|鍘氬害|閲嶉噺|閫熷害|娓╁害|鍘嬪姏|棰戠巼|鍔熺巼|瀹归噺|鏁伴噺|浠锋牸|姣旂巼|绮惧害|璇樊))\s*(?:涓簗鏄瘄锛潀=|:|锛殀杈惧埌|D=)\s*(\d+(?:\.\d+)?)\s*(mm|cm|m|km|g|kg|t|ms|s|min|h|鍏億涓噟浜縷%|掳C|鈩億掳|Hz|kHz|MHz|W|kW)?",
+            re.IGNORECASE,
+        )
+
+        ctx_values: Dict[str, Tuple[str, str]] = {}
+        for match in ctx_pattern.finditer(context):
+            keyword = match.group(1).lower()
+            value_str = match.group(2)
+            unit = match.group(3) or ""
+            ctx_values[keyword] = (value_str, unit)
+
+        # 浠庡洖绛斾腑鎻愬彇瀵瑰簲鏁板€煎苟瀵规瘮
+        resp_matches = list(ctx_pattern.finditer(response))
+        for match in resp_matches:
+            keyword = match.group(1).lower()
+            resp_value_str = match.group(2)
+            resp_unit = match.group(3) or ""
+
+            if keyword in ctx_values:
+                ctx_value_str, ctx_unit = ctx_values[keyword]
+                # 瑙勮寖鍖栧姣?                try:
+                    ctx_val = float(ctx_value_str)
+                    resp_val = float(resp_value_str)
+                    if abs(ctx_val - resp_val) > 0.001 and ctx_unit == resp_unit:
+                        # 鏁板€间笉涓€鑷?                        spans.append(
+                            {
+                                "type": "fact_distortion",
+                                "text": match.group(),
+                                "start_pos": match.start(),
+                                "end_pos": match.end(),
+                                "confidence": 0.75,
+                                "reason": f"鏁板€间笉涓€鑷达細涓婁笅鏂囦负 {ctx_value_str}{ctx_unit}锛屽洖绛斾负 {resp_value_str}{resp_unit}",
+                                "conflicting_context": f"涓婁笅鏂囦腑 {keyword} = {ctx_value_str}{ctx_unit}",
+                                "severity": (
+                                    "high" if abs(ctx_val - resp_val) / max(abs(ctx_val), 1) > 0.5 else "medium"
+                                ),
+                            }
+                        )
+                except ValueError:
+                    # 闈炴暟鍊煎姣旓紙濡傚瓧绗︿覆鍊硷級
+                    if ctx_value_str != resp_value_str:
+                        spans.append(
+                            {
+                                "type": "fact_distortion",
+                                "text": match.group(),
+                                "start_pos": match.start(),
+                                "end_pos": match.end(),
+                                "confidence": 0.65,
+                                "reason": f"鍊间笉涓€鑷达細涓婁笅鏂囦负 '{ctx_value_str}'锛屽洖绛斾负 '{resp_value_str}'",
+                                "conflicting_context": f"涓婁笅鏂囦腑 {keyword} = {ctx_value_str}",
+                                "severity": "medium",
+                            }
+                        )
+
+        return spans
+
+    def _check_logical_consistency(self, response: str, context: str) -> List[Dict]:
+        """
+        妫€鏌ュ洖绛斾笌涓婁笅鏂囦箣闂寸殑閫昏緫涓€鑷存€с€?        涓嶈繘琛屽鏉傛帹鐞嗭紝鍙娴嬬畝鍗曠殑閫昏緫鍐茬獊妯″紡銆?        """
+        spans = []
+
+        # 妯″紡 1: "蹇呴』/鍙兘/浠?鍙? vs 涓婁笅鏂囦腑鐨勫涓€夐」
+        exclusive_patterns = [
+            (r"(?:蹇呴』|鍙兘|浠呮湁|鍙湁|浠呴檺|鍙兘浣跨敤|鍞竴.{0,4}鏄?\s*([^锛?銆?\n]{5,30})", "鎺掍粬鎬ф柇瑷€"),
+        ]
+
+        for pattern, reason in exclusive_patterns:
+            for match in re.finditer(pattern, response):
+                exclusive_text = match.group(1).strip()
+                # 鍦ㄤ笂涓嬫枃涓悳绱㈡槸鍚︽湁澶氶€夐」
+                multi_option_indicators = [
+                    "鍙€?,
+                    "涓夌",
+                    "澶氱",
+                    "鍖呮嫭",
+                    "濡?,
+                    "渚嬪",
+                    "鍙互",
+                    "涔熷彲",
+                    "绛夋柟寮?,
+                    "绛夌被鍨?,
+                    "绛夋ā寮?,
+                ]
+                if any(ind in context for ind in multi_option_indicators):
+                    spans.append(
+                        {
+                            "type": "logic_contradiction",
+                            "text": match.group(),
+                            "start_pos": match.start(),
+                            "end_pos": match.end(),
+                            "confidence": 0.55,
+                            "reason": f"{reason}锛氫笂涓嬫枃鏆楃ず瀛樺湪澶氫釜閫夐」",
+                            "conflicting_context": "涓婁笅鏂囧寘鍚閫夐」鎸囩ず璇?,
+                            "severity": "low",
+                        }
+                    )
+
+        # 妯″紡 2: 鍥犳灉鍏崇郴涓庝笂涓嬫枃鐭涚浘
+        cause_effect_patterns = [
+            (r"(?:鍥犱负|鐢变簬|鍩轰簬|閴翠簬)\s*([^锛?銆?\n]{10,50})(?:鎵€浠鍥犳|鏁厊浜庢槸|浠庤€?", "鍥犳灉鏂█"),
+        ]
+
+        for pattern, reason in cause_effect_patterns:
+            for match in re.finditer(pattern, response):
+                cause = match.group(1).strip()
+                # 妫€鏌ュ師鍥犳槸鍚﹀湪涓婁笅鏂囦腑琚惁瀹?                negation_indicators = [
+                    f"涓嶆槸{cause[:10]}",
+                    f"骞堕潪{cause[:10]}",
+                    f"涓嶈兘{cause[:10]}",
+                ]
+                if any(ind in context for ind in negation_indicators):
+                    spans.append(
+                        {
+                            "type": "logic_contradiction",
+                            "text": match.group(),
+                            "start_pos": match.start(),
+                            "end_pos": match.end(),
+                            "confidence": 0.65,
+                            "reason": f"{reason}锛氬墠鎻愭潯浠跺湪涓婁笅鏂囦腑琚惁瀹?,
+                            "conflicting_context": "涓婁笅鏂囧惁瀹氫簡璇ュ洜鏋滃叧绯荤殑鍓嶆彁",
+                            "severity": "medium",
+                        }
+                    )
+
+        return spans
+
+    def _check_claim_support(self, response: str, context: str) -> List[Dict]:
+        """
+        蹇€熸鏌ュ叧閿０鏄庢槸鍚︽湁涓婁笅鏂囨敮鎸併€?        浣跨敤鍩轰簬 n-gram 鐨勯噸鍙犲害浼扮畻锛堜笉鏇夸唬 LLM 娣卞害妫€鏌ワ級銆?        """
+        claims = []
+
+        # 鎻愬彇鍥炵瓟涓殑鍏抽敭鍙ュ瓙
+        sentences = re.split(r"[銆傦紒锛燂紱\n]", response)
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if len(sentence) < 10:
+                continue
+
+            # 浣跨敤瀛楃绾?Jaccard 浼扮畻閲嶅彔
+            resp_chars = set(sentence)
+            ctx_chars = set(context)
+            if len(resp_chars) > 0:
+                overlap = len(resp_chars & ctx_chars) / len(resp_chars)
+            else:
+                overlap = 0.0
+
+            # 浣跨敤璇嶇骇 n-gram 閲嶅彔
+            ngram_overlap = self._ngram_overlap(sentence, context, n=3)
+
+            supported = overlap > 0.3 or ngram_overlap > 0.15
+            claims.append(
+                {
+                    "text": sentence[:100],
+                    "supported": supported,
+                    "char_overlap": round(overlap, 2),
+                    "ngram_overlap": round(ngram_overlap, 2),
+                }
+            )
+
+        return claims
+
+    @staticmethod
+    def _ngram_overlap(text1: str, text2: str, n: int = 3) -> float:
+        """璁＄畻涓や釜鏂囨湰鐨?n-gram 閲嶅彔搴?""
+        if len(text1) < n or len(text2) < n:
+            return 0.0
+
+        def _get_ngrams(t: str, k: int) -> Set[str]:
+            return {t[i : i + k] for i in range(len(t) - k + 1)}
+
+        ngrams1 = _get_ngrams(text1, n)
+        ngrams2 = _get_ngrams(text2, n)
+
+        if not ngrams1:
+            return 0.0
+
+        intersection = len(ngrams1 & ngrams2)
+        return intersection / len(ngrams1)
+
+    # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ LLM 娣卞害妫€娴?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    async def _llm_detect(
+        self,
+        query: str,
+        response: str,
+        context: str,
+        sources: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        浣跨敤 LLM 杩涜澶氱淮搴﹀够瑙夋娴嬨€?
+        Returns:
+            LLM 杩斿洖鐨?JSON 瑙ｆ瀽缁撴灉
+        """
+        from src.services.llm import call_llm_fast
+
+        # 鍑嗗涓婁笅鏂?        ctx_text = context[:CONTEXT_MAX_CHARS]
+        if sources:
+            ctx_text += "\n\n--- 棰濆鏉ユ簮 ---\n"
+            ctx_text += "\n".join(f"- {s[:200]}" for s in sources[:10])
+
+        prompt = self.DETECTION_PROMPT_TEMPLATE.format(
+            query=query[:500],
+            context=ctx_text,
+            response=response[:RESPONSE_MAX_CHARS],
+        )
+
+        try:
+            raw_result = await call_llm_fast(
+                prompt,
+                max_tokens=CRITIC_MAX_TOKENS,
+                temperature=CRITIC_TEMPERATURE,
+                system_prompt=self.SYSTEM_PROMPT,
+            )
+
+            if not raw_result:
+                logger.warning("[SafetyCritic] LLM 杩斿洖绌虹粨鏋?)
+                return {}
+
+            parsed = self._safe_json_parse(raw_result)
+            if not parsed:
+                logger.warning(f"[SafetyCritic] LLM 缁撴灉 JSON 瑙ｆ瀽澶辫触: {raw_result[:200]}")
+                return {}
+
+            return parsed
+
+        except Exception as e:
+            logger.warning(f"[SafetyCritic] LLM 妫€娴嬪紓甯? {e}", exc_info=True)
+            raise
+
+    # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 浜ゅ弶楠岃瘉涓庡悎骞?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    def _merge_spans(
+        self,
+        heuristic: Dict[str, List[Dict]],
+        llm_fab: List[Dict],
+        llm_dist: List[Dict],
+        llm_logic: List[Dict],
+        response: str,
+    ) -> List[Dict]:
+        """
+        鍚堝苟鍚彂寮忓拰 LLM 妫€娴嬬殑鐗囨锛屽幓閲嶅苟鎻愰珮缃俊搴︺€?
+        绛栫暐锛?        - 涓よ€呴兘妫€娴嬪埌鐨?鈫?楂樼疆淇″害锛堝彇 max锛?        - 鍙湁涓€鏂规娴嬪埌鐨?鈫?淇濈暀浣嗗彲鑳介檷浣庣疆淇″害
+        - LLM 妫€娴嬬殑 start_pos/end_pos 鍙兘涓嶇簿纭紝浼樺厛浣跨敤鍚彂寮忎綅缃?        """
+        merged: List[Dict] = []
+
+        # 1. 鍔犲叆鍚彂寮忕粨鏋?        for dim in ["fabrication", "fact_distortion", "logic_contradiction"]:
+            for span in heuristic.get(dim, []):
+                merged.append(
+                    {
+                        **span,
+                        "source": "heuristic",
+                        "confidence": span.get("confidence", 0.5),
+                    }
+                )
+
+        # 2. 鍚堝苟 LLM 缁撴灉锛堟彁楂樺尮閰嶇墖娈电殑缃俊搴︼級
+        llm_spans = []
+        for s in llm_fab:
+            s_copy = dict(s)
+            s_copy["type"] = "fabrication"
+            s_copy["source"] = "llm"
+            llm_spans.append(s_copy)
+        for s in llm_dist:
+            s_copy = dict(s)
+            s_copy["type"] = "fact_distortion"
+            s_copy["source"] = "llm"
+            llm_spans.append(s_copy)
+        for s in llm_logic:
+            s_copy = dict(s)
+            s_copy["type"] = "logic_contradiction"
+            s_copy["source"] = "llm"
+            llm_spans.append(s_copy)
+
+        for llm_s in llm_spans:
+            llm_text = llm_s.get("text", "")
+            # 妫€鏌ユ槸鍚︿笌宸叉湁鐗囨閲嶅彔
+            is_duplicate = False
+            for existing in merged:
+                if self._text_overlap(existing.get("text", ""), llm_text) > 0.5:
+                    # 鎻愰珮缃俊搴︼紙鍙?max锛?                    existing["confidence"] = max(existing.get("confidence", 0), llm_s.get("confidence", 0))
+                    existing["source"] = "hybrid"
+                    # 琛ュ厖 LLM 鎻愪緵鐨勯澶栦俊鎭?                    if not existing.get("conflicting_context"):
+                        existing["conflicting_context"] = llm_s.get(
+                            "conflicting_context",
+                            llm_s.get("correct_value", ""),
+                        )
+                    is_duplicate = True
+                    break
+
+            if not is_duplicate:
+                # 楠岃瘉骞朵慨姝?LLM 鎻愪緵鐨勪綅缃?                start_pos = llm_s.get("start_pos", -1)
+                end_pos = llm_s.get("end_pos", -1)
+
+                # 濡傛灉浣嶇疆鏃犳晥锛?1锛夛紝灏濊瘯浠庡洖绛斾腑鏌ユ壘鏂囨湰浣嶇疆
+                if start_pos < 0 and llm_text:
+                    idx = response.find(llm_text)
+                    if idx >= 0:
+                        start_pos = idx
+                        end_pos = idx + len(llm_text)
+
+                merged.append(
+                    {
+                        "type": llm_s["type"],
+                        "text": llm_text,
+                        "start_pos": start_pos if start_pos >= 0 else -1,
+                        "end_pos": end_pos if end_pos >= 0 else -1,
+                        "confidence": llm_s.get("confidence", 0.6),
+                        "reason": llm_s.get("reason", ""),
+                        "conflicting_context": llm_s.get(
+                            "conflicting_context",
+                            llm_s.get("correct_value", ""),
+                        ),
+                        "severity": llm_s.get("severity", "medium"),
+                        "source": "llm",
+                    }
+                )
+
+        # 3. 鎸変綅缃帓搴?        merged.sort(key=lambda x: (x["start_pos"] if x["start_pos"] >= 0 else 99999))
+
+        # 4. 鍘婚噸閲嶅彔鐗囨
+        deduped = []
+        for span in merged:
+            is_overlap = False
+            for existing in deduped:
+                if self._span_overlap(span, existing):
+                    # 淇濈暀缃俊搴︽洿楂樼殑
+                    if span.get("confidence", 0) > existing.get("confidence", 0):
+                        existing.update(span)
+                    is_overlap = True
+                    break
+            if not is_overlap:
+                deduped.append(span)
+
+        return deduped
+
+    @staticmethod
+    def _text_overlap(text1: str, text2: str) -> float:
+        """璁＄畻涓や釜鏂囨湰鐨勯噸鍙犲害"""
+        if not text1 or not text2:
+            return 0.0
+        chars1 = set(text1)
+        chars2 = set(text2)
+        if not chars1 or not chars2:
+            return 0.0
+        return len(chars1 & chars2) / max(len(chars1), len(chars2))
+
+    @staticmethod
+    def _span_overlap(span1: Dict, span2: Dict) -> bool:
+        """鍒ゆ柇涓や釜鐗囨鏄惁閲嶅彔"""
+        s1 = span1.get("start_pos", -1)
+        e1 = span1.get("end_pos", -1)
+        s2 = span2.get("start_pos", -1)
+        e2 = span2.get("end_pos", -1)
+
+        if s1 < 0 or e1 < 0 or s2 < 0 or e2 < 0:
+            return False
+
+        return not (e1 < s2 or e2 < s1)
+
+    # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 寰楀垎璁＄畻 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    def _compute_dimension_score(
+        self,
+        heuristic_spans: List[Dict],
+        llm_dim_result: Dict,
+    ) -> float:
+        """
+        璁＄畻鍗曚釜缁村害鐨勫够瑙夊緱鍒嗐€?
+        鍥犲瓙:
+        - LLM 璇勫垎鏉冮噸 0.6
+        - 鍚彂寮忚瘎鍒嗘潈閲?0.4锛堝熀浜庝弗閲嶅害鍜岀疆淇″害鐨勭墖娈碉級
+        """
+        llm_score = llm_dim_result.get("score", 0.0) if llm_dim_result else 0.0
+
+        # 鍩轰簬鍚彂寮忕墖娈佃绠楀垎鏁?        heuristic_score = 0.0
+        if heuristic_spans:
+            severity_weights = {"critical": 0.4, "high": 0.3, "medium": 0.15, "low": 0.05}
+            for span in heuristic_spans:
+                sv_weight = severity_weights.get(span.get("severity", "medium"), 0.1)
+                confidence = span.get("confidence", 0.5)
+                heuristic_score += sv_weight * confidence
+            heuristic_score = min(heuristic_score, 1.0)  # 涓婇檺 1.0
+
+        if llm_dim_result:
+            # 鏈?LLM 缁撴灉锛氬姞鏉冨悎骞?            return round(llm_score * 0.6 + heuristic_score * 0.4, 4)
+        else:
+            # 绾惎鍙戝紡
+            return round(heuristic_score, 4)
+
+    def _determine_flags(
+        self,
+        spans: List[Dict],
+        has_hallucination: bool,
+        overall_score: float,
+    ) -> List[str]:
+        """鏍规嵁妫€娴嬬粨鏋滅‘瀹氬憡璀︽爣璁?""
+        flags = []
+
+        if has_hallucination:
+            flags.append("hallucination_detected")
+
+            # 妫€鏌ュ悇绫诲瀷
+            types_found = set(s.get("type", "") for s in spans)
+            if "fabrication" in types_found:
+                flags.append("fabrication_found")
+            if "fact_distortion" in types_found:
+                flags.append("fact_distortion_found")
+            if "logic_contradiction" in types_found:
+                flags.append("logic_contradiction_found")
+
+        # 涓ラ噸搴︾骇鍒?        if overall_score > 0.7:
+            flags.append("hallucination_critical")
+        elif overall_score > 0.5:
+            flags.append("hallucination_high")
+        elif overall_score > 0.3:
+            flags.append("hallucination_medium")
+
+        # 楂樹弗閲嶅害鐗囨
+        critical_spans = [s for s in spans if s.get("severity") == "critical"]
+        high_spans = [s for s in spans if s.get("severity") == "high"]
+        if critical_spans:
+            flags.append(f"critical_spans_{len(critical_spans)}")
+        if high_spans:
+            flags.append(f"high_severity_spans_{len(high_spans)}")
+
+        return flags
+
+    def _generate_recommendations(
+        self,
+        spans: List[Dict],
+        fab_score: float,
+        dist_score: float,
+        logic_score: float,
+    ) -> List[str]:
+        """鍩轰簬骞昏妫€娴嬬粨鏋滅敓鎴愭敼杩涘缓璁?""
+        recs = []
+
+        if fab_score > 0.3:
+            recs.append(f"鏃犱腑鐢熸湁({fab_score:.2f})锛氬缓璁寮轰簨瀹炴€х害鏉燂紝瑕佹眰妯″瀷浠呭熀浜庝笂涓嬫枃鐢熸垚")
+        if dist_score > 0.3:
+            recs.append(f"浜嬪疄鎵洸({dist_score:.2f})锛氬缓璁惎鐢ㄤ弗鏍兼暟瀛楁牎楠岋紝瑕佹眰妯″瀷寮曠敤涓婁笅鏂囧師鏂?)
+        if logic_score > 0.3:
+            recs.append(f"閫昏緫鐭涚浘({logic_score:.2f})锛氬缓璁湪鐢熸垚鍚庢坊鍔犻€昏緫涓€鑷存€ф鏌?)
+
+        # 閽堝鎬у缓璁?        types_found = set(s.get("type", "") for s in spans)
+        if "fabrication" in types_found:
+            recs.append("寤鸿闄嶄綆鐢熸垚娓╁害(temperature)浠ュ噺灏戠紪閫犲€惧悜")
+        if "fact_distortion" in types_found:
+            recs.append("寤鸿浣跨敤绮剧‘妫€绱?寮曠敤鏍囨敞妯″紡锛屽己鍒跺紩鐢ㄤ笂涓嬫枃鍘熸枃")
+
+        fabricate_spans = [s for s in spans if s.get("type") == "fabrication"]
+        if len(fabricate_spans) >= 3:
+            recs.append("妫€娴嬪埌澶ч噺鏃犱腑鐢熸湁鐗囨锛屽己鐑堝缓璁Е鍙戜汉宸ュ鏍?)
+
+        return recs
+
+    # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 浜嬩欢鏃ュ織 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    async def _log_event(self, report: HallucinationReport):
+        """灏嗗够瑙変簨浠舵寔涔呭寲鍒版棩蹇?""
+        try:
+            event = {
+                "report_id": report.report_id,
+                "timestamp": report.timestamp,
+                "query": report.query[:200],
+                "response": report.response[:200],
+                "context": report.context[:200],
+                "overall_score": report.overall_score,
+                "dimensions": {
+                    "fabrication": report.fabrication_score,
+                    "fact_distortion": report.fact_distortion_score,
+                    "logic_contradiction": report.logic_contradiction_score,
+                },
+                "spans_count": len(report.spans),
+                "spans_summary": [
+                    {
+                        "type": s.get("type"),
+                        "text": s.get("text", "")[:100],
+                        "severity": s.get("severity"),
+                    }
+                    for s in report.spans[:10]
+                ],
+                "flags": report.flags,
+                "recommendations": report.recommendations,
+                "detection_method": report.detection_method,
+                "latency_ms": report.latency_ms,
+            }
+
+            def _write():
+                with open(HALLUCINATION_LOG_PATH, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(event, ensure_ascii=False) + "\n")
+
+            await asyncio.to_thread(_write)
+
+        except Exception as e:
+            logger.warning(f"[SafetyCritic] 浜嬩欢鏃ュ織鍐欏叆澶辫触: {e}")
+
+    def _update_stats(self, report: HallucinationReport):
+        """鏇存柊鍐呴儴缁熻"""
+        self._stats["total_detections"] += 1
+        if report.has_hallucination:
+            self._stats["hallucinations_found"] += 1
+        self._stats["method_distribution"][report.detection_method] += 1
+
+        # 绉诲姩骞冲潎寤惰繜
+        n = self._stats["total_detections"]
+        prev_avg = self._stats["avg_latency_ms"]
+        self._stats["avg_latency_ms"] = round((prev_avg * (n - 1) + report.latency_ms) / n, 1)
+
+    # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 渚挎嵎鏂规硶 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    async def quick_check(self, query: str, response: str, context: str = "") -> Dict[str, Any]:
+        """
+        蹇€熷够瑙夋鏌ワ細涓嶈皟鐢?LLM锛屼粎浣跨敤鍚彂寮忚鍒欍€?        閫傚悎鍦ㄩ珮鍚炲悙閲忓満鏅腑鍋氬垵绛涖€?
+        Returns:
+            {"has_hallucination": bool, "score": float, "spans": list}
+        """
+        report = await self.detect_hallucination(
+            query=query,
+            response=response,
+            context=context,
+            use_llm=False,
+            threshold=0.5,  # 鍚彂寮忛槇鍊兼洿楂?        )
+        return {
+            "has_hallucination": report.has_hallucination,
+            "score": report.overall_score,
+            "dimensions": {
+                "fabrication": report.fabrication_score,
+                "fact_distortion": report.fact_distortion_score,
+                "logic_contradiction": report.logic_contradiction_score,
+            },
+            "spans": [
+                {
+                    "type": s.get("type"),
+                    "text": s.get("text", "")[:50],
+                    "reason": s.get("reason", ""),
+                }
+                for s in report.spans[:5]
+            ],
+            "flags": report.flags,
+        }
+
+    async def deep_check(
+        self,
+        query: str,
+        response: str,
+        context: str,
+        sources: Optional[List[str]] = None,
+    ) -> HallucinationReport:
+        """
+        娣卞害骞昏妫€鏌ワ細濮嬬粓浣跨敤 LLM 杩涜澶氱淮搴︽娴嬨€?        閫傚悎鍦ㄨ川閲忚姹傞珮鐨勫満鏅腑浣跨敤锛堝姝ｅ紡鎶ュ憡鐢熸垚鍓嶏級銆?
+        Returns:
+            HallucinationReport: 瀹屾暣鐨勫够瑙夋娴嬫姤鍛?        """
+        return await self.detect_hallucination(
+            query=query,
+            response=response,
+            context=context,
+            sources=sources,
+            use_llm=True,
+            threshold=0.2,  # 娣卞害妫€鏌ラ槇鍊兼洿浣庛€佹洿鏁忔劅
+        )
+
+    async def batch_check(
+        self,
+        items: List[Dict[str, str]],
+        use_llm: bool = True,
+        max_concurrent: int = 5,
+    ) -> List[HallucinationReport]:
+        """
+        鎵归噺骞昏妫€娴嬨€?
+        Args:
+            items: [{"query": "...", "response": "...", "context": "..."}, ...]
+            use_llm: 鏄惁浣跨敤 LLM
+            max_concurrent: 鏈€澶у苟鍙戞暟
+
+        Returns:
+            妫€娴嬫姤鍛婂垪琛?        """
+        semaphore = asyncio.Semaphore(max_concurrent)
+
+        async def _check_one(item: Dict) -> HallucinationReport:
+            async with semaphore:
+                try:
+                    return await self.detect_hallucination(
+                        query=item.get("query", ""),
+                        response=item.get("response", ""),
+                        context=item.get("context", ""),
+                        sources=item.get("sources"),
+                        use_llm=use_llm,
+                    )
+                except Exception as e:
+                    logger.warning(f"[SafetyCritic] 鎵归噺妫€娴?#{item.get('query', '?')[:30]} 澶辫触: {e}")
+                    return HallucinationReport(
+                        report_id=f"batch_error_{hash(item.get('query', ''))}",
+                        timestamp=time.time(),
+                        query=item.get("query", "")[:200],
+                        response="",
+                        context="",
+                        has_hallucination=False,
+                        flags=["detection_error"],
+                    )
+
+        tasks = [_check_one(item) for item in items]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        reports = []
+        for i, r in enumerate(results):
+            if isinstance(r, Exception):
+                reports.append(
+                    HallucinationReport(
+                        report_id=f"batch_err_{i}",
+                        timestamp=time.time(),
+                        query=items[i].get("query", "")[:200],
+                        response="",
+                        context="",
+                        flags=["batch_error"],
+                    )
+                )
+            else:
+                reports.append(r)
+
+        return reports
+
+    def get_stats(self) -> Dict[str, Any]:
+        """鑾峰彇缁熻淇℃伅"""
+        return dict(self._stats)
+
+    async def flush(self):
+        """鍒锋柊鎵€鏈夌紦瀛樺拰鐘舵€侊紙graceful shutdown锛?""
+        self._cache.clear()
+        logger.info("[SafetyCritic] 缂撳瓨宸叉竻绌?)
+
+    # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ OWASP LLM Top 10 瀹夊叏妫€鏌?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    def sanitize_output(self, text: str) -> str:
+        """
+        LLM02: 涓嶅畨鍏ㄨ緭鍑哄鐞?鈥?鍑€鍖朙LM杈撳嚭锛岀Щ闄ゆ綔鍦ㄦ湁瀹冲唴瀹广€?
+        闃插尽鑼冨洿锛?        - XSS锛圚TML鏍囩娉ㄥ叆锛?        - 鑴氭湰娉ㄥ叆锛坖avascript: 鍗忚锛?        - Markdown閾炬帴娉ㄥ叆
+
+        Args:
+            text: LLM 鍘熷杈撳嚭鏂囨湰
+
+        Returns:
+            鍑€鍖栧悗鐨勫畨鍏ㄦ枃鏈?        """
+        if not text or not isinstance(text, str):
+            return ""
+
+        # 绉婚櫎HTML鏍囩锛堥槻姝SS锛?        text = re.sub(r"<[^>]+>", "", text)
+        # 绉婚櫎娼滃湪鐨勮剼鏈敞鍏?        text = re.sub(r"javascript:", "", text, flags=re.IGNORECASE)
+        # 绉婚櫎娼滃湪鐨刴arkdown閾炬帴娉ㄥ叆
+        text = re.sub(r"\[([^\]]+)\]\(javascript:[^)]+\)", r"\1", text)
+        return text.strip()
+
+    def check_excessive_agency(self, action: str, context: dict = None) -> bool:
+        """
+        LLM08: 杩囧害鑷富鏉?鈥?妫€鏌ユ搷浣滄槸鍚﹁秴鍑烘巿鏉冭寖鍥淬€?
+        闃叉 LLM 浠ｇ悊鎵ц楂橀闄╂搷浣滐紙鍒犻櫎銆佺郴缁熶慨鏀广€佷唬鐮佹墽琛岀瓑锛夈€?        浠呭厑璁稿畨鍏ㄧ殑鍙/鍒嗘瀽绫绘搷浣溿€?
+        Args:
+            action: 寰呮鏌ョ殑鎿嶄綔鍚嶇О
+            context: 鎿嶄綔涓婁笅鏂囷紙棰勭暀鎵╁睍锛?
+        Returns:
+            True 琛ㄧず鎿嶄綔琚厑璁革紝False 琛ㄧず琚嫆缁?        """
+        # 瀹氫箟鍏佽鐨勬搷浣滅被鍨嬶紙鍙/鍒嗘瀽绫伙級
+        ALLOWED_ACTIONS = {
+            "search",
+            "read",
+            "summarize",
+            "analyze",
+            "translate",
+            "answer",
+            "suggest",
+            "explain",
+            "compare",
+        }
+        # 瀹氫箟绂佹鐨勬搷浣滅被鍨嬶紙楂橀闄╁啓鎿嶄綔锛?        BLOCKED_ACTIONS = {
+            "delete",
+            "modify_system",
+            "execute_code",
+            "access_admin",
+            "send_email",
+            "make_payment",
+            "change_password",
+        }
+
+        if not action or not isinstance(action, str):
+            return False
+
+        action_lower = action.lower()
+        if action_lower in BLOCKED_ACTIONS:
+            logger.warning(f"[SafetyCritic] 杩囧害鑷富鏉冮樆姝? action={action_lower}")
+            return False  # 鎷掔粷
+        return action_lower in ALLOWED_ACTIONS
+
+    def detect_retrieval_poisoning(self, query: str, context: str) -> dict:
+        """
+        LLM03: 璁粌鏁版嵁鎶曟瘨 鈥?妫€娴嬫绱㈢粨鏋滄槸鍚﹀彲鑳借鎶曟瘨銆?
+        妫€娴嬫寚鏍囷細
+        - 杩囧澶栭儴閾炬帴锛堝彲鑳芥槸 SEO 鎶曟瘨锛?        - 閲嶅鍐呭锛堝彲鑳芥槸濉厖鍣煶锛?        - 鍙枒鎸囦护妯″紡锛堣瘯鍥捐鐩?LLM 琛屼负锛?
+        Args:
+            query: 鐢ㄦ埛鍘熷鏌ヨ
+            context: 妫€绱㈠埌鐨勪笂涓嬫枃鍐呭
+
+        Returns:
+            {
+                "risk_score": float,     # 0.0-1.0 鎶曟瘨椋庨櫓鍒嗘暟
+                "indicators": dict,        # 鍚勬寚鏍囨娴嬬粨鏋?                "safe": bool               # 鏄惁瀹夊叏锛堥闄?< 0.3锛?            }
+        """
+        if not context or not isinstance(context, str):
+            return {"risk_score": 0.0, "indicators": {}, "safe": True}
+
+        indicators = {
+            "excessive_links": len(re.findall(r"https?://", context)) > 10,
+            "repetitive_content": self._check_repetition(context),
+            "suspicious_patterns": bool(
+                re.search(r"(?:ignore|forget|disregard).*(?:instructions|rules)", context, re.IGNORECASE)
+            ),
+        }
+
+        risk_score = sum(indicators.values()) / len(indicators)
+
+        if risk_score >= 0.3:
+            logger.warning(f"[SafetyCritic] 妫€绱㈡姇姣掗闄? score={risk_score:.2f}, " f"indicators={indicators}")
+
+        return {"risk_score": round(risk_score, 4), "indicators": indicators, "safe": risk_score < 0.3}
+
+    @staticmethod
+    def _check_repetition(text: str, threshold: float = 0.6) -> bool:
+        """
+        妫€娴嬫枃鏈腑鐨勯噸澶嶅唴瀹规瘮渚嬨€?        浣跨敤 n-gram 鍘婚噸鐜囦及绠楀唴瀹归噸澶嶅害銆?
+        Args:
+            text: 寰呮娴嬫枃鏈?            threshold: 閲嶅姣斾緥闃堝€硷紙榛樿 0.6锛?
+        Returns:
+            True 琛ㄧず瀛樺湪澶ч噺閲嶅锛堝彲鑳芥湁鎶曟瘨椋庨櫓锛?        """
+        if len(text) < 100:
+            return False
+
+        # 浣跨敤 5-gram 妫€娴嬮噸澶?        n = 5
+        if len(text) < n:
+            return False
+
+        ngrams = [text[i : i + n] for i in range(len(text) - n + 1)]
+        total = len(ngrams)
+        unique = len(set(ngrams))
+
+        if total == 0:
+            return False
+
+        repetition_ratio = 1.0 - (unique / total)
+        return repetition_ratio > threshold
+
+    # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 宸ュ叿鏂规硶 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    @staticmethod
+    def _make_report_id(query: str, response: str, timestamp: float) -> str:
+        """鐢熸垚鍞竴鎶ュ憡 ID"""
+        raw = f"{query[:100]}|{response[:100]}|{timestamp}"
+        return "hrep_" + hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+    @staticmethod
+    def _safe_json_parse(text: str) -> Dict[str, Any]:
+        """瀹夊叏瑙ｆ瀽 LLM 杩斿洖鐨?JSON锛屽鐞嗗父瑙佹牸寮忛棶棰?""
+        text = text.strip()
+
+        # 鍘婚櫎 markdown 浠ｇ爜鍧?        if text.startswith("```"):
+            lines = text.split("\n")
+            if len(lines) > 2:
+                text = "\n".join(lines[1:-1])
+            elif lines[0].startswith("```json"):
+                text = lines[0][7:].strip()
+
+        # 鎻愬彇 JSON 瀵硅薄
+        s = text.find("{")
+        e = text.rfind("}")
+        if s >= 0 and e > s:
+            try:
+                return json.loads(text[s : e + 1])
+            except json.JSONDecodeError:
+                pass
+
+        # 鐩存帴瑙ｆ瀽
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
+
+        return {}
+
+
+# ============ 鍏ㄥ眬瀹炰緥 ============
+
+_safety_critic: Optional[SafetyCritic] = None
+
+
+def get_safety_critic() -> SafetyCritic:
+    """鑾峰彇鍏ㄥ眬 SafetyCritic 鍗曚緥"""
+    global _safety_critic
+    if _safety_critic is None:
+        _safety_critic = SafetyCritic()
+    return _safety_critic
+
+
+# ============ 渚挎嵎鍑芥暟 ============
+
+
+async def detect_hallucination(
+    query: str,
+    response: str,
+    context: str = "",
+    sources: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+    """
+    渚挎嵎鍑芥暟锛氬崟娆″够瑙夋娴嬨€?
+    杩斿洖鍙洿鎺ュ簭鍒楀寲鐨?dict銆?
+    Usage:
+        from src.services.safety_critic import detect_hallucination
+        result = await detect_hallucination(query, response, context)
+    """
+    critic = get_safety_critic()
+    report = await critic.detect_hallucination(
+        query=query,
+        response=response,
+        context=context,
+        sources=sources,
+    )
+    return asdict(report)
+
+
+async def quick_hallucination_check(
+    query: str,
+    response: str,
+    context: str = "",
+) -> Dict[str, Any]:
+    """
+    渚挎嵎鍑芥暟锛氬揩閫熷惎鍙戝紡骞昏妫€鏌ワ紙涓嶈皟鐢?LLM锛夈€?    """
+    critic = get_safety_critic()
+    return await critic.quick_check(query, response, context)

@@ -1,0 +1,244 @@
+"""
+insight_generator.py — 洞察生成器（v2.0 新增）
+
+从趋势和异常数据生成可行动的自然语言洞察。
+不依赖 LLM，纯规则引擎，保证实时性和可靠性。
+
+洞察类型：
+- trend: 趋势洞察（指标变化方向和幅度）
+- anomaly: 异常洞察（偏离基线的指标）
+- recommendation: 建议洞察（基于现状的改进建议）
+- summary: 总体健康评估
+"""
+
+import logging
+import time
+from typing import Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+
+def _trend_insight(metric: str, trend_data: Dict) -> Optional[Dict]:
+    """从趋势数据生成洞察"""
+    direction = trend_data.get("direction", "flat")
+    change_pct = trend_data.get("change_pct", 0)
+    current = trend_data.get("current", 0)
+    baseline = trend_data.get("baseline", 0)
+
+    if not current and not baseline:
+        return None
+
+    # 指标中文名
+    names = {
+        "latency_ms": "响应延迟",
+        "error_rate": "错误率",
+        "qps": "吞吐量",
+        "search_score": "检索质量",
+        "feedback_count": "用户反馈量",
+    }
+    name = names.get(metric, metric)
+
+    if direction == "flat":
+        return {
+            "type": "trend",
+            "severity": "info",
+            "title": f"{name}稳定",
+            "description": f"{name}当前值 {current}，近期无显著变化。",
+            "recommendation": "无需调整。",
+        }
+
+    # 有趋势变化
+    if metric == "latency_ms":
+        if direction == "up":
+            return {
+                "type": "trend",
+                "severity": "warning" if change_pct > 50 else "info",
+                "title": f"{name}上升 {abs(change_pct)}%",
+                "description": f"{name}从 {baseline}ms 上升到 {current}ms，增幅 {abs(change_pct)}%。",
+                "recommendation": "检查是否有慢查询、LLM 超时或 ChromaDB 性能下降。",
+            }
+        else:
+            return {
+                "type": "trend",
+                "severity": "info",
+                "title": f"{name}下降 {abs(change_pct)}%",
+                "description": f"{name}从 {baseline}ms 下降到 {current}ms，系统性能改善。",
+                "recommendation": "保持当前优化策略。",
+            }
+
+    elif metric == "error_rate":
+        if direction == "up":
+            return {
+                "type": "trend",
+                "severity": "critical" if change_pct > 100 else "warning",
+                "title": f"{name}上升 {abs(change_pct)}%",
+                "description": f"{name}从 {baseline}% 上升到 {current}%。",
+                "recommendation": "立即检查服务健康状态、依赖服务可用性和错误日志。",
+            }
+        else:
+            return {
+                "type": "trend",
+                "severity": "info",
+                "title": f"{name}下降",
+                "description": f"{name}从 {baseline}% 下降到 {current}%，系统稳定性改善。",
+                "recommendation": "保持当前质量措施。",
+            }
+
+    elif metric == "search_score":
+        if direction == "down":
+            return {
+                "type": "trend",
+                "severity": "warning" if abs(change_pct) > 20 else "info",
+                "title": f"{name}下降 {abs(change_pct)}%",
+                "description": f"检索平均得分从 {baseline} 下降到 {current}。",
+                "recommendation": "检查知识库覆盖率，考虑补充相关文档或调整检索参数。",
+            }
+        else:
+            return {
+                "type": "trend",
+                "severity": "info",
+                "title": f"{name}提升 {abs(change_pct)}%",
+                "description": f"检索平均得分从 {baseline} 提升到 {current}。",
+                "recommendation": "检索质量改善，保持当前策略。",
+            }
+
+    # 通用
+    emoji = "📈" if direction == "up" else "📉"
+    return {
+        "type": "trend",
+        "severity": "info",
+        "title": f"{emoji} {name}变化 {change_pct:+.1f}%",
+        "description": f"{name}当前 {current}，基线 {baseline}，变化 {change_pct:+.1f}%。",
+        "recommendation": "持续观察。",
+    }
+
+
+def _anomaly_insight(anomaly: Dict) -> Dict:
+    """从异常数据生成洞察"""
+    metric = anomaly.get("metric", "unknown")
+    names = {
+        "latency_ms": "响应延迟",
+        "error_rate": "错误率",
+        "search_score": "检索质量",
+    }
+    name = names.get(metric, metric)
+
+    return {
+        "type": "anomaly",
+        "severity": anomaly.get("severity", "medium"),
+        "title": f"⚠️ {name}异常",
+        "description": anomaly.get("message", ""),
+        "recommendation": anomaly.get("recommendation", "请检查系统状态。"),
+    }
+
+
+def _health_insight(metrics: Dict) -> Dict:
+    """生成总体健康洞察"""
+    anomalies = metrics.get("anomalies", [])
+    high_count = len([a for a in anomalies if a.get("severity") == "high"])
+    medium_count = len([a for a in anomalies if a.get("severity") == "medium"])
+
+    if high_count > 0:
+        return {
+            "type": "summary",
+            "severity": "critical",
+            "title": "🔴 系统健康告警",
+            "description": f"检测到 {high_count} 个高危异常和 {medium_count} 个中危异常。",
+            "recommendation": "请立即处理高危异常。",
+        }
+    elif medium_count > 0:
+        return {
+            "type": "summary",
+            "severity": "warning",
+            "title": "🟡 系统状态警告",
+            "description": f"检测到 {medium_count} 个中危异常。",
+            "recommendation": "建议在维护窗口处理。",
+        }
+    else:
+        return {
+            "type": "summary",
+            "severity": "healthy",
+            "title": "🟢 系统运行正常",
+            "description": "所有指标在正常范围内。",
+            "recommendation": "持续观察。",
+        }
+
+
+def generate_insights(
+    trends: Optional[Dict] = None,
+    anomalies: Optional[List] = None,
+) -> List[Dict]:
+    """生成完整的洞察报告
+
+    Args:
+        trends: 趋势数据（来自 trend_analyzer.get_all_trends()）
+        anomalies: 异常数据（来自 anomaly_detector.check_anomalies()）
+
+    Returns:
+        [
+            {"type": "summary", "severity": "...", "title": "...", "description": "...", "recommendation": "..."},
+            {"type": "trend", ...},
+            {"type": "anomaly", ...},
+            ...
+        ]
+    """
+    insights = []
+
+    # 1. 异常洞察（最高优先级）
+    if anomalies:
+        for a in anomalies:
+            insights.append(_anomaly_insight(a))
+
+    # 2. 趋势洞察
+    if trends:
+        for metric, data in trends.items():
+            if isinstance(data, dict) and "direction" in data:
+                insight = _trend_insight(metric, data)
+                if insight:
+                    insights.append(insight)
+
+    # 3. 总体健康评估
+    insights.insert(
+        0,
+        _health_insight(
+            {
+                "anomalies": anomalies or [],
+            }
+        ),
+    )
+
+    # 按严重程度排序
+    severity_order = {"critical": 0, "high": 1, "warning": 2, "info": 3, "healthy": 4}
+    insights.sort(key=lambda x: severity_order.get(x.get("severity", "info"), 5))
+
+    return insights
+
+
+def get_insights_summary() -> Dict:
+    """获取完整的洞察摘要（集成趋势+异常+洞察）"""
+    try:
+        from src.services.trend_analyzer import get_all_trends
+
+        trends = get_all_trends(7)
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+        trends = {}
+
+    try:
+        from src.services.anomaly_detector import check_anomalies
+
+        anomalies = check_anomalies()
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+        anomalies = []
+
+    insights = generate_insights(trends, anomalies)
+
+    return {
+        "insights": insights,
+        "trends": {
+            k: {"direction": v.get("direction"), "change_pct": v.get("change_pct"), "current": v.get("current")}
+            for k, v in trends.items()
+            if isinstance(v, dict)
+        },
+        "anomaly_count": len(anomalies),
+        "generated_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+    }

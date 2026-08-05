@@ -1,7 +1,8 @@
-"""
+﻿"""
 brain.py — 少阴·炼化 决策合成中枢
 合并大脑(决策)+心(路由)+Self-RAG+CRAG
 """
+
 import logging
 import time
 from typing import Dict, List
@@ -20,7 +21,7 @@ class ShaoyinBrain(SymbolBase):
             symbol_id="shaoyin",
             name="少阴·炼化",
             emoji="🌙",
-            description="决策合成中枢：问题进来 → 答案出去"
+            description="决策合成中枢：问题进来 → 答案出去",
         )
         self._thought_count = 0
         self._retry_count = 0
@@ -32,6 +33,7 @@ class ShaoyinBrain(SymbolBase):
         if self._self_rag is None:
             try:
                 from src.shaoyin.smart_self_rag import SmartSelfRAG
+
                 self._self_rag = SmartSelfRAG()
             except Exception as e:  # TODO: Narrow exception type
                 logger.warning("Exception 失败: %s", e, exc_info=True)
@@ -42,6 +44,7 @@ class ShaoyinBrain(SymbolBase):
         if self._crag is None:
             try:
                 from src.shaoyin.crag_corrector import CRAGCorrector
+
                 self._crag = CRAGCorrector()
             except Exception as e:  # TODO: Narrow exception type
                 logger.warning("Exception 失败: %s", e, exc_info=True)
@@ -53,7 +56,8 @@ class ShaoyinBrain(SymbolBase):
         start_time = time.time()
 
         if not trace_id:
-            from src.infra.logging import get_trace_id
+            from src.infra.fuxi_logging import get_trace_id
+
             trace_id = get_trace_id()
 
         try:
@@ -73,10 +77,14 @@ class ShaoyinBrain(SymbolBase):
             reflection_pass = True
             if self_rag:
                 max_score = max((r.get("score", 0) for r in results), default=0)
-                reflection = await self_rag.reflect_if_needed(query, results, {
-                    "max_score": max_score,
-                    "query_type": intent.get("intent", "general"),
-                })
+                reflection = await self_rag.reflect_if_needed(
+                    query,
+                    results,
+                    {
+                        "max_score": max_score,
+                        "query_type": intent.get("intent", "general"),
+                    },
+                )
                 reflection_pass = reflection.action == "pass"
                 if not reflection_pass:
                     logger.info(f"[{trace_id}] [少阴] Self-RAG未通过: {reflection.reason}")
@@ -100,6 +108,7 @@ class ShaoyinBrain(SymbolBase):
             # Step 6.5: L5 CRAG 答案质量评估 + 补充检索
             try:
                 from src.taiyang.l5_crag import L5CRAGExecutor
+
                 crag_executor = L5CRAGExecutor()
 
                 # 将 answer 包装为结果格式用于评估
@@ -137,20 +146,28 @@ class ShaoyinBrain(SymbolBase):
             # 记录成长数据
             try:
                 from src.growth.growth_recorder import GrowthRecordPoints
+
                 recorder = GrowthRecordPoints()
                 await recorder.record_shaoyin_decision(
-                    query=query, trace_id=trace_id or "",
-                    intent=intent.get("intent", "unknown"), strategy=strategy,
-                    confidence=confidence, retry_count=1 if confidence < 0.5 else 0,
+                    query=query,
+                    trace_id=trace_id or "",
+                    intent=intent.get("intent", "unknown"),
+                    strategy=strategy,
+                    confidence=confidence,
+                    retry_count=1 if confidence < 0.5 else 0,
                     duration_ms=duration,
                 )
             except Exception as e:  # TODO: Narrow exception type
                 logger.warning("Exception 失败: %s", e, exc_info=True)
 
             if logger.isEnabledFor(logging.DEBUG):
-                logger.info(f"[{trace_id}] [少阴] 决策完成: {query[:30]}... → confidence={confidence:.2f}, {duration:.0f}ms")
+                logger.info(
+                    f"[{trace_id}] [少阴] 决策完成: {query[:30]}... → confidence={confidence:.2f}, {duration:.0f}ms"
+                )
             else:
-                logger.info(f"[{trace_id}] [少阴] 决策完成: query_len={len(query)}, confidence={confidence:.2f}, {duration:.0f}ms")
+                logger.info(
+                    f"[{trace_id}] [少阴] 决策完成: query_len={len(query)}, confidence={confidence:.2f}, {duration:.0f}ms"
+                )
 
             return {
                 "answer": answer,
@@ -174,18 +191,25 @@ class ShaoyinBrain(SymbolBase):
         """意图识别"""
         try:
             from src.bagua.qian import QianGua, _match_intent_preload
+
             cache = {}
-            _load = getattr(QianGua, '_load_intent_preload_cache', None)
+            _load = getattr(QianGua, "_load_intent_preload_cache", None)
             if _load:
                 try:
                     cache = _load()
-                except Exception:  # TODO: Narrow exception type
+                except (
+                    OSError,
+                    ValueError,
+                    KeyError,
+                    ConnectionError,
+                    TimeoutError,
+                ) as e:  # TODO: Narrow exception type
                     pass
             result = _match_intent_preload(query, cache)
             if result:
                 return {"intent": result, "confidence": 0.98, "reasoning": "预加载匹配"}
             return {"intent": "SEARCH", "confidence": 0.85, "reasoning": "默认检索"}
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             return {"intent": "general_search", "intents": {}, "count": 0}
 
     def _select_strategy(self, intent: Dict) -> str:
@@ -202,6 +226,7 @@ class ShaoyinBrain(SymbolBase):
         """检索（调用太阳）"""
         try:
             from src.taiyang.retrieval import hybrid_search
+
             return await hybrid_search(query, top_k=10)
         except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[少阴] 检索失败: {e}")
@@ -211,6 +236,7 @@ class ShaoyinBrain(SymbolBase):
         """LLM 合成"""
         try:
             from src.infra.llm import call_deepseek
+
             context = "\n".join([r.get("text", "")[:200] for r in results[:5]])
             prompt = f"基于以下信息回答问题：\n{context}\n\n问题：{query}"
             answer = await call_deepseek(prompt)
@@ -237,6 +263,7 @@ class ShaoyinBrain(SymbolBase):
         self._retry_count += 1
         try:
             from src.infra.llm import call_deepseek
+
             context = "\n".join([r.get("text", "")[:300] for r in results[:8]])
             prompt = f"请更准确地回答以下问题，参考文档：\n{context}\n\n问题：{query}"
             answer = await call_deepseek(prompt)
@@ -246,13 +273,17 @@ class ShaoyinBrain(SymbolBase):
             logger.warning("Exception 失败: %s", e, exc_info=True)
         return "知识库中未找到相关信息。"
 
-    def _extract_sources(self, results: List[Dict]) -> List[str]:
+    def _extract_sources(self, results: List[Dict]) -> List[Dict]:
         """提取来源"""
         sources = []
         for r in results[:5]:
-            fn = r.get("file_name", "")
-            if fn and fn not in sources:
-                sources.append(fn)
+            source = {
+                "title": r.get("file_name", r.get("source", "")),
+                "snippet": r.get("text", "")[:200],
+                "score": r.get("score", 0),
+            }
+            if source["title"] and source not in sources:
+                sources.append(source)
         return sources
 
     # DEPRECATED: 未使用，v1.50 标记待删除

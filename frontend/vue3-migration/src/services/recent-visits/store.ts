@@ -210,8 +210,8 @@ export const useRecentVisitsStore = defineStore('recent-visits', () => {
 
     try {
       const data = await historyApi.getRecentVisits({ userId, limit, type });
-      visits.value = data.visits;
-      total.value = data.total;
+      visits.value = data?.visits ?? [];
+      total.value = data?.total ?? 0;
       localMode.value = false;
     } catch (err) {
       // 从本地加载

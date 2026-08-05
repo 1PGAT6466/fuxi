@@ -30,9 +30,7 @@ def _save_hash_index(index_path: str, index: Dict[str, str]) -> None:
     path = Path(index_path)
     path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        path.write_text(
-            json.dumps(index, indent=2, ensure_ascii=False), encoding="utf-8"
-        )
+        path.write_text(json.dumps(index, indent=2, ensure_ascii=False), encoding="utf-8")
     except OSError as e:
         logger.error(f"Failed to save hash index: {e}")
         raise

@@ -4,18 +4,19 @@ database.py — 数据库连接器
 支持 SQLite、PostgreSQL、MySQL 等数据库的数据接入。
 通过异步连接池执行查询，将表数据转换为统一文档格式。
 """
+
 import logging
 from typing import Any, Dict, List, Optional
 
 from .base import (
-    DataSource,
-    ConnectorConfig,
-    UnifiedDocument,
-    SourceType,
-    ConnectorStatus,
     ConnectionError,
+    ConnectorConfig,
+    ConnectorStatus,
+    DataSource,
     FetchError,
+    SourceType,
     TransformError,
+    UnifiedDocument,
 )
 
 logger = logging.getLogger(__name__)
@@ -72,9 +73,7 @@ class DatabaseConnector(DataSource):
 
             if self._db_type not in self._supported_types:
                 raise ConnectionError(
-                    self.name,
-                    f"不支持的数据库类型 '{self._db_type}'，"
-                    f"支持: {', '.join(self._supported_types)}"
+                    self.name, f"不支持的数据库类型 '{self._db_type}'，" f"支持: {', '.join(self._supported_types)}"
                 )
 
             if self._db_type == "sqlite":
@@ -100,15 +99,9 @@ class DatabaseConnector(DataSource):
         try:
             import aiosqlite
         except ImportError:
-            raise ConnectionError(
-                self.name,
-                "缺少 aiosqlite 依赖，请执行: pip install aiosqlite"
-            )
+            raise ConnectionError(self.name, "缺少 aiosqlite 依赖，请执行: pip install aiosqlite")
 
-        db_path = self.config.extra.get(
-            "db_path",
-            self.config.extra.get("database", "data/memory.db")
-        )
+        db_path = self.config.extra.get("db_path", self.config.extra.get("database", "data/memory.db"))
         self._connection = await aiosqlite.connect(db_path)
         # 启用 WAL 模式和行工厂以获得更好的并发和字典结果
         await self._connection.execute("PRAGMA journal_mode=WAL")
@@ -119,10 +112,7 @@ class DatabaseConnector(DataSource):
         try:
             import asyncpg
         except ImportError:
-            raise ConnectionError(
-                self.name,
-                "缺少 asyncpg 依赖，请执行: pip install asyncpg"
-            )
+            raise ConnectionError(self.name, "缺少 asyncpg 依赖，请执行: pip install asyncpg")
 
         dsn = self.config.extra.get(
             "dsn",
@@ -131,7 +121,7 @@ class DatabaseConnector(DataSource):
             f"{self.config.extra.get('password', '')}@"
             f"{self.config.extra.get('host', 'localhost')}:"
             f"{self.config.extra.get('port', 5432)}/"
-            f"{self.config.extra.get('database', 'postgres')}"
+            f"{self.config.extra.get('database', 'postgres')}",
         )
         self._connection = await asyncpg.connect(dsn)
 
@@ -140,10 +130,7 @@ class DatabaseConnector(DataSource):
         try:
             import aiomysql
         except ImportError:
-            raise ConnectionError(
-                self.name,
-                "缺少 aiomysql 依赖，请执行: pip install aiomysql"
-            )
+            raise ConnectionError(self.name, "缺少 aiomysql 依赖，请执行: pip install aiomysql")
 
         pool_kwargs = {
             "host": self.config.extra.get("host", "localhost"),
@@ -152,9 +139,7 @@ class DatabaseConnector(DataSource):
             "password": self.config.extra.get("password", ""),
             "db": self.config.extra.get("database", ""),
         }
-        self._connection = await aiomysql.create_pool(
-            minsize=1, maxsize=5, **pool_kwargs
-        )
+        self._connection = await aiomysql.create_pool(minsize=1, maxsize=5, **pool_kwargs)
 
     async def fetch(self, **kwargs) -> List[Dict[str, Any]]:
         """
@@ -181,10 +166,7 @@ class DatabaseConnector(DataSource):
             query = kwargs.get("query", "")
             if not query:
                 query = self._build_select_query(
-                    table_name=kwargs.get(
-                        "table_name",
-                        self.config.extra.get("table_name", "")
-                    ),
+                    table_name=kwargs.get("table_name", self.config.extra.get("table_name", "")),
                     columns=kwargs.get("columns"),
                     where=kwargs.get("where", ""),
                     limit=kwargs.get("limit", 1000),
@@ -203,6 +185,7 @@ class DatabaseConnector(DataSource):
         """执行 SQL 查询并转换为字典列表"""
         if self._db_type == "sqlite":
             import aiosqlite
+
             cursor = await self._connection.execute(query)
             rows = await cursor.fetchall()
             return [dict(row) for row in rows]
@@ -269,10 +252,7 @@ class DatabaseConnector(DataSource):
 
                 content = "\n".join(content_parts) if content_parts else str(row)
                 title = (
-                    row.get("title", "")
-                    or row.get("name", "")
-                    or row.get("subject", "")
-                    or f"数据库记录 #{idx + 1}"
+                    row.get("title", "") or row.get("name", "") or row.get("subject", "") or f"数据库记录 #{idx + 1}"
                 )
 
                 doc = UnifiedDocument(
@@ -280,9 +260,7 @@ class DatabaseConnector(DataSource):
                     content=content,
                     source_type=SourceType.DATABASE,
                     source_url=(
-                        f"{self._db_type}://"
-                        f"{self.config.extra.get('table_name', 'unknown')}"
-                        f"/row_{idx}"
+                        f"{self._db_type}://" f"{self.config.extra.get('table_name', 'unknown')}" f"/row_{idx}"
                     ),
                     metadata={
                         "db_type": self._db_type,
@@ -295,10 +273,7 @@ class DatabaseConnector(DataSource):
                 )
                 documents.append(doc)
 
-            logger.info(
-                "[%s] 转换完成: %d 行 → %d 个文档",
-                self.name, len(raw_data), len(documents)
-            )
+            logger.info("[%s] 转换完成: %d 行 → %d 个文档", self.name, len(raw_data), len(documents))
             return documents
 
         except Exception as e:

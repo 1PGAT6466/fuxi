@@ -17,13 +17,12 @@ permissions.py — 伏羲 v1.50 Phase E: Company Brain 权限隔离
   4. 管理员（role="admin"）自动绕过所有权限检查
 """
 
-
 import json
 import logging
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
-from dataclasses import dataclass, field
 
 logger = logging.getLogger("api.permissions")
 
@@ -31,13 +30,15 @@ logger = logging.getLogger("api.permissions")
 # 数据模型
 # ============================================================================
 
+
 @dataclass
 class Team:
     """团队数据模型"""
+
     team_id: str
     name: str
     description: str = ""
-    owner_id: str = ""           # 团队创建者
+    owner_id: str = ""  # 团队创建者
     member_ids: List[str] = field(default_factory=list)
     created_at: float = field(default_factory=time.time)
 
@@ -60,6 +61,7 @@ class Team:
 # ============================================================================
 # 权限管理器
 # ============================================================================
+
 
 class PermissionManager:
     """团队权限管理器
@@ -280,8 +282,9 @@ class PermissionManager:
         )
         self._teams[team.team_id] = team
 
-        logger.info("📋 团队已创建: %s (%s), owner=%s, members=%d",
-                     team.name, team.team_id, team.owner_id, len(team.member_ids))
+        logger.info(
+            "📋 团队已创建: %s (%s), owner=%s, members=%d", team.name, team.team_id, team.owner_id, len(team.member_ids)
+        )
 
         self._save_to_file()
         return team
@@ -427,12 +430,13 @@ class PermissionManager:
 
         try:
             from src.config import DATA_DIR
+
             users_file = Path(DATA_DIR) / "users.json"
             if users_file.exists():
                 users = json.loads(users_file.read_text(encoding="utf-8"))
                 user = users.get(user_id, {})
                 return user.get("role", "user") == self.ADMIN_ROLE
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             pass
 
         return False
@@ -595,7 +599,9 @@ class PermissionManager:
         if filtered_count > 0:
             logger.debug(
                 "🔒 权限过滤: %d/%d 条结果已过滤 (user=%s)",
-                filtered_count, len(results), user_id,
+                filtered_count,
+                len(results),
+                user_id,
             )
 
         return filtered
@@ -645,6 +651,7 @@ def get_permission_manager(data_dir: Optional[str] = None) -> PermissionManager:
     if _global_permission_manager is None:
         if data_dir is None:
             from src.config import DATA_DIR
+
             data_dir = str(DATA_DIR)
         _global_permission_manager = PermissionManager(data_dir=data_dir)
 
@@ -660,6 +667,7 @@ def reset_permission_manager() -> None:
 # ============================================================================
 # 文档 metadata 构建辅助函数
 # ============================================================================
+
 
 def build_document_metadata(
     owner_id: str = "",

@@ -2,7 +2,11 @@
 agentic_rag_v2.py — 太极 · 主 Agent v2.0
 Plan → Execute → Reflect 循环，8 个工具，由 MiMo function calling 驱动
 """
-import json, logging, asyncio, time
+
+import asyncio
+import json
+import logging
+import time
 from typing import Dict, List
 
 logger = logging.getLogger(__name__)
@@ -21,11 +25,11 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "搜索查询"},
-                    "top_k": {"type": "integer", "description": "返回结果数", "default": 5}
+                    "top_k": {"type": "integer", "description": "返回结果数", "default": 5},
                 },
-                "required": ["query"]
-            }
-        }
+                "required": ["query"],
+            },
+        },
     },
     {
         "type": "function",
@@ -34,12 +38,10 @@ TOOLS = [
             "description": "在 Wiki 知识库中搜索结构化知识。Wiki 包含提炼后的精炼知识，适合查找定义、概述、对比总结。",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "query": {"type": "string", "description": "搜索查询"}
-                },
-                "required": ["query"]
-            }
-        }
+                "properties": {"query": {"type": "string", "description": "搜索查询"}},
+                "required": ["query"],
+            },
+        },
     },
     {
         "type": "function",
@@ -54,12 +56,12 @@ TOOLS = [
                         "type": "string",
                         "enum": ["direct", "traverse"],
                         "default": "direct",
-                        "description": "查询模式"
-                    }
+                        "description": "查询模式",
+                    },
                 },
-                "required": ["entity"]
-            }
-        }
+                "required": ["entity"],
+            },
+        },
     },
     {
         "type": "function",
@@ -70,11 +72,11 @@ TOOLS = [
                 "type": "object",
                 "properties": {
                     "file_name": {"type": "string", "description": "文件名或文件名片段"},
-                    "chunk_index": {"type": "integer", "description": "段落索引（可选）", "default": 0}
+                    "chunk_index": {"type": "integer", "description": "段落索引（可选）", "default": 0},
                 },
-                "required": ["file_name"]
-            }
-        }
+                "required": ["file_name"],
+            },
+        },
     },
     {
         "type": "function",
@@ -83,12 +85,10 @@ TOOLS = [
             "description": "提取和查询文档中的表格数据。适合查找参数表、对比矩阵、规格清单。",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "query": {"type": "string", "description": "表格查询（如 'PA66 参数'、'PLC 对比'）"}
-                },
-                "required": ["query"]
-            }
-        }
+                "properties": {"query": {"type": "string", "description": "表格查询（如 'PA66 参数'、'PLC 对比'）"}},
+                "required": ["query"],
+            },
+        },
     },
     {
         "type": "function",
@@ -97,12 +97,10 @@ TOOLS = [
             "description": "描述文档中的图片内容。用于理解图表、流程图、示意图。",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "image_path": {"type": "string", "description": "图片路径或描述"}
-                },
-                "required": ["image_path"]
-            }
-        }
+                "properties": {"image_path": {"type": "string", "description": "图片路径或描述"}},
+                "required": ["image_path"],
+            },
+        },
     },
     {
         "type": "function",
@@ -111,12 +109,10 @@ TOOLS = [
             "description": "向用户追问以澄清需求。当问题模糊或有多种理解时使用。",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "question": {"type": "string", "description": "追问的问题"}
-                },
-                "required": ["question"]
-            }
-        }
+                "properties": {"question": {"type": "string", "description": "追问的问题"}},
+                "required": ["question"],
+            },
+        },
     },
     {
         "type": "function",
@@ -125,13 +121,11 @@ TOOLS = [
             "description": "已完成所有检索，可以生成最终答案。",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "reason": {"type": "string", "description": "判断依据：为什么认为信息已充分"}
-                },
-                "required": ["reason"]
-            }
-        }
-    }
+                "properties": {"reason": {"type": "string", "description": "判断依据：为什么认为信息已充分"}},
+                "required": ["reason"],
+            },
+        },
+    },
 ]
 
 SYSTEM_PROMPT = """你是伏羲知识库的执行智能体。
@@ -156,7 +150,7 @@ async def _call_mimo_with_tools(query: str, context: List[Dict], step: int) -> D
     from src.config import MIMO_API_KEY, MIMO_BASE_URL, MIMO_MODEL, MIMO_TIMEOUT
 
     messages = [{"role": "system", "content": SYSTEM_PROMPT}]
-    
+
     if step == 0:
         messages.append({"role": "user", "content": query})
     else:
@@ -164,13 +158,12 @@ async def _call_mimo_with_tools(query: str, context: List[Dict], step: int) -> D
         for ctx in context:
             messages.append({"role": "assistant", "content": None, "tool_calls": ctx.get("tool_calls", [])})
             for tc_result in ctx.get("tool_results", []):
-                messages.append({
-                    "role": "tool",
-                    "tool_call_id": tc_result.get("id", ""),
-                    "content": tc_result.get("content", "")
-                })
+                messages.append(
+                    {"role": "tool", "tool_call_id": tc_result.get("id", ""), "content": tc_result.get("content", "")}
+                )
 
     import aiohttp
+
     headers = {
         "Content-Type": "application/json",
         "Authorization": f"Bearer {MIMO_API_KEY}",
@@ -186,7 +179,8 @@ async def _call_mimo_with_tools(query: str, context: List[Dict], step: int) -> D
     async with aiohttp.ClientSession() as session:
         async with session.post(
             f"{MIMO_BASE_URL}/chat/completions",
-            json=payload, headers=headers,
+            json=payload,
+            headers=headers,
             timeout=aiohttp.ClientTimeout(total=MIMO_TIMEOUT),
         ) as resp:
             if resp.status != 200:
@@ -207,32 +201,31 @@ async def _call_mimo_with_tools(query: str, context: List[Dict], step: int) -> D
 
 async def _tool_search_knowledge(args: dict) -> str:
     """工具: 知识库关键词搜索"""
-    from src.services.retrieval import hybrid_search
+    from src.infra import hybrid_search
+
     results = await hybrid_search(args.get("query", ""), top_k=args.get("top_k", 5))
     snippets = []
     for r in results[:5]:
-        snippets.append({
-            "text": r.get("text", "")[:300],
-            "file": r.get("file_name", "?"),
-            "score": round(r.get("score", 0), 2)
-        })
+        snippets.append(
+            {"text": r.get("text", "")[:300], "file": r.get("file_name", "?"), "score": round(r.get("score", 0), 2)}
+        )
     return json.dumps(snippets, ensure_ascii=False)
 
 
 async def _tool_search_wiki(args: dict) -> str:
     """工具: Wiki 知识库搜索"""
-    from src.services.wiki import search_wiki_pages
+    from src.infra import get_wiki_engine as search_wiki_pages
+
     results = await search_wiki_pages(args.get("query", ""))
-    return json.dumps([{
-        "title": r.get("title", ""),
-        "summary": r.get("summary", "")[:200]
-    } for r in results[:3]], ensure_ascii=False)
+    return json.dumps(
+        [{"title": r.get("title", ""), "summary": r.get("summary", "")[:200]} for r in results[:3]], ensure_ascii=False
+    )
 
 
 def _tool_query_graph(args: dict) -> str:
     """工具: 知识图谱查询（direct / traverse）"""
-    from src.services.graph_router import get_entity_context
-    from src.services.graph_traversal import multi_hop_traverse
+    from src.infra import get_entity_context, multi_hop_traverse
+
     entity = args.get("entity", "")
     mode = args.get("mode", "direct")
     if mode == "traverse":
@@ -246,14 +239,17 @@ def _tool_query_graph(args: dict) -> str:
 def _tool_read_doc(args: dict) -> str:
     """工具: 读取指定文档的完整内容"""
     from src.db.memory_store import get_store
+
     file_name = args.get("file_name", "")
     chunk_idx = args.get("chunk_index", 0)
     store = get_store()
-    all_chunks = store.get_all() if hasattr(store, 'get_all') else []
+    all_chunks = store.get_all() if hasattr(store, "get_all") else []
     matched = [c for c in all_chunks if file_name.lower() in c.get("file_name", "").lower()]
     if matched:
-        target = matched[0] if chunk_idx == 0 else next(
-            (c for c in matched if c.get("chunk_index") == chunk_idx), matched[0]
+        target = (
+            matched[0]
+            if chunk_idx == 0
+            else next((c for c in matched if c.get("chunk_index") == chunk_idx), matched[0])
         )
         return f"[{target.get('file_name', '?')} #{target.get('chunk_index', 0)}]\n{target.get('text', '')[:1500]}"
     return f"未找到文件 '{file_name}'"
@@ -261,12 +257,14 @@ def _tool_read_doc(args: dict) -> str:
 
 async def _tool_extract_table(args: dict) -> str:
     """工具: 提取和查询文档中的表格数据"""
-    from src.services.table_view import search_tables
+    from src.infra import search_tables
+
     results = search_tables(args.get("query", ""))
     if results:
         return json.dumps(results[:3], ensure_ascii=False)
     # fallback: 从 chunk 中搜索表格内容
-    from src.services.retrieval import hybrid_search
+    from src.infra import hybrid_search
+
     results = await hybrid_search(args.get("query", ""), top_k=3)
     table_hits = [r for r in results if "|" in r.get("text", "") or "表格" in r.get("text", "")]
     if table_hits:
@@ -278,11 +276,13 @@ async def _tool_describe_image(args: dict) -> str:
     """工具: 描述文档中的图片内容（多模态 → 知识库 fallback）"""
     image_path = args.get("image_path", "")
     try:
-        from src.services.multimodal import transcribe_image
+        from src.infra import transcribe_image
+
         result = transcribe_image(image_path)
         if result:
             return f"图片描述: {result}"
-        from src.services.retrieval import hybrid_search
+        from src.infra import hybrid_search
+
         results = await hybrid_search(image_path, top_k=3)
         img_results = [r for r in results if r.get("result_type") == "image" or "图片" in r.get("text", "")]
         if img_results:
@@ -393,11 +393,13 @@ async def agentic_search(query: str) -> Dict:
             for tc, res in zip(execute_calls, results):
                 content = str(res) if not isinstance(res, Exception) else f"错误: {res}"
                 tool_results.append({"id": tc.get("id", ""), "content": content})
-                all_sources.append({
-                    "tool": tc["function"]["name"],
-                    "query": tc["function"].get("arguments", ""),
-                    "result": content[:300]
-                })
+                all_sources.append(
+                    {
+                        "tool": tc["function"]["name"],
+                        "query": tc["function"].get("arguments", ""),
+                        "result": content[:300],
+                    }
+                )
 
         context.append({"tool_calls": tool_calls, "tool_results": tool_results})
 

@@ -8,10 +8,11 @@ ChromaDB 封装：增删查 + 故障自愈 + 批量嵌入代理
 - query 失败时区别于"真的无结果"
 - 自动重连：_collection 失效时惰性重建
 """
-import os
+
 import asyncio
 import logging
-from typing import Optional, List, Dict, Any
+import os
+from typing import Any, Dict, List, Optional
 
 import aiohttp
 import chromadb
@@ -25,7 +26,7 @@ from src.config import EMBEDDER_URL
 # Embedder 健康检查缓存
 _embedder_available = None
 _embedder_last_check = 0
-_EMBEDDER_CHECK_INTERVAL = 30  # 30秒检查一次
+_EMBEDDER_CHECK_INTERVAL = 5  # 5秒检查一次（降低缓存时间，避免启动时卡住）
 CHROMA_DIR = os.getenv("KB_CHROMA_DIR", "data/chromadb")  # 统一路径配置
 COLLECTION_NAME = "kb_chunks"
 
@@ -36,44 +37,45 @@ MAX_CONSECUTIVE_FAILS = 3  # 连续失败超过此数触发重建
 # v1.50 R4: ChromaDB 文件权限检查 — 防止未授权访问向量数据库
 import stat as _stat
 
+
 def _check_chromadb_permissions(chroma_dir: str) -> None:
     """检查 ChromaDB 目录的文件权限。
-    
+
     安全规则：
     1. 目录必须存在
     2. 目录权限不能对其他用户可写（防止数据篡改）
     3. SQLite 数据库文件权限不能对其他用户可读写
-    
+
     如果权限不安全，记录警告但不阻止启动（避免服务不可用）。
     """
     if not os.path.exists(chroma_dir):
         return  # 目录不存在，后续会创建
-    
+
     try:
         # 检查目录权限
         dir_stat = os.stat(chroma_dir)
         dir_mode = dir_stat.st_mode
-        
+
         # 检查是否对其他用户可写 (o+w)
         if dir_mode & _stat.S_IWOTH:
             logger.warning(
                 f"[ChromaDB] 目录 {chroma_dir} 对其他用户可写 (mode={oct(dir_mode)})，"
                 f"建议执行: chmod o-w {chroma_dir}"
             )
-        
+
         # 检查 SQLite 数据库文件
         sqlite_path = os.path.join(chroma_dir, "chroma.sqlite3")
         if os.path.exists(sqlite_path):
             db_stat = os.stat(sqlite_path)
             db_mode = db_stat.st_mode
-            
+
             # 检查是否对其他用户可读写 (o+rw)
             if db_mode & (_stat.S_IROTH | _stat.S_IWOTH):
                 logger.warning(
                     f"[ChromaDB] 数据库文件 {sqlite_path} 对其他用户可读写 "
                     f"(mode={oct(db_mode)})，建议执行: chmod o-rw {sqlite_path}"
                 )
-            
+
             # 检查是否对组用户可写 (g+w)
             if db_mode & _stat.S_IWGRP:
                 logger.warning(
@@ -86,6 +88,7 @@ def _check_chromadb_permissions(chroma_dir: str) -> None:
 
 # ============ VectorStore ============
 
+
 class VectorStore:
     """ChromaDB 向量存储封装，带自愈能力"""
 
@@ -95,22 +98,16 @@ class VectorStore:
         self._fail_count = 0
         persist_dir = os.path.join(db_dir, "chromadb")
         os.makedirs(persist_dir, exist_ok=True)
-        
+
         # v1.50 R4: ChromaDB 访问控制 — 文件权限检查
         _check_chromadb_permissions(persist_dir)
-        
+
         self._client = chromadb.PersistentClient(
             path=persist_dir,
             settings=ChromaSettings(anonymized_telemetry=False),
         )
         self._collection = self._client.get_or_create_collection(
             name=collection_name,
-            metadata={
-                "hnsw:space": "cosine",
-                "hnsw:M": 32,
-                "hnsw:construction_ef": 200,
-                "hnsw:search_ef": 100,
-            },
             embedding_function=None,
         )
         self._usable = True
@@ -130,7 +127,7 @@ class VectorStore:
             self._usable = True
             logger.info(f"VectorStore: reconnected to collection '{self.collection_name}'")
             return True
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             logger.error(
                 f"VectorStore: failed to reconnect to '{self.collection_name}'",
                 exc_info=True,
@@ -141,9 +138,7 @@ class VectorStore:
         """记录一次失败，达到阈值触发自愈"""
         self._fail_count += 1
         if self._fail_count >= MAX_CONSECUTIVE_FAILS:
-            logger.warning(
-                f"VectorStore: {self._fail_count} consecutive failures, triggering reconnect..."
-            )
+            logger.warning(f"VectorStore: {self._fail_count} consecutive failures, triggering reconnect...")
             self._reset_connection()
 
     def _mark_success(self) -> None:
@@ -172,7 +167,7 @@ class VectorStore:
             c = self._collection.count()
             self._mark_success()
             return c
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             self._mark_failure()
             return -1
 
@@ -200,7 +195,7 @@ class VectorStore:
             )
             self._mark_success()
             return True
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             logger.error(f"VectorStore.add({len(ids)} ids) failed", exc_info=True)
             self._mark_failure()
             return False
@@ -226,10 +221,8 @@ class VectorStore:
             )
             self._mark_success()
             return result
-        except Exception:  # TODO: Narrow exception type
-            logger.error(
-                f"VectorStore.query(n={n_results}) failed", exc_info=True
-            )
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
+            logger.error(f"VectorStore.query(n={n_results}) failed", exc_info=True)
             self._mark_failure()
             return {"error": True, "reason": "ChromaDB query failed"}
 
@@ -255,10 +248,8 @@ class VectorStore:
             )
             self._mark_success()
             return True
-        except Exception:  # TODO: Narrow exception type
-            logger.error(
-                f"VectorStore.upsert({target_id}) failed", exc_info=True
-            )
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
+            logger.error(f"VectorStore.upsert({target_id}) failed", exc_info=True)
             self._mark_failure()
             return False
 
@@ -269,9 +260,7 @@ class VectorStore:
             True 成功（包括无数据时）；False 操作失败
         """
         try:
-            results = self._collection.get(
-                where={"file_hash": file_hash}, include=[]
-            )
+            results = self._collection.get(where={"file_hash": file_hash}, include=[])
             removed = 0
             if results and results.get("ids"):
                 ids = results["ids"]
@@ -281,10 +270,8 @@ class VectorStore:
             if removed:
                 logger.debug(f"VectorStore: deleted {removed} vectors for {file_hash}")
             return True
-        except Exception:  # TODO: Narrow exception type
-            logger.error(
-                f"VectorStore.delete_by_file({file_hash}) failed", exc_info=True
-            )
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
+            logger.error(f"VectorStore.delete_by_file({file_hash}) failed", exc_info=True)
             self._mark_failure()
             return False
 
@@ -333,12 +320,10 @@ class VectorStore:
                 self._collection.update(ids=batch_ids, metadatas=batch_metas)
 
             self._mark_success()
-            logger.info(
-                f"VectorStore: updated metadata for {len(ids)} vectors (file={file_hash})"
-            )
+            logger.info(f"VectorStore: updated metadata for {len(ids)} vectors (file={file_hash})")
             return True
 
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             logger.error(
                 f"VectorStore.update_metadata_by_file({file_hash}) failed",
                 exc_info=True,
@@ -363,8 +348,10 @@ def get_vector_store() -> Optional[VectorStore]:
     global _vector_store
     if _vector_store is None:
         try:
-            _vector_store = VectorStore()
-        except Exception:  # TODO: Narrow exception type
+            # 使用 FUXI_DATA_DIR 环境变量，如果未设置则使用默认值
+            data_dir = os.getenv("FUXI_DATA_DIR", "data")
+            _vector_store = VectorStore(db_dir=data_dir)
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             logger.error("VectorStore: init failed", exc_info=True)
             return None
     return _vector_store
@@ -373,9 +360,20 @@ def get_vector_store() -> Optional[VectorStore]:
 # ============ 批量嵌入代理 ============
 
 # 嵌入结果缓存（FIX-E3）
-_embedding_cache: Dict[str, tuple] = {}  # text → (vector, timestamp)
+# 任务5 P0修复: maxsize 200 → 1000，dict 降级从 FIFO 改为 LRU
+try:
+    from cachetools import TTLCache
+
+    _embedding_cache = TTLCache(maxsize=1000, ttl=600)
+except ImportError:
+    # cachetools 不可用时回退到 dict + TTL（使用 LRU 淘汰）
+    _embedding_cache: Dict[str, tuple] = {}
 _EMBEDDING_CACHE_TTL = 600  # 10 分钟
-_EMBEDDING_CACHE_MAX = 200
+_EMBEDDING_CACHE_MAX = 1000
+
+# v1.50: 持久化 aiohttp session，避免每次创建新连接
+_embedder_session: Optional[aiohttp.ClientSession] = None
+
 
 async def embed_texts(texts: List[str]) -> Optional[List[List[float]]]:
     """调用外部 embedder 服务做批量文本嵌入
@@ -391,10 +389,11 @@ async def embed_texts(texts: List[str]) -> Optional[List[List[float]]]:
         return None
 
     import time
+
     now = time.time()
 
-    # 健康检查缓存
-    if _embedder_available is False and (now - _embedder_last_check) < _EMBEDDER_CHECK_INTERVAL:
+    # 健康检查缓存（FIX: 缩短重试间隔到 10 秒，避免 Pipeline 批量处理时全部跳过）
+    if _embedder_available is False and (now - _embedder_last_check) < 10:
         return None
 
     # 嵌入缓存检查
@@ -406,6 +405,8 @@ async def embed_texts(texts: List[str]) -> Optional[List[List[float]]]:
         cache_entry = _embedding_cache.get(text)
         if cache_entry and (now - cache_entry[1]) < _EMBEDDING_CACHE_TTL:
             results[i] = cache_entry[0]
+            # 任务5 P0修复: 更新访问时间（LRU）
+            _embedding_cache[text] = (cache_entry[0], now)
         else:
             uncached_texts.append(text)
             uncached_indices.append(i)
@@ -414,42 +415,69 @@ async def embed_texts(texts: List[str]) -> Optional[List[List[float]]]:
     if not uncached_texts:
         return results
 
-    # 调用 embedder 获取未缓存的向量
+    # 尝试使用本地 Embedder（避免远程调用延迟）
     try:
-        async with aiohttp.ClientSession() as sess:
-            async with sess.post(
-                f"{EMBEDDER_URL}/embed",
-                json={"texts": uncached_texts},
-                timeout=aiohttp.ClientTimeout(total=5, connect=2),
-            ) as resp:
-                if resp.status == 200:
-                    _embedder_available = True
-                    data = await resp.json()
-                    vectors = data.get("vectors")
-                    if vectors:
-                        # 回填结果 + 写入缓存
-                        for j, idx in enumerate(uncached_indices):
-                            vec = vectors[j]
-                            results[idx] = vec
-                            # 缓存管理
-                            if len(_embedding_cache) >= _EMBEDDING_CACHE_MAX:
-                                oldest = next(iter(_embedding_cache))
-                                del _embedding_cache[oldest]
-                            _embedding_cache[uncached_texts[j]] = (vec, now)
+        from src.infra.local_embedder import embed_texts as local_embed_texts
+        
+        local_vectors = await local_embed_texts(uncached_texts)
+        if local_vectors:
+            # 回填结果 + 写入缓存
+            for j, idx in enumerate(uncached_indices):
+                vec = local_vectors[j]
+                results[idx] = vec
+                # LRU 淘汰
+                if len(_embedding_cache) >= _EMBEDDING_CACHE_MAX:
+                    lru_key = min(_embedding_cache, key=lambda k: _embedding_cache[k][1])
+                    del _embedding_cache[lru_key]
+                _embedding_cache[uncached_texts[j]] = (vec, now)
+            
+            _embedder_available = True
+            logger.info(f"本地 Embedding 完成: {len(local_vectors)} 个向量")
+            return results
+    except Exception as e:
+        logger.warning(f"本地 Embedder 不可用，回退到远程: {e}")
 
-                        if logger.isEnabledFor(logging.DEBUG):
-                            logger.debug(f"embed_texts: got {len(vectors)} vectors ({len(texts) - len(uncached_texts)} from cache)")
-                        return results
-                    return None
-                logger.warning(f"embed_texts: HTTP {resp.status}")
-                _embedder_available = False
-                _embedder_last_check = now
+    # 调用远程 embedder 获取未缓存的向量
+    try:
+        global _embedder_session
+        if _embedder_session is None or _embedder_session.closed:
+            _embedder_session = aiohttp.ClientSession()
+        sess = _embedder_session
+        async with sess.post(
+            f"{EMBEDDER_URL}/embed",
+            json={"texts": uncached_texts},
+            timeout=aiohttp.ClientTimeout(total=30, connect=5),
+        ) as resp:
+            if resp.status == 200:
+                _embedder_available = True
+                data = await resp.json()
+                vectors = data.get("vectors")
+                if vectors:
+                    # 回填结果 + 写入缓存
+                    for j, idx in enumerate(uncached_indices):
+                        vec = vectors[j]
+                        results[idx] = vec
+                        # 任务5 P0修复: LRU 淘汰（淘汰最后访问时间最早的条目）
+                        if len(_embedding_cache) >= _EMBEDDING_CACHE_MAX:
+                            lru_key = min(_embedding_cache, key=lambda k: _embedding_cache[k][1])
+                            del _embedding_cache[lru_key]
+                        _embedding_cache[uncached_texts[j]] = (vec, now)
+
+                    if logger.isEnabledFor(logging.DEBUG):
+                        logger.debug(
+                            f"embed_texts: got {len(vectors)} vectors ({len(texts) - len(uncached_texts)} from cache)"
+                        )
+                    return results
                 return None
+            logger.warning(f"embed_texts: HTTP {resp.status}")
+            _embedder_available = False
+            _embedder_last_check = now
+            return None
     except (aiohttp.ClientError, asyncio.TimeoutError) as e:
         _embedder_available = False
         _embedder_last_check = now
         logger.warning(f"embed_texts: embedder unreachable — {e}")
         return None
-    except Exception:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error("embed_texts: unexpected error", exc_info=True)
         return None

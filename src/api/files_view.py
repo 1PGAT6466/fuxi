@@ -1,17 +1,20 @@
 import asyncio
+import logging
+import os
+import urllib.parse
+from pathlib import Path
+
 # 兼容层 - 文件查看/下载路由
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
-from pathlib import Path
-import os
-import logging
-import urllib.parse
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["文件查看"])
 
-from src.config import UPLOAD_DIR as CONFIG_UPLOAD_DIR, DATA_DIR as CONFIG_DATA_DIR
+from src.config import DATA_DIR as CONFIG_DATA_DIR
+from src.config import UPLOAD_DIR as CONFIG_UPLOAD_DIR
+
 UPLOAD_DIR = Path(CONFIG_UPLOAD_DIR)
 DATA_DIR = Path(CONFIG_DATA_DIR)
 KB_IMAGES_DIR = Path(CONFIG_DATA_DIR) / "kb-images"
@@ -31,6 +34,7 @@ async def view_document(file_hash: str, request: Request):
             for root, dirs, files in os.walk(UPLOAD_DIR):
                 for fname in files:
                     import hashlib
+
                     fpath = Path(root) / fname
                     try:
                         content = await asyncio.to_thread(lambda: open(fpath, "rb").read())
@@ -46,7 +50,7 @@ async def view_document(file_hash: str, request: Request):
                     fpath = Path(root) / file_hash
                     if fpath.exists():
                         return FileResponse(str(fpath))
-        
+
         raise HTTPException(404, detail="文档未找到")
     except HTTPException:
         raise
@@ -70,15 +74,12 @@ async def download_document(file_hash: str, request: Request):
                 for fname in files:
                     fpath = Path(root) / fname
                     import hashlib
+
                     try:
                         content = await asyncio.to_thread(lambda: open(fpath, "rb").read())
                         computed_hash = hashlib.sha256(content).hexdigest()[:16]
                         if computed_hash == file_hash[:16] or file_hash in str(fpath):
-                            return FileResponse(
-                                str(fpath),
-                                filename=fname,
-                                media_type="application/octet-stream"
-                            )
+                            return FileResponse(str(fpath), filename=fname, media_type="application/octet-stream")
                     except (OSError, IOError, PermissionError) as e:
                         logger.warning("文件下载哈希计算失败: %s", e, exc_info=True)
         raise HTTPException(404, detail="文档未找到")
@@ -93,15 +94,12 @@ async def download_document(file_hash: str, request: Request):
 @router.post("/api/antenna/search")
 async def antenna_search(request: Request, q: str = ""):
     """天线搜索 — 混合检索：知识库语义搜索 + 联网搜索降级
-    
+
     优先使用本地知识库（ChromaDB + SQLite 混合检索），
     如果本地无结果或外部 API 可用，再尝试联网搜索。
     """
     if not q or not q.strip():
-        return JSONResponse(
-            status_code=400,
-            content={"error": "缺少 q 参数", "detail": "搜索关键词不能为空"}
-        )
+        return JSONResponse(status_code=400, content={"error": "缺少 q 参数", "detail": "搜索关键词不能为空"})
 
     query = q.strip()
     results = []
@@ -111,6 +109,7 @@ async def antenna_search(request: Request, q: str = ""):
     # 1) 优先尝试本地知识库混合检索
     try:
         from src.taiyang.retrieval import hybrid_search
+
         kb_results = await hybrid_search(query, top_k=5)
         if kb_results:
             results = [
@@ -135,8 +134,9 @@ async def antenna_search(request: Request, q: str = ""):
         try:
             brave_key = os.getenv("BRAVE_API_KEY", "")
             if brave_key:
-                import urllib.request
                 import json as _json
+                import urllib.request
+
                 def _brave_search():
                     req = urllib.request.Request(
                         f"https://api.search.brave.com/res/v1/web/search?q={urllib.parse.quote(query)}&count=5",
@@ -144,10 +144,11 @@ async def antenna_search(request: Request, q: str = ""):
                             "Accept": "application/json",
                             "Accept-Encoding": "gzip",
                             "X-Subscription-Token": brave_key,
-                        }
+                        },
                     )
                     with urllib.request.urlopen(req, timeout=10) as resp:
                         return _json.loads(resp.read().decode("utf-8"))
+
                 data = await asyncio.to_thread(_brave_search)
                 web_results = data.get("web", {}).get("results", [])
                 results = [

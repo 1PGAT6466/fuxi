@@ -9,7 +9,7 @@ from typing import List, Dict, Any, Optional
 logger = logging.getLogger(__name__)
 
 
-def search_chunks(
+async def search_chunks(
     query: str,
     top_k: int = 5,
     mode: str = "semantic",
@@ -37,20 +37,30 @@ def search_chunks(
 
     # 回退：ChromaDB 直接搜索
     try:
-        from src.db.vector_store import get_vector_store
+        from src.db.vector_store import get_vector_store, embed_texts
         vs = get_vector_store()
         if vs:
-            # v1.44 R2: 租户隔离 — 使用 where 子句
-            where_filter = {"tenant_id": tenant_id} if tenant_id != "default" else None
-            raw = vs.search(query, top_k=top_k, where=where_filter)
-            for r in raw:
-                results.append({
-                    "id": r.get("id", ""),
-                    "text": r.get("text", r.get("content", "")),
-                    "score": r.get("score", r.get("distance", 0)),
-                    "metadata": r.get("metadata", {}),
-                    "source": r.get("metadata", {}).get("source", r.get("file_name", "")),
-                })
+            # 获取查询向量
+            q_emb = await embed_texts([query])
+            if q_emb and q_emb[0]:
+                # v1.44 R2: 租户隔离 — 使用 where 子句
+                where_filter = {"tenant_id": tenant_id} if tenant_id != "default" else None
+                raw = vs.query(q_emb[0], n_results=top_k, where=where_filter)
+                if raw and not raw.get("error"):
+                    ids = raw.get("ids", [[]])[0]
+                    distances = raw.get("distances", [[]])[0]
+                    metadatas = raw.get("metadatas", [[]])[0]
+                    documents = raw.get("documents", [[]])[0]
+                    for i, (id, dist, meta, doc) in enumerate(zip(ids, distances, metadatas, documents)):
+                        sim = 1.0 - float(dist)
+                        results.append({
+                            "id": id,
+                            "text": doc or meta.get("text", ""),
+                            "score": round(sim * 10, 2),
+                            "metadata": meta,
+                            "source": meta.get("source", meta.get("file_name", "")),
+                            "file_name": meta.get("file_name", meta.get("source", "")),
+                        })
     except Exception as e2:  # TODO: Narrow exception type (ValueError, RuntimeError)
         logger.warning(f"vector_store 回退失败: {e2}")
 

@@ -2,9 +2,10 @@
 metrics_collector.py — 指标收集
 系统指标 + 业务指标
 """
+
 import logging
-from typing import Dict
 from collections import deque
+from typing import Dict
 
 logger = logging.getLogger("infra.metrics_collector")
 

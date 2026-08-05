@@ -2,8 +2,9 @@
 config_validation.py — 配置验证
 启动时验证配置
 """
-import os
+
 import logging
+import os
 from typing import Dict
 
 logger = logging.getLogger("infra.config_validation")
@@ -46,6 +47,7 @@ class ConfigValidator:
     def _check_database_paths(self):
         """检查数据库路径"""
         from src.config import DB_PATH
+
         db_dir = os.path.dirname(DB_PATH)
         if not os.path.exists(db_dir):
             try:
@@ -56,6 +58,7 @@ class ConfigValidator:
     def _check_llm_config(self):
         """检查LLM配置"""
         from src.config import MIMO_API_KEY, MIMO_BASE_URL
+
         if not MIMO_API_KEY:
             self._warnings.append("MIMO_API_KEY 未设置，LLM功能将不可用")
         if not MIMO_BASE_URL:

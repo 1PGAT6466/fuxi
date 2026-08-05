@@ -9,13 +9,14 @@ Phase 1: 行级多租户隔离
   - 租户数据隔离（自动为查询添加 tenant_id 过滤）
   - 种子数据：创建默认租户 "default"
 """
+
 import json
-import time
 import logging
 import threading
-from pathlib import Path
-from typing import Optional, List, Dict, Any
+import time
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("auth.tenant")
 
@@ -23,9 +24,11 @@ logger = logging.getLogger("auth.tenant")
 # 数据模型
 # ============================================================================
 
+
 @dataclass
 class Tenant:
     """租户数据模型"""
+
     tenant_id: str
     name: str
     description: str = ""
@@ -50,6 +53,7 @@ class Tenant:
 # 租户管理器
 # ============================================================================
 
+
 class TenantManager:
     """租户管理器 — 负责租户生命周期管理
 
@@ -73,6 +77,7 @@ class TenantManager:
             self._persist_file = Path(data_dir) / "tenants.json"
         else:
             from src.config import DATA_DIR
+
             self._persist_file = Path(DATA_DIR) / "tenants.json"
 
         # 租户缓存: {tenant_id: Tenant}
@@ -285,10 +290,7 @@ class TenantManager:
         """持久化到文件"""
         try:
             data = {
-                "tenants": {
-                    tid: t.to_dict()
-                    for tid, t in self._tenants.items()
-                },
+                "tenants": {tid: t.to_dict() for tid, t in self._tenants.items()},
                 "updated_at": time.time(),
             }
             self._persist_file.parent.mkdir(parents=True, exist_ok=True)
@@ -296,6 +298,7 @@ class TenantManager:
             with open(tmp, "w", encoding="utf-8") as f:
                 json.dump(data, f, ensure_ascii=False, indent=2)
             import os
+
             os.replace(tmp, str(self._persist_file))
         except Exception as e:
             logger.warning("租户持久化失败: %s", e)

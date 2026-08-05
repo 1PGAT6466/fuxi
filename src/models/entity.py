@@ -2,8 +2,9 @@
 entity.py — SAG 式实体模型
 从碎片和事件中提取的关键概念
 """
+
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 
 
 @dataclass

@@ -40,41 +40,46 @@ export interface SymbolStatusResponse {
 export async function fetchSymbolStatus(): Promise<SymbolStatusResponse> {
   const data = (await apiClient.get('/api/health')) as HealthResponse;
 
-  // 将 bagua 映射为 OrganStatus[]
+  // 所有八卦 ID 映射到标签
   const baguaMap: Record<string, string> = {
     qian: '乾·大脑', kun: '坤·脾', zhen: '震·肝', xun: '巽·肺',
     kan: '坎·肾', li: '离·心', gen: '艮·皮肤', dui: '兑·鼻',
+    zhonggong: '中宫·胃',
   };
-  const statuses: OrganStatus[] = [];
-  if (data.bagua) {
-    for (const [key, status] of Object.entries(data.bagua)) {
-      statuses.push({
-        trigramId: key as OrganStatus['trigramId'],
-        status: status === 'healthy' ? 'healthy' : status === 'warning' ? 'warning' : 'offline',
-        activeTaskCount: status === 'healthy' ? 0 : 1,
-        label: baguaMap[key] || key,
-      });
-    }
-  }
 
-  // 补充中宫
-  if (!statuses.find((s) => s.trigramId === 'zhonggong')) {
-    statuses.push({
-      trigramId: 'zhonggong',
-      status: 'healthy',
-      activeTaskCount: 0,
-      label: '中宫·胃',
-    });
+  const allIds = Object.keys(baguaMap);
+  const statuses: OrganStatus[] = allIds.map((id) => ({
+    trigramId: id,
+    status: 'healthy' as const,
+    activeTaskCount: 0,
+    label: baguaMap[id],
+  }));
+
+  // 如果后端有 bagua 字段，用后端数据填充
+  if (data.bagua && typeof data.bagua === 'object') {
+    for (const [key, status] of Object.entries(data.bagua)) {
+      const idx = statuses.findIndex((s) => s.trigramId === key);
+      const mappedStatus = status === 'healthy' ? 'healthy' as const
+        : status === 'warning' ? 'warning' as const
+        : 'offline' as const;
+      if (idx >= 0) {
+        statuses[idx] = {
+          ...statuses[idx],
+          status: mappedStatus,
+          activeTaskCount: status === 'healthy' ? 0 : 1,
+        };
+      }
+    }
   }
 
   return {
     data: {
       statuses,
       zhonggong: {
-        activeWindowCount: 4,
+        activeWindowCount: data.bagua ? Object.keys(data.bagua).length : 4,
         pendingTaskCount: 0,
         evolutionLevel: 1,
-        evolutionProgress: 50,
+        evolutionProgress: data.bagua ? 50 : 0,
       },
     },
   };
@@ -104,10 +109,11 @@ export async function unifiedSearch(query: string): Promise<UnifiedSearchRespons
 
 /** 后端不可用时的 mock 数据（供 HomeView 降级使用） */
 export function getMockSymbolStatus(): SymbolStatusResponse {
-  const guaIds = ['qian', 'kun', 'zhen', 'xun', 'kan', 'li', 'gen', 'dui'];
+  const guaIds = ['qian', 'kun', 'zhen', 'xun', 'kan', 'li', 'gen', 'dui', 'zhonggong'];
   const guaLabels: Record<string, string> = {
     qian: '乾·大脑', kun: '坤·脾', zhen: '震·肝', xun: '巽·肺',
     kan: '坎·肾', li: '离·心', gen: '艮·皮肤', dui: '兑·鼻',
+    zhonggong: '中宫·胃',
   };
   return {
     data: {

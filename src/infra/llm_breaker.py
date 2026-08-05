@@ -26,10 +26,12 @@ CircuitBreaker 参数:
 import asyncio
 import logging
 import time
-from typing import Any, Callable, Optional, Dict
+from typing import Any, Callable, Dict, Optional
+
 from src.infra.circuit_breaker import CircuitBreaker, get_circuit_breaker
 from src.infra.health_check import (
-    record_circuit_open, record_circuit_close,
+    record_circuit_close,
+    record_circuit_open,
     record_llm_call,
 )
 
@@ -84,15 +86,14 @@ async def protected_call(
     # 检查断路器
     if not breaker.can_execute():
         logger.warning(
-            "[CircuitBreaker:%s] 断路器 OPEN，拒绝请求", service_name,
+            "[CircuitBreaker:%s] 断路器 OPEN，拒绝请求",
+            service_name,
         )
         record_circuit_open(service_name)
         if fallback_func:
             logger.info("[CircuitBreaker:%s] 使用 fallback", service_name)
             return await fallback_func(*args, **kwargs)
-        raise RuntimeError(
-            f"服务 [{service_name}] 不可用（断路器断开），请稍后重试"
-        )
+        raise RuntimeError(f"服务 [{service_name}] 不可用（断路器断开），请稍后重试")
 
     try:
         result = await call_func(*args, **kwargs)
@@ -111,14 +112,16 @@ async def protected_call(
         if fallback_func:
             logger.info(
                 "[CircuitBreaker:%s] 调用失败，使用 fallback: %s",
-                service_name, str(e)[:100],
+                service_name,
+                str(e)[:100],
             )
             try:
                 return await fallback_func(*args, **kwargs)
             except Exception as fallback_e:
                 logger.error(
                     "[CircuitBreaker:%s] fallback 也失败: %s",
-                    service_name, str(fallback_e)[:100],
+                    service_name,
+                    str(fallback_e)[:100],
                 )
                 raise e  # 抛出原始异常
 
@@ -140,14 +143,13 @@ def protected_call_sync(
 
     if not breaker.can_execute():
         logger.warning(
-            "[CircuitBreaker:%s] 断路器 OPEN，拒绝请求", service_name,
+            "[CircuitBreaker:%s] 断路器 OPEN，拒绝请求",
+            service_name,
         )
         record_circuit_open(service_name)
         if fallback_func:
             return fallback_func(*args, **kwargs)
-        raise RuntimeError(
-            f"服务 [{service_name}] 不可用（断路器断开）"
-        )
+        raise RuntimeError(f"服务 [{service_name}] 不可用（断路器断开）")
 
     try:
         result = call_func(*args, **kwargs)
@@ -163,7 +165,7 @@ def protected_call_sync(
         if fallback_func:
             try:
                 return fallback_func(*args, **kwargs)
-            except Exception:
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
                 raise e
         raise
 

@@ -253,7 +253,8 @@ class OfflineService {
       });
 
       clearTimeout(timeoutId);
-      return response.ok;
+      // P0-修复: 任何响应（包括 5xx）都表示服务器可达，只有网络错误才视为离线
+      return true;
     } catch {
       return false;
     }
@@ -345,14 +346,15 @@ class OfflineService {
 
   /** 获取当前离线状态快照 */
   getState(): OfflineState {
+    // 安全访问：防止构造函数未完成时字段为 undefined
     return {
-      connectionStatus: this.connectionStatus,
-      syncStatus: this.syncStatus,
-      queueLength: this.operationQueue.length,
-      pendingCount: this.operationQueue.length,
-      lastSyncTime: this.lastSyncTime,
-      lastOnlineTime: this.lastOnlineTime,
-      cacheEntryCount: this.memoryCache.size,
+      connectionStatus: this.connectionStatus || 'online',
+      syncStatus: this.syncStatus || 'idle',
+      queueLength: this.operationQueue?.length || 0,
+      pendingCount: this.operationQueue?.length || 0,
+      lastSyncTime: this.lastSyncTime || null,
+      lastOnlineTime: this.lastOnlineTime || Date.now(),
+      cacheEntryCount: this.memoryCache?.size || 0,
       isInitializing: !this.isInitialized,
     };
   }

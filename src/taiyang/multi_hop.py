@@ -80,14 +80,35 @@ class SAGMultiHopSearch:
         return []
 
     async def _fallback_vector_search(self, query: str, top_k: int) -> List[Dict]:
-        """无实体降级：向量检索"""
+        """无实体降级：向量检索（直接调用底层向量召回，避免递归）"""
         try:
-            from src.taiyang.retrieval import hybrid_search
-            results = await hybrid_search(query, top_k=top_k)
-            for r in results:
-                r["_search_mode"] = "vector_fallback"
-                r["_reason"] = "no_entities_found"
-            return results
+            from src.db.vector_store import embed_texts, get_vector_store
+            q_emb = await embed_texts([query])
+            if not q_emb or not q_emb[0]:
+                return []
+            vs = get_vector_store()
+            if not vs or vs.count <= 0:
+                return []
+            result = vs.query(q_emb[0], n_results=max(top_k * 3, 30))
+            if not result.get("ids") or not result["ids"][0]:
+                return []
+            results = []
+            for i, vid in enumerate(result["ids"][0]):
+                meta = result["metadatas"][0][i] if i < len(result["metadatas"][0]) else {}
+                dist = result["distances"][0][i] if i < len(result["distances"][0]) else 0
+                sim = 1.0 - float(dist)
+                if sim > 0.15:
+                    results.append({
+                        "file_hash": meta.get("file_hash", ""),
+                        "text": meta.get("text", ""),
+                        "file_name": meta.get("file_name", ""),
+                        "score": round(sim * 10, 2),
+                        "_source": "vector",
+                        "_similarity": round(sim, 4),
+                        "_search_mode": "vector_fallback",
+                        "_reason": "no_entities_found",
+                    })
+            return results[:top_k]
         except Exception as e:  # TODO: Narrow exception type
             logger.error(f"[SAG多跳] 向量检索降级失败: {e}")
             return []
@@ -129,7 +150,7 @@ class SAGMultiHopSearch:
                 (f'%{entity}%',)
             ).fetchall()
             return [json.loads(r[0]) for r in rows if r[0]]
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             return []
 
     async def _multi_hop_search(self, entities: List[str], query: str, top_k: int) -> List[Dict]:
@@ -245,7 +266,7 @@ async def entity_recall(query: str, top_k: int = 10) -> list:
             (query, top_k)
         ).fetchall()
         return [{"name": r[0], "type": r[1], "description": r[2]} for r in rows]
-    except Exception:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         return []
 
 
@@ -280,7 +301,7 @@ async def get_events_by_entity(entity_name: str) -> list:
                 "_from_entity_channel": True,
             })
         return events
-    except Exception:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         return []
 
 
@@ -296,15 +317,38 @@ async def get_chunk_by_id(chunk_id: str) -> dict:
         ).fetchall()
         if rows:
             return json.loads(rows[0][0])
-    except Exception:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         pass
     return None
 
 
 async def vector_recall(query: str, top_k: int = 15) -> list:
-    """普通向量检索"""
+    """普通向量检索（直接调用底层向量召回，避免递归）"""
     try:
-        from src.taiyang.retrieval import hybrid_search
-        return await hybrid_search(query, top_k=top_k)
-    except Exception:  # TODO: Narrow exception type
+        from src.db.vector_store import embed_texts, get_vector_store
+        q_emb = await embed_texts([query])
+        if not q_emb or not q_emb[0]:
+            return []
+        vs = get_vector_store()
+        if not vs or vs.count <= 0:
+            return []
+        result = vs.query(q_emb[0], n_results=max(top_k * 3, 30))
+        if not result.get("ids") or not result["ids"][0]:
+            return []
+        results = []
+        for i, vid in enumerate(result["ids"][0]):
+            meta = result["metadatas"][0][i] if i < len(result["metadatas"][0]) else {}
+            dist = result["distances"][0][i] if i < len(result["distances"][0]) else 0
+            sim = 1.0 - float(dist)
+            if sim > 0.15:
+                results.append({
+                    "file_hash": meta.get("file_hash", ""),
+                    "text": meta.get("text", ""),
+                    "file_name": meta.get("file_name", ""),
+                    "score": round(sim * 10, 2),
+                    "_source": "vector",
+                    "_similarity": round(sim, 4),
+                })
+        return results[:top_k]
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         return []

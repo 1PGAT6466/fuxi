@@ -103,7 +103,7 @@ class WikiEngine:
             os.makedirs(_cdir, exist_ok=True)
             _cli = chromadb.PersistentClient(path=_cdir, settings=_ChromaSettings(anonymized_telemetry=False))
             self._wiki_collection = _cli.get_or_create_collection(name="wiki_summaries", metadata={"hnsw:space": "cosine"})
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             logger.warning(f"[wiki] suppressed exception", exc_info=True)
             pass
     
@@ -222,7 +222,7 @@ class WikiEngine:
                 "INSERT INTO wiki_history (page_id, version, content_snapshot, summary_snapshot, changed_at, source) VALUES (?, ?, ?, ?, ?, ?)",
                 (page_id, current_version, row[5] if len(row) > 5 else "", row[4] if len(row) > 4 else "", updates.get("updated_at", ""), "manual_update")
             )
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             logger.warning(f"[wiki] suppressed exception", exc_info=True)
             pass
         
@@ -427,7 +427,7 @@ class WikiEngine:
                 r = requests.post(f"{EMBEDDER_URL}/embed", json={"texts": summaries}, timeout=60)
                 if r.status_code == 200:
                     vectors = r.json().get("vectors")
-            except Exception:  # TODO: Narrow exception type
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
                 logger.warning(f"[wiki] suppressed exception", exc_info=True)
                 pass
             if not vectors or len(vectors) != len(ids_list):
@@ -436,7 +436,7 @@ class WikiEngine:
                 old = self._wiki_collection.get(include=[])
                 if old and old.get("ids"):
                     self._wiki_collection.delete(ids=old["ids"])
-            except Exception:  # TODO: Narrow exception type
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
                 logger.warning(f"[wiki] suppressed exception", exc_info=True)
                 pass
             metadatas = [{
@@ -483,7 +483,7 @@ class WikiEngine:
     def _row_to_dict(self, row) -> dict:
         """SQLite row → dict"""
         columns = ["id", "title", "category", "tags", "summary", "content",
-                    "sources", "version", "quality_score", "created_at", "updated_at", "author"]
+                    "sources", "version", "quality_score", "author", "created_at", "updated_at"]
         d = dict(zip(columns, row))
         d["tags"] = _safe_json_parse(d.get("tags") or "[]" or "[]", default=[])
         d["sources"] = _safe_json_parse(d.get("sources") or "[]" or "[]", default=[])

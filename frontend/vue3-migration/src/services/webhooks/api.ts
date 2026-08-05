@@ -28,25 +28,50 @@ import type {
 
 const API_BASE = '/api/webhooks';
 
+/**
+ * 后端返回格式: { status: 'success', data: T }
+ * apiClient 响应拦截器已返回 response.data，所以这里拿到的是 { status, data } 包装
+ * 需要提取 .data 字段
+ */
+interface ApiResponse<T> {
+  status: string;
+  data: T;
+}
+
+function extractData<T>(resp: unknown): T {
+  if (resp && typeof resp === 'object' && 'data' in resp) {
+    return (resp as ApiResponse<T>).data;
+  }
+  return resp as T;
+}
+
 // ═══════════════════════════════════════════
 // CRUD 端点
 // ═══════════════════════════════════════════
 
 /** 获取 Webhook 列表 */
 export async function getWebhooks(): Promise<WebhookListResponse> {
-  return apiClient.get(API_BASE) as Promise<WebhookListResponse>;
+  try {
+    const resp = await apiClient.get(API_BASE);
+    return extractData<WebhookListResponse>(resp);
+  } catch (e) {
+    console.error('[webhooks-api] getWebhooks 失败:', e);
+    return { webhooks: [], total: 0 };
+  }
 }
 
 /** 获取单个 Webhook 详情 */
 export async function getWebhook(id: string): Promise<Webhook> {
-  return apiClient.get(`${API_BASE}/${id}`) as Promise<Webhook>;
+  const resp = await apiClient.get(`${API_BASE}/${id}`);
+  return extractData<Webhook>(resp);
 }
 
 /** 创建 Webhook */
 export async function createWebhook(
   data: CreateWebhookRequest,
 ): Promise<WebhookActionResult & { webhook: Webhook }> {
-  return apiClient.post(API_BASE, data) as Promise<WebhookActionResult & { webhook: Webhook }>;
+  const resp = await apiClient.post(API_BASE, data);
+  return extractData<WebhookActionResult & { webhook: Webhook }>(resp);
 }
 
 /** 更新 Webhook */
@@ -54,12 +79,14 @@ export async function updateWebhook(
   id: string,
   data: UpdateWebhookRequest,
 ): Promise<WebhookActionResult> {
-  return apiClient.put(`${API_BASE}/${id}`, data) as Promise<WebhookActionResult>;
+  const resp = await apiClient.put(`${API_BASE}/${id}`, data);
+  return extractData<WebhookActionResult>(resp);
 }
 
 /** 删除 Webhook */
 export async function deleteWebhook(id: string): Promise<WebhookActionResult> {
-  return apiClient.delete(`${API_BASE}/${id}`) as Promise<WebhookActionResult>;
+  const resp = await apiClient.delete(`${API_BASE}/${id}`);
+  return extractData<WebhookActionResult>(resp);
 }
 
 // ═══════════════════════════════════════════
@@ -71,7 +98,8 @@ export async function testWebhook(
   id: string,
   data?: TestWebhookRequest,
 ): Promise<TestWebhookResponse> {
-  return apiClient.post(`${API_BASE}/${id}/test`, data || {}) as Promise<TestWebhookResponse>;
+  const resp = await apiClient.post(`${API_BASE}/${id}/test`, data || {});
+  return extractData<TestWebhookResponse>(resp);
 }
 
 /** 获取 Webhook 投递记录 */
@@ -80,9 +108,10 @@ export async function getWebhookDeliveries(
   page?: number,
   pageSize?: number,
 ): Promise<WebhookDeliveryListResponse> {
-  return apiClient.get(`${API_BASE}/${id}/deliveries`, {
+  const resp = await apiClient.get(`${API_BASE}/${id}/deliveries`, {
     params: { page, pageSize },
-  }) as Promise<WebhookDeliveryListResponse>;
+  });
+  return extractData<WebhookDeliveryListResponse>(resp);
 }
 
 /** 验证签名 */
@@ -92,10 +121,11 @@ export async function verifySignature(
   secret: string,
   algorithm?: string,
 ): Promise<{ valid: boolean }> {
-  return apiClient.post(`${API_BASE}/verify-signature`, {
+  const resp = await apiClient.post(`${API_BASE}/verify-signature`, {
     payload,
     signature,
     secret,
     algorithm: algorithm || 'sha256',
-  }) as Promise<{ valid: boolean }>;
+  });
+  return extractData<{ valid: boolean }>(resp);
 }

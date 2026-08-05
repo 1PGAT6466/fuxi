@@ -2,6 +2,7 @@
 services/query_resolver.py — 指代消解 + 上下文压缩
 Phase 1: 多轮对话核心模块
 """
+
 import logging
 from typing import List
 
@@ -31,26 +32,50 @@ COMPRESS_PROMPT = """将以下对话历史压缩成简短摘要（保留关键�
 
 摘要："""
 
+
 async def resolve_query(query: str, history: List[dict], llm_fn=None) -> str:
     """指代消解：将多轮对话中的指代性查询改写为独立查询"""
     if not history or len(history) == 0:
         return query
 
     # 快速检查：如果查询没有指代词，直接返回
-    pronouns = ['它', '这个', '那个', '他们', '她们', '这些', '那些',
-                '上述', '前面', '刚才', '之前', '上面', '其', '此',
-                'that', 'this', 'it', 'they', 'them', 'these', 'those']
+    pronouns = [
+        "它",
+        "这个",
+        "那个",
+        "他们",
+        "她们",
+        "这些",
+        "那些",
+        "上述",
+        "前面",
+        "刚才",
+        "之前",
+        "上面",
+        "其",
+        "此",
+        "that",
+        "this",
+        "it",
+        "they",
+        "them",
+        "these",
+        "those",
+    ]
     has_pronoun = any(p in query for p in pronouns)
-    
+
     # 也检查是否是短追问（< 15字且没有主语）
-    is_short_followup = len(query) < 15 and not any(kw in query for kw in ['什么是', '如何', '怎么', '为什么', '哪些', '请问'])
-    
+    is_short_followup = len(query) < 15 and not any(
+        kw in query for kw in ["什么是", "如何", "怎么", "为什么", "哪些", "请问"]
+    )
+
     if not has_pronoun and not is_short_followup:
         return query
 
     if llm_fn is None:
         try:
-            from src.services.llm import call_llm
+            from src.infra import call_llm
+
             llm_fn = call_llm
         except ImportError:
             return query
@@ -72,7 +97,7 @@ async def resolve_query(query: str, history: List[dict], llm_fn=None) -> str:
             temperature=0.1,
         )
         resolved = resolved.strip().strip('"').strip("'")
-        
+
         if resolved and resolved != query:
             if logger.isEnabledFor(logging.DEBUG):
                 logger.info(f"[QueryResolver] '{query[:30]}' → '{resolved[:50]}'")
@@ -91,14 +116,15 @@ async def compress_history(history: List[dict], llm_fn=None, max_turns: int = 5)
 
     if llm_fn is None:
         try:
-            from src.services.llm import call_llm
+            from src.infra import call_llm
+
             llm_fn = call_llm
         except ImportError:
-            return history[-(max_turns * 2):]
+            return history[-(max_turns * 2) :]
 
     # 分离早期对话和近期对话
-    recent = history[-(max_turns * 2):]
-    early = history[:-(max_turns * 2)]
+    recent = history[-(max_turns * 2) :]
+    early = history[: -(max_turns * 2)]
 
     # 压缩早期对话
     early_text = ""

@@ -2,6 +2,7 @@
 registry.py — 服务注册中心
 管理服务生命周期：注册、启动、停止、健康检查
 """
+
 import asyncio
 import logging
 import time
@@ -75,6 +76,7 @@ class ServiceRegistry:
             return None
 
         import json
+
         data = json.loads(manifest.read_text(encoding="utf-8"))
         info = ServiceInfo(
             id=data.get("id", svc_path.name),
@@ -102,6 +104,7 @@ class ServiceRegistry:
         try:
             mod_path = f"src.services.{service_id}"
             import importlib
+
             mod = importlib.import_module(mod_path)
             if hasattr(mod, "create_service"):
                 instance = mod.create_service(info.config)
@@ -167,6 +170,7 @@ class ServiceRegistry:
                         continue
                     try:
                         from src.core.http_client import get_http_session
+
                         url = f"http://localhost{info.api_prefix}{info.health_endpoint}"
                         session = await get_http_session()
                         async with session.get(url, timeout=aiohttp.ClientTimeout(total=5)) as resp:

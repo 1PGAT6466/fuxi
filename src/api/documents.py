@@ -1,18 +1,24 @@
-# v1.50 统一响应格式 - 文档路由
+﻿# v1.50 统一响应格式 - 文档路由
 # v1.50 Phase E: 新增文档可见性修改 API(Company Brain 权限隔离)
 import asyncio
-from fastapi import APIRouter, HTTPException, Request, UploadFile, File
-from fastapi.responses import JSONResponse
+import logging
 from pathlib import Path
 
+from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi.responses import JSONResponse
+from src.api.auth import require_admin
+
+logger = logging.getLogger("documents")
 router = APIRouter(tags=["文档管理"])
+
 
 @router.get("/api/documents")
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一,内部同步执行
 async def documents(page: int = 1, page_size: int = 50, request: Request = None):
     """文档列表 - v1.50 统一响应格式支持"""
+    from src.api.response import error, paginated, server_error, success
     from src.db.data_store import load_chunks
-    from src.api.response import success, paginated, error, server_error
+
     try:
         chunks = await asyncio.to_thread(load_chunks)
         seen = {}
@@ -29,106 +35,151 @@ async def documents(page: int = 1, page_size: int = 50, request: Request = None)
                 seen[fh]["chunk_count"] += 1
         files = list(seen.values())
 
-        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
-        if _wants_v2:
-            return paginated(items=files, total=len(files), page=page, page_size=page_size, message="获取文档列表成功")
-        return {"files": files, "total": len(files), "page": page, "page_size": page_size}
+        # 统一返回格式：默认返回 {success, data, message}
+        return paginated(items=files, total=len(files), page=page, page_size=page_size, message="获取文档列表成功")
     except (OSError, ValueError, KeyError) as e:
-        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        _wants_v2 = request and (
+            request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
+        )
         if _wants_v2:
             return error("获取文档列表失败", status_code=500, detail=str(e))
         return {"files": [], "total": 0, "error": str(e)}
 
+
 @router.post("/api/upload")
-async def upload(file: UploadFile = File(...), request: Request = None):
+async def upload(file: UploadFile = File(...), relative_path: str = None, request: Request = None):
     """文件上传 — v1.50 统一响应格式支持
     v1.50 R2 Blue: 路径穿越防护 — 规范化文件名并验证在允许目录内
     v1.44 Phase1: 异步处理 — 发布到任务队列
     v1.44 R1: 文件类型黑名单 — 禁止上传可执行文件
+    v2.2: 支持文件夹上传 — 保留目录结构
     """
     import os
-    from src.api.response import success, error
-    from src.infra.task_queue import get_task_queue, TASK_FILE_PROCESS
+
+    from src.api.response import error, success
+    from src.infra.task_queue import TASK_FILE_PROCESS, get_task_queue
 
     # v1.44 R1: 文件类型黑名单
-    BLOCKED_EXTENSIONS = frozenset({
-        ".py", ".sh", ".bat", ".ps1", ".exe", ".dll", ".so",
-        ".cmd", ".com", ".scr", ".msi", ".vbs", ".js", ".jar",
-        ".rb", ".pl", ".php", ".cgi", ".bin", ".elf", ".dylib",
-    })
+    BLOCKED_EXTENSIONS = frozenset(
+        {
+            ".py",
+            ".sh",
+            ".bat",
+            ".ps1",
+            ".exe",
+            ".dll",
+            ".so",
+            ".cmd",
+            ".com",
+            ".scr",
+            ".msi",
+            ".vbs",
+            ".js",
+            ".jar",
+            ".rb",
+            ".pl",
+            ".php",
+            ".cgi",
+            ".bin",
+            ".elf",
+            ".dylib",
+        }
+    )
 
     try:
         # 保存临时文件（使用配置的 UPLOAD_DIR）
         from src.config import UPLOAD_DIR as CONFIG_UPLOAD_DIR
+
         tmp_dir = Path(CONFIG_UPLOAD_DIR)
         tmp_dir.mkdir(parents=True, exist_ok=True)
-        
-        # v1.50 R2 Blue: 路径穿越防护
-        # 1. 仅取文件名部分（剥离路径分隔符）
-        safe_name = os.path.basename(file.filename)
-        if not safe_name or safe_name in ('.', '..'):
-            raise HTTPException(400, "无效的文件名")
-        # v1.50 R5: 检测 null byte 注入
-        if '\x00' in safe_name or '\0' in safe_name:
-            raise HTTPException(400, "文件名包含非法字符")
-        # v1.50 R5: 文件名 HTML 实体编码（防止前端 XSS）
-        import html as _html
-        display_name = _html.escape(safe_name, quote=True)
-        # v1.44 R1: 检查文件扩展名
-        file_ext = os.path.splitext(safe_name)[1].lower()
-        if file_ext in BLOCKED_EXTENSIONS:
-            raise HTTPException(400, f"不允许上传 {file_ext} 类型的文件（安全限制）")
-        # 2. 规范化路径并验证最终路径在允许目录内
-        tmp_path = (tmp_dir / safe_name).resolve()
-        allowed_base = tmp_dir.resolve()
-        if not str(tmp_path).startswith(str(allowed_base)):
-            raise HTTPException(400, "文件路径非法(路径穿越检测)")
+
+        # v2.2: 支持文件夹上传 — 保留目录结构
+        if relative_path:
+            # 使用相对路径保留目录结构
+            # 安全检查：规范化路径，防止路径穿越
+            safe_relative = os.path.normpath(relative_path)
+            # 移除开头的 .. 和路径分隔符
+            safe_relative = safe_relative.lstrip("..\\/ ")
+            if not safe_relative or safe_relative in (".", ".."):
+                raise HTTPException(400, "无效的相对路径")
+            # 构建完整路径
+            target_dir = tmp_dir / safe_relative
+            target_dir.parent.mkdir(parents=True, exist_ok=True)
+            # 验证路径在允许目录内
+            target_path = target_dir.resolve()
+            allowed_base = tmp_dir.resolve()
+            if not str(target_path).startswith(str(allowed_base)):
+                raise HTTPException(400, "文件路径非法(路径穿越检测)")
+            safe_name = safe_relative
+        else:
+            # 单文件上传：仅取文件名部分（剥离路径分隔符）
+            safe_name = os.path.basename(file.filename)
+            if not safe_name or safe_name in (".", ".."):
+                raise HTTPException(400, "无效的文件名")
+            # v1.50 R5: 检测 null byte 注入
+            if "\x00" in safe_name or "\0" in safe_name:
+                raise HTTPException(400, "文件名包含非法字符")
+            # v1.50 R5: 文件名 HTML 实体编码（防止前端 XSS）
+            import html as _html
+
+            display_name = _html.escape(safe_name, quote=True)
+            # v1.44 R1: 检查文件扩展名
+            file_ext = os.path.splitext(safe_name)[1].lower()
+            if file_ext in BLOCKED_EXTENSIONS:
+                raise HTTPException(400, f"不允许上传 {file_ext} 类型的文件（安全限制）")
+            # 2. 规范化路径并验证最终路径在允许目录内
+            target_path = (tmp_dir / safe_name).resolve()
+            allowed_base = tmp_dir.resolve()
+            if not str(target_path).startswith(str(allowed_base)):
+                raise HTTPException(400, "文件路径非法(路径穿越检测)")
 
         content = await file.read()
-        tmp_path.write_bytes(content)
+        target_path.parent.mkdir(parents=True, exist_ok=True)
+        target_path.write_bytes(content)
 
-        # v1.44 Phase1: 发布到异步任务队列
-        task_queue = await get_task_queue()
-        task_id = await task_queue.publish_task(
-            TASK_FILE_PROCESS,
-            {
-                "file_path": str(tmp_path),
+        # v1.50 P0 修复: 直接调用 UnifiedPipeline 处理文件
+        try:
+            from src.pipeline.unified import UnifiedPipeline
+
+            pipeline = UnifiedPipeline()
+            result = await pipeline.process(str(target_path), source="upload")
+            upload_data = {
                 "file_name": file.filename,
-                "source": "upload"
+                "status": "processed",
+                "file_hash": result.file_hash if hasattr(result, "file_hash") else "",
+                "chunks_count": result.chunks_count if hasattr(result, "chunks_count") else 0,
+                "message": "文件已上传并处理完成",
             }
-        )
-
-        upload_data = {
-            "file_name": file.filename,
-            "task_id": task_id,
-            "status": "processing",
-            "message": "文件已接收,正在后台处理"
-        }
+        except Exception as e:
+            logger.warning(f"[Upload] 文件处理失败: {e}")
+            upload_data = {
+                "file_name": file.filename,
+                "status": "uploaded",
+                "message": f"文件已保存，但处理失败: {str(e)}",
+            }
 
         # 向后兼容: 默认返回旧格式
-        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        _wants_v2 = request and (
+            request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
+        )
         if _wants_v2:
-            return success(data=upload_data, message="上传成功,正在后台处理")
+            return success(data=upload_data, message="上传成功")
         # 默认旧格式
-        return {
-            "status": "ok",
-            "file_name": file.filename,
-            "task_id": task_id,
-            "message": "文件已接收,正在后台处理"
-        }
+        return {"status": "ok", "file_name": file.filename, "task_id": "", "message": "文件已保存，等待处理"}
     except (OSError, IOError, ValueError) as e:
-        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        _wants_v2 = request and (
+            request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
+        )
         if _wants_v2:
             return error("上传失败", status_code=500, detail=str(e))
         raise HTTPException(500, f"处理失败: {str(e)}")
 
 
-@router.get("/api/tasks/{task_id}")
+@router.get("/api/documents/tasks/{task_id}")
 async def get_task_status(task_id: str, request: Request = None):
-    """获取任务状态 - v1.44 Phase1 异步任务队列
-    """
+    """获取任务状态 - v1.44 Phase1 异步任务队列"""
+    from src.api.response import error, success
     from src.infra.task_queue import get_task_queue
-    from src.api.response import success, error
 
     try:
         task_queue = await get_task_queue()
@@ -144,10 +195,12 @@ async def get_task_status(task_id: str, request: Request = None):
             "created_at": task.created_at,
             "updated_at": task.updated_at,
             "result": task.result,
-            "error": task.error
+            "error": task.error,
         }
 
-        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        _wants_v2 = request and (
+            request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
+        )
         if _wants_v2:
             return success(data=task_data, message="获取任务状态成功")
         return task_data
@@ -155,7 +208,9 @@ async def get_task_status(task_id: str, request: Request = None):
     except HTTPException:
         raise
     except (ValueError, KeyError, AttributeError) as e:
-        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        _wants_v2 = request and (
+            request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
+        )
         if _wants_v2:
             return error("获取任务状态失败", status_code=500, detail=str(e))
         raise HTTPException(500, f"获取任务状态失败: {str(e)}")
@@ -168,12 +223,14 @@ async def delete_document(file_hash: str, request: Request = None):
     v1.50 R2 安全修复: 添加所有权检查,普通用户只能删除自己上传的文档。
     管理员可以删除任何文档。
     """
+    import hashlib
+    import logging
+    import os
+
+    from src.api.response import error, success
     from src.db.data_store import load_chunks, save_chunks
     from src.db.vector_store import get_vector_store
-    from src.api.response import success, error
-    import hashlib
-    import os
-    import logging
+
     _logger = logging.getLogger(__name__)
 
     try:
@@ -213,10 +270,13 @@ async def delete_document(file_hash: str, request: Request = None):
             _logger.warning(f"向量库删除失败(非致命): {e}")
 
         # 删除物理文件(全同步逻辑,通过 asyncio.to_thread 调用)
-        from src.config import UPLOAD_DIR as _UPLOAD_DIR
         from pathlib import Path as _Path
+
+        from src.config import UPLOAD_DIR as _UPLOAD_DIR
+
         upload_dir = _Path(_UPLOAD_DIR)
         if upload_dir.exists():
+
             def _delete_physical_files():
                 for root, dirs, files in os.walk(str(upload_dir)):
                     for fname in files:
@@ -228,6 +288,7 @@ async def delete_document(file_hash: str, request: Request = None):
                                 fpath.unlink()
                         except (OSError, IOError, PermissionError) as e:
                             _logger.warning(f"物理文件删除失败: {e}")
+
             await asyncio.to_thread(_delete_physical_files)
 
         result_data = {
@@ -236,7 +297,9 @@ async def delete_document(file_hash: str, request: Request = None):
             "chunks_removed": len(matching),
         }
 
-        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        _wants_v2 = request and (
+            request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
+        )
         if _wants_v2:
             return success(data=result_data, message=f"文档 {file_name} 已删除")
         return {"status": "ok", "message": f"文档 {file_name} 已删除", **result_data}
@@ -245,7 +308,9 @@ async def delete_document(file_hash: str, request: Request = None):
         raise
     except (OSError, ValueError, KeyError) as e:
         _logger.exception(f"delete_document 失败: {e}")
-        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        _wants_v2 = request and (
+            request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
+        )
         if _wants_v2:
             return error("删除失败", status_code=500, detail=str(e))
         raise HTTPException(500, f"删除失败: {str(e)}")
@@ -254,6 +319,7 @@ async def delete_document(file_hash: str, request: Request = None):
 # ============================================================================
 # v1.50 Phase E: Company Brain 权限隔离 - 文档可见性 API
 # ============================================================================
+
 
 @router.put("/api/documents/{doc_id}/visibility")
 async def update_document_visibility(doc_id: str, request: Request):
@@ -269,8 +335,10 @@ async def update_document_visibility(doc_id: str, request: Request):
       - 文档所有者可修改
       - 管理员可修改所有文档
     """
-    from src.api.response import success, error, unauthorized
     import logging
+
+    from src.api.response import error, success, unauthorized
+
     _logger = logging.getLogger(__name__)
 
     try:
@@ -279,7 +347,8 @@ async def update_document_visibility(doc_id: str, request: Request):
         team_id = body.get("team_id", "")
 
         # 验证权限字段
-        from src.api.permissions import get_permission_manager, PermissionManager
+        from src.api.permissions import PermissionManager, get_permission_manager
+
         pm = get_permission_manager()
 
         visibility = PermissionManager.validate_visibility(visibility)
@@ -292,6 +361,7 @@ async def update_document_visibility(doc_id: str, request: Request):
         doc_owner_id = ""  # 默认为空字符串(无所有者)
         try:
             from src.db.data_store import load_chunks
+
             chunks = await asyncio.to_thread(load_chunks)
             for c in chunks:
                 if c.get("file_hash", "") == doc_id:
@@ -316,6 +386,7 @@ async def update_document_visibility(doc_id: str, request: Request):
         updated_count = 0
         try:
             from src.db.data_store import load_chunks, save_chunks
+
             chunks = await asyncio.to_thread(load_chunks)
             for c in chunks:
                 if c.get("file_hash", "") == doc_id:
@@ -333,12 +404,16 @@ async def update_document_visibility(doc_id: str, request: Request):
         # 也尝试更新向量库中的 metadata
         try:
             from src.db.vector_store import get_vector_store
+
             vs = get_vector_store()
             if vs:
-                vs.update_metadata_by_file(doc_id, {
-                    "visibility": visibility,
-                    "team_id": team_id or "",
-                })
+                vs.update_metadata_by_file(
+                    doc_id,
+                    {
+                        "visibility": visibility,
+                        "team_id": team_id or "",
+                    },
+                )
         except (ValueError, KeyError, AttributeError) as e:
             _logger.warning(f"向量库 metadata 更新失败(非致命): {e}")
 
@@ -349,14 +424,91 @@ async def update_document_visibility(doc_id: str, request: Request):
             "chunks_updated": updated_count,
         }
 
-        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        _wants_v2 = request and (
+            request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
+        )
         if _wants_v2:
             return success(data=result_data, message=f"文档 {doc_id} 可见性已更新为 {visibility}")
         return {"status": "ok", **result_data, "message": f"文档可见性已更新为 {visibility}"}
 
     except (OSError, ValueError, KeyError) as e:
         _logger.exception(f"update_document_visibility 失败: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Internal server error", "detail": str(e)}
+        return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
+
+
+# ============================================================================
+# v1.60 P2: 批量重索引 API
+# ============================================================================
+
+
+@router.post("/api/documents/reindex")
+async def reindex_documents(
+    request: Request,
+    admin=Depends(require_admin),
+):
+    """批量重新索引文档
+
+    请求体:
+        {
+            "file_hashes": ["hash1", "hash2"],  // 可选，空则全部重索引
+            "dry_run": false                      // 可选，仅统计不执行
+        }
+
+    权限要求: 管理员
+    """
+    import logging
+
+    from src.api.response import error, server_error, success
+    from src.pipeline.unified import UnifiedPipeline
+
+    _logger = logging.getLogger(__name__)
+
+    try:
+        body = await request.json()
+    except (ValueError, KeyError) as e:
+        body = {}
+        _logger.warning("Exception 失败: %s", e, exc_info=True)
+        _logger.warning("无法解析请求体，使用空字典")
+
+    file_hashes = body.get("file_hashes", []) if isinstance(body, dict) else []
+    dry_run = body.get("dry_run", False) if isinstance(body, dict) else False
+
+    pipeline = UnifiedPipeline()
+    results = {"processed": 0, "skipped": 0, "errors": []}
+
+    # 获取待重索引的文件列表
+    if not file_hashes:
+        from src.db.memory_store import get_store
+
+        store = get_store()
+        all_chunks = store.get_all()
+        # 提取唯一的 file_hash
+        seen_hashes = set()
+        for c in all_chunks:
+            fh = c.get("file_hash", "")
+            if fh and fh not in seen_hashes:
+                seen_hashes.add(fh)
+        file_hashes = list(seen_hashes)
+        _logger.info(f"[Reindex] 扫描到 {len(file_hashes)} 个待重索引文件")
+
+    for fh in file_hashes:
+        try:
+            if dry_run:
+                results["processed"] += 1
+                continue
+            await pipeline.reindex_file(fh)
+            results["processed"] += 1
+        except Exception as e:
+            _logger.warning(f"[Reindex] 重索引失败 file_hash={fh}: {e}")
+            results["errors"].append({"file_hash": fh, "error": str(e)})
+
+    _wants_v2 = request and (
+        request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
+    )
+    if _wants_v2:
+        dry_label = "[DRY RUN] " if dry_run else ""
+        return success(
+            data=results,
+            message=f"{dry_label}批量重索引完成: {results['processed']} 成功, {len(results['errors'])} 失败",
         )
+    return {"status": "ok", **results, "dry_run": dry_run}

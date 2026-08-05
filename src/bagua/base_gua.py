@@ -621,7 +621,7 @@ class GuaBase(ABC, GuaHandler):
                         cb.record_success()
                     else:
                         cb.record_failure()
-                except Exception:  # TODO: Narrow exception type
+                except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
                     cb.record_failure()
                     logger.debug("[%s] 依赖 [%s] 探活失败", self.GUA_NAME, name)
 

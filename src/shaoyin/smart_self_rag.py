@@ -2,18 +2,34 @@
 smart_self_rag.py — 智能 Self-RAG
 两层控制：Flag + 条件触发，规则优先 LLM 兜底
 """
-import re
+
 import logging
+import re
 from typing import Dict, List
 
 logger = logging.getLogger("shaoyin.smart_self_rag")
 
 # 数字查询模式
 NUMERIC_PATTERNS = [
-    r"拉伸强度", r"硬度", r"密度", r"熔点", r"温度",
-    r"压力", r"电压", r"电流", r"频率", r"转速",
-    r"多少", r"数值", r"参数", r"规格", r"指标",
-    r"收缩率", r"热变形", r"冲击强度", r"弯曲强度",
+    r"拉伸强度",
+    r"硬度",
+    r"密度",
+    r"熔点",
+    r"温度",
+    r"压力",
+    r"电压",
+    r"电流",
+    r"频率",
+    r"转速",
+    r"多少",
+    r"数值",
+    r"参数",
+    r"规格",
+    r"指标",
+    r"收缩率",
+    r"热变形",
+    r"冲击强度",
+    r"弯曲强度",
 ]
 
 # 触发条件
@@ -30,6 +46,7 @@ TRIGGER_CONDITIONS = {
 
 class ReflectionResult:
     """反思结果"""
+
     def __init__(self, action: str, confidence: float, reason: str = ""):
         self.action = action  # pass / crag_rewrite / retry
         self.confidence = confidence
@@ -91,7 +108,7 @@ class SmartSelfRAG:
         """数字查询规则检查"""
         for result in results[:3]:
             text = result.get("text", "")
-            has_numbers = bool(re.search(r'\d+\.?\d*', text))
+            has_numbers = bool(re.search(r"\d+\.?\d*", text))
             if has_numbers:
                 return ReflectionResult(action="pass", confidence=0.8, reason="numeric_rule_pass")
 
@@ -101,6 +118,7 @@ class SmartSelfRAG:
         """关键词重叠检查"""
         try:
             import jieba
+
             query_keywords = set(jieba.cut(query))
         except Exception as e:  # TODO: Narrow exception type
             logger.warning("jieba分词失败(查询): %s", e, exc_info=True)
@@ -130,6 +148,7 @@ class SmartSelfRAG:
         """完整反思（LLM）"""
         try:
             from src.infra.llm import call_ai
+
             context = "\n".join([r.get("text", "")[:200] for r in results[:3]])
             prompt = f"判断以下检索结果是否回答了问题。只回答 PASS 或 FAIL。\n问题：{query}\n结果：{context}"
             response = await call_ai(prompt)

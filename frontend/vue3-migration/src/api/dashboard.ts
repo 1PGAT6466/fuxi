@@ -38,3 +38,35 @@ export function getDashboardStats(): Promise<DashboardOverview> {
 export function getAdminMetricsSummary() {
   return apiClient.get('/api/admin/metrics-summary');
 }
+
+// ─── 数据洞察 → /api/dashboard/insights ───
+export interface DashboardInsights {
+  trends?: Array<{ label: string; value: number; change?: number }>;
+  anomalies?: Array<{
+    id: string;
+    type: 'spike' | 'drop' | 'pattern' | 'threshold';
+    description: string;
+    severity: 'low' | 'medium' | 'high' | 'critical';
+    metric: string;
+    timestamp: string;
+    acknowledged?: boolean;
+  }>;
+  insights?: Array<{
+    id: string;
+    type: 'optimization' | 'warning' | 'info' | 'action';
+    title: string;
+    description: string;
+    impact?: string;
+    priority: number;
+    actionLabel?: string;
+  }>;
+  healthScore?: number;
+  health_score?: number;
+  updatedAt?: string;
+  updated_at?: string;
+}
+
+/** 获取数据洞察 → /api/dashboard/insights */
+export function getDashboardInsights(): Promise<DashboardInsights> {
+  return apiClient.get('/api/dashboard/insights') as Promise<DashboardInsights>;
+}

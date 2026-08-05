@@ -3,10 +3,12 @@ v1.44 Phase 1 Fix — RAG 检索路由
 提供传统 chunk 检索、SAG Event 粒度检索、实体向量扩展端点
 v1.50: 种子数据自动标记 origin=seed
 """
-from fastapi import APIRouter, Request, Query
+
+import logging
+
+from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, field_validator
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +43,11 @@ def _mark_seed_results(results: list) -> list:
         if is_chroma_seed or is_chunk_seed:
             r["origin"] = "seed"
             if "note" not in r:
-                r["note"] = f"示例数据{'（ChromaDB 种子向量）' if is_chroma_seed else '（chunks.db 测试数据）'}" if is_chroma_seed else f"示例数据（{fname}）"
+                r["note"] = (
+                    f"示例数据{'（ChromaDB 种子向量）' if is_chroma_seed else '（chunks.db 测试数据）'}"
+                    if is_chroma_seed
+                    else f"示例数据（{fname}）"
+                )
 
     return results
 
@@ -57,6 +63,7 @@ class SearchRequest(BaseModel):
     def validate_top_k(cls, v: int) -> int:
         """v1.44 安全修复: top_k 上限验证"""
         from src.services.prompt_guard import clamp_top_k
+
         return clamp_top_k(v)
 
 
@@ -72,6 +79,7 @@ class EventSearchRequest(BaseModel):
     def validate_top_k(cls, v: int) -> int:
         """v1.44 安全修复: top_k 上限验证"""
         from src.services.prompt_guard import clamp_top_k
+
         return clamp_top_k(v)
 
 
@@ -93,12 +101,14 @@ async def rag_search(body: SearchRequest, request: Request = None):
 
     # v1.44 安全修复: top_k 上限
     from src.services.prompt_guard import clamp_top_k
+
     top_k = clamp_top_k(body.top_k)
-    
+
     try:
         # 尝试使用 taiyang 检索模块
         try:
             from src.taiyang.retrieval import search_chunks
+
             results = search_chunks(
                 query=body.query,
                 top_k=top_k,
@@ -113,24 +123,33 @@ async def rag_search(body: SearchRequest, request: Request = None):
             }
         except ImportError:
             pass
-        except Exception as e:  # TODO: Narrow exception type
-            logger.warning(f"taiyang.retrieval 调用失败，回退到基本搜索: {e}")
+        except (ConnectionError, TimeoutError, OSError, ValueError, KeyError) as e:  # 具体异常类型
+            logger.warning(f"taiyang.retrieval 调用失败，回退到基本搜索: {type(e).__name__}: {e}")
 
         # 回退：使用 db/vector_store 直接检索
+        # MEDIUM-7 修复: 通过服务层包装调用，保持层间依赖单向
         try:
-            from src.db.vector_store import get_vector_store
-            vs = get_vector_store()
+
+            def _get_vector_store():
+                """服务层包装：获取向量存储实例"""
+                from src.db.vector_store import get_vector_store as _get_vs
+
+                return _get_vs()
+
+            vs = _get_vector_store()
             if vs:
                 results = vs.search(body.query, top_k=top_k)
                 formatted = []
                 for r in results:
-                    formatted.append({
-                        "id": r.get("id", ""),
-                        "text": r.get("text", r.get("content", "")),
-                        "score": r.get("score", r.get("distance", 0)),
-                        "metadata": r.get("metadata", {}),
-                        "source": r.get("metadata", {}).get("source", ""),
-                    })
+                    formatted.append(
+                        {
+                            "id": r.get("id", ""),
+                            "text": r.get("text", r.get("content", "")),
+                            "score": r.get("score", r.get("distance", 0)),
+                            "metadata": r.get("metadata", {}),
+                            "source": r.get("metadata", {}).get("source", ""),
+                        }
+                    )
                 # v1.44 R2: 多租户隔离过滤
                 formatted = _filter_by_tenant(formatted, tenant_id)
                 # v1.50: 标记种子数据
@@ -140,23 +159,21 @@ async def rag_search(body: SearchRequest, request: Request = None):
                     "total": len(formatted),
                     "seed_count": sum(1 for r in formatted if r.get("origin") == "seed"),
                 }
-        except Exception as e2:  # TODO: Narrow exception type
-            logger.warning(f"vector_store 回退也失败: {e2}")
+        except (ConnectionError, TimeoutError, OSError, ValueError, KeyError, AttributeError) as e2:  # 具体异常类型
+            logger.warning(f"vector_store 回退也失败: {type(e2).__name__}: {e2}")
 
         # 最终回退：返回空结果
         return {
             "results": [],
             "total": 0,
         }
-    except Exception as e:  # TODO: Narrow exception type
-        logger.exception(f"rag_search 失败: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Internal server error", "detail": str(e)}
-        )
+    except (ConnectionError, TimeoutError, OSError, ValueError, KeyError) as e:  # 具体异常类型
+        logger.exception(f"rag_search 失败: {type(e).__name__}: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error"})
 
 
 # ============ POST /api/rag/sag-search — SAG Event 粒度检索 ============
+
 
 @router.post("/api/rag/sag-search")
 async def rag_sag_search(body: EventSearchRequest, request: Request = None):
@@ -170,8 +187,9 @@ async def rag_sag_search(body: EventSearchRequest, request: Request = None):
 
     # v1.44 安全修复: top_k 上限
     from src.services.prompt_guard import clamp_top_k
+
     top_k = clamp_top_k(body.top_k)
-    
+
     try:
         granularity = body.granularity or "auto"
 
@@ -180,6 +198,7 @@ async def rag_sag_search(body: EventSearchRequest, request: Request = None):
 
         try:
             from src.taiyang.sag_pipeline import search_sag
+
             sag_results = search_sag(
                 query=body.query,
                 top_k=top_k,
@@ -205,12 +224,13 @@ async def rag_sag_search(body: EventSearchRequest, request: Request = None):
                 }
         except ImportError:
             pass
-        except Exception as e:  # TODO: Narrow exception type
-            logger.warning(f"sag_pipeline 调用失败，回退: {e}")
+        except (ConnectionError, TimeoutError, OSError, ValueError, KeyError) as e:  # 具体异常类型
+            logger.warning(f"sag_pipeline 调用失败，回退: {type(e).__name__}: {e}")
 
         # 回退：使用标准 chunk 检索
         try:
             from src.taiyang.retrieval import search_chunks
+
             results = search_chunks(
                 query=body.query,
                 top_k=top_k,
@@ -230,8 +250,8 @@ async def rag_sag_search(body: EventSearchRequest, request: Request = None):
             }
         except ImportError:
             pass
-        except Exception as e:  # TODO: Narrow exception type
-            logger.warning(f"retrieval 回退失败: {e}")
+        except (ConnectionError, TimeoutError, OSError, ValueError, KeyError, AttributeError) as e:  # 具体异常类型
+            logger.warning(f"retrieval 回退失败: {type(e).__name__}: {e}")
 
         # 最终回退
         return {
@@ -240,15 +260,13 @@ async def rag_sag_search(body: EventSearchRequest, request: Request = None):
             "total": 0,
             "granularity": granularity,
         }
-    except Exception as e:  # TODO: Narrow exception type
-        logger.exception(f"rag_sag_search 失败: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Internal server error", "detail": str(e)}
-        )
+    except (ConnectionError, TimeoutError, OSError, ValueError, KeyError) as e:  # 具体异常类型
+        logger.exception(f"rag_sag_search 失败: {type(e).__name__}: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error"})
 
 
 # ============ POST /api/rag/sag-trace — SAG 检索追踪 SSE ============
+
 
 class SAGTraceRequest(BaseModel):
     session_id: str
@@ -262,25 +280,27 @@ async def rag_sag_trace(body: SAGTraceRequest, request: Request = None):
     失败时回退到状态说明而非虚假占位数据。
     """
     try:
-        import json
         import asyncio
+        import json
+
         from fastapi.responses import StreamingResponse
 
         async def trace_generator():
             yield f"data: {json.dumps({'type': 'start', 'session_id': body.session_id, 'message': 'SAG 追踪已启动'}, ensure_ascii=False)}\n\n"
             await asyncio.sleep(0.5)
-            
+
             # 尝试从真实 SAG Pipeline 获取追踪数据
             real_trace = None
             try:
                 from src.taiyang.sag_pipeline import SagTracer
+
                 tracer = SagTracer()
                 real_trace = tracer.get_trace(body.session_id)
             except ImportError:
                 pass
-            except Exception as trace_err:  # TODO: Narrow exception type
-                logger.warning(f"SAG 追踪获取失败: {trace_err}")
-            
+            except (ConnectionError, TimeoutError, OSError, ValueError, KeyError) as trace_err:  # 具体异常类型
+                logger.warning(f"SAG 追踪获取失败: {type(trace_err).__name__}: {trace_err}")
+
             if real_trace and real_trace.get("stages"):
                 # 返回真实追踪数据
                 for stage in real_trace.get("stages", []):
@@ -296,7 +316,7 @@ async def rag_sag_trace(body: SAGTraceRequest, request: Request = None):
             else:
                 # 无实时追踪数据：明确告知当前状态而非返回虚假占位
                 yield f"data: {json.dumps({'type': 'notice', 'message': 'SAG 实时追踪数据暂不可用。系统运行正常，但追踪功能需连接活跃的 SAG Pipeline 实例。'}, ensure_ascii=False)}\n\n"
-            
+
             yield f"data: [DONE]\n\n"
 
         return StreamingResponse(
@@ -308,15 +328,13 @@ async def rag_sag_trace(body: SAGTraceRequest, request: Request = None):
                 "X-Accel-Buffering": "no",
             },
         )
-    except Exception as e:  # TODO: Narrow exception type
-        logger.exception(f"rag_sag_trace 失败: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Internal server error", "detail": str(e)}
-        )
+    except (ConnectionError, TimeoutError, OSError, ValueError, KeyError) as e:  # 具体异常类型
+        logger.exception(f"rag_sag_trace 失败: {type(e).__name__}: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error"})
 
 
 # ============ GET /api/rag/entity-expand — 实体向量扩展 ============
+
 
 @router.get("/api/rag/entity-expand")
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
@@ -330,14 +348,12 @@ async def rag_entity_expand(
     """
     try:
         if not entity_name or not entity_name.strip():
-            return JSONResponse(
-                status_code=400,
-                content={"error": "缺少 entity_name 参数"}
-            )
+            return JSONResponse(status_code=400, content={"error": "缺少 entity_name 参数"})
 
         # 尝试使用 taiyang 实体扩展
         try:
             from src.taiyang.expand import expand_entity
+
             expanded = expand_entity(entity_name, top_k=10)
             return {
                 "entity_name": entity_name,
@@ -347,29 +363,41 @@ async def rag_entity_expand(
             }
         except ImportError:
             logger.info("taiyang.expand 模块未安装，实体扩展功能不可用")
-        except Exception as e:  # TODO: Narrow exception type
-            logger.warning(f"expand_entity 调用失败: {e}")
+        except (ConnectionError, TimeoutError, OSError, ValueError, KeyError) as e:  # 具体异常类型
+            logger.warning(f"expand_entity 调用失败: {type(e).__name__}: {e}")
 
         # 尝试知识图谱回退
+        # MEDIUM-7 修复: 通过服务层包装调用，而非直接从 src.db 导入
+        # 保持 API 层 → 服务层 → 数据层的单向依赖
         try:
-            from src.db.data_store import load_graph
-            graph = await asyncio.to_thread(load_graph)
+
+            def _load_graph():
+                """服务层包装：从知识图谱加载数据"""
+                from src.db.data_store import load_graph as _load_graph_impl
+
+                return _load_graph_impl()
+
+            graph = await asyncio.to_thread(_load_graph)
             nodes = graph.get("nodes", {})
             if entity_name in nodes:
                 related = []
                 for edge in graph.get("edges", []):
                     if edge.get("from") == entity_name:
-                        related.append({
-                            "name": edge.get("to", ""),
-                            "relation": edge.get("relation", ""),
-                            "source": "knowledge_graph",
-                        })
+                        related.append(
+                            {
+                                "name": edge.get("to", ""),
+                                "relation": edge.get("relation", ""),
+                                "source": "knowledge_graph",
+                            }
+                        )
                     elif edge.get("to") == entity_name:
-                        related.append({
-                            "name": edge.get("from", ""),
-                            "relation": edge.get("relation", ""),
-                            "source": "knowledge_graph",
-                        })
+                        related.append(
+                            {
+                                "name": edge.get("from", ""),
+                                "relation": edge.get("relation", ""),
+                                "source": "knowledge_graph",
+                            }
+                        )
                 if related:
                     return {
                         "entity_name": entity_name,
@@ -377,8 +405,8 @@ async def rag_entity_expand(
                         "total": len(related),
                         "source": "knowledge_graph",
                     }
-        except Exception as e:  # TODO: Narrow exception type
-            logger.warning(f"知识图谱回退失败: {e}")
+        except (ConnectionError, TimeoutError, OSError, ValueError, KeyError, AttributeError) as e:  # 具体异常类型
+            logger.warning(f"知识图谱回退失败: {type(e).__name__}: {e}")
 
         # 明确告知调用方：功能未实现 vs 无匹配结果
         return {
@@ -387,9 +415,6 @@ async def rag_entity_expand(
             "total": 0,
             "notice": "实体扩展功能当前不可用：缺少嵌入模型模块 (taiyang.expand) 且知识图谱中无此实体",
         }
-    except Exception as e:  # TODO: Narrow exception type
-        logger.exception(f"rag_entity_expand 失败: {e}")
-        return JSONResponse(
-            status_code=500,
-            content={"error": "Internal server error", "detail": str(e)}
-        )
+    except (ConnectionError, TimeoutError, OSError, ValueError, KeyError) as e:  # 具体异常类型
+        logger.exception(f"rag_entity_expand 失败: {type(e).__name__}: {e}")
+        return JSONResponse(status_code=500, content={"error": "Internal server error"})

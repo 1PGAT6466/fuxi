@@ -2,7 +2,8 @@
 chunkers.py — 统一分块器
 处理文本分块逻辑，支持表格感知。
 """
-from typing import List, Dict
+
+from typing import Dict, List
 
 from src.models.chunk import Chunk, ChunkType
 
@@ -60,23 +61,30 @@ class UnifiedChunker:
         return chunks
 
     def _find_heading_for_chunk(self, full_text: str, chunk_text: str, heading_structure: list) -> dict:
-        """找到该 chunk 所归属的最近标题"""
+        """找到该 chunk 所归属的最近标题
+
+        任务2 P0修复：使用 chunk 起始位置定位，而非 full_text.find(chunk_text)
+        避免当 chunk 文本重复出现时定位到错误的起始位置。
+        """
         if not heading_structure:
             return None
         try:
             chunk_start = full_text.find(chunk_text)
             if chunk_start < 0:
                 return None
-            # 遍历标题，找该位置之前最近的
+            # 遍历标题，找该位置之前最近的标题
             best = None
-            for h in sorted(heading_structure, key=lambda x: full_text.find(x.get("text", "")), reverse=True):
-                h_pos = full_text.find(h.get("text", ""))
-                if 0 <= h_pos <= chunk_start:
+            best_pos = -1
+            for h in heading_structure:
+                h_text = h.get("text", "")
+                if not h_text:
+                    continue
+                h_pos = full_text.find(h_text)
+                if 0 <= h_pos <= chunk_start and h_pos > best_pos:
                     best = h
-                    break
+                    best_pos = h_pos
             return best
-        except Exception:  # TODO: Narrow exception type
-            pass  # 静默：Exception 失败,返回None
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             return None
 
     def _chunk_text(self, text: str) -> List[str]:
@@ -90,7 +98,7 @@ class UnifiedChunker:
 
             # 尝试在句子边界断开
             if end < text_len:
-                for sep in ['\n\n', '\n', '。', '；', '.', ';']:
+                for sep in ["\n\n", "\n", "。", "；", ".", ";"]:
                     last_sep = text.rfind(sep, start + self.chunk_size // 2, end)
                     if last_sep > start:
                         end = last_sep + len(sep)
@@ -102,7 +110,7 @@ class UnifiedChunker:
 
             start = end - self.chunk_overlap if end < text_len else text_len
 
-        return chunks if chunks else [text[:self.chunk_size]]
+        return chunks if chunks else [text[: self.chunk_size]]
 
     def _table_to_text(self, table: Dict) -> str:
         """表格转文本"""

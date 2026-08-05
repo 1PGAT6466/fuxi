@@ -62,23 +62,47 @@ _PREFIX_OVERRIDES: Dict[str, str] = {
 _SKIP_FILES: set = {
     "__init__.py",
     "_auto_discovery.py",
-    "auth.py",          # 中间件定义，非路由
-    "response.py",       # 工具模块，非路由
+    "auth.py",  # 中间件定义，非路由
+    "response.py",  # 工具模块，非路由
     # 以下保留手动注册（特殊逻辑或已在 server.py 中 inline 注册）
-    "auth_routes.py",    # server.py 中手动 include
-    "evaluation.py",     # 有独立的 /api/eval 前缀，server.py 中手动 include
-    "evolution.py",      # server.py 中手动 include
+    "auth_routes.py",  # server.py 中手动 include
+    "evaluation.py",  # 有独立的 /api/eval 前缀，server.py 中手动 include
+    "evolution.py",  # server.py 中手动 include
     # v2.1 新增路由 — 已在 server.py 中手动注册
     "services.py",
     "notifications.py",
     "unified_search.py",
     "user_preferences.py",
+    "favorites.py",
+    "history.py",
+    "feedback.py",  # 已在 routes.py 中手动注册
+    "tasks.py",
     "feature_flags_ws.py",
     # v1.44 Phase 1 Fix: 手动注册以避免路径冲突
     "rag.py",
     "kb.py",
     # v1.44 Phase 1: 租户管理路由 — 已在 server.py 中手动注册
     "tenant_routes.py",
+    # v1.50 P1: 统一文件管理路由 — 已在 routes.py 中手动注册
+    "files_unified.py",
+    # 工作流路由 — 已在 routes.py 中手动注册
+    "workflows.py",
+    # v1.50: 开发者门户路由 — 已在 routes.py 中手动注册
+    "developer_portal.py",
+    # v1.44: API 密钥管理 — 已在 routes.py 中手动注册
+    "api_keys.py",
+    # v1.44: Webhook 管理 — 已在 routes.py 中手动注册
+    "webhooks.py",
+    # Phase 3: 报告管理 — 已在 routes.py 中手动注册
+    "report_routes.py",
+    # 插件管理 — 已在 routes.py 中手动注册
+    "plugin_manager_routes.py",
+    # 插件系统 Phase 1 — 已在 routes.py 中手动注册
+    "plugin_phase1_routes.py",
+    # 插件系统 Phase 2 — 已在 routes.py 中手动注册
+    "plugin_phase2_routes.py",
+    # 插件系统 Phase 3 — 已在 routes.py 中手动注册
+    "plugin_phase3_routes.py",
 }
 
 # ── 已发现的 router 信息 ──
@@ -151,9 +175,7 @@ def discover_routers(api_dir: Optional[Path] = None) -> Dict[str, APIRouter]:
                 actual_prefix = ""  # files_view has /api/view, /api/download, /api/antenna prefixes
 
             discovered[actual_prefix] = (router, var_name, entry)
-            logger.info(
-                f"[AutoDiscovery] ✓ {entry}::{var_name} → prefix='{actual_prefix}'"
-            )
+            logger.info(f"[AutoDiscovery] ✓ {entry}::{var_name} → prefix='{actual_prefix}'")
 
     return discovered
 
@@ -174,9 +196,7 @@ def auto_discover_routers(app: FastAPI, api_dir: Optional[Path] = None) -> int:
             app.include_router(router, prefix="")  # all routes use absolute paths
             registered += 1
         except Exception as e:  # TODO: Narrow exception type
-            logger.error(
-                f"[AutoDiscovery] 注册失败 {source_file}::{var_name} (prefix={prefix}): {e}"
-            )
+            logger.error(f"[AutoDiscovery] 注册失败 {source_file}::{var_name} (prefix={prefix}): {e}")
 
     # 保存发现信息供 services 端点使用
     _discovered_routers = [
@@ -189,9 +209,7 @@ def auto_discover_routers(app: FastAPI, api_dir: Optional[Path] = None) -> int:
         for prefix, (router, var_name, source_file) in discovered.items()
     ]
 
-    logger.info(
-        f"[AutoDiscovery] 自动发现完成: {registered}/{len(discovered)} 个路由已注册"
-    )
+    logger.info(f"[AutoDiscovery] 自动发现完成: {registered}/{len(discovered)} 个路由已注册")
     return registered
 
 

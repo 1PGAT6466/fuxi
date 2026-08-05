@@ -1,0 +1,37 @@
+{
+  "name": "data-exporter",
+  "version": "1.0.0",
+  "type": "api",
+  "display_name": "数据导出器",
+  "description": "将数据导出为CSV、JSON、Excel等格式",
+  "author": "伏羲团队",
+  "icon": "📊",
+  "routes": [
+    {
+      "path": "/api/plugins/data-exporter/export",
+      "method": "POST",
+      "handler": "export_data",
+      "description": "导出数据为指定格式"
+    },
+    {
+      "path": "/api/plugins/data-exporter/formats",
+      "method": "GET",
+      "handler": "list_formats",
+      "description": "获取支持的导出格式"
+    }
+  ],
+  "events": ["on_export_request"],
+  "dependencies": ["openpyxl"],
+  "config_schema": {
+    "max_rows": {
+      "type": "number",
+      "default": 10000,
+      "description": "最大导出行数"
+    },
+    "default_format": {
+      "type": "string",
+      "default": "csv",
+      "description": "默认导出格式"
+    }
+  }
+}

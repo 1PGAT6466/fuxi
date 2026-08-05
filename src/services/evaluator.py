@@ -57,7 +57,7 @@ def eval_relevancy(query: str, results: List[Dict]) -> Dict:
             return json.loads(resp[s:e])
     except json.JSONDecodeError as e:
         logger.error(f"eval_relevancy JSON 解析失败: {e}, resp={resp[:200]}")
-    except Exception:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         pass
     return {"score": 0.5, "detail": "LLM 评判解析失败"}
 
@@ -81,7 +81,7 @@ def eval_faithfulness(query: str, answer: str, context: str) -> Dict:
             return json.loads(resp[s:e])
     except json.JSONDecodeError as e:
         logger.error(f"eval_faithfulness JSON 解析失败: {e}, resp={resp[:200]}")
-    except Exception:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         pass
     return {"faithfulness_score": 0.5, "detail": "LLM 评判解析失败"}
 

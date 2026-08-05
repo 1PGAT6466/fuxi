@@ -36,7 +36,7 @@
 
     <!-- 反馈表格 -->
     <div v-else class="feedback-table-wrap">
-      <el-table :data="feedbacks" stripe style="width: 100%">
+      <el-table :data="Array.isArray(feedbacks) ? feedbacks : []" stripe style="width: 100%">
         <el-table-column prop="user" label="用户" width="120">
           <template #default="{ row }">
             <div class="user-cell">
@@ -223,8 +223,9 @@ async function fetchFeedbacks(): Promise<void> {
   loading.value = true;
   error.value = false;
   try {
-    const data = (await apiClient.get('/api/feedback/weekly')) as Record<string, unknown>;
-    feedbacks.value = (data.feedbacks || data.data || []) as FeedbackItem[];
+    const resp = (await apiClient.get('/api/feedback')) as Record<string, unknown>;
+    const data = (resp?.data || resp) as Record<string, unknown>;
+    feedbacks.value = (data.items || data.feedbacks || []) as FeedbackItem[];
   } catch {
     console.warn('[FeedbackView] API 不可用，使用 mock 数据');
     feedbacks.value = getMockFeedbacks();

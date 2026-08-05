@@ -2,6 +2,7 @@
 decision_growth.py — 少阴成长
 决策能力监控
 """
+
 import logging
 from typing import Dict
 
@@ -23,10 +24,7 @@ class DecisionGrowth:
             self._retry_count += 1
 
         await self.engine.record_event(
-            symbol="shaoyin",
-            metric="decision_confidence",
-            value=confidence,
-            context={"retried": retried}
+            symbol="shaoyin", metric="decision_confidence", value=confidence, context={"retried": retried}
         )
 
     def get_stats(self) -> Dict:

@@ -31,11 +31,22 @@ def rrf_fusion(bm25_results: list, vector_results: list, k: int = 60) -> list:
     rrf_scores = {}
     all_results = {}
     for i, r in enumerate(bm25_results):
-        key = f"{r.get('file_hash','')}:{r.get('chunk_index',0)}"
+        # 优先用 chunk_index，否则用 _db_id 或 text 前50字作为唯一标识
+        cidx = r.get('chunk_index')
+        if cidx is not None:
+            key = f"{r.get('file_hash','')}:{cidx}"
+        elif r.get('_db_id'):
+            key = f"db:{r['_db_id']}"
+        else:
+            key = f"bm25:{i}"
         rrf_scores[key] = rrf_scores.get(key, 0) + 1.0 / (k + i + 1)
         all_results[key] = r
     for i, r in enumerate(vector_results):
-        key = f"{r.get('file_hash','')}:{r.get('chunk_index',0)}"
+        cidx = r.get('chunk_index')
+        if cidx is not None:
+            key = f"{r.get('file_hash','')}:{cidx}"
+        else:
+            key = f"vec:{i}"
         rrf_scores[key] = rrf_scores.get(key, 0) + 1.0 / (k + i + 1)
         if key not in all_results:
             all_results[key] = r
@@ -159,7 +170,7 @@ def dynamic_category_weight(query: str, results: list) -> list:
 def personalized_boost(query: str, results: list) -> list:
     """P1-A: 基于用户历史反馈的个性化术语权重"""
     try:
-        from src.services.learner import get_personalized_boost
+        from src.infra import get_personalized_boost
         boost = get_personalized_boost(query)
         if not boost:
             return results
@@ -169,7 +180,7 @@ def personalized_boost(query: str, results: list) -> list:
             if bonus > 0:
                 r["score"] = round(float(r.get("score", 0)) + bonus, 2)
         results.sort(key=lambda x: float(x.get("score", 0)), reverse=True)
-    except Exception:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.warning(f"[retrieval] suppressed exception", exc_info=True)
         pass
     return results

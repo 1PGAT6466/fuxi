@@ -12,11 +12,15 @@ from typing import Dict, List
 
 # ---- 从 services 导入原有实现 ----
 from src.services.learner import (
-    update_term_weight,
-    log_feedback as _learner_log_feedback,
     extract_new_terms,
+)
+from src.services.learner import get_feedback_stats as _learner_get_stats
+from src.services.learner import (
     get_personalized_boost,
-    get_feedback_stats as _learner_get_stats,
+)
+from src.services.learner import log_feedback as _learner_log_feedback
+from src.services.learner import (
+    update_term_weight,
 )
 
 logger = logging.getLogger("evolution.learner")
@@ -83,7 +87,8 @@ class EvolutionLearner:
 
         logger.info(
             "[EvolutionLearner] 学习完成: processed=%d terms_updated=%d",
-            processed, terms_updated,
+            processed,
+            terms_updated,
         )
         return {"ok": True, "processed": processed, "terms_updated": terms_updated}
 
@@ -123,6 +128,7 @@ class EvolutionLearner:
 
 
 # ---- 便捷函数 ----
+
 
 async def learn_from_feedback(feedback_batch: List[Dict]) -> Dict:
     """便捷函数：从批量反馈中学习

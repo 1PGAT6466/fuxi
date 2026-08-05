@@ -1,0 +1,1 @@
+import{d as r}from"./base-CGNS6RFG.js";import{k as t}from"./utils-pFX9DEgi.js";const s="update:modelValue",e="change",p="input",o=r({ariaLabel:String,ariaOrientation:{type:String,values:["horizontal","vertical","undefined"]},ariaControls:String}),u=a=>t(o,a);export{e as C,p as I,s as U,u};

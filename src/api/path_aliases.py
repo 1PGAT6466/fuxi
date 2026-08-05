@@ -16,9 +16,11 @@
 本文件新增的别名（本模块独有）：
   - GET /api/antenna/search → 联网搜索              (Vue3 前端用 GET 方法)
 """
+
+import logging
+
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-import logging
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +35,7 @@ router = APIRouter(tags=["路径别名兼容层"])
 # 注意：/api/antenna/search 主路由在 files_view.py 中实现（注册顺序优先）。
 # 本路由作为备用兼容层，仅在 files_view.py 路由未注册时生效。
 
+
 @router.get("/api/antenna/search")
 async def antenna_search_get(q: str = "", request: Request = None):
     """备用：GET /api/antenna/search?q=xxx (Vue3 前端使用 GET 方法)
@@ -41,13 +44,11 @@ async def antenna_search_get(q: str = "", request: Request = None):
     本路由兼容 Vue3 前端的 GET 请求。
     """
     if not q or not q.strip():
-        return JSONResponse(
-            status_code=400,
-            content={"error": "缺少 q 参数", "detail": "搜索关键词不能为空"}
-        )
+        return JSONResponse(status_code=400, content={"error": "缺少 q 参数", "detail": "搜索关键词不能为空"})
 
     try:
         from src.taiyang.retrieval import hybrid_search
+
         results = await hybrid_search(q, top_k=5)
 
         return {

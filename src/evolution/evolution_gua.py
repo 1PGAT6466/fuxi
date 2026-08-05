@@ -32,16 +32,15 @@ Usage::
     gua.stop()
 """
 
-
 import asyncio
 import logging
 import time
 from typing import Any, Dict, List, Optional
 
 from src.bagua.base_gua import (
-    GuaBase,
     DegradationRule,
     FallbackAction,
+    GuaBase,
 )
 from src.bagua.intent_bus import (
     IntentBus,
@@ -94,7 +93,8 @@ class EvolutionGua(GuaBase):
         self._last_execution_time: float = 0.0
 
         logger.info(
-            "⊙ [中宫] 初始化完成 — %s", self.GUA_DESCRIPTION,
+            "⊙ [中宫] 初始化完成 — %s",
+            self.GUA_DESCRIPTION,
         )
 
     # ========================================================================
@@ -110,40 +110,46 @@ class EvolutionGua(GuaBase):
           - 30: 进化器不可用 → 跳过进化
         """
         # 规则 10: 四大组件全部不可用 → 空操作降级
-        self.add_rule(DegradationRule(
-            name="all_components_unavailable",
-            condition_fn=self._all_components_degraded,
-            fallback=FallbackAction(
-                name="noop_fallback",
-                handler=self._fallback_noop,
-                description="所有进化组件不可用，返回空操作",
-            ),
-            priority=10,
-        ))
+        self.add_rule(
+            DegradationRule(
+                name="all_components_unavailable",
+                condition_fn=self._all_components_degraded,
+                fallback=FallbackAction(
+                    name="noop_fallback",
+                    handler=self._fallback_noop,
+                    description="所有进化组件不可用，返回空操作",
+                ),
+                priority=10,
+            )
+        )
 
         # 规则 20: 学习者不可用 → 跳过学习步骤
-        self.add_rule(DegradationRule(
-            name="learner_unavailable",
-            condition_fn=lambda: not self._is_learner_available(),
-            fallback=FallbackAction(
-                name="skip_learn",
-                handler=self._fallback_skip_learn,
-                description="学习者不可用，跳过学习",
-            ),
-            priority=20,
-        ))
+        self.add_rule(
+            DegradationRule(
+                name="learner_unavailable",
+                condition_fn=lambda: not self._is_learner_available(),
+                fallback=FallbackAction(
+                    name="skip_learn",
+                    handler=self._fallback_skip_learn,
+                    description="学习者不可用，跳过学习",
+                ),
+                priority=20,
+            )
+        )
 
         # 规则 30: 进化器不可用 → 跳过进化步骤
-        self.add_rule(DegradationRule(
-            name="evolver_unavailable",
-            condition_fn=lambda: not self._is_evolver_available(),
-            fallback=FallbackAction(
-                name="skip_evolve",
-                handler=self._fallback_skip_evolve,
-                description="进化器不可用，跳过进化",
-            ),
-            priority=30,
-        ))
+        self.add_rule(
+            DegradationRule(
+                name="evolver_unavailable",
+                condition_fn=lambda: not self._is_evolver_available(),
+                fallback=FallbackAction(
+                    name="skip_evolve",
+                    handler=self._fallback_skip_evolve,
+                    description="进化器不可用，跳过进化",
+                ),
+                priority=30,
+            )
+        )
 
     def _execute_core(self, params: Dict[str, Any]) -> Any:
         """统一执行入口 — action 驱动
@@ -172,10 +178,7 @@ class EvolutionGua(GuaBase):
         """
         action = params.get("action", "")
         if not action:
-            raise ValueError(
-                "[中宫] execute() 缺少 action 参数。"
-                "有效值: feedback, learn, evolve, lifecycle"
-            )
+            raise ValueError("[中宫] execute() 缺少 action 参数。" "有效值: feedback, learn, evolve, lifecycle")
 
         self._execution_count += 1
         self._last_execution_time = time.time()
@@ -189,10 +192,7 @@ class EvolutionGua(GuaBase):
         elif action == "lifecycle":
             return self._handle_lifecycle(params)
         else:
-            raise ValueError(
-                f"[中宫] 未知的 action: '{action}'。"
-                f"有效值: feedback, learn, evolve, lifecycle"
-            )
+            raise ValueError(f"[中宫] 未知的 action: '{action}'。" f"有效值: feedback, learn, evolve, lifecycle")
 
     # ========================================================================
     # Action 处理器
@@ -231,7 +231,10 @@ class EvolutionGua(GuaBase):
             )
             logger.info(
                 "⊙ [中宫] 反馈已记录: user=%s query='%s...' dedup=%s learn=%s",
-                user_id, query[:40], result.get("dedup"), result.get("learn_triggered"),
+                user_id,
+                query[:40],
+                result.get("dedup"),
+                result.get("learn_triggered"),
             )
             return result
         except Exception as exc:  # TODO: Narrow exception type
@@ -255,12 +258,11 @@ class EvolutionGua(GuaBase):
             return {"ok": False, "error": "feedback_batch 不能为空"}
 
         try:
-            result = _sync_run(
-                self._get_learner().learn_from_feedback(feedback_batch)
-            )
+            result = _sync_run(self._get_learner().learn_from_feedback(feedback_batch))
             logger.info(
                 "⊙ [中宫] 学习完成: processed=%d terms_updated=%d",
-                result.get("processed", 0), result.get("terms_updated", 0),
+                result.get("processed", 0),
+                result.get("terms_updated", 0),
             )
             return result
         except Exception as exc:  # TODO: Narrow exception type
@@ -357,9 +359,7 @@ class EvolutionGua(GuaBase):
             try:
                 triggers = _sync_run(lifecycle.check_triggers())
                 for trigger in triggers:
-                    candidates.extend(
-                        _sync_run(lifecycle.get_candidates(trigger["event_type"]))
-                    )
+                    candidates.extend(_sync_run(lifecycle.get_candidates(trigger["event_type"])))
                 if triggers:
                     logger.info(
                         "⊙ [中宫] 生命周期触发: %d 种事件类型",
@@ -397,10 +397,7 @@ class EvolutionGua(GuaBase):
             candidates = await lifecycle.get_candidates(trigger["event_type"])
             if candidates:
                 # 将候选知识中的 query 聚合为文本用于实体发现
-                combined_text = " ".join(
-                    c.get("query", "") or c.get("text", "") or ""
-                    for c in candidates[:50]
-                )
+                combined_text = " ".join(c.get("query", "") or c.get("text", "") or "" for c in candidates[:50])
                 if combined_text.strip():
                     evolver = self._get_evolver()
                     entities = evolver.discover(combined_text)
@@ -422,6 +419,7 @@ class EvolutionGua(GuaBase):
         """延迟获取 FeedbackLoop 实例"""
         if self._feedback_loop is None:
             from src.evolution.feedback_loop import FeedbackLoop
+
             self._feedback_loop = FeedbackLoop()
         return self._feedback_loop
 
@@ -429,6 +427,7 @@ class EvolutionGua(GuaBase):
         """延迟获取 EvolutionLearner 实例"""
         if self._learner is None:
             from src.evolution.learner import EvolutionLearner
+
             self._learner = EvolutionLearner()
         return self._learner
 
@@ -436,6 +435,7 @@ class EvolutionGua(GuaBase):
         """延迟获取 EvolutionEvolver 实例"""
         if self._evolver is None:
             from src.evolution.evolver import EvolutionEvolver
+
             self._evolver = EvolutionEvolver()
         return self._evolver
 
@@ -443,6 +443,7 @@ class EvolutionGua(GuaBase):
         """延迟获取 EvolutionLifecycle 实例"""
         if self._lifecycle is None:
             from src.evolution.lifecycle import EvolutionLifecycle
+
             self._lifecycle = EvolutionLifecycle()
         return self._lifecycle
 
@@ -545,9 +546,7 @@ class EvolutionGua(GuaBase):
         # 添加执行统计
         summary["execution_count"] = self._execution_count
         summary["last_execution_sec"] = (
-            round(time.time() - self._last_execution_time, 1)
-            if self._last_execution_time > 0
-            else -1
+            round(time.time() - self._last_execution_time, 1) if self._last_execution_time > 0 else -1
         )
 
         return summary
@@ -611,12 +610,14 @@ def _sync_run(coro: Any) -> Any:
             # 使用 nest_asyncio 解决嵌套事件循环
             try:
                 import nest_asyncio
+
                 nest_asyncio.apply()
                 new_loop = asyncio.new_event_loop()
                 return new_loop.run_until_complete(coro)
             except ImportError:
                 # fallback: 在线程中运行
                 import concurrent.futures
+
                 with concurrent.futures.ThreadPoolExecutor() as executor:
                     future = executor.submit(asyncio.run, coro)
                     return future.result(timeout=30)

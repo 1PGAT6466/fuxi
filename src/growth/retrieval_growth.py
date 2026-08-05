@@ -2,6 +2,7 @@
 retrieval_growth.py — 太阳成长
 检索效果监控
 """
+
 import logging
 from typing import Dict
 
@@ -26,7 +27,7 @@ class RetrievalGrowth:
             symbol="taiyang",
             metric="search_result_count",
             value=float(results_count),
-            context={"cache_hit": cache_hit, "duration_ms": duration_ms}
+            context={"cache_hit": cache_hit, "duration_ms": duration_ms},
         )
 
     def get_stats(self) -> Dict:

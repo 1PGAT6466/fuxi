@@ -122,3 +122,16 @@ def seed_dataset():
     for case in SEED_CASES:
         add_case(case)
     logger.info(f"已初始化 {len(SEED_CASES)} 条种子评测用例")
+
+
+def get_ground_truth() -> List[Dict]:
+    """获取所有评测用例作为 ground truth 数据
+    
+    Returns:
+        评测用例列表，每个用例包含 query, expected_answer 等字段
+    """
+    try:
+        return get_cases()
+    except Exception as e:
+        logger.warning(f"get_ground_truth failed: {e}")
+        return []

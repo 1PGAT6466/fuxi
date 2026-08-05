@@ -2,10 +2,11 @@
 request_metrics.py — 请求指标
 延迟 + 错误率 + 吞吐量
 """
-import time
+
 import logging
-from typing import Dict
+import time
 from collections import deque
+from typing import Dict
 
 logger = logging.getLogger("infra.request_metrics")
 

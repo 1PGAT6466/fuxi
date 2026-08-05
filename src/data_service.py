@@ -11,23 +11,25 @@ data_service.py — 统一数据访问服务层
 - 所有路径统一从 src.config 获取，避免硬编码
 """
 
-import sqlite3
-import os
 import json
-import time
 import logging
+import os
+import sqlite3
+import time
 from pathlib import Path
 from typing import Dict, Tuple
 
-from src.config import DATA_DIR, CHROMA_PATH
+from src.config import CHROMA_PATH, DATA_DIR
 
 logger = logging.getLogger(__name__)
 
 # ============ SQLite 路径统一 ============
 
+
 def _ensure_dir(path: Path) -> Path:
     path.parent.mkdir(parents=True, exist_ok=True)
     return path
+
 
 CHUNKS_DB = _ensure_dir(Path(DATA_DIR) / "chunks.db")
 CHAT_SESSIONS_DB = _ensure_dir(Path(DATA_DIR) / "chat_sessions.db")
@@ -37,6 +39,7 @@ USERS_FILE = _ensure_dir(Path(DATA_DIR) / "users.json")
 USER_PREFERENCES_FILE = _ensure_dir(Path(DATA_DIR) / "user_preferences.json")
 
 # ============ 连接管理 ============
+
 
 def _connect(db_path: str, row_factory: bool = True) -> sqlite3.Connection:
     """Create SQLite connection with WAL + busy_timeout"""
@@ -49,6 +52,7 @@ def _connect(db_path: str, row_factory: bool = True) -> sqlite3.Connection:
 
 
 # ============ 会话管理 (chat_sessions.db) ============
+
 
 def ensure_chat_tables(db_path: str = None):
     """Ensure sessions and messages tables exist (idempotent)"""
@@ -96,21 +100,21 @@ def load_all_chat_sessions(db_path: str = None) -> Tuple[Dict, Dict]:
             rows = conn.execute("SELECT * FROM sessions").fetchall()
             for row in rows:
                 sessions[row["id"]] = dict(row)
-            msg_rows = conn.execute(
-                "SELECT * FROM messages ORDER BY timestamp"
-            ).fetchall()
+            msg_rows = conn.execute("SELECT * FROM messages ORDER BY timestamp").fetchall()
             for row in msg_rows:
                 sid = row["session_id"]
                 if sid not in messages:
                     messages[sid] = []
-                messages[sid].append({
-                    "role": row["role"],
-                    "content": row["content"],
-                    "sources": json.loads(row["sources"]) if row.get("sources") else [],
-                    "timestamp": row["timestamp"],
-                })
+                messages[sid].append(
+                    {
+                        "role": row["role"],
+                        "content": row["content"],
+                        "sources": json.loads(row["sources"]) if row["sources"] else [],
+                        "timestamp": row["timestamp"],
+                    }
+                )
         logger.info("[data_service] loaded %d sessions from SQLite", len(sessions))
-    except Exception as e:  # TODO: Narrow exception type
+    except (sqlite3.Error, OSError, KeyError) as e:
         logger.warning("[data_service] load sessions failed: %s", e)
     return sessions, messages
 
@@ -121,17 +125,24 @@ def save_session_to_db(session: dict, db_path: str = None):
     ensure_chat_tables(db_path)
     try:
         with _connect(db_path) as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO sessions
                 (id, title, user_id, last_message, created_at, updated_at, message_count)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                session["id"], session.get("title", ""), session.get("user_id", ""),
-                session.get("last_message", ""), session.get("created_at", 0),
-                session.get("updated_at", 0), session.get("message_count", 0)
-            ))
+            """,
+                (
+                    session["id"],
+                    session.get("title", ""),
+                    session.get("user_id", ""),
+                    session.get("last_message", ""),
+                    session.get("created_at", 0),
+                    session.get("updated_at", 0),
+                    session.get("message_count", 0),
+                ),
+            )
             conn.commit()
-    except Exception as e:  # TODO: Narrow exception type
+    except (sqlite3.Error, OSError) as e:
         logger.warning("[data_service] save session failed: %s", e)
 
 
@@ -142,15 +153,15 @@ def save_message_to_db(session_id: str, msg: dict, db_path: str = None):
     try:
         with _connect(db_path) as conn:
             sources_json = json.dumps(msg.get("sources", []), ensure_ascii=False)
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT INTO messages (session_id, role, content, sources, timestamp)
                 VALUES (?, ?, ?, ?, ?)
-            """, (
-                session_id, msg.get("role", ""), msg.get("content", ""),
-                sources_json, msg.get("timestamp", 0)
-            ))
+            """,
+                (session_id, msg.get("role", ""), msg.get("content", ""), sources_json, msg.get("timestamp", 0)),
+            )
             conn.commit()
-    except Exception as e:  # TODO: Narrow exception type
+    except (sqlite3.Error, OSError) as e:
         logger.warning("[data_service] save message failed: %s", e)
 
 
@@ -163,7 +174,7 @@ def delete_session_from_db(session_id: str, db_path: str = None):
             conn.execute("DELETE FROM messages WHERE session_id = ?", (session_id,))
             conn.execute("DELETE FROM sessions WHERE id = ?", (session_id,))
             conn.commit()
-    except Exception as e:  # TODO: Narrow exception type
+    except (sqlite3.Error, OSError) as e:
         logger.warning("[data_service] delete session failed: %s", e)
 
 
@@ -174,10 +185,10 @@ def save_session_with_messages(
     db_path: str = None,
 ) -> None:
     """Atomically save a session and all its messages in a single transaction.
-    
+
     替代分别调用 save_session_to_db() + save_message_to_db() 多次，
     确保不会出现孤立的 session 或 message。
-    
+
     Args:
         session: 会话字典 {id, title, user_id, last_message, created_at, updated_at, message_count}
         messages: 消息列表 [{role, content, sources, timestamp}, ...]
@@ -187,26 +198,33 @@ def save_session_with_messages(
     ensure_chat_tables(db_path)
     try:
         with _connect(db_path) as conn:
-            conn.execute("""
+            conn.execute(
+                """
                 INSERT OR REPLACE INTO sessions
                 (id, title, user_id, last_message, created_at, updated_at, message_count)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-            """, (
-                session["id"], session.get("title", ""), session.get("user_id", ""),
-                session.get("last_message", ""), session.get("created_at", 0),
-                session.get("updated_at", 0), session.get("message_count", 0)
-            ))
+            """,
+                (
+                    session["id"],
+                    session.get("title", ""),
+                    session.get("user_id", ""),
+                    session.get("last_message", ""),
+                    session.get("created_at", 0),
+                    session.get("updated_at", 0),
+                    session.get("message_count", 0),
+                ),
+            )
             for msg in messages:
                 sources_json = json.dumps(msg.get("sources", []), ensure_ascii=False)
-                conn.execute("""
+                conn.execute(
+                    """
                     INSERT INTO messages (session_id, role, content, sources, timestamp)
                     VALUES (?, ?, ?, ?, ?)
-                """, (
-                    session["id"], msg.get("role", ""), msg.get("content", ""),
-                    sources_json, msg.get("timestamp", 0)
-                ))
+                """,
+                    (session["id"], msg.get("role", ""), msg.get("content", ""), sources_json, msg.get("timestamp", 0)),
+                )
             conn.commit()
-    except Exception as e:  # TODO: Narrow exception type
+    except (sqlite3.Error, OSError, json.JSONDecodeError) as e:
         logger.warning("[data_service] save_session_with_messages failed: %s", e)
         raise  # v1.50 R4: 向上传播，让调用方可以回滚内存状态
 
@@ -234,8 +252,7 @@ def ensure_login_rate_table(db_path: str = None):
         conn.commit()
 
 
-def check_login_rate(ip: str, db_path: str = None,
-                     max_attempts: int = None, window_sec: int = None) -> bool:
+def check_login_rate(ip: str, db_path: str = None, max_attempts: int = None, window_sec: int = None) -> bool:
     """Check if login is within rate limits — True means allowed
 
     Args:
@@ -257,27 +274,22 @@ def check_login_rate(ip: str, db_path: str = None,
     try:
         with _connect(db_path, row_factory=False) as conn:
             conn.execute("DELETE FROM login_attempts WHERE timestamp < ?", (cutoff,))
-            cursor = conn.execute(
-                "SELECT COUNT(*) FROM login_attempts WHERE ip = ? AND timestamp >= ?",
-                (ip, cutoff)
-            )
+            cursor = conn.execute("SELECT COUNT(*) FROM login_attempts WHERE ip = ? AND timestamp >= ?", (ip, cutoff))
             count = cursor.fetchone()[0]
 
             if count >= max_attempts:
                 return False
 
-            conn.execute(
-                "INSERT INTO login_attempts (ip, timestamp) VALUES (?, ?)",
-                (ip, now)
-            )
+            conn.execute("INSERT INTO login_attempts (ip, timestamp) VALUES (?, ?)", (ip, now))
             conn.commit()
             return True
-    except Exception as e:  # TODO: Narrow exception type
+    except (sqlite3.Error, OSError) as e:
         logger.warning("[data_service] login rate check error: %s", e)
         return True  # Fail-open: allow login
 
 
 # ============ 用户管理 (users.json) ============
+
 
 def load_users() -> dict:
     """Load user data from users.json"""
@@ -285,7 +297,7 @@ def load_users() -> dict:
     if users_file.exists():
         try:
             return json.loads(users_file.read_text(encoding="utf-8"))
-        except Exception:  # TODO: Narrow exception type
+        except (json.JSONDecodeError, OSError, KeyError):
             logger.warning("[data_service] Failed to read users.json")
     return {}
 
@@ -294,6 +306,7 @@ def save_users(users: dict):
     """Save user data to users.json — v1.50 R4: 原子写入"""
     import os as _os
     import tempfile as _tempfile
+
     users_file = Path(USERS_FILE)
     users_file.parent.mkdir(parents=True, exist_ok=True)
     # v1.50 R4: 原子写入（先写临时文件，再 rename）
@@ -307,6 +320,7 @@ def save_users(users: dict):
 
 # ============ 用户偏好 ============
 
+
 def load_user_preferences(uid: str) -> dict:
     """Load preferences for a specific user"""
     prefs = {}
@@ -315,7 +329,7 @@ def load_user_preferences(uid: str) -> dict:
         try:
             all_prefs = json.loads(pref_file.read_text(encoding="utf-8"))
             prefs = all_prefs.get(uid, {})
-        except Exception:  # TODO: Narrow exception type
+        except (json.JSONDecodeError, OSError, KeyError):
             logger.warning("[data_service] Failed to read user preferences")
     return prefs
 
@@ -327,15 +341,14 @@ def save_user_preferences(uid: str, prefs: dict):
     if pref_file.exists():
         try:
             all_prefs = json.loads(pref_file.read_text(encoding="utf-8"))
-        except Exception:  # TODO: Narrow exception type
+        except (json.JSONDecodeError, OSError, KeyError):
             pass
     all_prefs[uid] = prefs
-    pref_file.write_text(
-        json.dumps(all_prefs, ensure_ascii=False, indent=2), encoding="utf-8"
-    )
+    pref_file.write_text(json.dumps(all_prefs, ensure_ascii=False, indent=2), encoding="utf-8")
 
 
 # ============ ChromaDB 路径工具 ============
+
 
 def get_chroma_dir() -> str:
     """Get ChromaDB persistence directory (single source of truth)
@@ -351,6 +364,7 @@ def get_chroma_dir() -> str:
 
 
 # ============ 审计日志 ============
+
 
 def log_audit(entry: dict, db_path: str = None):
     """Write an audit log entry"""
@@ -368,18 +382,17 @@ def log_audit(entry: dict, db_path: str = None):
                 )
             """)
             conn.execute(
-                "INSERT INTO audit_logs (event_type, user_id, ip, details, timestamp) "
-                "VALUES (?, ?, ?, ?, ?)",
+                "INSERT INTO audit_logs (event_type, user_id, ip, details, timestamp) " "VALUES (?, ?, ?, ?, ?)",
                 (
                     entry.get("event_type", ""),
                     entry.get("user_id", ""),
                     entry.get("ip", ""),
                     json.dumps(entry.get("details", {}), ensure_ascii=False),
                     entry.get("timestamp", time.strftime("%Y-%m-%d %H:%M:%S")),
-                )
+                ),
             )
             conn.commit()
-    except Exception as e:  # TODO: Narrow exception type
+    except (sqlite3.Error, OSError, json.JSONDecodeError) as e:
         logger.warning("[data_service] Audit log write failed: %s", e)
 
 
@@ -388,20 +401,22 @@ logger.info("[data_service] Data service layer loaded")
 
 # ============ v1.50 R4: 定期 WAL Checkpoint ============
 
+
 def _periodic_wal_checkpoint():
     """后台线程：定期对所有 SQLite 数据库执行 WAL checkpoint
-    
+
     防止 WAL 文件在频繁写入下无限增长。
     使用 PASSIVE 模式，不阻塞正常读写操作。
     """
     import threading as _thr
+
     db_paths = [
         str(CHUNKS_DB),
         str(LOGIN_RATE_DB),
         str(CHAT_SESSIONS_DB),
         str(AUDIT_DB),
     ]
-    
+
     def _run():
         while True:
             time.sleep(600)  # 每 10 分钟执行一次
@@ -412,10 +427,11 @@ def _periodic_wal_checkpoint():
                     conn = sqlite3.connect(db_path, timeout=10)
                     conn.execute("PRAGMA wal_checkpoint(PASSIVE)")
                     conn.close()
-                except Exception:
+                except (sqlite3.Error, OSError):
                     pass  # checkpoint 失败不影响业务
-    
+
     _thr.Thread(target=_run, daemon=True, name="wal-checkpoint").start()
     logger.info("[data_service] WAL checkpoint 后台任务已启动（每10分钟）")
+
 
 _periodic_wal_checkpoint()

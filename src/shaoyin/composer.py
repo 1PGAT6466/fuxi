@@ -2,6 +2,7 @@
 composer.py — 少阴·LLM合成器
 三级降级：MiMo→DeepSeek→模板
 """
+
 import logging
 from typing import Dict, List
 
@@ -11,8 +12,7 @@ logger = logging.getLogger("shaoyin.composer")
 class AnswerComposer:
     """答案合成器"""
 
-    async def compose(self, query: str, results: List[Dict],
-                       history: List[Dict] = None) -> Dict:
+    async def compose(self, query: str, results: List[Dict], history: List[Dict] = None) -> Dict:
         """合成答案"""
         if not results:
             return {
@@ -25,6 +25,7 @@ class AnswerComposer:
 
         try:
             from src.infra.llm import call_llm_by_task
+
             answer = await call_llm_by_task(
                 task="synthesis",
                 prompt=f"基于以下资料回答问题。\n\n资料：{context}\n\n问题：{query}\n\n回答：",

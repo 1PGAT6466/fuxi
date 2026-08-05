@@ -11,17 +11,11 @@ export default defineConfig(({ mode }) => {
   return {
     plugins: [
       vue(),
-      // Element Plus 按需导入：自动转换组件样式导入，避免全量打包
-      ElementPlus({
-        useSource: true,
-      }),
-      // 自动注册 Element Plus 组件，无需全局 app.use(ElementPlus)
-      Components({
-        resolvers: [ElementPlusResolver()],
-      }),
+      ElementPlus({ useSource: true }),
+      Components({ resolvers: [ElementPlusResolver()] }),
     ],
     root: '.',
-    base: './',
+    base: '/',
     build: {
       outDir: 'dist',
       // 目标浏览器优化
@@ -35,9 +29,10 @@ export default defineConfig(({ mode }) => {
           // 手动分包，将大型依赖拆分为独立 chunk
           manualChunks: {
             'vue-vendor': ['vue', 'vue-router', 'pinia'],
-            // element-plus 已通过 unplugin-element-plus 按需导入，不再整体打包
             'utils': ['axios', 'lodash-es', 'marked', 'dompurify'],
           },
+          // 小模块内联到父 chunk，减少 HTTP 请求
+          inlineSizeLimit: 4096,
         },
       },
       // esbuild 压缩

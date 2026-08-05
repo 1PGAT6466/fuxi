@@ -2,24 +2,31 @@
 Phase A 集成验证脚本 — 验证 pipeline 事件/实体提取通路
 从 repo 根目录运行：python src/scripts/verify_phase_a.py
 """
-import sys, os, asyncio, tempfile, shutil, logging
 
+import asyncio
+import logging
+import os
 import secrets as _secrets
-os.environ.setdefault('FUXI_JWT_SECRET', _secrets.token_hex(32))
+import shutil
+import sys
+import tempfile
+
+os.environ.setdefault("FUXI_JWT_SECRET", _secrets.token_hex(32))
 
 repo_root = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 sys.path.insert(0, repo_root)
-sys.path.insert(0, os.path.join(repo_root, 'src'))
+sys.path.insert(0, os.path.join(repo_root, "src"))
 
-logging.basicConfig(level=logging.INFO, format='%(asctime)s [%(name)s] %(levelname)s: %(message)s')
+logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(name)s] %(levelname)s: %(message)s")
 logger = logging.getLogger(__name__)
 
 from db.memory_store import MemoryStore
 
+
 async def verify():
     # 使用临时数据库
     test_dir = tempfile.mkdtemp()
-    test_db = os.path.join(test_dir, 'test_verify.db')
+    test_db = os.path.join(test_dir, "test_verify.db")
     store = MemoryStore(db_path=test_db)
 
     logger.info("=" * 60)
@@ -27,12 +34,10 @@ async def verify():
     logger.info("=" * 60)
 
     # 1. 验证 tables 存在
-    tables = store._db_conn.execute(
-        "SELECT name FROM sqlite_master WHERE type='table'"
-    ).fetchall()
+    tables = store._db_conn.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
     table_names = [t[0] for t in tables]
-    assert 'events' in table_names, "❌ events 表缺失"
-    assert 'entities' in table_names, "❌ entities 表缺失"
+    assert "events" in table_names, "❌ events 表缺失"
+    assert "entities" in table_names, "❌ entities 表缺失"
     logger.info("✅ 任务 1: events/entities 表已创建")
 
     # 2. 验证 CRUD 方法
@@ -79,28 +84,31 @@ async def verify():
 
     # 5. 验证 SAGExtractor 可导入并可调用（即使 LLM 不可用也不 crash）
     from shaoyang.extractor import SAGExtractor
+
     extractor = SAGExtractor()
     result = await extractor.extract("张三在2024年参加了AI大会。这是一个重要事件。", {})
     assert result is not None
     # LLM 可能不可用，所以 events/entities 可能为空，只要不抛异常即可
-    logger.info(f"✅ 任务 2: SAGExtractor.extract() 调用成功 (events={len(result.events)}, entities={len(result.entities)})")
+    logger.info(
+        f"✅ 任务 2: SAGExtractor.extract() 调用成功 (events={len(result.events)}, entities={len(result.entities)})"
+    )
 
     # 6. 验证 pipeline._extract_events_entities 可用
     from shaoyang.pipeline import ShaoyangPipeline
 
     # 测试：直接验证方法存在
-    assert hasattr(ShaoyangPipeline, '_extract_events_entities'), "❌ _extract_events_entities 方法缺失"
+    assert hasattr(ShaoyangPipeline, "_extract_events_entities"), "❌ _extract_events_entities 方法缺失"
     logger.info("✅ 任务 2: ShaoyangPipeline._extract_events_entities 方法已定义")
 
     # 验证 _vectorize_events 方法存在
-    assert hasattr(ShaoyangPipeline, '_vectorize_events'), "❌ _vectorize_events 方法缺失"
+    assert hasattr(ShaoyangPipeline, "_vectorize_events"), "❌ _vectorize_events 方法缺失"
     logger.info("✅ 任务 3: _vectorize_events 方法已定义")
 
     # 7. 验证 reindex_events 脚本存在且可导入
     import importlib.util
+
     spec = importlib.util.spec_from_file_location(
-        "reindex_events",
-        os.path.join(repo_root, "src", "scripts", "reindex_events.py")
+        "reindex_events", os.path.join(repo_root, "src", "scripts", "reindex_events.py")
     )
     mod = importlib.util.module_from_spec(spec)
     logger.info("✅ 任务 4: reindex_events.py 脚本可导入")
@@ -113,6 +121,7 @@ async def verify():
     logger.info("=" * 60)
     logger.info("🎉 Phase A 全部 5 项任务集成验证通过！")
     logger.info("=" * 60)
+
 
 if __name__ == "__main__":
     asyncio.run(verify())

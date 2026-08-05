@@ -2,7 +2,9 @@
 gateway.py — API 网关
 将请求路由到已注册的服务
 """
+
 import logging
+
 from fastapi import APIRouter, HTTPException
 
 from .registry import ServiceRegistry

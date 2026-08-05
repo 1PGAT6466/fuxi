@@ -3,13 +3,13 @@ services.py — 伏羲 v2.1 /api/services 聚合端点
 
 GET /api/services — 返回所有已注册服务的清单（JSON 数组），含健康检查。
 """
+
 import logging
 from typing import List
 
-from fastapi import APIRouter, Request, Depends
-
-from src.api.response import success, error
+from fastapi import APIRouter, Depends, Request
 from src.api.auth import require_admin  # v1.50 R2: 内部端点需要认证
+from src.api.response import error, success
 
 logger = logging.getLogger("api.services")
 
@@ -52,8 +52,10 @@ _SERVICES_MANIFEST: List[dict] = [
         "route": "/api/documents",
         "apiBase": "/api/documents",
         "endpoints": [
-            "POST /api/documents/upload", "GET /api/documents/list",
-            "POST /api/documents/ingest", "POST /api/documents/reindex"
+            "POST /api/documents/upload",
+            "GET /api/documents/list",
+            "POST /api/documents/ingest",
+            "POST /api/documents/reindex",
         ],
         "status": "up",
         "description": "文档上传、入库、重索引",
@@ -103,9 +105,12 @@ _SERVICES_MANIFEST: List[dict] = [
         "route": "/api/ai",
         "apiBase": "/api/ai",
         "endpoints": [
-            "POST /api/ai/summarize", "POST /api/ai/translate",
-            "POST /api/ai/keywords", "POST /api/ai/entities",
-            "POST /api/ai/classify", "GET /api/ai/health"
+            "POST /api/ai/summarize",
+            "POST /api/ai/translate",
+            "POST /api/ai/keywords",
+            "POST /api/ai/entities",
+            "POST /api/ai/classify",
+            "GET /api/ai/health",
         ],
         "status": "up",
         "description": "摘要、翻译、关键词、实体提取、分类",
@@ -119,9 +124,11 @@ _SERVICES_MANIFEST: List[dict] = [
         "route": "/api/analytics",
         "apiBase": "/api/analytics",
         "endpoints": [
-            "GET /api/analytics/stats", "POST /api/analytics/trends",
-            "GET /api/analytics/report", "POST /api/analytics/export",
-            "GET /api/analytics/health"
+            "GET /api/analytics/stats",
+            "POST /api/analytics/trends",
+            "GET /api/analytics/report",
+            "POST /api/analytics/export",
+            "GET /api/analytics/health",
         ],
         "status": "up",
         "description": "数据统计、趋势分析、报表导出",
@@ -135,9 +142,11 @@ _SERVICES_MANIFEST: List[dict] = [
         "route": "/api/tools",
         "apiBase": "/api/tools",
         "endpoints": [
-            "POST /api/tools/convert", "POST /api/tools/merge",
-            "POST /api/tools/split", "POST /api/tools/compress",
-            "GET /api/tools/health"
+            "POST /api/tools/convert",
+            "POST /api/tools/merge",
+            "POST /api/tools/split",
+            "POST /api/tools/compress",
+            "GET /api/tools/health",
         ],
         "status": "up",
         "description": "文档转换、合并、拆分、压缩",
@@ -151,9 +160,11 @@ _SERVICES_MANIFEST: List[dict] = [
         "route": "/api/dxf",
         "apiBase": "/api/dxf",
         "endpoints": [
-            "POST /api/dxf/upload", "GET /api/dxf/files",
-            "GET /api/dxf/view/{hash}", "GET /api/dxf/download/{hash}",
-            "GET /api/dxf/health"
+            "POST /api/dxf/upload",
+            "GET /api/dxf/files",
+            "GET /api/dxf/view/{hash}",
+            "GET /api/dxf/download/{hash}",
+            "GET /api/dxf/health",
         ],
         "status": "up",
         "description": "DXF/CAD 文件上传、查看、下载",
@@ -166,10 +177,7 @@ _SERVICES_MANIFEST: List[dict] = [
         "guaAffinity": "离",
         "route": "/api/eval",
         "apiBase": "/api/eval",
-        "endpoints": [
-            "POST /api/eval/run", "GET /api/eval/report",
-            "GET /api/eval/history", "GET /api/evaluation/*"
-        ],
+        "endpoints": ["POST /api/eval/run", "GET /api/eval/report", "GET /api/eval/history", "GET /api/evaluation/*"],
         "status": "up",
         "description": "自动化评测、报告生成、历史查询",
     },
@@ -230,9 +238,12 @@ _SERVICES_MANIFEST: List[dict] = [
         "route": "/api/mcp",
         "apiBase": "/api/mcp",
         "endpoints": [
-            "POST /api/mcp", "GET /api/mcp/tools",
-            "POST /api/mcp/sag_search", "POST /api/mcp/sag_ingest",
-            "POST /api/mcp/sag_explain", "GET /api/mcp/sag_status"
+            "POST /api/mcp",
+            "GET /api/mcp/tools",
+            "POST /api/mcp/sag_search",
+            "POST /api/mcp/sag_ingest",
+            "POST /api/mcp/sag_explain",
+            "GET /api/mcp/sag_status",
         ],
         "status": "up",
         "description": "MCP JSON-RPC 协议入口",
@@ -249,6 +260,7 @@ async def list_services(request: Request):
         # 从 auto_discovery 模块获取动态发现的路由信息
         try:
             from src.api._auto_discovery import get_discovered_router_info
+
             discovered = get_discovered_router_info()
         except ImportError:
             discovered = []
@@ -261,11 +273,13 @@ async def list_services(request: Request):
             svc_copy["status"] = _check_service_health(svc, discovered)
             services.append(svc_copy)
 
-        return success({
-            "services": services,
-            "total": len(services),
-            "auto_discovered_routes": len(discovered),
-        })
+        return success(
+            {
+                "services": services,
+                "total": len(services),
+                "auto_discovered_routes": len(discovered),
+            }
+        )
     except Exception as e:  # TODO: Narrow exception type
         logger.error(f"[Services] 获取服务清单失败: {e}", exc_info=True)
         return error("获取服务清单失败", status_code=500, detail=str(e))
@@ -301,15 +315,17 @@ async def toggle_service(service_id: str, action: str, request: Request):
     # 更新服务状态
     svc["status"] = "running" if action == "start" else "stopped"
     verb = "启动" if action == "start" else "停止"
-    user = getattr(request.state, 'username', 'admin')
+    user = getattr(request.state, "username", "admin")
     logger.info(f"[Services] {verb}服务: {service_id} (by {user})")
 
-    return success({
-        "service_id": service_id,
-        "action": action,
-        "status": svc["status"],
-        "message": f"服务已{verb}",
-    })
+    return success(
+        {
+            "service_id": service_id,
+            "action": action,
+            "status": svc["status"],
+            "message": f"服务已{verb}",
+        }
+    )
 
 
 def _check_service_health(svc: dict, discovered: List[dict]) -> str:

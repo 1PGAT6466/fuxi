@@ -416,7 +416,7 @@ class GracefulShutdown:
                     try:
                         await attr.close()
                         logger.debug("  → 已关闭 HTTP 会话: %s.%s", mod_name, attr_name)
-                    except Exception:  # TODO: Narrow exception type
+                    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
                         pass
 
     async def _drain_temp_files(self) -> None:
@@ -433,7 +433,7 @@ class GracefulShutdown:
                         try:
                             os.remove(os.path.join(root, f))
                             count += 1
-                        except Exception:  # TODO: Narrow exception type
+                        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
                             pass
             if count > 0:
                 logger.info("  → 已清理 %d 个临时文件", count)
@@ -450,14 +450,14 @@ class GracefulShutdown:
                 if hasattr(cb, "reset"):
                     cb.reset()
             logger.debug("  → 断路器已重置 (%d 个)", len(_circuit_breakers))
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             pass
 
         # 同时清理健康检查跟踪的断路器状态
         try:
             from src.infra.health_check import _circuit_open_times
             _circuit_open_times.clear()
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             pass
 
     def _drain_gua_registry(self) -> None:
@@ -466,7 +466,7 @@ class GracefulShutdown:
             from src.infra.health_check import _gua_registry
             _gua_registry.clear()
             logger.debug("  → 八卦注册表已清理")
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             pass
 
     def _flush_logs(self) -> None:
@@ -475,7 +475,7 @@ class GracefulShutdown:
             for handler in logging.getLogger().handlers:
                 handler.flush()
             logger.debug("  → 日志已刷新")
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             pass
 
 
@@ -490,7 +490,7 @@ def _get_all_gua_instances() -> Dict[str, Any]:
         from src.infra.health_check import _gua_registry
         if _gua_registry:
             return dict(_gua_registry)
-    except Exception:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         pass
     return {}
 

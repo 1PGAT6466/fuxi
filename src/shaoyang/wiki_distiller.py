@@ -1,7 +1,9 @@
 """
 wiki_distiller.py — Phase 5.4: Wiki 知识蒸馏 + 交叉引用 + 增量更新
 """
-import json, logging
+
+import json
+import logging
 from typing import List
 
 logger = logging.getLogger(__name__)
@@ -46,7 +48,8 @@ Wiki 内容：{wiki_content}
 
 async def distill_section(text: str, heading: str, file_name: str, category: str = "") -> str:
     """蒸馏章节为 Wiki 页面"""
-    from src.services.llm import call_llm
+    from src.infra import call_llm
+
     prompt = DISTILL_PROMPT.format(heading=heading, file_name=file_name, category=category, text=text[:4000])
     result = await call_llm(prompt, max_tokens=2000)
     return result or ""
@@ -54,7 +57,8 @@ async def distill_section(text: str, heading: str, file_name: str, category: str
 
 async def generate_overview(file_name: str, summary: str) -> str:
     """生成文档总览"""
-    from src.services.llm import call_llm
+    from src.infra import call_llm
+
     prompt = OVERVIEW_PROMPT.format(file_name=file_name, summary=summary[:2000])
     result = await call_llm(prompt, max_tokens=1000)
     return result or ""
@@ -62,7 +66,8 @@ async def generate_overview(file_name: str, summary: str) -> str:
 
 async def verify_wiki_page(wiki_content: str, source_text: str) -> dict:
     """校验 Wiki 页面质量"""
-    from src.services.llm import call_llm
+    from src.infra import call_llm
+
     prompt = VERIFY_PROMPT.format(wiki_content=wiki_content[:2000], source_text=source_text[:3000])
     result = await call_llm(prompt, max_tokens=300)
     if result:

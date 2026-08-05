@@ -2,8 +2,9 @@
 strategy.py — 少阴·策略选择
 SAG式映射：快速/深度/表格三种模式
 """
+
 import logging
-from typing import Dict, Any
+from typing import Any, Dict
 
 logger = logging.getLogger("shaoyin.strategy")
 
@@ -35,7 +36,7 @@ def select_strategy(intent: Dict) -> str:
 
 def get_strategy_params(strategy: str) -> Dict[str, Any]:
     """获取策略参数 — v1.50: 任务 5 五层路由接入 SAG
-    
+
     L1 (fast): Path B 向量直接（不用 SAG）
     L2 (standard): 标准混合检索（不用 SAG）
     L3 (deep): 完整 SAG 三阶段管线（Path A + Path B + 多跳 + Rerank）

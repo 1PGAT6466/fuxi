@@ -2,8 +2,9 @@
 relation.py — 三层关系模型
 碎片↔事件↔实体 的关联
 """
+
 from dataclasses import dataclass
-from typing import Dict, Any
+from typing import Any, Dict
 
 
 @dataclass

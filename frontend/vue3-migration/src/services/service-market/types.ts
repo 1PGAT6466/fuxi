@@ -113,7 +113,7 @@ export interface MarketServiceListResponse {
 
 /** 安装服务请求 */
 export interface InstallServiceRequest {
-  serviceId: string;
+  service_id: string;
   version?: string; // 不传则安装最新版本
 }
 
@@ -128,7 +128,7 @@ export interface InstallServiceResponse {
 
 /** 卸载服务请求 */
 export interface UninstallServiceRequest {
-  serviceId: string;
+  service_id: string;
 }
 
 /** 卸载服务响应 */

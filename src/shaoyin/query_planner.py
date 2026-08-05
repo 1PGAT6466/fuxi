@@ -2,11 +2,15 @@
 query_planner.py — Phase 8.2: 查询规划与分解 v2.0
 正则快速匹配 + LLM 深度分解
 """
-import json, re, logging
-from typing import List, Optional
+
+import json
+import logging
+import re
 from dataclasses import dataclass
+from typing import List, Optional
 
 logger = logging.getLogger("query_planner")
+
 
 @dataclass
 class PlanStep:
@@ -49,13 +53,16 @@ def _quick_plan(query: str) -> Optional[List[PlanStep]]:
                 PlanStep(2, f"{m.group(1).strip()} {m.group(2).strip()}", "vector", f"向量检索属性"),
             ]
     return None
+
+
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 
 async def _llm_plan(query: str) -> Optional[List[PlanStep]]:
     """LLM 深度分解（1-3s，仅复杂查询触发）"""
     try:
-        from src.services.llm import call_llm_fast
+        from src.infra import call_llm_fast
+
         prompt = f"""分析以下查询，分解为子查询。只输出 JSON 数组。
 
 查询：{query}
@@ -87,12 +94,14 @@ async def _llm_plan(query: str) -> Optional[List[PlanStep]]:
 
         steps = []
         for i, item in enumerate(items):
-            steps.append(PlanStep(
-                step_id=i + 1,
-                query=item.get("q", ""),
-                source=item.get("source", "hybrid"),
-                reason=item.get("reason", "LLM 分解"),
-            ))
+            steps.append(
+                PlanStep(
+                    step_id=i + 1,
+                    query=item.get("q", ""),
+                    source=item.get("source", "hybrid"),
+                    reason=item.get("reason", "LLM 分解"),
+                )
+            )
 
         if steps:
             logger.info(f"[Planner] LLM 分解: {len(steps)} 步")

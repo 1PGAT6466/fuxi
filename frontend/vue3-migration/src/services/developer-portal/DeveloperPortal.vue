@@ -139,10 +139,10 @@ async function loadApiDoc(version?: string): Promise<void> {
   try {
     // 先加载版本列表
     const versionRes = await getApiDocVersions();
-    store.setApiVersions(versionRes.versions, versionRes.currentVersion);
+    store.setApiVersions(versionRes?.versions ?? [], versionRes?.currentVersion ?? 'latest');
 
     // 再加载具体文档
-    const targetVersion = version || versionRes.currentVersion;
+    const targetVersion = version || versionRes?.currentVersion || 'latest';
     const doc = await getApiDoc(targetVersion);
 
     // 将 OpenAPI paths 解析为分组
@@ -196,7 +196,7 @@ async function loadCommunityPosts(): Promise<void> {
       store.communityPageSize,
       store.selectedCommunityCategory || undefined,
     );
-    store.setCommunityPosts(res.posts, res.total, res.page);
+    store.setCommunityPosts(res?.posts || [], res?.total || 0, res?.page || 1);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : '加载社区帖子失败';
     store.communityError = msg;
@@ -255,7 +255,9 @@ watch(
 
 // ───── 工具函数 ─────
 
-function parseOpenApiDoc(doc: import('./types').OpenApiDoc): import('./types').ApiEndpointGroup[] {
+function parseOpenApiDoc(doc: import('./types').OpenApiDoc | null | undefined): import('./types').ApiEndpointGroup[] {
+  if (!doc) return [];
+
   const tagMap = new Map<string, import('./types').ApiEndpointDef[]>();
 
   // 从 tags 初始化分组

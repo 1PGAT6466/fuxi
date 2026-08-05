@@ -5,7 +5,6 @@ common_settings.py — 八卦层通用配置 & Meridian 工厂函数
 给 fuxi.py 的 Fuxi 类提供全身唯一信号总线实例。
 """
 
-
 import logging
 from typing import Optional
 
@@ -91,14 +90,10 @@ def _try_import_meridian():
             module = __import__(module_path, fromlist=[class_name])
             cls = getattr(module, class_name, None)
             if cls is not None:
-                logger.debug(
-                    "[config] 从 %s 导入 Meridian 类成功", module_path
-                )
+                logger.debug("[config] 从 %s 导入 Meridian 类成功", module_path)
                 return cls
         except ImportError as e:
-            logger.debug(
-                "[config] 从 %s 导入 Meridian 失败: %s", module_path, e
-            )
+            logger.debug("[config] 从 %s 导入 Meridian 失败: %s", module_path, e)
             continue
 
     return None

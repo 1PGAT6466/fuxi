@@ -62,9 +62,9 @@ export const useApiKeysStore = defineStore('api-keys', () => {
   // ───── Actions ─────
 
   /** 设置 Key 列表 */
-  function setKeys(list: ApiKey[], t: number): void {
-    keys.value = list;
-    total.value = t;
+  function setKeys(list: ApiKey[], t?: number): void {
+    keys.value = Array.isArray(list) ? list : [];
+    total.value = t ?? (Array.isArray(list) ? list.length : 0);
     error.value = null;
   }
 

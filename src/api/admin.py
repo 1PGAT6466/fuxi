@@ -2,23 +2,30 @@
 admin.py - 管理路由
 v1.44 Phase 1: 使用 RBAC require_role 替代旧版 require_admin
 """
-from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
-from src.auth.rbac import require_role
+
 import json
 import logging
 import os
 from pathlib import Path
 
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
+from src.auth.rbac import require_role
+
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["管理"])
+# v1.50 安全修复: 所有管理端点统一要求 admin 角色
+router = APIRouter(
+    tags=["管理"],
+    dependencies=[Depends(require_role("admin"))],
+)
 
 
 def _get_chunks_stats():
     """获取文档块统计信息"""
     try:
         from src.db.data_store import load_chunks
+
         chunks = load_chunks()
         total_chunks = len(chunks)
         categories = {}
@@ -40,40 +47,49 @@ def _load_users():
     """加载用户列表 — v1.50 R3: 保留 password 字段防止数据丢失"""
     try:
         from src.config import DATA_DIR as CONFIG_DATA_DIR
+
         users_file = Path(CONFIG_DATA_DIR) / "users.json"
         if users_file.exists():
             raw = json.loads(users_file.read_text(encoding="utf-8"))
             users = []
             for username, info in raw.items():
-                users.append({
-                    "username": username,
-                    "role": info.get("role", "user"),
-                    "tenant_id": info.get("tenant_id", "default"),
-                    "password": info.get("password", ""),
-                    "display_name": info.get("display_name", username),
-                    "email": info.get("email", ""),
-                })
+                users.append(
+                    {
+                        "username": username,
+                        "role": info.get("role", "user"),
+                        "tenant_id": info.get("tenant_id", "default"),
+                        "password": info.get("password", ""),
+                        "display_name": info.get("display_name", username),
+                        "email": info.get("email", ""),
+                    }
+                )
             return users
         return []
     except (OSError, IOError, json.JSONDecodeError) as e:
         logger.warning(f"_load_users 失败: {e}")
         return []
 
+
 # v1.50 R4: 进程内文件级锁，防止 users.json 并发 read-modify-write 引发数据丢失
 import threading as _threading
+
 _users_file_lock = _threading.Lock()
+
 
 def _load_users_locked():
     """带锁加载用户列表，与 _save_users 配对使用以保证原子 read-modify-write"""
     with _users_file_lock:
         return _load_users()
 
+
 def _save_users(users):
     """保存用户列表 — v1.50 R3-4: 文件锁 + 原子写入"""
     import os as _os
     import tempfile as _tempfile
+
     try:
         from src.config import DATA_DIR as CONFIG_DATA_DIR
+
         users_file = Path(CONFIG_DATA_DIR) / "users.json"
         users_file.parent.mkdir(parents=True, exist_ok=True)
         with _users_file_lock:
@@ -100,7 +116,7 @@ async def admin_stats(request: Request = None):
             "data": {
                 "chunks": chunks_stats,
                 "users": {"total": len(users)},
-            }
+            },
         }
     except (OSError, IOError, ValueError) as e:
         logger.exception(f"admin_stats 失败: {e}")
@@ -112,6 +128,7 @@ async def server_status(request: Request = None):
     """服务器状态"""
     try:
         import psutil
+
         cpu = psutil.cpu_percent(interval=0.1)
         mem = psutil.virtual_memory()
         return {
@@ -121,7 +138,7 @@ async def server_status(request: Request = None):
                 "memory_percent": mem.percent,
                 "memory_used_mb": mem.used // (1024 * 1024),
                 "memory_total_mb": mem.total // (1024 * 1024),
-            }
+            },
         }
     except (ImportError, OSError) as e:
         return {"status": "success", "data": {"message": "psutil 不可用"}}
@@ -132,7 +149,9 @@ async def admin_users(request: Request = None):
     """用户列表"""
     try:
         users = _load_users()
-        return {"status": "success", "data": {"users": users, "total": len(users)}}
+        # v1.50 P0 安全修复: 过滤密码字段，不返回给客户端
+        safe_users = [{k: v for k, v in u.items() if k != "password"} for u in users]
+        return {"status": "success", "data": {"users": safe_users, "total": len(safe_users)}}
     except (OSError, IOError, ValueError) as e:
         logger.exception(f"admin_users 失败: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
@@ -141,20 +160,21 @@ async def admin_users(request: Request = None):
 @router.post("/api/admin/users")
 async def admin_create_user(request: Request):
     """创建用户 — v1.50 R3: 安全性修复
-    
+
     - 密码长度验证
     - 敏感用户名黑名单检查
     - 合法 role 值验证
     - 使用 dict 格式保存，防止数据丢失
     - 写入审计日志
     """
-    from src.api.response import success, error
+    from src.api.response import error, success
+
     try:
         data = await request.json()
         username = data.get("username", "").strip()
         password = data.get("password", "")
         role = data.get("role", "user")
-        
+
         # v1.50 R3: 输入验证
         if not username or len(username) < 1 or len(username) > 64:
             return JSONResponse(status_code=400, content={"status": "error", "message": "用户名长度必须在1-64字符之间"})
@@ -162,25 +182,31 @@ async def admin_create_user(request: Request):
             return JSONResponse(status_code=400, content={"status": "error", "message": "密码长度至少需要8个字符"})
         if role not in ("user", "admin", "viewer"):
             return JSONResponse(status_code=400, content={"status": "error", "message": "无效的角色值"})
-        
+
         # v1.50 R3: 敏感用户名检查（与 auth_routes 保持一致）
         from src.api.auth_routes import _is_username_blocked
+
         if _is_username_blocked(username):
-            return JSONResponse(status_code=400, content={"status": "error", "message": "该用户名不可用，请选择其他用户名"})
-        
+            return JSONResponse(
+                status_code=400, content={"status": "error", "message": "该用户名不可用，请选择其他用户名"}
+            )
+
         # v1.50 R3: 合并到 dict 格式
         from src.config import DATA_DIR as CONFIG_DATA_DIR
+
         users_file = Path(CONFIG_DATA_DIR) / "users.json"
         if users_file.exists():
             raw = json.loads(users_file.read_text(encoding="utf-8"))
         else:
             raw = {}
-        
+
         if username in raw:
             return JSONResponse(status_code=409, content={"status": "error", "message": "用户已存在"})
-        
-        import bcrypt
+
         import time
+
+        import bcrypt
+
         hashed = bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
         raw[username] = {
             "password": hashed,
@@ -190,9 +216,11 @@ async def admin_create_user(request: Request):
             "email": "",
             "created_at": time.time(),
         }
-        
+
         # v1.50 R5: 原子写入 — 使用全局文件锁防止并发覆盖
-        import os as _os, tempfile as _tempfile
+        import os as _os
+        import tempfile as _tempfile
+
         with _users_file_lock:
             fd, tmp_path = _tempfile.mkstemp(suffix=".json", dir=str(users_file.parent))
             try:
@@ -200,19 +228,22 @@ async def admin_create_user(request: Request):
             finally:
                 _os.close(fd)
             _os.replace(tmp_path, str(users_file))
-        
+
         # v1.50 R3: 审计日志
         try:
             from src.data_service import log_audit
-            log_audit({
-                "event_type": "user_created",
-                "user_id": getattr(request.state, "user", "admin") if request else "admin",
-                "ip": request.client.host if request and request.client else "-",
-                "details": {"target_user": username, "role": role},
-            })
-        except Exception:
+
+            log_audit(
+                {
+                    "event_type": "user_created",
+                    "user_id": getattr(request.state, "user", "admin") if request else "admin",
+                    "ip": request.client.host if request and request.client else "-",
+                    "details": {"target_user": username, "role": role},
+                }
+            )
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
             pass
-        
+
         return {"status": "success", "message": f"用户 {username} 创建成功"}
     except (OSError, IOError, json.JSONDecodeError, ValueError) as e:
         logger.exception(f"admin_create_user 失败: {e}")
@@ -227,21 +258,24 @@ async def admin_delete_user(user_id: str, request: Request = None):
         current_user = getattr(request.state, "user", "") if request else ""
         if current_user and current_user == user_id:
             return JSONResponse(status_code=400, content={"status": "error", "message": "不能删除自己的账号"})
-        
+
         from src.config import DATA_DIR as CONFIG_DATA_DIR
+
         users_file = Path(CONFIG_DATA_DIR) / "users.json"
         if users_file.exists():
             raw = json.loads(users_file.read_text(encoding="utf-8"))
         else:
             raw = {}
-        
+
         if user_id not in raw:
             return JSONResponse(status_code=404, content={"status": "error", "message": "用户不存在"})
-        
+
         del raw[user_id]
-        
+
         # v1.50 R5: 原子写入 — 使用全局文件锁防止并发覆盖
-        import os as _os, tempfile as _tempfile
+        import os as _os
+        import tempfile as _tempfile
+
         with _users_file_lock:
             fd, tmp_path = _tempfile.mkstemp(suffix=".json", dir=str(users_file.parent))
             try:
@@ -249,20 +283,52 @@ async def admin_delete_user(user_id: str, request: Request = None):
             finally:
                 _os.close(fd)
             _os.replace(tmp_path, str(users_file))
-        
+
         # v1.50 R3: 审计日志
         try:
             from src.data_service import log_audit
-            log_audit({
-                "event_type": "user_deleted",
-                "user_id": current_user or "admin",
-                "ip": request.client.host if request and request.client else "-",
-                "details": {"target_user": user_id},
-            })
-        except Exception:
+
+            log_audit(
+                {
+                    "event_type": "user_deleted",
+                    "user_id": current_user or "admin",
+                    "ip": request.client.host if request and request.client else "-",
+                    "details": {"target_user": user_id},
+                }
+            )
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
             pass
-        
+
         return {"status": "success", "message": f"用户 {user_id} 已删除"}
     except (OSError, IOError, ValueError) as e:
         logger.exception(f"admin_delete_user 失败: {e}")
         return JSONResponse(status_code=500, content={"status": "error", "message": "删除用户服务异常"})
+
+
+@router.post("/api/admin/cache/clear")
+async def clear_search_cache():
+    """清除搜索缓存 — L1 精确匹配 + L2 语义缓存"""
+    try:
+        from src.services.cache import clear_cache, get_cache_stats
+
+        stats_before = get_cache_stats()
+        clear_cache()
+        return {
+            "status": "success",
+            "message": "缓存已清除",
+            "before": stats_before,
+        }
+    except Exception as e:
+        logger.exception(f"clear_cache 失败: {e}")
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})
+
+
+@router.get("/api/admin/cache/stats")
+async def cache_stats():
+    """查看缓存统计"""
+    try:
+        from src.services.cache import get_cache_stats
+
+        return {"status": "success", "data": get_cache_stats()}
+    except Exception as e:
+        return JSONResponse(status_code=500, content={"status": "error", "message": str(e)})

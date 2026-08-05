@@ -22,7 +22,7 @@
       </div>
 
       <!-- 空状态 -->
-      <div v-else-if="store.workflows.length === 0" class="empty-state">
+      <div v-else-if="!Array.isArray(store.workflows) || store.workflows.length === 0" class="empty-state">
         <div class="empty-icon">⚡</div>
         <h2>尚无工作流</h2>
         <p>创建您的第一个工作流，开始自动化之旅</p>
@@ -32,7 +32,7 @@
       <!-- 工作流列表 -->
       <div v-else class="workflow-grid">
         <div
-          v-for="wf in store.workflows"
+          v-for="wf in (Array.isArray(store.workflows) ? store.workflows : [])"
           :key="wf.id"
           class="workflow-card"
           @click="openWorkflow(wf.id)"

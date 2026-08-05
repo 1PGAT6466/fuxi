@@ -2,10 +2,11 @@
 meridian_monitor.py — 经络监控器
 实时监控信号流、健康状态、性能指标
 """
-import time
+
 import logging
-from typing import Dict, Optional
+import time
 from collections import deque
+from typing import Dict, Optional
 
 logger = logging.getLogger("infra.meridian_monitor")
 
@@ -28,8 +29,9 @@ class MeridianMonitor:
         self._signal_history = deque(maxlen=max_history)
         self._start_time = time.time()
 
-    def record_signal(self, signal_id: str, source: str, target: str,
-                      signal_type: str, latency_ms: float, success: bool):
+    def record_signal(
+        self, signal_id: str, source: str, target: str, signal_type: str, latency_ms: float, success: bool
+    ):
         """记录信号指标"""
         self.metrics["signals_sent"] += 1
 
@@ -42,30 +44,34 @@ class MeridianMonitor:
         self._update_avg_latency()
 
         # 记录信号历史
-        self._signal_history.append({
-            "signal_id": signal_id,
-            "source": source,
-            "target": target,
-            "type": signal_type,
-            "latency_ms": latency_ms,
-            "success": success,
-            "timestamp": time.time(),
-        })
+        self._signal_history.append(
+            {
+                "signal_id": signal_id,
+                "source": source,
+                "target": target,
+                "type": signal_type,
+                "latency_ms": latency_ms,
+                "success": success,
+                "timestamp": time.time(),
+            }
+        )
 
     def record_timeout(self, signal_id: str, source: str, target: str):
         """记录信号超时"""
         self.metrics["signals_timeout"] += 1
         self.metrics["signals_error"] += 1
 
-        self._signal_history.append({
-            "signal_id": signal_id,
-            "source": source,
-            "target": target,
-            "type": "timeout",
-            "latency_ms": 0,
-            "success": False,
-            "timestamp": time.time(),
-        })
+        self._signal_history.append(
+            {
+                "signal_id": signal_id,
+                "source": source,
+                "target": target,
+                "type": "timeout",
+                "latency_ms": 0,
+                "success": False,
+                "timestamp": time.time(),
+            }
+        )
 
     def _update_avg_latency(self):
         """更新平均延迟"""

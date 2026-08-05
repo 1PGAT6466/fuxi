@@ -100,7 +100,7 @@
 
     <!-- 表格视图 -->
     <div v-else-if="viewMode === 'table'" class="documents-table-wrap">
-      <el-table :data="filteredFiles" stripe style="width: 100%" @row-click="handleRowClick">
+      <el-table :data="filteredFiles || []" stripe style="width: 100%" @row-click="handleRowClick">
         <el-table-column prop="filename" label="文件名" min-width="250">
           <template #default="{ row }">
             <div class="table-filename">

@@ -787,7 +787,7 @@ class DegradationChain:
                 for cb in self._on_recovery:
                     try:
                         cb(cat)
-                    except Exception:
+                    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
                         pass
 
     def reset(self) -> None:

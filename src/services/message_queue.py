@@ -236,7 +236,7 @@ class RedisStreamBackend(MessageQueueBackend):
             )
             if claimed:
                 logger.info("[MQ:Redis] 认领 %d 条超时消息 (topic=%s)", len(claimed), topic)
-        except Exception:
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
             # xautoclaim may not exist in all Redis versions / drivers
             logger.debug("[MQ:Redis] xautoclaim 不可用，跳过 pending 认领")
 
@@ -374,7 +374,7 @@ class RedisStreamBackend(MessageQueueBackend):
                 # 确认消息（从 pending 中移除）
                 try:
                     await self._redis.xack(stream_key, group_name, message_id)
-                except Exception:
+                except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
                     pass
 
     async def _send_to_dead_letter(self, msg: Message) -> None:
@@ -425,7 +425,7 @@ class RedisStreamBackend(MessageQueueBackend):
         try:
             await self._redis.ping()
             return True
-        except Exception:
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
             return False
 
     async def close(self) -> None:

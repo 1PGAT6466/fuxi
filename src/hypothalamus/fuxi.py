@@ -12,8 +12,8 @@ from src.bagua.config.common_settings import get_meridian
 
 # 四象模块
 from src.shaoyang.pipeline import ShaoyangPipeline
-from src.taiyang.retrieval import TaiyangRetrieval
 from src.shaoyin.brain import ShaoyinBrain
+from src.taiyang.retrieval import TaiyangRetrieval
 from src.taiyin.server import TaiyinServer
 
 logger = logging.getLogger("fuxi")
@@ -57,6 +57,10 @@ class Fuxi:
         logger.info("🌱 少阳·消化 已就绪")
 
         self.taiyang = TaiyangRetrieval(self.meridian)
+        # 注册到全局变量，让 hybrid_search 能找到实例
+        import src.taiyang.retrieval as _tr
+
+        _tr._retrieval_instance = self.taiyang
         logger.info("☀️ 太阳·筑基 已就绪")
 
         self.shaoyin = ShaoyinBrain(self.meridian)
@@ -71,8 +75,7 @@ class Fuxi:
         logger.info("  伏羲 Fuxi 2.1 — 已苏醒（四象 + 八卦）")
         logger.info("=" * 50)
 
-    async def think(self, query: str,
-                    enable_external: bool = False) -> Dict:
+    async def think(self, query: str, enable_external: bool = False) -> Dict:
         """用户向伏羲提问"""
         if not self._born:
             raise RuntimeError("伏羲尚未诞生，请先调用 born()")

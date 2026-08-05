@@ -1,6 +1,6 @@
 """
-feature_flags.py — Phase 5.0.3: Feature Flag 服务
-支持秒级回滚，不重启切换功能
+feature_flags.py - Phase 5.0.3: Feature Flag Service
+Supports instant rollback without restart
 """
 import json, time, logging
 from pathlib import Path
@@ -12,44 +12,44 @@ from src.config import DATA_DIR
 FLAG_FILE = Path(DATA_DIR) / "feature_flags.json"
 
 DEFAULT_FLAGS = {
-    # 核心Flag（必须独立控制）
-    "shaoyang_sag_extract": True,        # SAG式事件/实体提取（已默认开启）
-    "taiyang_multi_hop": True,           # SAG式多跳检索（已默认开启）
-    "taiyang_seed_score": True,          # SAG式 seed_score 融合（已默认开启）
+    # Core Flags (must be independently controlled)
+    "shaoyang_sag_extract": True,        # SAG-style event/entity extraction (default enabled)
+    "taiyang_multi_hop": True,           # SAG-style multi-hop search (default enabled)
+    "taiyang_seed_score": True,          # SAG seed_score fusion (default enabled)
 
-    # Phase B 新增 Flag（伏羲检索架构融合）
-    "taiyang_sag_pipeline": True,        # SAG 三阶段管线总开关（ADR-001，任务 3）
-    "taiyang_path_a": True,              # Path A: 实体引导召回（ADR-002，任务 2）
-    "taiyang_event_search": True,        # Event 粒度检索（ADR-003，任务 1）
-    "taiyang_sql_multi_hop": True,       # SQL JOIN 多跳扩展 H=1（任务 3）
+    # Phase B New Flags (Fuxi search architecture fusion)
+    "taiyang_sag_pipeline": True,        # SAG three-stage pipeline master switch (ADR-001, task #3)
+    "taiyang_path_a": True,              # Path A: Entity-guided fallback (ADR-002, task #2)
+    "taiyang_event_search": True,        # Event granularity search (ADR-003, task #1)
+    "taiyang_sql_multi_hop": True,       # SQL JOIN multi-hop expansion H=1 (task #3)
 
-    # 增强Flag（一键控制）
-    "enhanced_pipeline": False,          # 包含：query_rewrite/hyde/self_check/crag/context_compress
+    # Enhancement Flags (one-click control)
+    "enhanced_pipeline": False,          # Contains: query_rewrite/hyde/self_check/crag/context_compress
 
-    # 基础Flag
+    # Basic Flags
     "graphrag_multi_hop": False,
     "query_planner": False,
     "table_structured_search": False,
     "multimodal_rag": False,
     "sentence_level_compress": False,
     "knowledge_lifecycle": False,
-    "siliconflow_rerank": False,
-    "self_rag_check": True,              # 以 services/feature_flags.py 为准（原 taiyin 为 False）
-    "crag_rewrite": True,                # 以 services/feature_flags.py 为准（原 taiyin 为 False）
-    "query_rewrite": False,
+    "siliconflow_rerank": True,
+    "self_rag_check": True,              # From services/feature_flags.py (originally taiyin was False)
+    "crag_rewrite": True,                # From services/feature_flags.py (originally taiyin was False)
+    "query_rewrite": True,
     "hyde": False,
     "wiki_search": False,
     "table_view": False,
     "session_memory": False,
 
     # v1.50 Phase C: Dream Cycle
-    "enable_dream_cycle_notifications": False,  # 日报通知推送（默认关闭，后续接入飞书/企微后开启）
-    "enable_gap_llm": False,                    # gap_scan LLM 增强（默认关闭，零 LLM 设计）
+    "enable_dream_cycle_notifications": False,  # Daily report notification push (default off, enable after connecting to enterprise WeChat)
+    "enable_gap_llm": False,                    # gap_scan LLM enhancement (default off, zero LLM design)
 }
 
 _flags = None
 _last_load = 0
-_RELOAD_INTERVAL = 10  # 10 秒重新加载
+_RELOAD_INTERVAL = 10  # 10 seconds reload
 
 def load_flags() -> Dict[str, bool]:
     global _flags, _last_load
@@ -62,7 +62,7 @@ def load_flags() -> Dict[str, bool]:
             saved = json.loads(FLAG_FILE.read_text(encoding="utf-8"))
             _flags = {**DEFAULT_FLAGS, **saved}
         except Exception as e:  # TODO: Narrow exception type
-            logger.warning("加载 feature flags 失败: %s", e, exc_info=True)
+            logger.warning("Failed to load feature flags: %s", e, exc_info=True)
             _flags = dict(DEFAULT_FLAGS)
     else:
         _flags = dict(DEFAULT_FLAGS)
@@ -89,28 +89,28 @@ def set_flag(feature: str, enabled: bool) -> bool:
     _last_load = time.time()
     logger.info(f"[FeatureFlag] {feature} = {enabled}")
 
-    # v2.1: 通过 WebSocket 广播变更事件
+    # v2.1: Broadcast change event via WebSocket
     _broadcast_change(feature, old_value, enabled)
 
     return True
 
 
 def _broadcast_change(flag_name: str, old_value, new_value: bool):
-    """广播 flag 变更到 WebSocket 客户端"""
+    """Broadcast flag change to WebSocket clients."""
     try:
         from src.api.feature_flags_ws import broadcast_flag_change
         import asyncio
-        # 尝试在现有事件循环中运行
+        # Try to run in existing event loop
         try:
             loop = asyncio.get_running_loop()
             loop.create_task(broadcast_flag_change(flag_name, old_value, new_value))
         except RuntimeError:
-            # 没有运行中的事件循环（同步调用时）
+            # No running event loop (when called synchronously)
             pass
     except ImportError:
         pass
     except Exception as e:  # TODO: Narrow exception type
-        logger.debug(f"[FeatureFlag] WebSocket 广播失败: {e}")
+        logger.debug(f"[FeatureFlag] WebSocket broadcast failed: {e}")
 
 def get_all_flags() -> Dict[str, Any]:
     flags = load_flags()

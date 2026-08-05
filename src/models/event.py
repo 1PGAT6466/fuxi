@@ -2,8 +2,9 @@
 event.py — SAG 式事件模型
 从碎片中提取的结构化事项
 """
+
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any
+from typing import Any, Dict, List, Optional
 
 
 @dataclass

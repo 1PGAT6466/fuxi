@@ -1,0 +1,402 @@
+﻿"""
+smart_llm.py - 鏅鸿兘LLM璋冪敤鍣?
+鍔熻兘锛?1. 鏅鸿兘璺敱锛氳嚜鍔ㄦ娴嬫煡璇㈢被鍨嬶紝閫夋嫨鏈€浼樻ā鍨?2. 鑷姩闄嶇骇锛氫富妯″瀷澶辫触鑷姩鍒囨崲澶囩敤妯″瀷
+3. 缁撴灉鏍￠獙锛氭娴婮SON schema杩斿洖绌虹瓑寮傚父
+4. 缁熻鐩戞帶锛氳褰曟垚鍔熺巼銆佹垚鏈瓑鎸囨爣
+"""
+
+import asyncio
+import json
+import logging
+import sys
+import time
+from collections import OrderedDict
+from dataclasses import dataclass
+from typing import Any, AsyncGenerator, Dict, Optional
+
+from ..config import MIMO_API_KEY, MIMO_BASE_URL, MIMO_TIMEOUT
+from .llm import _call_api, _call_api_stream
+from .model_router import ModelRouter, QueryType, get_router
+
+logger = logging.getLogger(__name__)
+
+
+@dataclass
+class LLMResponse:
+    """LLM鍝嶅簲"""
+
+    content: str
+    model: str
+    query_type: str
+    fallback: bool
+    success: bool
+    tokens_used: int = 0
+    error: Optional[str] = None
+
+
+class SmartLLM:
+    """鏅鸿兘LLM璋冪敤鍣紙甯﹁嚜鍔ㄩ檷绾э級"""
+
+    def __init__(self, router: Optional[ModelRouter] = None):
+        self.router = router or get_router()
+        self.max_retries = 2
+
+        # 鎴愭湰鎺у埗閰嶇疆
+        self.daily_limit = 10.0  # 姣忔棩闄愰锛堝厓锛?        self.per_request_limit = 0.1  # 鍗曟闄愰锛堝厓锛?
+        # 缂撳瓨閰嶇疆
+        self.cache_enabled = True
+        self.cache_ttl = 3600  # 缂撳瓨鏃堕棿锛堢锛?        self.cache_max_memory = 50 * 1024 * 1024  # 50MB 鍐呭瓨涓婇檺
+        self._cache: OrderedDict = OrderedDict()  # {key: (response, timestamp)}  LRU鏈夊簭瀛楀吀
+        self._cache_memory_used = 0  # 褰撳墠缂撳瓨鍐呭瓨浣跨敤閲忥紙瀛楄妭锛?
+        # 缂撳瓨缁熻
+        self._cache_hits = 0
+        self._cache_misses = 0
+        self._cache_evictions = 0
+
+    def _estimate_size(self, obj) -> int:
+        """浼扮畻瀵硅薄鍐呭瓨澶у皬"""
+        return sys.getsizeof(obj)
+
+    def _get_cache_key(self, messages: list, model: str) -> str:
+        """鐢熸垚缂撳瓨閿?""
+        # 绠€鍖栵細浣跨敤娑堟伅鍐呭鐨刪ash浣滀负缂撳瓨閿?        import hashlib
+
+        content = json.dumps(messages, sort_keys=True) + model
+        return hashlib.sha256(content.encode()).hexdigest()
+
+    def _get_from_cache(self, cache_key: str) -> Optional[str]:
+        """浠庣紦瀛樿幏鍙栵紙LRU: 鍛戒腑鏃剁Щ鍒版湯灏撅級"""
+        if not self.cache_enabled:
+            return None
+
+        if cache_key in self._cache:
+            response, timestamp = self._cache[cache_key]
+            if time.time() - timestamp < self.cache_ttl:
+                # LRU: 鍛戒腑鏃剁Щ鍒版湯灏?                self._cache.move_to_end(cache_key)
+                self._cache_hits += 1
+                logger.debug(f"缂撳瓨鍛戒腑: {cache_key[:8]}...")
+                return response
+            else:
+                # 缂撳瓨杩囨湡
+                item_size = self._estimate_size(self._cache[cache_key])
+                self._cache_memory_used = max(0, self._cache_memory_used - item_size)
+                del self._cache[cache_key]
+
+        self._cache_misses += 1
+        return None
+
+    def _set_cache(self, cache_key: str, response: str):
+        """璁剧疆缂撳瓨锛堝甫LRU娣樻卑鍜?0MB鍐呭瓨涓婇檺锛?""
+        if not self.cache_enabled:
+            return
+
+        entry = (response, time.time())
+        entry_size = self._estimate_size(entry)
+
+        # 濡傛灉鍗曟潯灏辫秴杩囦笂闄愶紝涓嶇紦瀛?        if entry_size > self.cache_max_memory:
+            logger.warning(f"鍗曟潯缂撳瓨杩囧ぇ ({entry_size} bytes)锛岃烦杩囩紦瀛?)
+            return
+
+        # LRU娣樻卑锛氬厛娓呯悊杩囨湡鏉＄洰
+        self._cleanup_cache()
+
+        # 濡傛灉鍔犱笂鏂版潯鐩細瓒呭唴瀛樹笂闄愶紝鎸佺画娣樻卑鏈€鑰佺殑鏉＄洰
+        while (self._cache_memory_used + entry_size > self.cache_max_memory) and self._cache:
+            oldest_key, oldest_value = self._cache.popitem(last=False)  # LRU: 娣樻卑鏈€鑰佺殑
+            oldest_size = self._estimate_size(oldest_value)
+            self._cache_memory_used = max(0, self._cache_memory_used - oldest_size)
+            self._cache_evictions += 1
+            logger.debug(f"LRU娣樻卑缂撳瓨: {oldest_key[:8]}... (閲婃斁 {oldest_size} bytes)")
+
+        self._cache[cache_key] = entry
+        self._cache_memory_used += entry_size
+
+        # 棰濆瀹夊叏闃€锛氭潯鐩暟涓婇檺10000
+        while len(self._cache) > 10000:
+            oldest_key, oldest_value = self._cache.popitem(last=False)
+            oldest_size = self._estimate_size(oldest_value)
+            self._cache_memory_used = max(0, self._cache_memory_used - oldest_size)
+            self._cache_evictions += 1
+
+    def _cleanup_cache(self):
+        """娓呯悊杩囨湡缂撳瓨"""
+        current_time = time.time()
+        expired_keys = [key for key, (_, timestamp) in self._cache.items() if current_time - timestamp > self.cache_ttl]
+        for key in expired_keys:
+            item_size = self._estimate_size(self._cache[key])
+            self._cache_memory_used = max(0, self._cache_memory_used - item_size)
+            del self._cache[key]
+        if expired_keys:
+            logger.debug(f"娓呯悊浜?{len(expired_keys)} 鏉¤繃鏈熺紦瀛?)
+
+    async def call(
+        self,
+        messages: list,
+        query: str = "",
+        context: Optional[Dict] = None,
+        response_format: Optional[Dict] = None,
+        max_tokens: int = 4096,
+        temperature: float = 0.3,
+        **kwargs,
+    ) -> LLMResponse:
+        """
+        鏅鸿兘璋冪敤LLM
+
+        Args:
+            messages: 娑堟伅鍒楄〃
+            query: 鐢ㄦ埛鏌ヨ锛堢敤浜庤矾鐢卞垽鏂級
+            context: 涓婁笅鏂囦俊鎭?            response_format: 鍝嶅簲鏍煎紡锛堝JSON schema锛?            max_tokens: 鏈€澶oken鏁?            temperature: 娓╁害鍙傛暟
+            **kwargs: 鍏朵粬鍙傛暟
+
+        Returns:
+            LLMResponse: 鍝嶅簲瀵硅薄
+        """
+        # 閫夋嫨涓绘ā鍨?        primary_model = self.router.select_model(query, context)
+        query_type = self.router.detect_query_type(query, context)
+
+        # 妫€鏌ョ紦瀛?        cache_key = self._get_cache_key(messages, primary_model)
+        cached_response = self._get_from_cache(cache_key)
+        if cached_response:
+            return LLMResponse(
+                content=cached_response,
+                model=primary_model,
+                query_type=query_type.value,
+                fallback=False,
+                success=True,
+            )
+
+        # 灏濊瘯涓绘ā鍨?        result = await self._try_model(
+            model=primary_model,
+            messages=messages,
+            response_format=response_format,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            **kwargs,
+        )
+
+        if result.success:
+            self.router.record_success(primary_model, result.tokens_used)
+            self._set_cache(cache_key, result.content)
+            return LLMResponse(
+                content=result.content,
+                model=primary_model,
+                query_type=query_type.value,
+                fallback=False,
+                success=True,
+                tokens_used=result.tokens_used,
+            )
+
+        # 涓绘ā鍨嬪け璐ワ紝灏濊瘯闄嶇骇
+        logger.warning(f"涓绘ā鍨?{primary_model} 澶辫触锛屽皾璇曢檷绾?..")
+        fallback_model = self.router.get_fallback_model(primary_model)
+
+        result = await self._try_model(
+            model=fallback_model,
+            messages=messages,
+            response_format=response_format,
+            max_tokens=max_tokens,
+            temperature=temperature,
+            **kwargs,
+        )
+
+        if result.success:
+            self.router.record_success(fallback_model, result.tokens_used)
+            self._set_cache(cache_key, result.content)
+            return LLMResponse(
+                content=result.content,
+                model=fallback_model,
+                query_type=query_type.value,
+                fallback=True,
+                success=True,
+                tokens_used=result.tokens_used,
+            )
+
+        # 涓や釜妯″瀷閮藉け璐?        self.router.record_failure(fallback_model)
+        logger.error(f"涓や釜妯″瀷閮藉け璐? {primary_model}, {fallback_model}")
+
+        return LLMResponse(
+            content="鎶辨瓑锛屾湇鍔℃殏鏃朵笉鍙敤锛岃绋嶅悗閲嶈瘯銆?,
+            model=fallback_model,
+            query_type=query_type.value,
+            fallback=True,
+            success=False,
+            error="鎵€鏈夋ā鍨嬮兘璋冪敤澶辫触",
+        )
+
+    async def _try_model(
+        self,
+        model: str,
+        messages: list,
+        response_format: Optional[Dict] = None,
+        max_tokens: int = 4096,
+        temperature: float = 0.3,
+        **kwargs,
+    ) -> LLMResponse:
+        """灏濊瘯浣跨敤鎸囧畾妯″瀷璋冪敤"""
+        try:
+            # 璋冪敤API
+            response = await _call_api(
+                base_url=MIMO_BASE_URL,
+                api_key=MIMO_API_KEY,
+                model=model,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                timeout=MIMO_TIMEOUT,
+            )
+
+            # 妫€鏌ュ搷搴旀槸鍚︽湁鏁?            if response and response.strip():
+                return LLMResponse(
+                    content=response,
+                    model=model,
+                    query_type="",
+                    fallback=False,
+                    success=True,
+                )
+
+            # JSON schema杩斿洖绌虹殑鎯呭喌
+            if response_format and not response:
+                logger.warning(f"妯″瀷 {model} JSON schema杩斿洖绌?)
+                return LLMResponse(
+                    content="",
+                    model=model,
+                    query_type="",
+                    fallback=False,
+                    success=False,
+                    error="JSON schema杩斿洖绌?,
+                )
+
+            return LLMResponse(
+                content="",
+                model=model,
+                query_type="",
+                fallback=False,
+                success=False,
+                error="绌哄搷搴?,
+            )
+
+        except Exception as e:
+            logger.error(f"妯″瀷 {model} 璋冪敤澶辫触: {e}")
+            return LLMResponse(
+                content="",
+                model=model,
+                query_type="",
+                fallback=False,
+                success=False,
+                error=str(e),
+            )
+
+    async def call_stream(
+        self,
+        messages: list,
+        query: str = "",
+        context: Optional[Dict] = None,
+        max_tokens: int = 4096,
+        temperature: float = 0.3,
+        **kwargs,
+    ) -> AsyncGenerator[str, None]:
+        """
+        娴佸紡璋冪敤LLM
+
+        Args:
+            messages: 娑堟伅鍒楄〃
+            query: 鐢ㄦ埛鏌ヨ
+            context: 涓婁笅鏂囦俊鎭?            max_tokens: 鏈€澶oken鏁?            temperature: 娓╁害鍙傛暟
+            **kwargs: 鍏朵粬鍙傛暟
+
+        Yields:
+            str: 鍝嶅簲鍐呭鐗囨
+        """
+        # 閫夋嫨妯″瀷
+        model = self.router.select_model(query, context)
+
+        try:
+            async for chunk in _call_api_stream(
+                base_url=MIMO_BASE_URL,
+                api_key=MIMO_API_KEY,
+                model=model,
+                messages=messages,
+                max_tokens=max_tokens,
+                temperature=temperature,
+                timeout=MIMO_TIMEOUT,
+            ):
+                yield chunk
+        except Exception as e:
+            logger.error(f"娴佸紡璋冪敤澶辫触: {e}")
+            yield f"[閿欒: {e}]"
+
+    def get_stats(self) -> Dict:
+        """鑾峰彇缁熻淇℃伅锛堝寘鍚紦瀛樼粺璁★級"""
+        stats = self.router.get_stats()
+        stats["cache"] = self.get_cache_stats()
+        return stats
+
+    def get_cache_stats(self) -> Dict:
+        """鑾峰彇缂撳瓨缁熻"""
+        total_requests = self._cache_hits + self._cache_misses
+        return {
+            "enabled": self.cache_enabled,
+            "size": len(self._cache),
+            "memory_used_bytes": self._cache_memory_used,
+            "memory_used_mb": round(self._cache_memory_used / (1024 * 1024), 2),
+            "memory_limit_mb": round(self.cache_max_memory / (1024 * 1024), 2),
+            "hits": self._cache_hits,
+            "misses": self._cache_misses,
+            "hit_rate": round(self._cache_hits / total_requests * 100, 2) if total_requests > 0 else 0,
+            "evictions": self._cache_evictions,
+            "ttl_seconds": self.cache_ttl,
+        }
+
+    def reset_stats(self):
+        """閲嶇疆缁熻淇℃伅"""
+        self.router.reset_stats()
+
+
+# 鍏ㄥ眬瀹炰緥
+_smart_llm: Optional[SmartLLM] = None
+
+
+def get_smart_llm() -> SmartLLM:
+    """鑾峰彇鍏ㄥ眬SmartLLM瀹炰緥"""
+    global _smart_llm
+    if _smart_llm is None:
+        _smart_llm = SmartLLM()
+    return _smart_llm
+
+
+# 渚挎嵎鍑芥暟
+async def smart_call(
+    query: str,
+    system_prompt: Optional[str] = None,
+    context: Optional[Dict] = None,
+    response_format: Optional[Dict] = None,
+    max_tokens: int = 4096,
+    temperature: float = 0.3,
+) -> LLMResponse:
+    """
+    渚挎嵎鐨勬櫤鑳絃LM璋冪敤鍑芥暟
+
+    Args:
+        query: 鐢ㄦ埛鏌ヨ
+        system_prompt: 绯荤粺鎻愮ず
+        context: 涓婁笅鏂囦俊鎭?        response_format: 鍝嶅簲鏍煎紡
+        max_tokens: 鏈€澶oken鏁?        temperature: 娓╁害鍙傛暟
+
+    Returns:
+        LLMResponse: 鍝嶅簲瀵硅薄
+    """
+    smart_llm = get_smart_llm()
+
+    messages = []
+    if system_prompt:
+        messages.append({"role": "system", "content": system_prompt})
+    messages.append({"role": "user", "content": query})
+
+    return await smart_llm.call(
+        messages=messages,
+        query=query,
+        context=context,
+        response_format=response_format,
+        max_tokens=max_tokens,
+        temperature=temperature,
+    )

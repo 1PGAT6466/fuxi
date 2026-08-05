@@ -3,22 +3,25 @@ mcp_tools.py — MCP 暴露工具 (v1.50 Phase F 扩展)
 供外部 Agent 调用的 24 个工具 (原有 4 个 + 新增 20 个)
 对标 GBrain 30+ MCP tools
 """
+
+import asyncio
 import json
 import logging
 import os
 import time
-from typing import Dict, List
 from pathlib import Path
-import asyncio
+from typing import Dict, List
 
 logger = logging.getLogger("taiyin.mcp_tools")
 
 
 # ==================== 原有 4 个工具 ====================
 
+
 async def sag_search(query: str, top_k: int = 10) -> Dict:
     """MCP 工具：搜索知识库"""
     from src.taiyang.retrieval import hybrid_search
+
     try:
         results = await hybrid_search(query, top_k=top_k)
         return {
@@ -26,7 +29,7 @@ async def sag_search(query: str, top_k: int = 10) -> Dict:
             "count": len(results),
             "query": query,
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] sag_search 失败: {e}")
         return {"error": str(e), "results": []}
 
@@ -34,6 +37,7 @@ async def sag_search(query: str, top_k: int = 10) -> Dict:
 async def sag_ingest(file_path: str, category: str = "") -> Dict:
     """MCP 工具：入库文档"""
     from src.shaoyang.pipeline import ShaoyangPipeline
+
     try:
         pipeline = ShaoyangPipeline(None)
         result = await pipeline.digest(file_path, category=category)
@@ -43,7 +47,7 @@ async def sag_ingest(file_path: str, category: str = "") -> Dict:
             "entities": result.get("entities", 0),
             "file_path": file_path,
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] sag_ingest 失败: {e}")
         return {"error": str(e)}
 
@@ -51,6 +55,7 @@ async def sag_ingest(file_path: str, category: str = "") -> Dict:
 async def sag_explain(query: str) -> Dict:
     """MCP 工具：解释查询结果"""
     from src.shaoyin.brain import ShaoyinBrain
+
     try:
         brain = ShaoyinBrain(None)
         result = await brain.think(query)
@@ -59,7 +64,7 @@ async def sag_explain(query: str) -> Dict:
             "confidence": result.get("confidence", 0),
             "sources": result.get("sources", []),
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] sag_explain 失败: {e}")
         return {"error": str(e)}
 
@@ -67,15 +72,17 @@ async def sag_explain(query: str) -> Dict:
 async def sag_status(args: dict = None) -> Dict:
     """MCP 工具：获取系统状态"""
     from src.infra.meridian_monitor import get_monitor
+
     try:
         monitor = get_monitor()
         return monitor.get_health_report()
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] sag_status 失败: {e}")
         return {"error": str(e)}
 
 
 # ==================== v1.50 Phase F 新增 20 个工具 ====================
+
 
 # ── 5. kb_search ──
 async def kb_search(query: str, top_k: int = 5, mode: str = "semantic") -> Dict:
@@ -83,28 +90,33 @@ async def kb_search(query: str, top_k: int = 5, mode: str = "semantic") -> Dict:
     try:
         try:
             from src.taiyang.retrieval import search_chunks
+
             results = search_chunks(query=query, top_k=top_k, mode=mode)
             return {"results": results, "total": len(results)}
         except ImportError:
             pass
-        except Exception as e:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             logger.warning(f"kb_search retrieval 回退: {e}")
 
         # 回退 ChromaDB
         from src.db.vector_store import get_vector_store
+
         vs = get_vector_store()
         if vs:
             raw = vs.search(query, top_k=top_k)
-            results = [{
-                "id": r.get("id", ""),
-                "text": r.get("text", r.get("content", "")),
-                "score": r.get("score", r.get("distance", 0)),
-                "source": r.get("metadata", {}).get("source", r.get("file_name", "")),
-                "metadata": r.get("metadata", {}),
-            } for r in raw]
+            results = [
+                {
+                    "id": r.get("id", ""),
+                    "text": r.get("text", r.get("content", "")),
+                    "score": r.get("score", r.get("distance", 0)),
+                    "source": r.get("metadata", {}).get("source", r.get("file_name", "")),
+                    "metadata": r.get("metadata", {}),
+                }
+                for r in raw
+            ]
             return {"results": results, "total": len(results)}
         return {"results": [], "total": 0}
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] kb_search 失败: {e}")
         return {"error": str(e), "results": [], "total": 0}
 
@@ -114,6 +126,7 @@ async def kb_list_documents(args: dict = None) -> Dict:
     """列出知识库文档"""
     try:
         from src.db.data_store import load_chunks
+
         chunks = await asyncio.to_thread(load_chunks)
         seen = {}
         for c in chunks:
@@ -128,7 +141,7 @@ async def kb_list_documents(args: dict = None) -> Dict:
                 }
         docs = list(seen.values())
         return {"documents": docs, "total": len(docs)}
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] kb_list_documents 失败: {e}")
         return {"error": str(e), "documents": [], "total": 0}
 
@@ -138,6 +151,7 @@ async def kb_get_document(doc_id: str) -> Dict:
     """获取单个文档内容"""
     try:
         from src.db.data_store import load_chunks
+
         chunks = await asyncio.to_thread(load_chunks)
         matching = [c for c in chunks if c.get("file_hash", "") == doc_id]
         if not matching:
@@ -148,32 +162,43 @@ async def kb_get_document(doc_id: str) -> Dict:
         return {
             "doc_id": doc_id,
             "file_name": matching[0].get("file_name", ""),
-            "chunks": [{
-                "id": c.get("id", ""),
-                "text": c.get("text", c.get("content", "")),
-                "chunk_index": c.get("chunk_index", 0),
-            } for c in matching],
+            "chunks": [
+                {
+                    "id": c.get("id", ""),
+                    "text": c.get("text", c.get("content", "")),
+                    "chunk_index": c.get("chunk_index", 0),
+                }
+                for c in matching
+            ],
             "total_chunks": len(matching),
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] kb_get_document 失败: {e}")
         return {"error": str(e)}
 
 
 # ── 8. graph_query ──
-async def graph_query(entity: str = "", source: str = "", target: str = "",
-                      edge_type: str = "", min_confidence: float = 0.0,
-                      limit: int = 100) -> Dict:
+async def graph_query(
+    entity: str = "",
+    source: str = "",
+    target: str = "",
+    edge_type: str = "",
+    min_confidence: float = 0.0,
+    limit: int = 100,
+) -> Dict:
     """知识图谱查询（通过 AutoGraphBuilder）"""
     try:
-        from src.config import GRAPH_PATH
         import os as _os
+
+        from src.config import GRAPH_PATH
 
         edges = []
         if _os.path.exists(GRAPH_PATH):
+
             def _read_graph():
                 with open(GRAPH_PATH, "r", encoding="utf-8") as f:
                     return json.load(f)
+
             kg_data = await asyncio.to_thread(_read_graph)
             edges = list(kg_data.get("edges", []))
 
@@ -196,18 +221,20 @@ async def graph_query(entity: str = "", source: str = "", target: str = "",
             if edge_conf < min_confidence:
                 continue
 
-            filtered.append({
-                "source": edge_source,
-                "target": edge_target,
-                "type": edge_rel,
-                "confidence": edge_conf,
-                "doc_id": edge_doc,
-                "evidence": edge.get("description", edge.get("evidence", "")),
-            })
+            filtered.append(
+                {
+                    "source": edge_source,
+                    "target": edge_target,
+                    "type": edge_rel,
+                    "confidence": edge_conf,
+                    "doc_id": edge_doc,
+                    "evidence": edge.get("description", edge.get("evidence", "")),
+                }
+            )
 
         total = len(filtered)
         return {"total": total, "limit": limit, "edges": filtered[:limit]}
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] graph_query 失败: {e}")
         return {"error": str(e), "edges": [], "total": 0}
 
@@ -216,9 +243,10 @@ async def graph_query(entity: str = "", source: str = "", target: str = "",
 async def graph_stats(args: dict = None) -> Dict:
     """图谱统计"""
     try:
-        from src.config import GRAPH_PATH
-        from collections import Counter
         import os as _os
+        from collections import Counter
+
+        from src.config import GRAPH_PATH
 
         nodes_count = 0
         edges_count = 0
@@ -226,9 +254,11 @@ async def graph_stats(args: dict = None) -> Dict:
         entity_type_dist = {}
 
         if _os.path.exists(GRAPH_PATH):
+
             def _read_graph():
                 with open(GRAPH_PATH, "r", encoding="utf-8") as f:
                     return json.load(f)
+
             kg_data = await asyncio.to_thread(_read_graph)
             nodes = kg_data.get("nodes", kg_data.get("entities", {}))
             nodes_count = len(nodes)
@@ -243,9 +273,10 @@ async def graph_stats(args: dict = None) -> Dict:
         builder_stats = {}
         try:
             from src.bagua.auto_graph import get_auto_graph_builder
+
             builder = get_auto_graph_builder()
             builder_stats = builder.get_stats()
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             pass
 
         return {
@@ -255,7 +286,7 @@ async def graph_stats(args: dict = None) -> Dict:
             "entity_type_distribution": entity_type_dist,
             "auto_graph_builder": builder_stats,
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] graph_stats 失败: {e}")
         return {"error": str(e)}
 
@@ -275,6 +306,7 @@ async def wiki_search(args: dict = None) -> Dict:
             limit = 20
 
         from src.taiyang.wiki import get_wiki_engine
+
         engine = get_wiki_engine()
         if not q or not str(q).strip():
             pages = engine.list_pages(category=category, limit=limit)
@@ -283,7 +315,7 @@ async def wiki_search(args: dict = None) -> Dict:
             if not pages:
                 pages = engine.search_by_title(str(q).strip(), limit=limit)
         return {"pages": pages, "total": len(pages)}
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] wiki_search 失败: {e}")
         return {"error": str(e), "pages": [], "total": 0}
 
@@ -293,6 +325,7 @@ async def wiki_get(page_id: str) -> Dict:
     """获取 Wiki 页面"""
     try:
         from src.taiyang.wiki import get_wiki_engine
+
         engine = get_wiki_engine()
         page = engine.get_page(page_id)
         if not page:
@@ -300,7 +333,7 @@ async def wiki_get(page_id: str) -> Dict:
         linked = engine.get_linked_pages(page_id)
         page["linked_pages"] = linked
         return page
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] wiki_get 失败: {e}")
         return {"error": str(e)}
 
@@ -310,13 +343,14 @@ async def dream_cycle_run(args: dict = None) -> Dict:
     """触发夜间消化循环"""
     try:
         from src.evolution.dream_cycle import DreamCycle
+
         dc = DreamCycle()
         report = await dc.run()
         return {"ok": True, "message": "Dream Cycle 执行完成", "report": str(report)[:5000]}
     except ImportError as e:
         logger.error(f"[MCP] DreamCycle 导入失败: {e}")
         return {"ok": False, "error": "DreamCycle 模块不可用", "detail": str(e)}
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] dream_cycle_run 失败: {e}")
         return {"ok": False, "error": str(e)}
 
@@ -325,10 +359,12 @@ async def dream_cycle_run(args: dict = None) -> Dict:
 async def dream_cycle_report(args: dict = None) -> Dict:
     """获取最新日报"""
     try:
-        _report_dir = Path(os.environ.get(
-            "DREAM_CYCLE_REPORT_DIR",
-            str(Path(__file__).parent.parent / "data" / "dream_reports"),
-        ))
+        _report_dir = Path(
+            os.environ.get(
+                "DREAM_CYCLE_REPORT_DIR",
+                str(Path(__file__).parent.parent / "data" / "dream_reports"),
+            )
+        )
         report_files = sorted(_report_dir.glob("dream_report_*.md"), reverse=True)
         if not report_files:
             return {"ok": True, "has_report": False, "message": "暂无日报"}
@@ -341,7 +377,7 @@ async def dream_cycle_report(args: dict = None) -> Dict:
             "report": content,
             "generated_at": latest.stem.replace("dream_report_", ""),
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] dream_cycle_report 失败: {e}")
         return {"error": str(e)}
 
@@ -354,25 +390,29 @@ async def gap_analyze(query: str = "", topic: str = "") -> Dict:
         # 尝试运行实际的 gap scan
         try:
             from src.evolution.dream_cycle import DreamCycle
+
             dc = DreamCycle()
             # 只跑 gap_scan 阶段
             results = await dc._run_gap_scan()
             gaps = results if isinstance(results, list) else []
-        except Exception as e:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             logger.warning(f"gap_scan 调用失败，使用基础分析: {e}")
             # 基础：查询知识库覆盖
             try:
                 from src.taiyang.retrieval import search_chunks
+
                 search_query = query or topic or "知识库覆盖分析"
                 results = search_chunks(query=search_query, top_k=10, mode="semantic")
                 if results:
-                    gaps = [{
-                        "query": search_query,
-                        "result_count": len(results),
-                        "top_scores": [r.get("score", 0) for r in results[:5]],
-                        "gap_detected": any(r.get("score", 0) < 0.5 for r in results),
-                    }]
-            except Exception:  # TODO: Narrow exception type
+                    gaps = [
+                        {
+                            "query": search_query,
+                            "result_count": len(results),
+                            "top_scores": [r.get("score", 0) for r in results[:5]],
+                            "gap_detected": any(r.get("score", 0) < 0.5 for r in results),
+                        }
+                    ]
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
                 pass
 
         return {
@@ -381,7 +421,7 @@ async def gap_analyze(query: str = "", topic: str = "") -> Dict:
             "gaps": gaps,
             "query": query or topic,
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] gap_analyze 失败: {e}")
         return {"ok": False, "error": str(e)}
 
@@ -396,10 +436,11 @@ async def entity_expand(entity_name: str, top_k: int = 10) -> Dict:
         expanded = []
         try:
             from src.taiyang.expand import expand_entity
+
             expanded = expand_entity(entity_name, top_k=top_k)
         except ImportError:
             pass
-        except Exception as e:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             logger.warning(f"expand_entity 失败: {e}")
 
         return {
@@ -407,7 +448,7 @@ async def entity_expand(entity_name: str, top_k: int = 10) -> Dict:
             "expanded_entities": expanded,
             "total": len(expanded),
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] entity_expand 失败: {e}")
         return {"error": str(e), "expanded_entities": [], "total": 0}
 
@@ -416,8 +457,9 @@ async def entity_expand(entity_name: str, top_k: int = 10) -> Dict:
 async def cross_entity_synthesize(entity_a: str, entity_b: str) -> Dict:
     """跨实体合成 — 查找两个实体之间的关联路径"""
     try:
-        from src.config import GRAPH_PATH
         import os as _os
+
+        from src.config import GRAPH_PATH
 
         if not _os.path.exists(GRAPH_PATH):
             return {"entity_a": entity_a, "entity_b": entity_b, "paths": [], "synthesis": "无图谱数据"}
@@ -425,6 +467,7 @@ async def cross_entity_synthesize(entity_a: str, entity_b: str) -> Dict:
         def _read_graph():
             with open(GRAPH_PATH, "r", encoding="utf-8") as f:
                 return json.load(f)
+
         kg_data = await asyncio.to_thread(_read_graph)
 
         edges = list(kg_data.get("edges", []))
@@ -437,14 +480,17 @@ async def cross_entity_synthesize(entity_a: str, entity_b: str) -> Dict:
         for e in edges:
             src = e.get("from", e.get("source", ""))
             tgt = e.get("to", e.get("target", ""))
-            if (entity_a.lower() in src.lower() and entity_b.lower() in tgt.lower()) or \
-               (entity_a.lower() in tgt.lower() and entity_b.lower() in src.lower()):
-                direct_edges.append({
-                    "source": src,
-                    "target": tgt,
-                    "type": e.get("relation", e.get("type", "related_to")),
-                    "confidence": e.get("confidence", e.get("weight", 1.0)),
-                })
+            if (entity_a.lower() in src.lower() and entity_b.lower() in tgt.lower()) or (
+                entity_a.lower() in tgt.lower() and entity_b.lower() in src.lower()
+            ):
+                direct_edges.append(
+                    {
+                        "source": src,
+                        "target": tgt,
+                        "type": e.get("relation", e.get("type", "related_to")),
+                        "confidence": e.get("confidence", e.get("weight", 1.0)),
+                    }
+                )
 
         # 间接路径（二跳）
         a_neighbors = {}
@@ -463,10 +509,12 @@ async def cross_entity_synthesize(entity_a: str, entity_b: str) -> Dict:
 
         common = set(a_neighbors.keys()) & set(b_neighbors.keys())
         for mid in common:
-            indirect_paths.append({
-                "path": [entity_a, mid, entity_b],
-                "via": mid,
-            })
+            indirect_paths.append(
+                {
+                    "path": [entity_a, mid, entity_b],
+                    "via": mid,
+                }
+            )
 
         return {
             "entity_a": entity_a,
@@ -475,10 +523,13 @@ async def cross_entity_synthesize(entity_a: str, entity_b: str) -> Dict:
             "indirect_paths": indirect_paths,
             "direct_count": len(direct_edges),
             "indirect_count": len(indirect_paths),
-            "synthesis": f"发现 {len(direct_edges)} 条直接关联、{len(indirect_paths)} 条间接路径"
-                if direct_edges or indirect_paths else "未找到关联",
+            "synthesis": (
+                f"发现 {len(direct_edges)} 条直接关联、{len(indirect_paths)} 条间接路径"
+                if direct_edges or indirect_paths
+                else "未找到关联"
+            ),
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] cross_entity_synthesize 失败: {e}")
         return {"error": str(e)}
 
@@ -487,8 +538,9 @@ async def cross_entity_synthesize(entity_a: str, entity_b: str) -> Dict:
 async def file_upload(file_path: str, category: str = "") -> Dict:
     """文件上传 — 从本地路径入库"""
     try:
-        from src.shaoyang.pipeline import ShaoyangPipeline
         from pathlib import Path as _Path
+
+        from src.shaoyang.pipeline import ShaoyangPipeline
 
         path = _Path(file_path)
         if not path.exists():
@@ -503,7 +555,7 @@ async def file_upload(file_path: str, category: str = "") -> Dict:
             "events": result.get("events", 0),
             "entities": result.get("entities", 0),
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] file_upload 失败: {e}")
         return {"ok": False, "error": str(e)}
 
@@ -513,6 +565,7 @@ async def file_list(page: int = 1, page_size: int = 50) -> Dict:
     """文件列表"""
     try:
         from src.db.data_store import load_chunks
+
         chunks = await asyncio.to_thread(load_chunks)
         seen = {}
         for c in chunks:
@@ -528,7 +581,7 @@ async def file_list(page: int = 1, page_size: int = 50) -> Dict:
                 seen[fh]["chunk_count"] += 1
         files = list(seen.values())
         return {"files": files, "total": len(files), "page": page, "page_size": page_size}
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] file_list 失败: {e}")
         return {"error": str(e), "files": [], "total": 0}
 
@@ -538,6 +591,7 @@ async def chat_query(query: str, history: List[dict] = None) -> Dict:
     """对话查询（简单版）"""
     try:
         from src.shaoyin.brain import ShaoyinBrain
+
         brain = ShaoyinBrain(None)
         result = await brain.think(query, history or [])
         return {
@@ -546,7 +600,7 @@ async def chat_query(query: str, history: List[dict] = None) -> Dict:
             "sources": result.get("sources", []),
             "mode": result.get("mode", "shaoyin"),
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] chat_query 失败: {e}")
         return {"answer": f"对话失败: {str(e)}", "error": str(e)}
 
@@ -555,7 +609,8 @@ async def chat_query(query: str, history: List[dict] = None) -> Dict:
 async def eval_run(dataset: str = "", test_name: str = "") -> Dict:
     """运行评测"""
     try:
-        from src.services.eval_automation import get_eval_automation
+        from src.infra import get_eval_automation
+
         automation = get_eval_automation()
         result = await automation.run_smoke_test()
         return {
@@ -565,14 +620,13 @@ async def eval_run(dataset: str = "", test_name: str = "") -> Dict:
             "errors": result.get("errors", []),
             "dataset": dataset or "smoke_test",
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] eval_run 失败: {e}")
         return {"ok": False, "error": str(e)}
 
 
 # ── 21. notifications_list ──
-async def notifications_list(page: int = 1, page_size: int = 20,
-                            unread_only: bool = False) -> Dict:
+async def notifications_list(page: int = 1, page_size: int = 20, unread_only: bool = False) -> Dict:
     """获取通知列表"""
     try:
         return {
@@ -582,7 +636,7 @@ async def notifications_list(page: int = 1, page_size: int = 20,
             "page": page,
             "page_size": page_size,
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] notifications_list 失败: {e}")
         return {"error": str(e), "notifications": []}
 
@@ -591,10 +645,11 @@ async def notifications_list(page: int = 1, page_size: int = 20,
 async def feature_flags_list(args: dict = None) -> Dict:
     """列出功能开关"""
     try:
-        from src.services.feature_flags import load_flags, DEFAULT_FLAGS
+        from src.services.feature_flags import DEFAULT_FLAGS, load_flags
+
         flags = load_flags()
         return {"flags": flags, "defaults": DEFAULT_FLAGS}
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] feature_flags_list 失败: {e}")
         return {"error": str(e), "flags": {}}
 
@@ -604,6 +659,7 @@ async def health_check(args: dict = None) -> Dict:
     """系统健康检查"""
     try:
         from src.infra.health_check import get_health_checker
+
         checker = get_health_checker()
         result = await checker.check_all()
         return result
@@ -618,21 +674,20 @@ async def health_check(args: dict = None) -> Dict:
                 "memory": "ok",
             },
         }
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] health_check 失败: {e}")
         return {"status": "error", "error": str(e)}
 
 
 # ── 24. audit_logs ──
-async def audit_logs(user: str = "", action: str = "", days: int = 1,
-                     limit: int = 100) -> Dict:
+async def audit_logs(user: str = "", action: str = "", days: int = 1, limit: int = 100) -> Dict:
     """审计日志查询"""
     try:
         from src.infra.audit_log import query_audit
-        results = query_audit(user=user or None, action=action or None,
-                             days=days, limit=limit)
+
+        results = query_audit(user=user or None, action=action or None, days=days, limit=limit)
         return {"entries": results, "count": len(results)}
-    except Exception as e:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.error(f"[MCP] audit_logs 失败: {e}")
         return {"error": str(e), "entries": [], "count": 0}
 
@@ -698,7 +753,11 @@ MCP_TOOLS = [
             "entity": {"type": "string", "description": "实体名称（模糊匹配 source 或 target）", "default": ""},
             "source": {"type": "string", "description": "按源实体过滤", "default": ""},
             "target": {"type": "string", "description": "按目标实体过滤", "default": ""},
-            "edge_type": {"type": "string", "description": "按边类型过滤 (works_at, invested_in, supplied_by...)", "default": ""},
+            "edge_type": {
+                "type": "string",
+                "description": "按边类型过滤 (works_at, invested_in, supplied_by...)",
+                "default": "",
+            },
             "min_confidence": {"type": "number", "description": "最小置信度 (0-1)", "default": 0.0},
             "limit": {"type": "integer", "description": "返回上限", "default": 100},
         },

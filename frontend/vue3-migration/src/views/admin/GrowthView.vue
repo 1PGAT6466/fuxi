@@ -87,10 +87,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import {
-  DataAnalysis,
-  Aim,
-  MagicStick,
-  UserFilled,
   TrendCharts,
 } from '@element-plus/icons-vue';
 import * as echarts from 'echarts/core';
@@ -129,70 +125,6 @@ let chartInstance: echarts.ECharts | null = null;
 const metrics = ref<MetricInfo[]>([]);
 const trendsData = ref<Record<string, number[][]>>({});
 
-// ─── Mock 数据 ───
-function getMockGrowth(): GrowthData {
-  return {
-    metrics: [
-      {
-        key: 'extraction',
-        label: '提取效率',
-        value: 87.5,
-        unit: '%',
-        trend: 3.2,
-        desc: '文档处理准确率',
-        icon: DataAnalysis,
-      },
-      {
-        key: 'retrieval',
-        label: '检索准确率',
-        value: 92.1,
-        unit: '%',
-        trend: 1.8,
-        desc: '向量搜索 Top-5 精度',
-        icon: Aim,
-      },
-      {
-        key: 'decision',
-        label: '决策质量',
-        value: 78.3,
-        unit: '%',
-        trend: -2.1,
-        desc: '综合评分（最近30天）',
-        icon: MagicStick,
-      },
-      {
-        key: 'experience',
-        label: '用户体验',
-        value: 85.0,
-        unit: '分',
-        trend: 4.5,
-        desc: 'NPS 净推荐值',
-        icon: UserFilled,
-      },
-    ],
-    trends: {
-      day: [
-        [7, 85, 87, 86, 88, 89, 87.5], // extraction
-        [7, 90, 91, 92, 91, 93, 92.1], // retrieval
-        [7, 76, 78, 77, 79, 78, 78.3], // decision
-        [7, 80, 82, 83, 84, 86, 85],   // experience
-      ],
-      week: [
-        [4, 84, 86, 88, 87.5], // extraction (4 weeks)
-        [4, 89, 91, 93, 92.1], // retrieval
-        [4, 75, 77, 79, 78.3], // decision
-        [4, 79, 82, 84, 85],   // experience
-      ],
-      month: [
-        [3, 85, 86, 87.5], // extraction (3 months)
-        [3, 90, 91, 92.1], // retrieval
-        [3, 76, 77, 78.3], // decision
-        [3, 81, 83, 85],   // experience
-      ],
-    },
-  };
-}
-
 // ─── Computed ───
 const metricsKeys = computed(() => metrics.value.map((m) => m.key));
 
@@ -225,22 +157,21 @@ const metricNames: Record<string, string> = {
 async function fetchGrowth(): Promise<void> {
   loading.value = true;
   error.value = false;
+  hasData.value = false;
   try {
     const data = (await apiClient.get('/api/growth/overview')) as GrowthData;
     if (data?.metrics && data.metrics.length > 0) {
       metrics.value = data.metrics;
-      trendsData.value = data.trends;
+      trendsData.value = data.trends || {};
       hasData.value = true;
     } else {
-      // 降级 mock
-      applyMock();
+      // 后端返回空数据，显示空状态
+      hasData.value = false;
     }
   } catch {
-    applyMock();
-    // 如果 mock 应用后仍无数据，标记 error
-    if (!hasData.value) {
-      error.value = true;
-    }
+    // API 调用失败，显示空状态而非假数据
+    error.value = true;
+    hasData.value = false;
   } finally {
     loading.value = false;
     if (hasData.value) {
@@ -248,13 +179,6 @@ async function fetchGrowth(): Promise<void> {
       initChart();
     }
   }
-}
-
-function applyMock(): void {
-  const mock = getMockGrowth();
-  metrics.value = mock.metrics;
-  trendsData.value = mock.trends;
-  hasData.value = true;
 }
 
 // ─── ECharts ───

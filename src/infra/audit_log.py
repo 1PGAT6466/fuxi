@@ -4,6 +4,7 @@ audit_log.py — 访问控制审计日志
 记录 API 访问的关键操作（登录、登出、权限变更、敏感数据访问）。
 写入结构化 JSONL 文件，支持时间窗口查询和统计。
 """
+
 import json
 import logging
 import os
@@ -31,10 +32,11 @@ _write_lock = threading.Lock()
 @dataclass
 class AuditEntry:
     """审计日志条目"""
+
     timestamp: str = ""
     user: str = ""
-    action: str = ""          # login | logout | access | permission_change | error
-    resource: str = ""        # 访问的 API 路径或资源名
+    action: str = ""  # login | logout | access | permission_change | error
+    resource: str = ""  # 访问的 API 路径或资源名
     ip_address: str = ""
     success: bool = True
     details: Dict[str, Any] = field(default_factory=dict)
@@ -57,7 +59,7 @@ def _rotate_if_needed(path: Path) -> None:
             rotated = path.with_suffix(f".{int(time.time())}.jsonl")
             path.rename(rotated)
             logger.info("审计日志轮转: %s → %s (%d 行)", path.name, rotated.name, line_count)
-    except Exception:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         pass
 
 
@@ -95,15 +97,21 @@ def write_audit(
         _rotate_if_needed(path)
         try:
             with open(path, "a", encoding="utf-8") as f:
-                f.write(json.dumps({
-                    "timestamp": entry.timestamp,
-                    "user": entry.user,
-                    "action": entry.action,
-                    "resource": entry.resource,
-                    "ip": entry.ip_address,
-                    "success": entry.success,
-                    "details": entry.details,
-                }, ensure_ascii=False) + "\n")
+                f.write(
+                    json.dumps(
+                        {
+                            "timestamp": entry.timestamp,
+                            "user": entry.user,
+                            "action": entry.action,
+                            "resource": entry.resource,
+                            "ip": entry.ip_address,
+                            "success": entry.success,
+                            "details": entry.details,
+                        },
+                        ensure_ascii=False,
+                    )
+                    + "\n"
+                )
         except Exception as exc:  # TODO: Narrow exception type
             logger.error("审计日志写入失败: %s", exc)
 
@@ -159,7 +167,7 @@ def query_audit(
                         results.append(entry)
                         if len(results) >= limit:
                             break
-            except Exception:  # TODO: Narrow exception type
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
                 continue
     except Exception as exc:  # TODO: Narrow exception type
         logger.warning("审计日志查询失败: %s", exc)
@@ -213,7 +221,7 @@ def get_audit_stats(days: int = 7) -> Dict[str, Any]:
                         stats["unique_users"].add(entry.get("user", ""))
                         if not entry.get("success", True):
                             stats["failed_attempts"] += 1
-            except Exception:  # TODO: Narrow exception type
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
                 continue
     except Exception as exc:  # TODO: Narrow exception type
         logger.warning("审计统计失败: %s", exc)
@@ -227,6 +235,7 @@ def register_audit_routes():
     """注册审计日志路由到全局 health checker"""
     try:
         from src.infra.health_check import get_health_checker
+
         checker = get_health_checker()
         checker.register_infra_check("audit_log", _check_audit_log_health)
         logger.info("审计日志路由已注册")

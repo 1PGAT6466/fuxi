@@ -2,6 +2,7 @@
 experience_growth.py — 太阴成长
 接口体验监控
 """
+
 import logging
 from typing import Dict
 
@@ -26,7 +27,7 @@ class ExperienceGrowth:
             symbol="taiyin",
             metric="request_success",
             value=1.0 if success else 0.0,
-            context={"duration_ms": duration_ms}
+            context={"duration_ms": duration_ms},
         )
 
     def get_stats(self) -> Dict:

@@ -49,7 +49,7 @@ async def evaluate_retrieval(query: str, docs: list) -> str:
 
 async def rewrite_for_retry(original_query: str, reason: str) -> str:
     """失败驱动的问题改写"""
-    from src.services.llm import call_ai_raw as call_ai
+    from src.infra import call_ai_raw as call_ai
     prompt = REWRITE_PROMPT.format(original_query=original_query, reason=reason)
     try:
         rewritten = await call_ai(prompt)
@@ -115,7 +115,7 @@ async def rewrite_and_retry(query: str, bad_docs: list, top_k: int = 10) -> list
     retries = 0
     while retries < 2:
         try:
-            from src.services.llm import call_deepseek
+            from src.infra import call_deepseek
             prompt = f'Original query: {query}\nRewrite this query to improve search results. Output ONLY the rewritten query.'
             new_q = await call_deepseek(prompt, max_tokens=100)
             if not new_q:
@@ -124,7 +124,7 @@ async def rewrite_and_retry(query: str, bad_docs: list, top_k: int = 10) -> list
             if new_q == query:
                 retries += 1
                 continue
-            from src.services.retrieval import hybrid_search
+            from src.infra import hybrid_search
             from src.db.data_store import load_chunks
             _chunks = await asyncio.to_thread(load_chunks)
             results = await hybrid_search(new_q, _chunks, top_k=top_k)

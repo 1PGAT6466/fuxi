@@ -2,10 +2,11 @@
 message_bus.py — Agent 间异步通信 v4.0
 发布/订阅 + 请求/响应
 """
+
 import asyncio
 import logging
-from typing import Dict, List, Callable, Awaitable, Optional
 from collections import defaultdict
+from typing import Awaitable, Callable, Dict, List, Optional
 
 from src.protocols import ProtocolMessage
 
@@ -57,7 +58,7 @@ class MessageBus:
     def _log_message(self, message: ProtocolMessage):
         self._message_log.append(message.to_dict())
         if len(self._message_log) > self._max_log_size:
-            self._message_log = self._message_log[-self._max_log_size:]
+            self._message_log = self._message_log[-self._max_log_size :]
 
     def get_stats(self) -> Dict:
         return {
@@ -69,6 +70,7 @@ class MessageBus:
 
 # 全局实例
 _bus = None
+
 
 def get_message_bus() -> MessageBus:
     global _bus

@@ -1,13 +1,14 @@
 import asyncio
+
 """
 health_check.py — 健康检查（v2.1 扩展版）
 系统状态 + 组件状态 + 八卦级健康 + 基础设施 + 告警规则
 """
-import time
 import logging
-from typing import Dict, List, Optional, Any
+import time
 from dataclasses import dataclass
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("infra.health_check")
 
@@ -16,9 +17,11 @@ logger = logging.getLogger("infra.health_check")
 # 告警规则配置
 # ============================================================================
 
+
 @dataclass
 class AlertRule:
     """告警规则定义"""
+
     name: str
     description: str
     severity: str  # critical / warning / info
@@ -64,17 +67,20 @@ ALERT_RULES: List[AlertRule] = [
 # 八卦健康等级
 # ============================================================================
 
+
 class GuaHealthLevel(Enum):
     """八卦健康等级"""
-    FULL = "full"           # 全功能正常
-    DEGRADED = "degraded"   # 降级运行
-    MINIMAL = "minimal"     # 最低限度
-    OFF = "off"             # 完全关闭
+
+    FULL = "full"  # 全功能正常
+    DEGRADED = "degraded"  # 降级运行
+    MINIMAL = "minimal"  # 最低限度
+    OFF = "off"  # 完全关闭
 
 
 # ============================================================================
 # HealthChecker 扩展版
 # ============================================================================
+
 
 class HealthChecker:
     """健康检查器（v2.1 扩展）"""
@@ -285,14 +291,16 @@ class HealthChecker:
             try:
                 triggered_flag, context = await self._evaluate_rule(rule)
                 if triggered_flag:
-                    triggered.append({
-                        "rule": rule.name,
-                        "severity": rule.severity,
-                        "description": rule.description,
-                        "threshold": rule.threshold,
-                        "context": context,
-                        "timestamp": time.time(),
-                    })
+                    triggered.append(
+                        {
+                            "rule": rule.name,
+                            "severity": rule.severity,
+                            "description": rule.description,
+                            "threshold": rule.threshold,
+                            "context": context,
+                            "timestamp": time.time(),
+                        }
+                    )
             except (RuntimeError, ValueError, AttributeError) as e:
                 logger.warning("告警规则 [%s] 评估失败: %s", rule.name, e)
 
@@ -391,6 +399,8 @@ async def _check_llm_failure_rate_alert(threshold: float) -> tuple:
         "failure_rate": round(rate, 4),
         "threshold": threshold,
     }
+
+
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 
@@ -404,6 +414,8 @@ async def _check_gua_failures_alert(threshold: int) -> tuple:
         "triggered_gua": triggered_gua,
         "threshold": threshold,
     }
+
+
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 
@@ -419,6 +431,8 @@ async def _check_circuit_open_alert(threshold: float) -> tuple:
         "long_open_circuits": long_open,
         "threshold_sec": threshold,
     }
+
+
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 
@@ -426,6 +440,7 @@ async def _check_conn_pool_usage_alert(threshold: float) -> tuple:
     """检查连接池使用率"""
     try:
         from src.infra.connection_pool import get_connection_pool
+
         pool = get_connection_pool()
         usage = pool._active_connections / pool.max_connections if pool.max_connections > 0 else 0
         triggered = usage > threshold
@@ -437,6 +452,8 @@ async def _check_conn_pool_usage_alert(threshold: float) -> tuple:
         }
     except (ImportError, AttributeError, OSError) as e:
         return False, {"error": str(e)}
+
+
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 
@@ -448,6 +465,8 @@ async def _check_conn_pool_usage_alert(threshold: float) -> tuple:
 async def check_database() -> bool:
     """检查数据库（保留旧接口兼容）"""
     return await check_database_extended()
+
+
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 
@@ -459,15 +478,17 @@ async def check_database_extended() -> dict:
                      "seed_chunks": int, "status": str}
     """
     try:
-        from src.db.memory_store import get_store
         from src.db.data_store import load_chunks
+        from src.db.memory_store import get_store
+
         store = get_store()
         store._db_conn.execute("SELECT 1")
 
         chunks = await asyncio.to_thread(load_chunks) or []
         unique_files = len(set(c.get("file_name", "") for c in chunks if c.get("file_name")))
         seed_count = sum(
-            1 for c in chunks
+            1
+            for c in chunks
             if "test_knowledge" in (c.get("file_name", "") or "").lower()
             or "malware" in (c.get("file_name", "") or "").lower()
         )
@@ -483,6 +504,8 @@ async def check_database_extended() -> dict:
         }
     except (ImportError, AttributeError, OSError) as e:
         return {"healthy": False, "error": str(e), "status": "error"}
+
+
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 
@@ -490,6 +513,8 @@ async def check_vector_store() -> bool:
     """检查向量存储（保留旧接口兼容）"""
     result = await check_vector_store_extended()
     return result.get("healthy", False)
+
+
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 
@@ -501,6 +526,7 @@ async def check_vector_store_extended() -> dict:
     """
     try:
         from src.db.vector_store import get_vector_store
+
         vs = get_vector_store()
         if vs is None:
             return {"healthy": False, "vector_count": 0, "status": "unavailable"}
@@ -515,6 +541,8 @@ async def check_vector_store_extended() -> dict:
         }
     except (ImportError, AttributeError, OSError) as e:
         return {"healthy": False, "vector_count": 0, "error": str(e), "status": "error"}
+
+
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 
@@ -524,6 +552,8 @@ async def check_llm() -> bool:
         return True
     except (RuntimeError, OSError):
         return False
+
+
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 
@@ -584,6 +614,8 @@ async def check_bagua_overall() -> Dict:
         result["error"] = str(e)
 
     return result
+
+
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 
@@ -591,6 +623,7 @@ async def check_connection_pool() -> Dict:
     """检查数据库连接池使用率"""
     try:
         from src.infra.connection_pool import get_connection_pool
+
         pool = get_connection_pool()
         active = pool._active_connections
         max_conn = pool.max_connections
@@ -610,6 +643,8 @@ async def check_connection_pool() -> Dict:
             "error": str(e),
             "timestamp": time.time(),
         }
+
+
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 
@@ -620,6 +655,7 @@ async def check_llm_api_reachable() -> Dict:
     """
     try:
         from src.config import MIMO_API_KEY, MIMO_BASE_URL
+
         if not MIMO_API_KEY or not MIMO_BASE_URL:
             return {
                 "healthy": True,
@@ -629,6 +665,7 @@ async def check_llm_api_reachable() -> Dict:
             }
 
         import aiohttp
+
         timeout = aiohttp.ClientTimeout(total=5)
         async with aiohttp.ClientSession(timeout=timeout) as session:
             headers = {
@@ -659,18 +696,21 @@ async def check_intent_bus() -> Dict:
     """检查 IntentBus 状态"""
     try:
         from src.bagua.intent_bus import get_intent_bus
+
         intent_bus = get_intent_bus()
         return {
             "healthy": True,
             "engine": "v2",
-            "registered_guas": len(intent_bus._guas) if hasattr(intent_bus, '_guas') else 0,
-            "circuit_breakers": len(intent_bus._circuit_breakers) if hasattr(intent_bus, '_circuit_breakers') else 0,
+            "registered_guas": len(intent_bus._guas) if hasattr(intent_bus, "_guas") else 0,
+            "circuit_breakers": len(intent_bus._circuit_breakers) if hasattr(intent_bus, "_circuit_breakers") else 0,
         }
     except (ImportError, AttributeError, RuntimeError) as e:
         return {
             "healthy": False,
             "error": str(e),
         }
+
+
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 
@@ -681,9 +721,10 @@ async def check_redis() -> Dict:
         dict with {"healthy": bool, "status": str, "latency_ms": float}
     """
     try:
-        from src.config import REDIS_HOST, REDIS_PORT, REDIS_DB, REDIS_PASSWORD
-        import redis.asyncio as redis
         import time as _time
+
+        import redis.asyncio as redis
+        from src.config import REDIS_DB, REDIS_HOST, REDIS_PASSWORD, REDIS_PORT
 
         client = redis.Redis(
             host=REDIS_HOST,
@@ -755,6 +796,7 @@ def _get_gua_instances() -> Dict[str, Any]:
         for name, mod_path in gua_modules:
             try:
                 import importlib
+
                 mod = importlib.import_module(mod_path)
                 # 查找 GuaBase 子类实例
                 for attr_name in dir(mod):

@@ -32,9 +32,72 @@ auto_graph.py — 自组网知识图谱构建器
 import logging
 import re
 import time
+import json
 from typing import Any, Dict, List, Optional, Tuple
 
 logger = logging.getLogger("bagua.auto_graph")
+
+# ============================================================================
+# 增强版中文 NER 模式 — 补充 ENTITY_PATTERNS
+# 用于 EnhancedAutoGraphBuilder 的规则抽取降级方案
+# ============================================================================
+
+ENHANCED_ENTITY_PATTERNS: Dict[str, str] = {
+    # 中文人名（增强版）— 支持姓名后跟职务/角色，或前面有"由""请"等动词
+    "chinese_person": (
+        r'(?:由|请|让|派|通知|联系)\s*([\u4e00-\u9fff]{2,4})'
+        r'|([\u4e00-\u9fff]{2,4})(?:总工程师|工程师|研究员|教授|博士|总经理|副总|'
+        r'部长|科长|处长|主管|经理|总监|主任|书记|主席|院长|校长|所长)'
+    ),
+    # 中文组织机构名（增强版）— 支持更多组织类型后缀
+    "chinese_org": (
+        r'[\u4e00-\u9fff]{2,}(?:大学|学院|研究院|研究所|实验室|中心|学会|协会|'
+        r'委员会|基金会|联盟|组织|部门|厅|局|处|科|办|站|院|所|厂|矿|场|店|'
+        r'银行|证券|保险|基金|投资)'
+    ),
+    # 中文地名（增强版）— 支持省市区县镇村及地理实体
+    "chinese_location": (
+        r'[\u4e00-\u9fff]{2,}(?:省|市|区|县|镇|村|乡|街道|路|大道|街|巷|号|'
+        r'工业区|开发区|高新区|新区|园区|基地)'
+    ),
+    # 技术术语 — 常见工业/制造技术关键词
+    "tech_term": (
+        r'(?:注塑|冲压|压铸|锻造|焊接|切割|打磨|抛光|电镀|喷涂|热处理|'
+        r'退火|淬火|回火|渗碳|氮化|阳极氧化|钝化|磷化|电泳|粉末冶金|'
+        r'CNC|数控|加工中心|车床|铣床|磨床|钻床|线切割|放电加工|EDM|'
+        r'三坐标|CMM|投影仪|卡尺|千分尺|粗糙度|硬度|拉伸|压缩|弯曲|'
+        r'疲劳|蠕变|冲击|韧性|强度|刚度|硬度|耐磨|耐腐蚀|绝缘|导热)'
+    ),
+    # 产品型号 — 支持中英文混合型号，如 "HG-KN43BJ" "M3x10" "φ10H7"
+    "product_model": (
+        r'\b[A-Z]{1,6}[-]?\d{2,6}[A-Z]?(?:[-/][A-Z0-9]+)*\b'
+        r'|[Mm]\d+[xX×]\d+(?:\.\d+)?'
+        r'|[φΦ]\d+(?:\.\d+)?[A-Z]?\d*'
+    ),
+}
+
+# LLM 实体抽取/关系抽取配置
+_LLM_API_KEY = None  # 延迟加载，避免循环导入
+_LLM_BASE_URL = None
+_LLM_MODEL = None
+_LLM_TIMEOUT = 30  # 秒
+_LLM_ENTITY_PROMPT = """请从以下文本中提取所有实体，返回 JSON 格式：
+{"entities": [{"name": "实体名", "type": "person/org/location/product/tech_term/other", "confidence": 0.9}]}
+
+文本：
+{text}
+
+仅返回 JSON，不要解释。"""
+
+_LLM_RELATION_PROMPT = """请从以下文本中提取实体间关系，返回 JSON 格式：
+{"relations": [{"source": "实体A", "target": "实体B", "relation": "关系类型", "confidence": 0.9}]}
+
+关系类型包括：works_at, located_in, contains, uses, produces, supplies, collaborates_with, related_to
+
+文本：
+{text}
+
+仅返回 JSON，不要解释。"""
 
 # ============================================================================
 # 实体提取模式 — 正则规则（零 LLM）
@@ -205,6 +268,10 @@ class AutoGraphBuilder:
         self._built_count: int = 0
         self._total_entities: int = 0
         self._total_edges: int = 0
+
+        # 内存邻接缓存（优化遍历性能）
+        self._adjacency_cache: Optional[Dict[str, List[Tuple[str, str, float]]]] = None
+        self._adjacency_dirty: bool = True
     
     # ========================================================================
     # 核心 API
@@ -584,9 +651,252 @@ class AutoGraphBuilder:
             return False
     
     # ========================================================================
+    # 增量更新支持
+    # ========================================================================
+
+    def update_incremental(
+        self,
+        text: str,
+        doc_id: str,
+        existing_graph: Dict[str, Any],
+    ) -> Dict[str, Any]:
+        """增量更新知识图谱
+
+        仅处理新增/变更的文档内容，合并到已有图谱中。
+        与 build_full_graph 的区别：
+          - build_full_graph: 从零构建
+          - update_incremental: 合并到已有图谱，去重、保留高置信度边
+
+        Args:
+            text:           新文档文本
+            doc_id:         文档 ID
+            existing_graph: 已有图谱数据
+                            {"entities": [...], "edges": [...]}
+                            或 {"nodes": {...}, "edges": [...]}
+
+        Returns:
+            {
+                "doc_id": str,
+                "entities": [...],       # 合并后的全部实体
+                "edges": [...],          # 合并后的全部边
+                "new_entities": int,     # 本次新增实体数
+                "new_edges": int,        # 本次新增边数
+                "updated_edges": int,    # 本次更新（置信度提升）的边数
+                "stats": {...},
+            }
+        """
+        # 提取新文档的实体和边
+        new_entities = self.extract_entities(text)
+        new_edges = self.build_from_text(text, doc_id)
+
+        # 解析已有图谱
+        existing_entities = existing_graph.get("entities", [])
+        existing_edges = existing_graph.get("edges", [])
+        # 兼容 nodes 格式
+        if not existing_entities and "nodes" in existing_graph:
+            nodes = existing_graph["nodes"]
+            if isinstance(nodes, dict):
+                existing_entities = [
+                    {"name": name, **(info if isinstance(info, dict) else {})}
+                    for name, info in nodes.items()
+                ]
+
+        # 合并实体（按 name 去重）
+        entity_map: Dict[str, Dict[str, Any]] = {}
+        for e in existing_entities:
+            name = e.get("name", "")
+            if name:
+                entity_map[name] = e
+
+        new_entity_count = 0
+        for e in new_entities:
+            name = e["name"]
+            if name not in entity_map:
+                entity_map[name] = {
+                    "name": name,
+                    "type": e["type"],
+                    "description": f"从文档 {doc_id} 中提取的 {e['type']}",
+                    "count": e["count"],
+                }
+                new_entity_count += 1
+            else:
+                # 更新计数
+                prev_count = entity_map[name].get("count", 0)
+                entity_map[name]["count"] = prev_count + e["count"]
+
+        # 合并边（按 source+target+type 去重，保留高置信度）
+        edge_key_map: Dict[Tuple[str, str, str], Dict[str, Any]] = {}
+        for edge in existing_edges:
+            src = edge.get("source", edge.get("from", ""))
+            tgt = edge.get("target", edge.get("to", ""))
+            rel = edge.get("relation", edge.get("type", "related_to"))
+            key = (src, tgt, rel)
+            edge_key_map[key] = {
+                "source": src,
+                "target": tgt,
+                "type": rel,
+                "confidence": float(edge.get("confidence", edge.get("weight", 1.0))),
+                "doc_id": edge.get("doc_id", ""),
+                "evidence": edge.get("description", edge.get("evidence", "")),
+            }
+
+        new_edge_count = 0
+        updated_edge_count = 0
+        for edge in new_edges:
+            key = (edge["source"], edge["target"], edge["type"])
+            if key not in edge_key_map:
+                edge_key_map[key] = {
+                    "source": edge["source"],
+                    "target": edge["target"],
+                    "type": edge["type"],
+                    "confidence": edge["confidence"],
+                    "doc_id": doc_id,
+                    "evidence": edge.get("evidence", ""),
+                }
+                new_edge_count += 1
+            else:
+                existing_conf = edge_key_map[key]["confidence"]
+                if edge["confidence"] > existing_conf:
+                    edge_key_map[key]["confidence"] = edge["confidence"]
+                    edge_key_map[key]["evidence"] = edge.get("evidence", "")
+                    updated_edge_count += 1
+
+        # 转换为输出格式
+        merged_entities = list(entity_map.values())
+        merged_edges = list(edge_key_map.values())
+
+        # 标记邻接缓存需要更新
+        self._adjacency_dirty = True
+
+        # 更新统计
+        self._built_count += 1
+        self._total_entities += new_entity_count
+        self._total_edges += new_edge_count
+
+        logger.info(
+            "AutoGraph: 增量更新 %s — 新增 %d 实体 / %d 边，更新 %d 边",
+            doc_id, new_entity_count, new_edge_count, updated_edge_count,
+        )
+
+        return {
+            "doc_id": doc_id,
+            "entities": merged_entities,
+            "edges": merged_edges,
+            "new_entities": new_entity_count,
+            "new_edges": new_edge_count,
+            "updated_edges": updated_edge_count,
+            "stats": {
+                "entity_count": len(merged_entities),
+                "edge_count": len(merged_edges),
+                "built_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            },
+        }
+
+    # ========================================================================
+    # 邻接缓存（优化遍历性能）
+    # ========================================================================
+
+    def build_adjacency_cache(self, edges: List[Dict[str, Any]]) -> None:
+        """构建内存邻接缓存，加速图遍历
+
+        Args:
+            edges: 边列表（source/target/type/confidence 格式）
+        """
+        adj: Dict[str, List[Tuple[str, str, float]]] = {}
+        for edge in edges:
+            src = edge.get("source", edge.get("from", ""))
+            tgt = edge.get("target", edge.get("to", ""))
+            rel = edge.get("type", edge.get("relation", "related_to"))
+            conf = float(edge.get("confidence", edge.get("weight", 1.0)))
+            if src and tgt:
+                adj.setdefault(src, []).append((tgt, rel, conf))
+                adj.setdefault(tgt, []).append((src, rel, conf))
+        self._adjacency_cache = adj
+        self._adjacency_dirty = False
+        logger.debug("AutoGraph: 邻接缓存已构建，%d 个节点", len(adj))
+
+    def get_neighbors(
+        self,
+        entity: str,
+        relation_filter: Optional[str] = None,
+        min_confidence: float = 0.0,
+    ) -> List[Tuple[str, str, float]]:
+        """获取实体的邻居节点（使用邻接缓存加速）
+
+        Args:
+            entity:          实体名称
+            relation_filter: 只返回指定关系类型的邻居
+            min_confidence:  最低置信度阈值
+
+        Returns:
+            [(neighbor, relation, confidence), ...]
+        """
+        if self._adjacency_cache is None or self._adjacency_dirty:
+            # 需要先构建缓存（从外部传入 edges 或返回空）
+            return []
+
+        neighbors = self._adjacency_cache.get(entity, [])
+        result = []
+        for neighbor, rel, conf in neighbors:
+            if relation_filter and rel != relation_filter:
+                continue
+            if conf < min_confidence:
+                continue
+            result.append((neighbor, rel, conf))
+
+        # 按置信度降序排序
+        result.sort(key=lambda x: x[2], reverse=True)
+        return result
+
+    def find_paths_cached(
+        self,
+        start: str,
+        end: str,
+        max_hops: int = 3,
+    ) -> List[List[Tuple[str, str, float]]]:
+        """使用邻接缓存查找两实体间路径
+
+        Args:
+            start:    起始实体
+            end:      目标实体
+            max_hops: 最大跳数
+
+        Returns:
+            路径列表，每条路径为 [(entity, relation, confidence), ...]
+        """
+        if self._adjacency_cache is None or self._adjacency_dirty:
+            return []
+
+        from collections import deque
+
+        visited = {start}
+        queue: deque = deque([(start, [], 0)])
+        found_paths = []
+
+        while queue:
+            current, path, depth = queue.popleft()
+            if depth >= max_hops:
+                continue
+
+            for neighbor, rel, conf in self._adjacency_cache.get(current, []):
+                if neighbor in visited:
+                    continue
+
+                new_path = path + [(neighbor, rel, conf)]
+                if neighbor == end:
+                    found_paths.append(new_path)
+                    if len(found_paths) >= 10:
+                        return found_paths
+                else:
+                    visited.add(neighbor)
+                    queue.append((neighbor, new_path, depth + 1))
+
+        return found_paths
+
+    # ========================================================================
     # 统计
     # ========================================================================
-    
+
     def get_stats(self) -> Dict[str, Any]:
         """获取构建器统计信息
         
@@ -610,6 +920,574 @@ class AutoGraphBuilder:
         }
 
 
+
+# ============================================================================
+# EnhancedAutoGraphBuilder — 增强版知识图谱构建器
+# ============================================================================
+
+class EnhancedAutoGraphBuilder(AutoGraphBuilder):
+    """增强版知识图谱构建器
+    
+    在 AutoGraphBuilder 基础上增加：
+      1. LLM 实体/关系抽取（可选，API 不可用时自动降级到规则引擎）
+      2. 共现关系提取（作为关系抽取的降级方案）
+      3. 增强中文实体识别（更多模式、后缀过滤）
+      4. 边权重综合计算（置信度 × 共现频率 × 关系类型权重）
+      5. 实体去重与合并（名称归一化 + 相似实体合并）
+    
+    使用示例::
+    
+        from src.bagua.auto_graph import EnhancedAutoGraphBuilder
+        
+        builder = EnhancedAutoGraphBuilder()
+        text = "张三在阿里巴巴工作，负责淘宝项目。他于2020年参加了云栖大会。"
+        entities = builder.extract_entities(text)
+        edges = builder.build_from_text(text, doc_id="doc-001")
+    """
+    
+    def __init__(self, custom_patterns=None, custom_rules=None):
+        """初始化增强版构建器
+        
+        Args:
+            custom_patterns: 自定义实体提取模式
+            custom_rules:    自定义边规则
+        """
+        super().__init__(custom_patterns, custom_rules)
+        
+        # 加载增强版中文 NER 模式
+        for name, pattern in ENHANCED_ENTITY_PATTERNS.items():
+            if name not in self._compiled_entities:
+                try:
+                    self._compiled_entities[name] = re.compile(pattern, re.IGNORECASE)
+                    self.entity_patterns[name] = pattern
+                except re.error as e:
+                    logger.warning("增强模式编译失败 [%s]: %s", name, e)
+        
+        # LLM 配置（延迟加载）
+        self._llm_available = None  # None = 未检测, True/False = 已检测
+        
+        # 共现窗口大小（句子级）
+        self._cooccurrence_window = 200  # 字符
+        self._min_cooccurrence = 2  # 最小共现次数
+        
+        # 关系类型权重映射
+        self._relation_weights = {
+            "works_at": 0.90,
+            "located_in": 0.85,
+            "contains": 0.80,
+            "uses": 0.85,
+            "produces": 0.85,
+            "supplies": 0.80,
+            "collaborates_with": 0.75,
+            "related_to": 0.50,
+            "co_occurrence": 0.40,
+        }
+        
+        # 统计
+        self._llm_calls = 0
+        self._cooccurrence_edges = 0
+    
+    # ========================================================================
+    # LLM 实体抽取
+    # ========================================================================
+    
+    def extract_entities_llm(self, text) -> Any:
+        """使用 LLM 抽取实体（可选增强）
+        
+        调用 MiMo API 进行实体抽取。如果 API 不可用，返回空列表。
+        
+        Args:
+            text: 待抽取的文本
+            
+        Returns:
+            实体列表，格式同 extract_entities
+        """
+        if not self._ensure_llm_available():
+            return []
+        
+        # 限制文本长度
+        truncated = text[:3000]
+        
+        prompt = _LLM_ENTITY_PROMPT.format(text=truncated)
+        response = self._call_llm(prompt)
+        
+        if not response:
+            return []
+        
+        # 解析 JSON 响应
+        try:
+            json_str = response
+            # 如果响应包含 markdown 代码块，提取其中的 JSON
+            if "```" in json_str:
+                match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', json_str, re.DOTALL)
+                if match:
+                    json_str = match.group(1).strip()
+            
+            data = json.loads(json_str)
+            entities = []
+            seen = set()
+            
+            for item in data.get("entities", []):
+                name = item.get("name", "").strip()
+                etype = item.get("type", "other")
+                confidence = float(item.get("confidence", 0.8))
+                
+                if not name or len(name) < 2:
+                    continue
+                if name in seen:
+                    continue
+                seen.add(name)
+                
+                entities.append({
+                    "name": name,
+                    "type": etype,
+                    "confidence": confidence,
+                    "positions": [],
+                    "count": 1,
+                    "source": "llm",
+                })
+            
+            self._llm_calls += 1
+            return entities
+            
+        except Exception as e:
+            logger.warning("LLM 实体抽取结果解析失败: %s", e)
+            return []
+    
+    def extract_entities_fallback(self, text) -> Any:
+        """规则抽取降级方案 — 当 LLM 不可用时使用
+        
+        Args:
+            text: 待抽取的文本
+            
+        Returns:
+            实体列表
+        """
+        # 使用父类的正则抽取
+        return super().extract_entities(text)
+    
+    def extract_entities(self, text) -> Any:
+        """增强版实体抽取 — 优先 LLM，降级到规则
+        
+        Args:
+            text: 待抽取的文本
+            
+        Returns:
+            实体列表（合并 LLM 和规则抽取结果，去重）
+        """
+        if not text:
+            return []
+        
+        # 1. 规则抽取（始终执行，作为基线）
+        rule_entities = self.extract_entities_fallback(text)
+        
+        # 2. LLM 抽取（可选）
+        llm_entities = self.extract_entities_llm(text)
+        
+        if not llm_entities:
+            return rule_entities
+        
+        # 3. 合并去重
+        merged = self._merge_entity_lists(llm_entities, rule_entities)
+        
+        # 4. 按置信度排序
+        merged.sort(key=lambda e: e.get("confidence", 0.5), reverse=True)
+        
+        return merged
+    
+    # ========================================================================
+    # LLM 关系抽取
+    # ========================================================================
+    
+    def extract_relations_llm(self, text) -> Any:
+        """使用 LLM 抽取关系
+        
+        Args:
+            text: 待抽取的文本
+            
+        Returns:
+            关系列表，格式同 _extract_edges 输出
+        """
+        if not self._ensure_llm_available():
+            return []
+        
+        truncated = text[:3000]
+        
+        prompt = _LLM_RELATION_PROMPT.format(text=truncated)
+        response = self._call_llm(prompt)
+        
+        if not response:
+            return []
+        
+        try:
+            json_str = response
+            if "```" in json_str:
+                match = re.search(r'```(?:json)?\s*\n?(.*?)\n?```', json_str, re.DOTALL)
+                if match:
+                    json_str = match.group(1).strip()
+            
+            data = json.loads(json_str)
+            relations = []
+            
+            for item in data.get("relations", []):
+                source = item.get("source", "").strip()
+                target = item.get("target", "").strip()
+                relation = item.get("relation", "related_to")
+                confidence = float(item.get("confidence", 0.7))
+                
+                if not source or not target:
+                    continue
+                if source == target:
+                    continue
+                
+                relations.append({
+                    "source": source,
+                    "target": target,
+                    "type": relation,
+                    "confidence": confidence,
+                    "doc_id": "",
+                    "evidence": "LLM 抽取",
+                    "source_method": "llm",
+                })
+            
+            self._llm_calls += 1
+            return relations
+            
+        except Exception as e:
+            logger.warning("LLM 关系抽取结果解析失败: %s", e)
+            return []
+    
+    def extract_relations_cooccurrence(self, text, entities, window_size=None) -> Any:
+        """共现关系抽取 — 作为关系抽取的降级方案
+        
+        基于实体在同一句子/窗口中共现的频率来推断关系。
+        共现频率越高，关系置信度越高。
+        
+        Args:
+            text:        原文文本
+            entities:    已提取的实体列表
+            window_size: 共现窗口大小（字符数），默认使用 self._cooccurrence_window
+            
+        Returns:
+            关系列表
+        """
+        if not entities or not text:
+            return []
+        
+        window = window_size or self._cooccurrence_window
+        entity_names = [e["name"] for e in entities if e.get("name")]
+        
+        if len(entity_names) < 2:
+            return []
+        
+        # 按句子分割
+        sentences = re.split(r'[。！？\n;；]', text)
+        
+        # 统计共现
+        cooccurrence_counts = {}
+        
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence or len(sentence) < 4:
+                continue
+            
+            # 找到这个句子中出现的实体
+            present = []
+            for name in entity_names:
+                if name in sentence:
+                    present.append(name)
+            
+            # 如果有多个实体共现，两两建立关系
+            if len(present) >= 2:
+                for i in range(len(present)):
+                    for j in range(i + 1, len(present)):
+                        key = tuple(sorted([present[i], present[j]]))
+                        cooccurrence_counts[key] = cooccurrence_counts.get(key, 0) + 1
+        
+        # 转换为关系列表
+        relations = []
+        max_count = max(cooccurrence_counts.values()) if cooccurrence_counts else 1
+        
+        for (e1, e2), count in cooccurrence_counts.items():
+            if count < self._min_cooccurrence:
+                continue
+            
+            # 置信度 = 基础值 + 频率贡献
+            confidence = 0.4 + 0.4 * (count / max_count)
+            confidence = min(confidence, 0.85)
+            
+            relations.append({
+                "source": e1,
+                "target": e2,
+                "type": "co_occurrence",
+                "confidence": round(confidence, 2),
+                "doc_id": "",
+                "evidence": f"共现 {count} 次",
+                "source_method": "cooccurrence",
+            })
+        
+        self._cooccurrence_edges += len(relations)
+        return relations
+    
+    # ========================================================================
+    # 重写核心方法
+    # ========================================================================
+    
+    def build_from_text(self, text, doc_id="") -> Any:
+        """增强版图谱构建 — LLM + 规则 + 共现三层策略
+        
+        Args:
+            text:   文档文本
+            doc_id: 文档 ID
+            
+        Returns:
+            边列表
+        """
+        if not text or not text.strip():
+            return []
+        
+        # 1. 提取实体
+        entities = self.extract_entities(text)
+        
+        # 2. LLM 关系抽取（可选）
+        llm_relations = self.extract_relations_llm(text)
+        
+        # 3. 规则关系抽取（降级方案）
+        rule_relations = self._extract_edges(text, entities, doc_id)
+        
+        # 4. 共现关系抽取（降级方案）
+        cooccurrence_relations = self.extract_relations_cooccurrence(text, entities)
+        
+        # 5. 合并所有关系
+        all_relations = llm_relations + rule_relations + cooccurrence_relations
+        
+        # 6. 边权重计算
+        weighted = self._calculate_edge_weights(all_relations, entities)
+        
+        # 7. 去重
+        deduped = self._deduplicate_edges(weighted)
+        
+        # 8. 排序
+        deduped.sort(key=lambda e: e["confidence"], reverse=True)
+        
+        # 更新统计
+        self._built_count += 1
+        self._total_entities += len(entities)
+        self._total_edges += len(deduped)
+        
+        return deduped
+    
+    def build_full_graph(self, text, doc_id="") -> Any:
+        """增强版完整图构建
+        
+        Args:
+            text:   文档文本
+            doc_id: 文档 ID
+            
+        Returns:
+            {"doc_id", "entities", "edges", "stats"}
+        """
+        entities = self.extract_entities(text)
+        edges = self.build_from_text(text, doc_id)
+        
+        graph_entities = [
+            {
+                "name": e["name"],
+                "type": e["type"],
+                "description": f"从文档 {doc_id} 中提取的 {e['type']}",
+                "count": e.get("count", 1),
+                "confidence": e.get("confidence", 0.5),
+                "source": e.get("source", "rule"),
+            }
+            for e in entities
+        ]
+        
+        graph_relations = [
+            {
+                "source": edge["source"],
+                "target": edge["target"],
+                "relation": edge["type"],
+                "description": edge.get("evidence", ""),
+                "confidence": edge["confidence"],
+                "weight": edge.get("weight", edge["confidence"]),
+                "source_method": edge.get("source_method", "rule"),
+            }
+            for edge in edges
+        ]
+        
+        return {
+            "doc_id": doc_id,
+            "entities": graph_entities,
+            "edges": graph_relations,
+            "stats": {
+                "entity_count": len(graph_entities),
+                "edge_count": len(graph_relations),
+                "llm_calls": self._llm_calls,
+                "cooccurrence_edges": self._cooccurrence_edges,
+                "built_at": time.strftime("%Y-%m-%d %H:%M:%S"),
+            },
+        }
+    
+    def get_stats(self) -> Any:
+        """获取增强版构建器统计信息"""
+        base = super().get_stats()
+        base["llm_calls"] = self._llm_calls
+        base["cooccurrence_edges"] = self._cooccurrence_edges
+        base["builder_type"] = "enhanced"
+        return base
+    
+    # ========================================================================
+    # 内部辅助方法
+    # ========================================================================
+    
+    def _ensure_llm_available(self) -> Any:
+        """检测 LLM API 是否可用（缓存结果）"""
+        if self._llm_available is not None:
+            return self._llm_available
+        
+        try:
+            from src.config import MIMO_API_KEY
+            if not MIMO_API_KEY:
+                self._llm_available = False
+                return False
+            self._llm_available = True
+            return True
+        except ImportError:
+            self._llm_available = False
+            return False
+    
+    def _call_llm(self, prompt) -> Any:
+        """调用 LLM API"""
+        try:
+            from src.config import MIMO_API_KEY, MIMO_BASE_URL, MIMO_MODEL, AI_TIMEOUT_SECONDS
+            import httpx
+            
+            url = f"{MIMO_BASE_URL.rstrip('/')}/chat/completions"
+            headers = {
+                "Authorization": f"Bearer {MIMO_API_KEY}",
+                "Content-Type": "application/json",
+            }
+            payload = {
+                "model": MIMO_MODEL,
+                "messages": [{"role": "user", "content": prompt}],
+                "temperature": 0.1,
+                "max_tokens": 2000,
+            }
+            
+            with httpx.Client(timeout=AI_TIMEOUT_SECONDS) as client:
+                resp = client.post(url, json=payload, headers=headers)
+                resp.raise_for_status()
+                data = resp.json()
+                return data["choices"][0]["message"]["content"]
+        except Exception as e:
+            logger.debug("LLM 调用失败（将降级到规则引擎）: %s", e)
+            self._llm_available = False
+            return None
+    
+    def _merge_entity_lists(self, primary, secondary) -> Any:
+        """合并两个实体列表，primary 优先
+        
+        Args:
+            primary:   主要实体列表（如 LLM 结果）
+            secondary: 次要实体列表（如规则结果）
+            
+        Returns:
+            合并后的去重实体列表
+        """
+        merged = {}
+        
+        # 先加入主要列表
+        for e in primary:
+            name = self._normalize_entity_name(e["name"])
+            if name not in merged:
+                merged[name] = e.copy()
+                merged[name]["name"] = name
+        
+        # 再加入次要列表（不覆盖已有）
+        for e in secondary:
+            name = self._normalize_entity_name(e["name"])
+            if name not in merged:
+                merged[name] = e.copy()
+                merged[name]["name"] = name
+            else:
+                # 如果已存在，增加 count
+                merged[name]["count"] = merged[name].get("count", 1) + e.get("count", 1)
+        
+        return list(merged.values())
+    
+    def _normalize_entity_name(self, name) -> Any:
+        """实体名称归一化
+        
+        处理：去前后缀、去多余空格、统一标点
+        """
+        if not name:
+            return name
+        # 去除职务后缀
+        suffixes = ["先生", "女士", "经理", "总监", "主任", "工程师", 
+                    "设计师", "老师", "博士", "硕士", "总裁", "CEO", 
+                    "CTO", "CFO", "副总", "部长", "科长", "处长", 
+                    "主管", "书记", "主席", "院长", "校长", "所长"]
+        result = name.strip()
+        for suffix in suffixes:
+            if result.endswith(suffix) and len(result) > len(suffix):
+                result = result[:-len(suffix)]
+                break
+        # 去多余空格
+        result = re.sub(r'\s+', '', result)
+        return result if result else name.strip()
+    
+    def _calculate_edge_weights(self, edges, entities) -> Any:
+        """计算边权重
+        
+        权重 = 置信度 × 关系类型权重 × 实体共现频率贡献
+        
+        Args:
+            edges:    原始边列表
+            entities: 已提取的实体列表
+            
+        Returns:
+            带权重的边列表
+        """
+        entity_names = {e["name"] for e in entities}
+        
+        weighted = []
+        for edge in edges:
+            conf = edge.get("confidence", 0.5)
+            rel_type = edge.get("type", "related_to")
+            rel_weight = self._relation_weights.get(rel_type, 0.5)
+            
+            # 源实体是否在已提取实体中（提升可信度）
+            src_in = 1.0 if edge.get("source") in entity_names else 0.7
+            tgt_in = 1.0 if edge.get("target") in entity_names else 0.7
+            
+            # 综合权重
+            weight = conf * rel_weight * ((src_in + tgt_in) / 2)
+            
+            edge_copy = edge.copy()
+            edge_copy["weight"] = round(min(weight, 1.0), 3)
+            weighted.append(edge_copy)
+        
+        return weighted
+    
+    def _deduplicate_edges(self, edges) -> Any:
+        """增强版边去重 — 相同 (source, target, type) 保留置信度最高的"""
+        best = {}
+        
+        for edge in edges:
+            src = self._normalize_entity_name(edge.get("source", ""))
+            tgt = self._normalize_entity_name(edge.get("target", ""))
+            rel = edge.get("type", "related_to")
+            key = (src, tgt, rel)
+            
+            if key not in best or edge.get("confidence", 0) > best[key].get("confidence", 0):
+                edge_copy = edge.copy()
+                edge_copy["source"] = src
+                edge_copy["target"] = tgt
+                best[key] = edge_copy
+        
+        return list(best.values())
+
+
 # ============================================================================
 # 全局单例
 # ============================================================================
@@ -617,15 +1495,21 @@ class AutoGraphBuilder:
 _global_builder: Optional[AutoGraphBuilder] = None
 
 
-def get_auto_graph_builder() -> AutoGraphBuilder:
+def get_auto_graph_builder(use_enhanced: bool = True) -> AutoGraphBuilder:
     """获取全局 AutoGraphBuilder 单例
     
+    Args:
+        use_enhanced: 是否使用增强版（默认 True，自动检测 LLM 可用性）
+    
     Returns:
-        AutoGraphBuilder 实例
+        AutoGraphBuilder 或 EnhancedAutoGraphBuilder 实例
     """
     global _global_builder
     if _global_builder is None:
-        _global_builder = AutoGraphBuilder()
+        if use_enhanced:
+            _global_builder = EnhancedAutoGraphBuilder()
+        else:
+            _global_builder = AutoGraphBuilder()
     return _global_builder
 
 
@@ -635,7 +1519,9 @@ def get_auto_graph_builder() -> AutoGraphBuilder:
 
 __all__ = [
     "AutoGraphBuilder",
+    "EnhancedAutoGraphBuilder",
     "ENTITY_PATTERNS",
+    "ENHANCED_ENTITY_PATTERNS",
     "EDGE_RULES",
     "get_auto_graph_builder",
 ]

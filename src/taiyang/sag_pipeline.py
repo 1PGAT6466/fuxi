@@ -414,7 +414,7 @@ class SAGPipeline:
                                 "_score": 0.7,
                             })
                     return events
-                except Exception:  # TODO: Narrow exception type
+                except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
                     return []
 
             # 并行执行所有 entity_name 查询

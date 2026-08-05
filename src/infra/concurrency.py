@@ -2,6 +2,7 @@
 concurrency.py — 并发控制
 少阳Semaphore(3) / 太阳Semaphore(10) / 太阴RateLimiting
 """
+
 import asyncio
 import logging
 import time
@@ -20,7 +21,9 @@ class RateLimiter:
         self._lock = asyncio.Lock()
         # v1.50 R4: 同步锁，用于保护 get_remaining() 的 read/cull 操作
         import threading
+
         self._sync_lock = threading.Lock()
+
     # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def acquire(self) -> bool:

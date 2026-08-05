@@ -4,6 +4,7 @@ api_connector.py — REST API 连接器
 通过 HTTP 请求接入 REST API 数据源。
 支持 GET/POST 请求、分页、认证头和速率限制。
 """
+
 import asyncio
 import json
 import logging
@@ -13,14 +14,14 @@ from typing import Any, Dict, List, Optional
 import aiohttp
 
 from .base import (
-    DataSource,
-    ConnectorConfig,
-    UnifiedDocument,
-    SourceType,
-    ConnectorStatus,
     ConnectionError,
+    ConnectorConfig,
+    ConnectorStatus,
+    DataSource,
     FetchError,
+    SourceType,
     TransformError,
+    UnifiedDocument,
 )
 
 logger = logging.getLogger(__name__)
@@ -104,6 +105,7 @@ class APIConnector(DataSource):
                     headers[key_header] = api_key
             elif auth_type == "basic":
                 import base64
+
                 username = self.config.extra.get("username", "")
                 password = self.config.extra.get("password", "")
                 token = base64.b64encode(f"{username}:{password}".encode()).decode()
@@ -127,29 +129,14 @@ class APIConnector(DataSource):
 
             # 健康检查：尝试访问 base_url
             try:
-                health_url = self.config.extra.get(
-                    "health_endpoint",
-                    self._base_url
-                )
-                async with self._session.get(
-                    health_url,
-                    timeout=aiohttp.ClientTimeout(total=10)
-                ) as resp:
+                health_url = self.config.extra.get("health_endpoint", self._base_url)
+                async with self._session.get(health_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                     if resp.status >= 500:
-                        raise ConnectionError(
-                            self.name,
-                            f"API 服务器返回 {resp.status}"
-                        )
+                        raise ConnectionError(self.name, f"API 服务器返回 {resp.status}")
             except asyncio.TimeoutError:
-                logger.warning(
-                    "[%s] 健康检查超时，继续连接（不影响接入流程）",
-                    self.name
-                )
+                logger.warning("[%s] 健康检查超时，继续连接（不影响接入流程）", self.name)
             except aiohttp.ClientError as e:
-                logger.warning(
-                    "[%s] 健康检查异常: %s，继续连接",
-                    self.name, str(e)
-                )
+                logger.warning("[%s] 健康检查异常: %s，继续连接", self.name, str(e))
 
             self._set_status(ConnectorStatus.CONNECTED)
             logger.info("[%s] API 连接就绪 (base_url: %s)", self.name, self._base_url)
@@ -183,10 +170,7 @@ class APIConnector(DataSource):
         if not self._session or not self.is_connected:
             raise FetchError(self.name, "API 未连接，请先调用 connect()")
 
-        endpoint = kwargs.get(
-            "endpoint",
-            self.config.extra.get("endpoint", "")
-        )
+        endpoint = kwargs.get("endpoint", self.config.extra.get("endpoint", ""))
         params = kwargs.get("params", self.config.extra.get("params", {}))
         method = kwargs.get("method", "GET").upper()
         body = kwargs.get("body")
@@ -198,17 +182,13 @@ class APIConnector(DataSource):
             pagination = self.config.extra.get("pagination", {})
             if not pagination or max_pages == 1:
                 # 单次请求，不分页
-                data, _ = await self._make_request(
-                    url, method=method, params=params, body=body
-                )
+                data, _ = await self._make_request(url, method=method, params=params, body=body)
                 items = self._extract_items(data)
                 logger.info("[%s] 获取 %d 条数据 (单页)", self.name, len(items))
                 return items
             else:
                 # 分页请求
-                return await self._fetch_paginated(
-                    url, method, params, body, pagination, max_pages
-                )
+                return await self._fetch_paginated(url, method, params, body, pagination, max_pages)
 
         except FetchError:
             raise
@@ -245,9 +225,7 @@ class APIConnector(DataSource):
                 page_params[offset_param] = page * page_size
                 page_params[limit_param] = page_size
 
-            data, response_headers = await self._make_request(
-                url, method=method, params=page_params, body=body
-            )
+            data, response_headers = await self._make_request(url, method=method, params=page_params, body=body)
 
             items = self._extract_items(data)
             all_items.extend(items)
@@ -273,10 +251,7 @@ class APIConnector(DataSource):
             # 速率限制等待
             await asyncio.sleep(self._rate_limit_delay)
 
-        logger.info(
-            "[%s] 分页获取完成: %d 页, %d 条数据",
-            self.name, page, len(all_items)
-        )
+        logger.info("[%s] 分页获取完成: %d 页, %d 条数据", self.name, page, len(all_items))
         return all_items
 
     async def _make_request(
@@ -310,27 +285,30 @@ class APIConnector(DataSource):
                         retry_after = int(resp.headers.get("Retry-After", 5))
                         logger.warning(
                             "[%s] 触发速率限制 (429)，等待 %ds (第 %d/%d 次重试)",
-                            self.name, retry_after, attempt + 1, self.config.retry_count
+                            self.name,
+                            retry_after,
+                            attempt + 1,
+                            self.config.retry_count,
                         )
                         await asyncio.sleep(retry_after)
                         continue
 
                     if resp.status >= 500 and attempt < self.config.retry_count:
-                        delay = self.config.retry_delay * (2 ** attempt)
+                        delay = self.config.retry_delay * (2**attempt)
                         logger.warning(
                             "[%s] 服务器错误 %d，%s 后重试 (第 %d/%d 次)",
-                            self.name, resp.status, delay, attempt + 1,
-                            self.config.retry_count
+                            self.name,
+                            resp.status,
+                            delay,
+                            attempt + 1,
+                            self.config.retry_count,
                         )
                         await asyncio.sleep(delay)
                         continue
 
                     if resp.status >= 400:
                         text = await resp.text()
-                        raise FetchError(
-                            self.name,
-                            f"HTTP {resp.status}: {text[:500]}"
-                        )
+                        raise FetchError(self.name, f"HTTP {resp.status}: {text[:500]}")
 
                     data = await resp.json()
                     self._last_request_time = time.time()
@@ -339,11 +317,14 @@ class APIConnector(DataSource):
             except aiohttp.ClientError as e:
                 last_error = e
                 if attempt < self.config.retry_count:
-                    delay = self.config.retry_delay * (2 ** attempt)
+                    delay = self.config.retry_delay * (2**attempt)
                     logger.warning(
                         "[%s] 请求失败: %s，%s 后重试 (第 %d/%d 次)",
-                        self.name, str(e), delay, attempt + 1,
-                        self.config.retry_count
+                        self.name,
+                        str(e),
+                        delay,
+                        attempt + 1,
+                        self.config.retry_count,
                     )
                     await asyncio.sleep(delay)
                 else:
@@ -379,10 +360,7 @@ class APIConnector(DataSource):
             return data
 
         if isinstance(data, dict):
-            items_key = self.config.extra.get(
-                "items_key",
-                self.config.extra.get("results_key", "")
-            )
+            items_key = self.config.extra.get("items_key", self.config.extra.get("results_key", ""))
             if not items_key:
                 # 自动探测
                 for key in ("data", "results", "items", "records", "content"):
@@ -445,7 +423,8 @@ class APIConnector(DataSource):
 
                 # 根据字段映射提取内容
                 title = (
-                    field_map.get("title") and item.get(field_map["title"])
+                    field_map.get("title")
+                    and item.get(field_map["title"])
                     or item.get("title")
                     or item.get("name")
                     or item.get("subject")
@@ -455,18 +434,15 @@ class APIConnector(DataSource):
 
                 content_fields = field_map.get("content", [])
                 if content_fields:
-                    content = "\n".join(
-                        str(item.get(f, ""))
-                        for f in content_fields
-                        if f in item
-                    )
+                    content = "\n".join(str(item.get(f, "")) for f in content_fields if f in item)
                 else:
                     # 自动：把所有可读字段拼接为文本
                     content = json.dumps(item, ensure_ascii=False, indent=2)
 
                 url_key = field_map.get("url")
                 source_url = (
-                    url_key and item.get(url_key, "")
+                    url_key
+                    and item.get(url_key, "")
                     or item.get("url", "")
                     or item.get("href", "")
                     or item.get("link", "")
@@ -490,10 +466,7 @@ class APIConnector(DataSource):
                 )
                 documents.append(doc)
 
-            logger.info(
-                "[%s] 转换完成: %d 条 → %d 个文档",
-                self.name, len(raw_data), len(documents)
-            )
+            logger.info("[%s] 转换完成: %d 条 → %d 个文档", self.name, len(raw_data), len(documents))
             return documents
 
         except Exception as e:

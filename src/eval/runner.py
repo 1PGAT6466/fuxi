@@ -2,12 +2,13 @@
 runner.py — 评测运行器（P0-E1）
 计算 Recall@5、Precision@1、MRR
 """
+
+import asyncio
 import json
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import List, Dict, Any
-import asyncio
+from typing import Any, Dict, List
 
 logger = logging.getLogger("eval.runner")
 
@@ -121,6 +122,8 @@ def compute_mrr(
             return 1.0 / rank
 
     return 0.0
+
+
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
@@ -146,6 +149,7 @@ async def run_evaluation(
     if retriever_fn is None:
         try:
             from src.taiyang.retrieval import hybrid_search
+
             retriever_fn = hybrid_search
         except ImportError:
             return {"error": "检索模块不可用", "test_cases_count": len(test_cases)}
@@ -162,35 +166,28 @@ async def run_evaluation(
             logger.warning(f"[Eval] 检索失败: tc={tc['id']} error={e}")
             retrieved = []
 
-        recall = compute_recall_at_k(
-            retrieved, tc.get("relevant_keywords", []), k=5
-        )
-        precision = compute_precision_at_1(
-            retrieved, tc.get("relevant_keywords", [])
-        )
-        mrr = compute_mrr(
-            retrieved, tc.get("relevant_chunk_ids", [])
-        )
+        recall = compute_recall_at_k(retrieved, tc.get("relevant_keywords", []), k=5)
+        precision = compute_precision_at_1(retrieved, tc.get("relevant_keywords", []))
+        mrr = compute_mrr(retrieved, tc.get("relevant_chunk_ids", []))
 
         recall_scores.append(recall)
         precision_scores.append(precision)
         mrr_scores.append(mrr)
 
-        results.append({
-            "id": tc["id"],
-            "query": tc["query"],
-            "recall_at_5": round(recall, 4),
-            "precision_at_1": round(precision, 4),
-            "mrr": round(mrr, 4),
-            "result_count": len(retrieved),
-            "top_3_scores": [
-                r.get("score", 0) for r in retrieved[:3]
-            ],
-        })
+        results.append(
+            {
+                "id": tc["id"],
+                "query": tc["query"],
+                "recall_at_5": round(recall, 4),
+                "precision_at_1": round(precision, 4),
+                "mrr": round(mrr, 4),
+                "result_count": len(retrieved),
+                "top_3_scores": [r.get("score", 0) for r in retrieved[:3]],
+            }
+        )
 
         logger.info(
-            f"[Eval] {tc['id']}: R@5={recall:.3f} P@1={precision:.3f} "
-            f"MRR={mrr:.3f} n_results={len(retrieved)}"
+            f"[Eval] {tc['id']}: R@5={recall:.3f} P@1={precision:.3f} " f"MRR={mrr:.3f} n_results={len(retrieved)}"
         )
 
     n = len(test_cases)
@@ -213,6 +210,7 @@ async def run_evaluation(
     def _write_result():
         with open(result_path, "w", encoding="utf-8") as f:
             json.dump(report, f, ensure_ascii=False, indent=2)
+
     await asyncio.to_thread(_write_result)
 
     logger.info(f"[Eval] 评测完成，报告已写入: {result_path}")

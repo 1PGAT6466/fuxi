@@ -3,11 +3,12 @@
 =============================
 从 server.py 拆分的 Fuxi 生命体管理: 启动、八卦注册、关机。
 """
-import os
-import gc
-import sys
-import logging
+
 import asyncio
+import gc
+import logging
+import os
+import sys
 from typing import Any, Optional
 
 from fastapi import FastAPI
@@ -28,19 +29,16 @@ def _setup_python_malloc():
     """在启动时设置 PYTHONMALLOC=malloc 以减少内存碎片"""
     if os.environ.get("PYTHONMALLOC") is None:
         os.environ["PYTHONMALLOC"] = "malloc"
-        logging.getLogger("server").info(
-            "[GC] PYTHONMALLOC 已设置为 malloc（减少内存碎片）"
-        )
+        logging.getLogger("server").info("[GC] PYTHONMALLOC 已设置为 malloc（减少内存碎片）")
     else:
-        logging.getLogger("server").info(
-            f"[GC] PYTHONMALLOC 已由环境变量设置: {os.environ['PYTHONMALLOC']}"
-        )
+        logging.getLogger("server").info(f"[GC] PYTHONMALLOC 已由环境变量设置: {os.environ['PYTHONMALLOC']}")
 
 
 def _get_memory_usage_mb() -> float:
     """获取当前进程内存使用（MB）"""
     try:
         import psutil
+
         process = psutil.Process(os.getpid())
         return process.memory_info().rss / (1024 * 1024)
     except ImportError:
@@ -51,38 +49,33 @@ async def _periodic_gc_collector():
     """定期GC收集器：每 _gc_interval 秒触发一次"""
     logger = logging.getLogger("server")
     global _last_gc_stats
-    
+
     while True:
         try:
             await asyncio.sleep(_gc_interval)
-            
+
             # 收集 GC 前统计
             gen0_before = gc.get_count()[0]
-            
+
             # 执行 full GC
             collected = gc.collect()
-            
+
             # 收集内存信息
             mem_mb = _get_memory_usage_mb()
-            
+
             _last_gc_stats = {
                 "collected_objects": collected,
                 "gen0_objects_before": gen0_before,
                 "memory_mb": round(mem_mb, 2),
                 "gc_thresholds": gc.get_threshold(),
             }
-            
-            logger.debug(
-                f"[GC] 定期回收: {collected} 个对象, "
-                f"Gen0前: {gen0_before}, 内存: {mem_mb:.1f}MB"
-            )
-            
+
+            logger.debug(f"[GC] 定期回收: {collected} 个对象, " f"Gen0前: {gen0_before}, 内存: {mem_mb:.1f}MB")
+
             # 内存告警
             if mem_mb > _memory_warn_threshold_mb:
-                logger.warning(
-                    f"[GC] ⚠️ 内存使用超过阈值: {mem_mb:.1f}MB > {_memory_warn_threshold_mb}MB"
-                )
-                
+                logger.warning(f"[GC] ⚠️ 内存使用超过阈值: {mem_mb:.1f}MB > {_memory_warn_threshold_mb}MB")
+
         except asyncio.CancelledError:
             logger.info("[GC] 定期GC收集器已停止")
             break
@@ -123,7 +116,7 @@ async def start_fuxi(app: FastAPI) -> None:
     """
     global _fuxi_instance, _message_queue_instance, _gc_task
     import time as _time
-    
+
     # ── P1: 启动时内存分配器优化 ──
     _setup_python_malloc()
     engine = os.getenv("FUXI_ENGINE", "v2").lower()
@@ -132,6 +125,7 @@ async def start_fuxi(app: FastAPI) -> None:
     # ── P1 修复: 对话历史持久化 ──
     try:
         from src.db.conversation_db import init_conversation_db
+
         init_conversation_db()
         logging.getLogger("server").info("[Fuxi] 对话持久化数据库已初始化")
     except (ImportError, OSError) as e:
@@ -139,8 +133,8 @@ async def start_fuxi(app: FastAPI) -> None:
 
     try:
         if engine == "v2":
-            from src.bagua.qian import QianGua
             from src.bagua.intent_bus import get_intent_bus
+            from src.bagua.qian import QianGua
 
             intent_bus = get_intent_bus()
             _fuxi_instance = QianGua(intent_bus=intent_bus, intent_mode=intent_mode)
@@ -153,6 +147,15 @@ async def start_fuxi(app: FastAPI) -> None:
             app.state.engine = "v2"
             app.state.intent_mode = intent_mode
 
+            # 初始化检索管线（供 /api/search 使用）
+            import src.taiyang.retrieval as _tr
+            from src.taiyang.retrieval import TaiyangRetrieval
+
+            _meridian = getattr(_fuxi_instance, "meridian", None)
+            if _meridian:
+                _tr._retrieval_instance = TaiyangRetrieval(_meridian)
+                logging.getLogger("server").info("[Fuxi] 太阳·检索管线已就绪")
+
             logging.getLogger("server").info(f"[Fuxi] 引擎: v2 (Bagua) | intent_mode: {intent_mode}")
             logging.getLogger("server").info(f"[Fuxi] 伏羲八卦体系已苏醒 ☰")
 
@@ -160,6 +163,7 @@ async def start_fuxi(app: FastAPI) -> None:
 
         elif engine == "v1":
             from src.hypothalamus.fuxi import Fuxi
+
             _fuxi_instance = Fuxi()
             app.state.fuxi = _fuxi_instance
             app.state.meridian = _fuxi_instance.meridian
@@ -174,12 +178,18 @@ async def start_fuxi(app: FastAPI) -> None:
 
         # ---- 初始化消息队列（P0 修复） ----
         await _init_message_queue(app)
-        
+
         # ── P1: 启动定期GC收集器 ──
         _gc_task = asyncio.create_task(_periodic_gc_collector())
         logging.getLogger("server").info(
             f"[GC] 定期GC收集器已启动（间隔 {_gc_interval}s，内存告警阈值 {_memory_warn_threshold_mb}MB）"
         )
+
+        # ── 初始化任务队列 + 注册 file_process handler ──
+        await _init_task_queue(app)
+
+        # ── Phase 1: 启动自运转调度器 ──
+        await _init_scheduler(app)
 
         _register_shutdown_handler(app)
 
@@ -212,12 +222,15 @@ async def stop_fuxi(app: FastAPI) -> None:
             pass
         _gc_task = None
         logging.getLogger("server").info("[GC] 定期GC收集器已停止")
-    
+
     # 关闭消息队列
     if _message_queue_instance:
         await _message_queue_instance.close()
         _message_queue_instance = None
         logging.getLogger("server").info("[MQ] 消息队列已关闭")
+
+    # 停止调度器
+    _stop_scheduler()
 
 
 def _register_bagua_guas(app: FastAPI, intent_bus: Any) -> None:
@@ -248,6 +261,7 @@ def _register_shutdown_handler(app: FastAPI) -> None:
     """v2.1: 注册三步清理法关机 handler"""
     try:
         from src.bagua.shutdown import register_shutdown_handler
+
         register_shutdown_handler(
             app=app,
             fuxi_instance=_fuxi_instance,
@@ -260,6 +274,107 @@ def _register_shutdown_handler(app: FastAPI) -> None:
         logging.getLogger("server").warning("[Shutdown] bagua.shutdown 模块未找到，跳过优雅关机注册")
     except (RuntimeError, AttributeError, TypeError) as e:
         logging.getLogger("server").warning("[Shutdown] 关机 handler 注册失败: %s", e)
+
+
+# ── Phase 1: 自运转调度器 ──
+_scheduler_instance: Optional[Any] = None
+
+
+async def _init_scheduler(app: FastAPI) -> None:
+    """初始化自运转调度器 — Phase 1"""
+    global _scheduler_instance
+    logger = logging.getLogger("server")
+    try:
+        from src.api.scheduler_routes import set_scheduler_instance
+        from src.autonomous.scheduler import FuxiScheduler, register_preset_jobs
+
+        _scheduler_instance = FuxiScheduler()
+        register_preset_jobs(_scheduler_instance)
+        _scheduler_instance.schedule_registered_jobs()
+        _scheduler_instance.start()
+
+        app.state.scheduler = _scheduler_instance
+        set_scheduler_instance(_scheduler_instance)
+
+        jobs_count = len(_scheduler_instance.list_jobs())
+        logger.info(f"[Scheduler] 自运转调度器已启动 — {jobs_count} 个任务就绪 ⏰")
+    except Exception as e:
+        logger.warning("[Scheduler] 调度器初始化失败（服务继续运行）: %s", e, exc_info=True)
+
+
+def _stop_scheduler():
+    """停止调度器"""
+    global _scheduler_instance
+    if _scheduler_instance:
+        _scheduler_instance.stop(wait=False)
+        _scheduler_instance = None
+        logging.getLogger("server").info("[Scheduler] 自运转调度器已停止")
+
+
+async def _init_task_queue(app: FastAPI) -> None:
+    """初始化任务队列 + 注册 file_process handler"""
+    logger = logging.getLogger("server")
+    try:
+        import redis.asyncio as redis
+        from src.infra.task_queue import TASK_FILE_PROCESS, initialize_task_queue
+
+        # 尝试连接 Redis
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+        try:
+            redis_client = redis.from_url(redis_url, decode_responses=True)
+            await redis_client.ping()
+            task_queue = await initialize_task_queue(redis_client)
+            logger.info("[TaskQueue] 使用 Redis 任务队列")
+        except Exception:
+            # Redis 不可用，使用内存队列
+            logger.info("[TaskQueue] Redis 不可用，使用内存队列")
+            from src.infra.task_queue import RedisStreamTaskQueue
+
+            class MemoryTaskQueue:
+                def __init__(self):
+                    self._handlers = {}
+                    self._tasks = []
+
+                def register_handler(self, task_type, handler):
+                    self._handlers[task_type] = handler
+
+                async def submit_task(self, task_type, payload):
+                    self._tasks.append((task_type, payload))
+                    return {"id": "memory-0"}
+
+                async def process_next(self):
+                    if not self._tasks:
+                        return None
+                    task_type, payload = self._tasks.pop(0)
+                    handler = self._handlers.get(task_type)
+                    if handler:
+                        return await handler(payload)
+                    return None
+
+            task_queue = MemoryTaskQueue()
+
+        app.state.task_queue = task_queue
+
+        async def _file_process_handler(payload: dict) -> dict:
+            """处理文件上传后的 pipeline 任务"""
+            file_path = payload.get("file_path")
+            if not file_path:
+                return {"status": "error", "message": "缺少 file_path"}
+            try:
+                from src.pipeline.unified import UnifiedPipeline
+
+                pipeline = UnifiedPipeline()
+                result = await pipeline.process(file_path, source="upload")
+                logger.info(f"[TaskQueue] 文件处理完成: {file_path}")
+                return {"status": "ok", "result": str(result)}
+            except Exception as e:
+                logger.error(f"[TaskQueue] 文件处理失败: {e}", exc_info=True)
+                return {"status": "error", "message": str(e)}
+
+        task_queue.register_handler(TASK_FILE_PROCESS, _file_process_handler)
+        logger.info("[TaskQueue] 任务队列已初始化，file_process handler 已注册")
+    except Exception as e:
+        logger.warning(f"[TaskQueue] 任务队列初始化失败（服务继续运行）: {e}", exc_info=True)
 
 
 async def _init_message_queue(app: FastAPI) -> None:
@@ -284,7 +399,8 @@ async def _init_message_queue(app: FastAPI) -> None:
         health = await _message_queue_instance.health()
         logger.info(
             "[MQ] 消息队列已就绪 — backend=%s status=%s",
-            health["backend"], health["status"],
+            health["backend"],
+            health["status"],
         )
     except Exception as e:
         logger.warning("[MQ] 消息队列初始化失败（服务继续运行，消息功能不可用）: %s", e)

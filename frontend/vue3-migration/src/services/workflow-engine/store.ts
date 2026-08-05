@@ -75,8 +75,14 @@ export const useWorkflowEngineStore = defineStore('workflow-engine', () => {
     error.value = null;
     try {
       const result = await workflowApi.getWorkflows();
-      workflows.value = result.workflows;
-      total.value = result.total;
+      // 兼容后端返回 {items: [...]} 或 {workflows: [...]} 两种格式
+      const list = Array.isArray(result.workflows)
+        ? result.workflows
+        : Array.isArray((result as unknown as Record<string, unknown>).items)
+          ? ((result as unknown as Record<string, unknown>).items as Workflow[])
+          : [];
+      workflows.value = list;
+      total.value = result.total ?? list.length;
       logger.info(`加载了 ${total.value} 个工作流`);
     } catch (e) {
       error.value = e instanceof Error ? e.message : '加载工作流列表失败';

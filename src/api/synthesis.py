@@ -14,14 +14,13 @@ synthesis.py — 跨实体合成 API
   - src.taiyang.retrieval / src.services.retrieval
 """
 
-
+import asyncio
 import logging
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
-import asyncio
 
 logger = logging.getLogger("api.synthesis")
 
@@ -32,9 +31,10 @@ router = APIRouter(tags=["Synthesis 跨实体合成"])
 # 请求/响应模型
 # ============================================================================
 
+
 class CrossEntityRequest(BaseModel):
     """跨实体合成请求
-    
+
     Attributes:
         query:          用户查询
         entity_names:   可选，指定要合成的实体列表（不指定则自动提取）
@@ -45,6 +45,7 @@ class CrossEntityRequest(BaseModel):
                         - "force_cross_entity": 强制跨实体合成
                         - "rag_only": 仅 RAG 检索（回退模式）
     """
+
     query: str = Field(..., min_length=1, max_length=5000, description="用户查询")
     entity_names: Optional[List[str]] = Field(None, max_length=20, description="指定实体列表")
     top_k: int = Field(10, ge=1, le=50, description="检索数量")
@@ -54,6 +55,7 @@ class CrossEntityRequest(BaseModel):
 
 class CrossEntityResponse(BaseModel):
     """跨实体合成响应"""
+
     query: str
     synthesized_text: str
     entity_groups: List[Dict[str, Any]] = []
@@ -69,18 +71,19 @@ class CrossEntityResponse(BaseModel):
 # POST /api/synthesis/cross-entity
 # ============================================================================
 
+
 @router.post("/api/synthesis/cross-entity", response_model=CrossEntityResponse)
 async def cross_entity_synthesize(body: CrossEntityRequest, request: Request = None):
     """跨实体合成查询
-    
+
     将 RAG 检索结果与知识图谱数据结合，生成跨实体/跨文档的整合回答。
-    
+
     工作流程：
       1. RAG 检索 — 从 ChromaDB/向量数据库检索相关 chunk
       2. 知识图谱查询 — 获取实体和关系数据
       3. 跨实体合成 — 按实体分组、时间线排序、关系整合
       4. 格式化输出 — Markdown + 来源引用
-    
+
     请求示例:
     ```json
     {
@@ -90,7 +93,7 @@ async def cross_entity_synthesize(body: CrossEntityRequest, request: Request = N
         "include_graph": true
     }
     ```
-    
+
     返回示例:
     ```json
     {
@@ -107,20 +110,21 @@ async def cross_entity_synthesize(body: CrossEntityRequest, request: Request = N
     ```
     """
     try:
-        from src.bagua.synthesizer import CrossEntitySynthesizer, SynthesisResult
         from src.bagua.auto_graph import get_auto_graph_builder
-        
+        from src.bagua.synthesizer import CrossEntitySynthesizer, SynthesisResult
+
         synthesizer = CrossEntitySynthesizer()
         graph_builder = get_auto_graph_builder()
-        
+
         # ---- 步骤 1: RAG 检索 ----
         retrieved_chunks: List[Dict[str, Any]] = []
         graph_entities: List[Dict[str, Any]] = []
         graph_edges: List[Dict[str, Any]] = []
-        
+
         try:
             # 尝试 taiyang retrieval
             from src.taiyang.retrieval import search_chunks
+
             retrieved_chunks = search_chunks(
                 query=body.query,
                 top_k=body.top_k,
@@ -128,63 +132,70 @@ async def cross_entity_synthesize(body: CrossEntityRequest, request: Request = N
             )
         except (ImportError, Exception):
             pass
-        
+
         # 回退：尝试 services.retrieval
         if not retrieved_chunks:
             try:
                 from src.services.retrieval import search as svc_search
+
                 retrieved_chunks = svc_search(query=body.query, top_k=body.top_k)
             except (ImportError, Exception):
                 pass
-        
+
         # 回退：尝试 db/vector_store
         if not retrieved_chunks:
             try:
                 from src.db.vector_store import get_vector_store
+
                 vs = get_vector_store()
                 if vs:
                     raw_results = vs.search(body.query, top_k=body.top_k)
                     for r in raw_results:
-                        retrieved_chunks.append({
-                            "content": r.get("text", r.get("content", "")),
-                            "doc_id": r.get("id", ""),
-                            "source": r.get("metadata", {}).get("source", ""),
-                            "date": r.get("metadata", {}).get("date", ""),
-                            "score": r.get("score", 0),
-                        })
+                        retrieved_chunks.append(
+                            {
+                                "content": r.get("text", r.get("content", "")),
+                                "doc_id": r.get("id", ""),
+                                "source": r.get("metadata", {}).get("source", ""),
+                                "date": r.get("metadata", {}).get("date", ""),
+                                "score": r.get("score", 0),
+                            }
+                        )
             except (ImportError, Exception) as e:
                 logger.warning("所有检索方法失败: %s", e)
-        
+
         # ---- 步骤 2: 知识图谱数据 ----
         if body.include_graph:
             # 尝试从 graph_router 或 auto_graph 获取
             try:
                 from src.taiyang.graph_router import load_graph
+
                 graph_data = await asyncio.to_thread(load_graph)
                 graph_entities = graph_data.get("entities", [])
                 graph_edges = graph_data.get("edges", graph_data.get("relations", []))
             except (ImportError, Exception):
                 pass
-            
+
             # 回退：从 knowledge_graph.json 读取
             if not graph_entities:
                 try:
                     import json
                     import os
+
                     kg_path = os.path.join(
-                        os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
-                        "data", "knowledge_graph.json"
+                        os.path.dirname(os.path.dirname(os.path.dirname(__file__))), "data", "knowledge_graph.json"
                     )
                     if os.path.exists(kg_path):
+
                         def _read_kg():
                             with open(kg_path, "r", encoding="utf-8") as f:
                                 return json.load(f)
+
                         kg_data = await asyncio.to_thread(_read_kg)
                         graph_entities = kg_data.get("entities", [])
                         graph_edges = kg_data.get("edges", kg_data.get("relations", []))
                 except (ImportError, Exception) as e:
                     logger.debug("knowledge_graph.json 读取失败: %s", e)
-        
+
         # ---- 步骤 3: 跨实体合成 ----
         result: SynthesisResult = synthesizer.synthesize(
             query=body.query,
@@ -193,7 +204,7 @@ async def cross_entity_synthesize(body: CrossEntityRequest, request: Request = N
             graph_edges=graph_edges,
             entity_names=body.entity_names,
         )
-        
+
         # ---- 步骤 4: 构建响应 ----
         return CrossEntityResponse(
             query=result.query,
@@ -211,30 +222,38 @@ async def cross_entity_synthesize(body: CrossEntityRequest, request: Request = N
                 "synthesizer_stats": synthesizer.get_stats(),
             },
         )
-        
+
     except ValueError as e:
         logger.warning("跨实体合成参数错误: %s", e)
-        return JSONResponse(status_code=400, content={
-            "error": "参数错误",
-            "detail": str(e),
-        })
+        return JSONResponse(
+            status_code=400,
+            content={
+                "error": "参数错误",
+                "detail": str(e),
+            },
+        )
     except Exception as e:  # TODO: Narrow exception type
         logger.exception("跨实体合成失败: %s", e)
-        return JSONResponse(status_code=500, content={
-            "error": "内部服务错误",
-            "detail": str(e),
-        })
+        return JSONResponse(
+            status_code=500,
+            content={
+                "error": "内部服务错误",
+                "detail": str(e),
+            },
+        )
 
 
 # ============================================================================
 # GET /api/synthesis/health — 健康检查
 # ============================================================================
 
+
 @router.get("/api/synthesis/health")
 async def synthesis_health(request: Request = None):
     """Synthesis 模块健康检查"""
     try:
         from src.bagua.synthesizer import get_synthesizer
+
         syn = get_synthesizer()
         return {
             "status": "ok",
@@ -242,10 +261,13 @@ async def synthesis_health(request: Request = None):
             "stats": syn.get_stats(),
         }
     except Exception as e:  # TODO: Narrow exception type
-        return JSONResponse(status_code=503, content={
-            "status": "unavailable",
-            "error": str(e),
-        })
+        return JSONResponse(
+            status_code=503,
+            content={
+                "status": "unavailable",
+                "error": str(e),
+            },
+        )
 
 
 __all__ = ["router"]

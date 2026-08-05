@@ -83,7 +83,6 @@ ENTITY_TYPES = {
         "subtype": ["OA系统", "ERP系统", "设计软件", "设备操作", "测量软件"],
         "attributes": ["系统名称", "版本号", "功能模块", "适用范围"],
     },
-
     "document": {
         "label": "文档",
         "subtype": ["SOP", "技术规范", "图纸", "合同", "制度"],
@@ -176,7 +175,6 @@ RELATION_TYPES = {
         "range": ["software", "measuring_device", "machine_tool"],
         "description": "使用手册指导用户在特定系统/设备上的操作",
     },
-
     "mentions": {
         "label": "提及",
         "domain": ["document"],
@@ -185,7 +183,8 @@ RELATION_TYPES = {
     },
     "related_to": {
         "label": "关联",
-        "domain": [], "range": [],
+        "domain": [],
+        "range": [],
         "description": "通用关联（未明确分类时使用）",
     },
 }
@@ -194,12 +193,12 @@ RELATION_TYPES = {
 # 三、属性约束（数据类型）
 # ============================================================
 PROPERTY_TYPES = {
-    "ip": r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$',
-    "mac": r'^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$',
-    "vlan_id": r'^\d{1,4}$',
-    "cidr": r'^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$',
-    "phone": r'^\d{11}$',
-    "email": r'^[\w\.-]+@[\w\.-]+\.\w+$',
+    "ip": r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}$",
+    "mac": r"^([0-9A-Fa-f]{2}[:-]){5}[0-9A-Fa-f]{2}$",
+    "vlan_id": r"^\d{1,4}$",
+    "cidr": r"^(\d{1,3}\.){3}\d{1,3}/\d{1,2}$",
+    "phone": r"^\d{11}$",
+    "email": r"^[\w\.-]+@[\w\.-]+\.\w+$",
 }
 
 # ============================================================
@@ -216,30 +215,47 @@ SYNONYMS = {
 def get_entity_type(name: str, text_context: str = "") -> str:
     """根据实体名+上下文推断实体类型"""
     import re
+
     name_upper = name.upper()
     # 网络设备
-    if re.match(r'^(LSW|AR|AP|AC|FW)\d+', name_upper):
+    if re.match(r"^(LSW|AR|AP|AC|FW)\d+", name_upper):
         return "network_device"
-    if re.search(r'(交换机|路由器|AP|AC|防火墙)', name):
+    if re.search(r"(交换机|路由器|AP|AC|防火墙)", name):
         return "network_device"
     # 设备型号
-    if re.match(r'^[A-Z]{2,4}[\-]?\d{2,4}', name) and not any(k in name for k in ["LSW","AR","AC","AP"]):
-        if any(k in text_context.lower() for k in ["传感器","sensor","光电","接近"]):
+    if re.match(r"^[A-Z]{2,4}[\-]?\d{2,4}", name) and not any(k in name for k in ["LSW", "AR", "AC", "AP"]):
+        if any(k in text_context.lower() for k in ["传感器", "sensor", "光电", "接近"]):
             return "sensor"
-        if any(k in text_context.lower() for k in ["气缸","电磁阀","伺服","变频"]):
+        if any(k in text_context.lower() for k in ["气缸", "电磁阀", "伺服", "变频"]):
             return "actuator"
         return "standard_part"
     # 材料
-    if re.match(r'^(SUJ2|SKD|S136|DC53|NAK80|718H|P20|H13|LCP|PA66|PBT|POM|PPS|PA6|PA12|ABS|PC|PP|PE|PEEK)$', name_upper):
+    if re.match(
+        r"^(SUJ2|SKD|S136|DC53|NAK80|718H|P20|H13|LCP|PA66|PBT|POM|PPS|PA6|PA12|ABS|PC|PP|PE|PEEK)$", name_upper
+    ):
         return "material"
     # 供应商
-    for s in ["米思米","盘起","天田","恒钢","翁开尔","住友","蔡司","西门子","欧姆龙","三菱","基恩士","SMC","FESTO"]:
+    for s in [
+        "米思米",
+        "盘起",
+        "天田",
+        "恒钢",
+        "翁开尔",
+        "住友",
+        "蔡司",
+        "西门子",
+        "欧姆龙",
+        "三菱",
+        "基恩士",
+        "SMC",
+        "FESTO",
+    ]:
         if s in name:
             return "supplier"
     # VLAN/IP
-    if re.match(r'^VLAN\s*\d+$', name_upper):
+    if re.match(r"^VLAN\s*\d+$", name_upper):
         return "vlan"
-    if re.match(r'^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(/\d{2})?$', name):
+    if re.match(r"^\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}(/\d{2})?$", name):
         return "subnet"
     # 使用手册
     if any(k in text_context.lower() for k in ["使用手册", "操作指南", "用户手册", "泛微", "ecology"]):

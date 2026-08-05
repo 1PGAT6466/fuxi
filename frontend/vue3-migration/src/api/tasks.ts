@@ -101,6 +101,21 @@ export function getTaskDashboard(): Promise<TaskDashboardOverview> {
   return apiClient.get('/api/tasks/dashboard') as Promise<TaskDashboardOverview>;
 }
 
+/** 仪表盘统计 → /api/dashboard/stats */
+export function getDashboardStats<T = Record<string, unknown>>(): Promise<T> {
+  return apiClient.get('/api/dashboard/stats') as Promise<T>;
+}
+
+/** 仪表盘最近活动 → /api/dashboard/activity */
+export function getDashboardActivity<T = Record<string, unknown>>(): Promise<T> {
+  return apiClient.get('/api/dashboard/activity') as Promise<T>;
+}
+
+/** 仪表盘系统状态 → /api/dashboard/system */
+export function getDashboardSystem<T = Record<string, unknown>>(): Promise<T> {
+  return apiClient.get('/api/dashboard/system') as Promise<T>;
+}
+
 /** 触发扫描任务 */
 export function triggerScan(): Promise<{ ok: boolean; taskId: string }> {
   return apiClient.post('/api/tasks/scan') as Promise<{ ok: boolean; taskId: string }>;

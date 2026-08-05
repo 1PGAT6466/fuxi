@@ -1,0 +1,156 @@
+"""
+services/fusion.py — 搜索结果融合与加权调整（v2.3）
+
+提供 RRF 融合、加权调整、精确匹配增强、动态分类权重和个性化加权。
+"""
+
+import logging
+from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+
+def rrf_fusion(results_a: List[Dict[str, Any]], results_b: List[Dict[str, Any]], k: int = 60) -> List[Dict[str, Any]]:
+    """
+    Reciprocal Rank Fusion — 将两个排序列表融合为单一排序。
+
+    Args:
+        results_a: 第一个结果列表
+        results_b: 第二个结果列表
+        k: 平滑参数，默认 60
+
+    Returns:
+        融合后的排序列表
+    """
+    scores: Dict[str, float] = {}
+    items: Dict[str, Dict[str, Any]] = {}
+
+    for rank, item in enumerate(results_a):
+        doc_id = item.get("id", str(rank))
+        scores[doc_id] = scores.get(doc_id, 0) + 1.0 / (k + rank + 1)
+        items[doc_id] = item
+
+    for rank, item in enumerate(results_b):
+        doc_id = item.get("id", str(rank))
+        scores[doc_id] = scores.get(doc_id, 0) + 1.0 / (k + rank + 1)
+        if doc_id not in items:
+            items[doc_id] = item
+
+    ranked = sorted(scores.items(), key=lambda x: -x[1])
+    result = [items[doc_id] for doc_id, _ in ranked]
+
+    # v1.44: 标记双路命中 — 同时出现在 BM25 和向量结果中的项
+    bm25_ids = set()
+    vec_ids = set()
+    for rank, item in enumerate(results_a):
+        bm25_ids.add(item.get("id", str(rank)))
+    for rank, item in enumerate(results_b):
+        vec_ids.add(item.get("id", str(rank)))
+    fused_ids = bm25_ids & vec_ids  # 交集 = 双路命中
+    for item in result:
+        doc_id = item.get("id", "")
+        if doc_id in fused_ids:
+            item["_fused"] = True
+            item["_source"] = "bm25+vector"
+
+    return result
+
+
+def weighted_fusion_adjust(
+    query: str,
+    merged: List[Dict[str, Any]],
+    bm25_results: Optional[List[Dict[str, Any]]] = None,
+    vector_results: Optional[List[Dict[str, Any]]] = None,
+) -> List[Dict[str, Any]]:
+    """
+    加权融合调整 — 根据查询特征调整融合权重。
+
+    Args:
+        query: 查询文本
+        merged: 已融合的结果列表
+        bm25_results: BM25 检索结果（可选）
+        vector_results: 向量检索结果（可选）
+
+    Returns:
+        调整后的排序列表
+    """
+    # 简单实现：如果查询包含中文，略微提升向量结果权重
+    has_chinese = any("\u4e00" <= c <= "\u9fff" for c in query)
+    if has_chinese and vector_results:
+        vec_ids = {item.get("id", "") for item in vector_results}
+        for item in merged:
+            if item.get("id", "") in vec_ids:
+                item["_weight_boost"] = item.get("_weight_boost", 1.0) * 1.1
+
+    return merged
+
+
+def exact_match_boost(
+    query: str,
+    results: List[Dict[str, Any]],
+    field: str = "text",
+) -> List[Dict[str, Any]]:
+    """
+    精确匹配增强 — 对包含查询精确匹配的文档给予排名提升。
+
+    Args:
+        query: 查询文本
+        results: 结果列表
+        field: 要搜索的字段名
+
+    Returns:
+        调整后的排序列表
+    """
+    query_lower = query.lower()
+    for item in results:
+        text = str(item.get(field, "")).lower()
+        if query_lower in text:
+            item["_exact_match"] = True
+    return results
+
+
+def dynamic_category_weight(
+    query: str,
+    results: List[Dict[str, Any]],
+) -> Dict[str, float]:
+    """
+    动态分类权重 — 根据查询意图动态调整不同来源的权重。
+
+    Args:
+        query: 查询文本
+        results: 结果列表
+
+    Returns:
+        分类权重映射（如 {"wiki": 0.8, "chunk": 0.2}）
+    """
+    weights: Dict[str, float] = {"wiki": 0.3, "chunk": 0.5, "table": 0.2}
+
+    # 简单启发式：如果查询很短（≤4字符），更信任 wiki 摘要
+    if len(query) <= 4:
+        weights["wiki"] = 0.5
+        weights["chunk"] = 0.35
+        weights["table"] = 0.15
+
+    return weights
+
+
+def personalized_boost(
+    user_id: Optional[str],
+    results: List[Dict[str, Any]],
+) -> List[Dict[str, Any]]:
+    """
+    个性化加权 — 根据用户偏好调整结果排序。
+
+    Args:
+        user_id: 用户 ID（可选）
+        results: 结果列表
+
+    Returns:
+        调整后的排序列表
+    """
+    if not user_id:
+        return results
+
+    # 占位：实际实现可以从用户偏好存储中读取
+    logger.debug("personalized_boost: user=%s, results=%d", user_id, len(results))
+    return results

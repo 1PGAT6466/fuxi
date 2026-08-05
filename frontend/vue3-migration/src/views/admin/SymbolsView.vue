@@ -1,483 +1,234 @@
 <template>
-  <!--
-    伏羲 v1.44 — 四象系统状态
-    四象卡片布局：少阳(消化)/太阳(探索)/少阴(判断)/太阴(守护)
-    每个卡片内显示关联器官网格 + 健康状态指示 + 2×2 响应式布局
-  -->
   <div class="symbols-view">
-    <h2 class="page-title">四象系统状态</h2>
-    <p class="page-desc">监测四象模块运行状态与关联能力映射</p>
+    <header class="page-header">
+      <h1>🏛️ 四象状态</h1>
+      <el-button @click="refreshSymbols" :loading="loading">
+        <el-icon><Refresh /></el-icon>
+        刷新
+      </el-button>
+    </header>
 
-    <!-- 加载态 — 必须在内容之前渲染 -->
-    <div v-if="loading" class="symbols-loading">
-      <el-skeleton :rows="8" animated />
-    </div>
-
-    <!-- 错误状态 — API 失败且无 mock/mock 为空时显示 -->
-    <ErrorState
-      v-else-if="error && symbols.length === 0"
-      message="无法获取四象系统状态，请检查后端服务是否正常运行"
-      @retry="fetchSymbols"
-    />
-
-    <!-- 空状态 -->
-    <div v-else-if="symbols.length === 0 && !loading" class="symbols-empty">
-      <el-empty description="暂无四象数据" />
-    </div>
-
-    <!-- 四象卡片：2×2 布局 -->
-    <div v-else class="symbols-grid">
-      <div
-        v-for="symbol in symbols"
-        :key="symbol.id"
+    <div class="symbols-grid" v-loading="loading">
+      <el-card
+        v-for="(data, name) in symbols"
+        :key="name"
         class="symbol-card"
-        :class="`symbol-card--${symbol.cssClass}`"
+        :class="`status-${data.status}`"
       >
-        <div class="symbol-card-header">
-          <div class="symbol-icon">
-            <el-icon :size="28">
-              <component :is="symbol.icon" />
-            </el-icon>
-          </div>
-          <div class="symbol-title">
-            <h3>{{ symbol.name }}</h3>
-            <span class="symbol-subtitle">{{ symbol.subtitle }}（{{ symbol.role }}）</span>
-          </div>
-        </div>
-
-        <div class="symbol-status">
-          <span
-            class="status-indicator"
-            :class="`status-indicator--${symbol.health}`"
-          />
-          <span class="status-label">{{ healthLabel(symbol.health) }}</span>
-        </div>
-
-        <!-- 关联器官网格 -->
-        <div class="organ-grid">
-          <div
-            v-for="organ in symbol.organs"
-            :key="organ.name"
-            class="organ-item"
-            :class="`organ-item--${organ.status}`"
-          >
-            <span class="organ-name">{{ organ.name }}</span>
-            <span class="organ-desc">{{ organ.desc }}</span>
-            <el-tag :type="organTagType(organ.status)" size="small">
-              {{ organStatusLabel(organ.status) }}
+        <div class="symbol-header">
+          <div class="symbol-icon">{{ data.symbol }}</div>
+          <div class="symbol-info">
+            <h3>{{ data.name }} · {{ data.element }}</h3>
+            <el-tag :type="statusType(data.status)" size="small">
+              {{ statusLabel(data.status) }}
             </el-tag>
           </div>
         </div>
-
-        <div class="symbol-footer">
-          <span class="footer-metric">
-            活跃度：<strong>{{ symbol.activity }}%</strong>
-          </span>
-          <span class="footer-metric">
-            任务：<strong>{{ symbol.taskCount }}</strong>
-          </span>
+        <div class="symbol-component">{{ data.component }}</div>
+        <div class="symbol-desc">{{ data.description }}</div>
+        <div class="symbol-metrics">
+          <div class="metric">
+            <span class="metric-label">查询数</span>
+            <span class="metric-value">{{ data.metrics?.query_count || 0 }}</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">平均延迟</span>
+            <span class="metric-value">{{ data.metrics?.avg_latency_ms || 0 }}ms</span>
+          </div>
+          <div class="metric">
+            <span class="metric-label">成功率</span>
+            <span class="metric-value">{{ ((data.metrics?.success_rate || 1) * 100).toFixed(1) }}%</span>
+          </div>
         </div>
-      </div>
+        <div class="symbol-endpoints">
+          <div class="endpoints-title">端点</div>
+          <div v-for="ep in data.endpoints_status" :key="ep.endpoint" class="endpoint-item">
+            <span class="endpoint-status" :class="`status-${ep.status}`" />
+            <span class="endpoint-path">{{ ep.endpoint }}</span>
+          </div>
+        </div>
+      </el-card>
     </div>
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue';
-import { Sunny, Moon, Sunrise, Sunset, Loading } from '@element-plus/icons-vue';
-import apiClient from '@/api';
-import ErrorState from '@/components/common/ErrorState.vue';
+import { ref, onMounted } from 'vue'
+import { ElMessage } from 'element-plus'
+import { Refresh } from '@element-plus/icons-vue'
+import axios from 'axios'
 
-// ─── 类型 ───
-interface OrganInfo {
-  name: string;
-  desc: string;
-  status: 'healthy' | 'warning' | 'critical';
-}
+const loading = ref(false)
+const symbols = ref<Record<string, any>>({})
 
-interface SymbolData {
-  id: string;
-  name: string;
-  subtitle: string;
-  role: string;
-  icon: unknown;
-  cssClass: string;
-  health: 'healthy' | 'warning' | 'critical';
-  activity: number;
-  taskCount: number;
-  organs: OrganInfo[];
-}
-
-// ─── 状态 ───
-const loading = ref(false);
-const error = ref(false);
-const symbols = ref<SymbolData[]>([]);
-
-// ─── Mock 数据 ───
-function getMockSymbols(): SymbolData[] {
-  return [
-    {
-      id: 'shaoyang',
-      name: '少阳',
-      subtitle: '初生之阳',
-      role: '消化',
-      icon: Sunrise,
-      cssClass: 'shaoyang',
-      health: 'healthy',
-      activity: 82,
-      taskCount: 34,
-      organs: [
-        { name: '文档解析', desc: 'PDF/Word 提取', status: 'healthy' },
-        { name: '文本分块', desc: '智能分句', status: 'healthy' },
-        { name: '实体提取', desc: 'NER 识别', status: 'healthy' },
-        { name: '语义编码', desc: '向量化', status: 'warning' },
-      ],
-    },
-    {
-      id: 'taiyang',
-      name: '太阳',
-      subtitle: '盛阳之光',
-      role: '探索',
-      icon: Sunny,
-      cssClass: 'taiyang',
-      health: 'healthy',
-      activity: 95,
-      taskCount: 67,
-      organs: [
-        { name: '知识检索', desc: '向量搜索', status: 'healthy' },
-        { name: '联网搜索', desc: '实时查询', status: 'healthy' },
-        { name: '图谱遍历', desc: '关系探索', status: 'healthy' },
-        { name: '假设生成', desc: '推理路径', status: 'healthy' },
-      ],
-    },
-    {
-      id: 'shaoyin',
-      name: '少阴',
-      subtitle: '初生之阴',
-      role: '判断',
-      icon: Sunset,
-      cssClass: 'shaoyin',
-      health: 'warning',
-      activity: 65,
-      taskCount: 21,
-      organs: [
-        { name: '结果验证', desc: '事实核查', status: 'healthy' },
-        { name: '一致性检验', desc: '逻辑审查', status: 'warning' },
-        { name: '质量评分', desc: '置信度评估', status: 'warning' },
-        { name: '偏见检测', desc: '公平性分析', status: 'critical' },
-      ],
-    },
-    {
-      id: 'taiyin',
-      name: '太阴',
-      subtitle: '盛阴之藏',
-      role: '守护',
-      icon: Moon,
-      cssClass: 'taiyin',
-      health: 'healthy',
-      activity: 78,
-      taskCount: 45,
-      organs: [
-        { name: '数据存储', desc: '持久化', status: 'healthy' },
-        { name: '备份恢复', desc: '容灾', status: 'healthy' },
-        { name: '安全审计', desc: '日志追踪', status: 'healthy' },
-        { name: '资源管理', desc: '内存/磁盘', status: 'warning' },
-      ],
-    },
-  ];
-}
-
-// ─── 方法 ───
-function healthLabel(health: string): string {
-  const map: Record<string, string> = {
-    healthy: '健康',
-    warning: '注意',
-    critical: '异常',
-  };
-  return map[health] || health;
-}
-
-function organTagType(status: string): 'success' | 'warning' | 'danger' {
-  const map: Record<string, 'success' | 'warning' | 'danger'> = {
-    healthy: 'success',
-    warning: 'warning',
-    critical: 'danger',
-  };
-  return map[status] || 'warning';
-}
-
-function organStatusLabel(status: string): string {
-  const map: Record<string, string> = {
-    healthy: '正常',
-    warning: '注意',
-    critical: '异常',
-  };
-  return map[status] || status;
-}
-
-// ─── 数据加载 ───
-async function fetchSymbols(): Promise<void> {
-  loading.value = true;
-  error.value = false;
+const refreshSymbols = async () => {
+  loading.value = true
   try {
-    const data = (await apiClient.get('/api/symbols/status')) as Record<string, unknown>;
-    const result = (data.symbols || data.data || []) as SymbolData[];
-    if (result.length > 0) {
-      symbols.value = result;
-    } else {
-      // 后端返回空数据时也用 mock
-      symbols.value = getMockSymbols();
-    }
-  } catch {
-    console.warn('[SymbolsView] API 不可用，使用 mock 数据');
-    symbols.value = getMockSymbols();
-    // 如果 mock 也为空（不应发生），才设置 error
-    if (symbols.value.length === 0) {
-      error.value = true;
-    }
+    const resp = await axios.get('/api/symbols/status')
+    symbols.value = resp.data.data || {}
+  } catch (error) {
+    console.error('获取四象状态失败:', error)
+    ElMessage.error('获取四象状态失败')
   } finally {
-    loading.value = false;
+    loading.value = false
   }
 }
 
+const statusType = (status: string) => {
+  const types: Record<string, string> = {
+    online: 'success',
+    degraded: 'warning',
+    offline: 'danger',
+  }
+  return types[status] || 'info'
+}
+
+const statusLabel = (status: string) => {
+  const labels: Record<string, string> = {
+    online: '在线',
+    degraded: '降级',
+    offline: '离线',
+  }
+  return labels[status] || status
+}
+
 onMounted(() => {
-  fetchSymbols();
-});
+  refreshSymbols()
+})
 </script>
 
-<style scoped lang="scss">
+<style scoped>
 .symbols-view {
-  max-width: 1200px;
-  margin: 0 auto;
-  padding: 28px 24px;
+  padding: 20px;
 }
 
-.page-title {
-  margin: 0 0 8px;
+.page-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.page-header h1 {
+  margin: 0;
   font-size: 24px;
-  font-weight: 700;
-  color: var(--text-primary);
 }
 
-.page-desc {
-  margin: 0 0 24px;
-  font-size: var(--font-size-caption);
-  color: var(--text-secondary);
-}
-
-/* ─── 四象卡片 2×2 网格 ─── */
 .symbols-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
   gap: 20px;
 }
 
 .symbol-card {
-  background: var(--bg-card);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-sm);
-  padding: 24px;
-  border-top: 4px solid transparent;
-  transition:
-    transform var(--duration-normal) var(--ease-out),
-    box-shadow var(--duration-normal) var(--ease-out);
-
-  &:hover {
-    transform: translateY(-2px);
-    box-shadow: var(--shadow-md);
-  }
-
-  // F-03: 使用 CSS 变量替代硬编码颜色
-  // 少阳 — 对应八卦 "震" 色系（消化=震）
-  &--shaoyang {
-    border-top-color: var(--zhen-color, #4CAF50);
-  }
-  // 太阳 — 对应八卦 "离" 色系（探索=离/火）
-  &--taiyang {
-    border-top-color: var(--li-color, #E53935);
-  }
-  // 少阴 — 对应八卦 "坎" 色系（判断=坎/水）
-  &--shaoyin {
-    border-top-color: var(--kan-color, #424242);
-  }
-  // 太阴 — 对应八卦 "坤" 色系（守护=坤/土）
-  &--taiyin {
-    border-top-color: var(--kun-color, #C8A96E);
-  }
+  transition: all 0.3s;
 }
 
-/* ─── 卡片头部 ─── */
-.symbol-card-header {
+.symbol-card.status-online {
+  border-left: 4px solid #67c23a;
+}
+
+.symbol-card.status-degraded {
+  border-left: 4px solid #e6a23c;
+}
+
+.symbol-card.status-offline {
+  border-left: 4px solid #f56c6c;
+}
+
+.symbol-header {
   display: flex;
   align-items: center;
-  gap: 14px;
-  margin-bottom: 16px;
+  gap: 16px;
+  margin-bottom: 12px;
 }
 
 .symbol-icon {
-  width: 52px;
-  height: 52px;
-  border-radius: var(--radius-sm);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-
-  .symbol-card--shaoyang & {
-    background: var(--zhen-color-light, rgba(76, 175, 80, 0.1));
-    color: var(--zhen-color, #4CAF50);
-  }
-  .symbol-card--taiyang & {
-    background: var(--li-color-light, rgba(229, 57, 53, 0.1));
-    color: var(--li-color, #E53935);
-  }
-  .symbol-card--shaoyin & {
-    background: var(--kan-color-light, rgba(66, 66, 66, 0.1));
-    color: var(--kan-color, #424242);
-  }
-  .symbol-card--taiyin & {
-    background: var(--kun-color-light, rgba(200, 169, 110, 0.1));
-    color: var(--kun-color, #C8A96E);
-  }
+  font-size: 48px;
 }
 
-.symbol-title {
-  h3 {
-    margin: 0;
-    font-size: 20px;
-    font-weight: 700;
-    color: var(--text-primary);
-  }
-
-  .symbol-subtitle {
-    font-size: 12px;
-    color: var(--text-tertiary);
-  }
+.symbol-info h3 {
+  margin: 0 0 8px 0;
+  font-size: 18px;
 }
 
-/* ─── 健康状态 ─── */
-.symbol-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
+.symbol-component {
+  font-weight: 500;
+  color: #409eff;
+  margin-bottom: 8px;
+}
+
+.symbol-desc {
+  color: #666;
+  font-size: 14px;
   margin-bottom: 16px;
-  padding: 8px 12px;
-  background: var(--bg-subtle);
-  border-radius: var(--radius-sm);
 }
 
-.status-indicator {
-  width: 10px;
-  height: 10px;
-  border-radius: 50%;
-
-  &--healthy {
-    background: var(--status-healthy, #34C759);
-    box-shadow: 0 0 6px var(--status-healthy-bg, rgba(52, 199, 89, 0.4));
-  }
-  &--warning {
-    background: var(--status-warning, #FF9500);
-    box-shadow: 0 0 6px var(--status-warning-bg, rgba(255, 149, 0, 0.4));
-  }
-  &--critical {
-    background: var(--status-error, #FF3B30);
-    box-shadow: 0 0 6px var(--status-error-bg, rgba(255, 59, 48, 0.4));
-  }
-}
-
-.status-label {
-  font-size: var(--font-size-caption);
-  font-weight: 600;
-  color: var(--text-primary);
-}
-
-/* ─── 关联器官网格 ─── */
-.organ-grid {
+.symbol-metrics {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
   margin-bottom: 16px;
 }
 
-.organ-item {
-  padding: 10px;
-  border-radius: var(--radius-sm);
-  background: var(--bg-subtle);
-  border-left: 3px solid transparent;
-
-  &--healthy {
-    border-left-color: var(--status-healthy, #34C759);
-  }
-  &--warning {
-    border-left-color: var(--status-warning, #FF9500);
-  }
-  &--critical {
-    border-left-color: var(--status-error, #FF3B30);
-  }
+.metric {
+  text-align: center;
+  padding: 8px;
+  background: #f5f7fa;
+  border-radius: 4px;
 }
 
-.organ-name {
+.metric-label {
   display: block;
-  font-size: var(--font-size-caption);
-  font-weight: 600;
-  color: var(--text-primary);
-  margin-bottom: 2px;
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 4px;
 }
 
-.organ-desc {
-  display: block;
-  font-size: 11px;
-  color: var(--text-tertiary);
-  margin-bottom: 6px;
+.metric-value {
+  font-size: 16px;
+  font-weight: bold;
 }
 
-/* ─── 卡片底部指标 ─── */
-.symbol-footer {
-  display: flex;
-  gap: 24px;
+.symbol-endpoints {
+  border-top: 1px solid #ebeef5;
   padding-top: 12px;
-  border-top: 1px solid var(--bg-divider);
 }
 
-.footer-metric {
-  font-size: var(--font-size-small);
-  color: var(--text-secondary);
-
-  strong {
-    color: var(--text-primary);
-    font-weight: 700;
-  }
+.endpoints-title {
+  font-size: 12px;
+  color: #999;
+  margin-bottom: 8px;
 }
 
-/* ─── 加载 / 空状态 ─── */
-.symbols-loading {
-  margin-top: 24px;
-  padding: 24px;
-  background: var(--bg-card);
-  border-radius: var(--radius-md);
+.endpoint-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 0;
 }
 
-.symbols-empty {
-  margin-top: 24px;
-  background: var(--bg-card);
-  border-radius: var(--radius-md);
-  padding: 40px;
+.endpoint-status {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
 }
 
-/* ─── 响应式 ─── */
-@media (max-width: 1023px) {
-  .symbols-grid {
-    grid-template-columns: 1fr;
-  }
+.endpoint-status.status-online,
+.endpoint-status.status-healthy {
+  background: #67c23a;
 }
 
-@media (max-width: 767px) {
-  .symbols-view {
-    padding: 16px;
-  }
+.endpoint-status.status-degraded {
+  background: #e6a23c;
+}
 
-  .organ-grid {
-    grid-template-columns: 1fr;
-  }
+.endpoint-status.status-offline {
+  background: #f56c6c;
+}
+
+.endpoint-path {
+  font-family: monospace;
+  font-size: 13px;
 }
 </style>

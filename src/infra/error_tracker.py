@@ -2,10 +2,11 @@
 error_tracker.py — 错误追踪
 错误分类 + 频率统计
 """
-import time
+
 import logging
-from typing import Dict, List
+import time
 from collections import deque
+from typing import Dict, List
 
 logger = logging.getLogger("infra.error_tracker")
 

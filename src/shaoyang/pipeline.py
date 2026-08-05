@@ -2,18 +2,19 @@
 pipeline.py — 少阳·消化 统一处理管线
 合并胃(解析)+脾(存储)+肺(呼吸)+小肠(分类)的能力
 """
+
 import asyncio
 import logging
 import struct
 import time
-from pathlib import Path
-from typing import List, Dict
 from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Dict, List
 
-from src.models.chunk import Chunk
-from src.models.event import Event
-from src.models.entity import Entity
 from src.infra.symbol_base import SymbolBase
+from src.models.chunk import Chunk
+from src.models.entity import Entity
+from src.models.event import Event
 
 logger = logging.getLogger("shaoyang.pipeline")
 
@@ -21,6 +22,7 @@ logger = logging.getLogger("shaoyang.pipeline")
 @dataclass
 class PipelineResult:
     """管线处理结果"""
+
     source: str = ""
     file_path: str = ""
     raw_text: str = ""
@@ -44,7 +46,7 @@ class ShaoyangPipeline(SymbolBase):
             symbol_id="shaoyang",
             name="少阳·消化",
             emoji="🌱",
-            description="知识消化中枢：文档进来 → 碎片 + 事件 + 实体出去"
+            description="知识消化中枢：文档进来 → 碎片 + 事件 + 实体出去",
         )
         self._processing = set()
         self._lock = asyncio.Lock()
@@ -89,7 +91,9 @@ class ShaoyangPipeline(SymbolBase):
             await self._extract_events_entities(result)
 
             result.duration_ms = (time.time() - start_time) * 1000
-            logger.info(f"[少阳] 完成: {file_path} → {len(result.chunks)} chunks, {len(result.events)} events, {len(result.entities)} entities, {result.duration_ms:.0f}ms")
+            logger.info(
+                f"[少阳] 完成: {file_path} → {len(result.chunks)} chunks, {len(result.events)} events, {len(result.entities)} entities, {result.duration_ms:.0f}ms"
+            )
 
             return result
 
@@ -124,32 +128,35 @@ class ShaoyangPipeline(SymbolBase):
         """PDF 解析"""
         try:
             import fitz
+
             doc = fitz.open(file_path)
             pages_text = []
             for page in doc:
                 pages_text.append(page.get_text())
             doc.close()
             return {"text": "\n".join(pages_text), "tables": [], "metadata": {"parser": "fitz"}}
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             return {"text": "", "tables": [], "metadata": {"parser": "none"}}
 
     def _parse_docx(self, file_path: str) -> Dict:
         """DOCX 解析"""
         try:
             from docx import Document
+
             doc = Document(file_path)
             paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
             return {"text": "\n".join(paragraphs), "tables": [], "metadata": {"parser": "python-docx"}}
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             return {"text": "", "tables": [], "metadata": {"parser": "none"}}
 
     def _parse_excel(self, file_path: str) -> Dict:
         """Excel 解析"""
         try:
             import pandas as pd
+
             df = pd.read_excel(file_path)
             return {"text": df.to_string(index=False), "tables": [], "metadata": {"parser": "pandas"}}
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             return {"text": "", "tables": [], "metadata": {"parser": "none"}}
 
     def _parse_text(self, file_path: str) -> Dict:
@@ -157,7 +164,7 @@ class ShaoyangPipeline(SymbolBase):
         try:
             with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
                 return {"text": f.read(), "tables": [], "metadata": {"parser": "text"}}
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             return {"text": "", "tables": [], "metadata": {"parser": "none"}}
 
     def _clean(self, text: str) -> str:
@@ -166,16 +173,17 @@ class ShaoyangPipeline(SymbolBase):
 
         # v1.44 安全修复: Prompt Injection 净化
         try:
-            from src.services.prompt_guard import sanitize_document_content
+            from src.infra import sanitize_document_content
+
             text, injection_detected = sanitize_document_content(text)
             if injection_detected:
                 logger.warning("[Security] 文档内容中检测到 Prompt Injection 模式，已净化")
         except ImportError:
             pass
 
-        text = re.sub(r'<[^>]+>', '', text)
-        text = re.sub(r'https?://\S+', '', text)
-        text = re.sub(r'\s+', ' ', text)
+        text = re.sub(r"<[^>]+>", "", text)
+        text = re.sub(r"https?://\S+", "", text)
+        text = re.sub(r"\s+", " ", text)
         return text.strip()
 
     def _chunk(self, text: str, tables: List[Dict]) -> List[Chunk]:
@@ -192,7 +200,7 @@ class ShaoyangPipeline(SymbolBase):
         while start < text_len:
             end = min(start + chunk_size, text_len)
             if end < text_len:
-                for sep in ['\n\n', '\n', '。', '；', '.', ';']:
+                for sep in ["\n\n", "\n", "。", "；", ".", ";"]:
                     last_sep = text.rfind(sep, start + chunk_size // 2, end)
                     if last_sep > start:
                         end = last_sep + len(sep)
@@ -213,13 +221,15 @@ class ShaoyangPipeline(SymbolBase):
         """分类"""
         try:
             from src.category_registry import match_category
+
             return match_category(chunk.text, file_ext=chunk.file_type, file_name=chunk.file_name) or "通用办公"
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             return "通用办公"
 
     def _compute_hash(self, file_path: str) -> str:
         """计算文件哈希"""
         import hashlib
+
         with open(file_path, "rb") as f:
             return hashlib.sha256(f.read()).hexdigest()
 
@@ -227,6 +237,7 @@ class ShaoyangPipeline(SymbolBase):
         """向量化"""
         try:
             from src.db.vector_store import embed_texts
+
             embeddings = await embed_texts([c.text for c in chunks])
             if embeddings:
                 for chunk, emb in zip(chunks, embeddings):
@@ -240,6 +251,7 @@ class ShaoyangPipeline(SymbolBase):
         # 路1: BM25 全文索引 (memory_store)
         try:
             from src.db.memory_store import get_store
+
             store = get_store()
             chunk_dicts = [c.to_dict() for c in chunks]
             store.insert_many(chunk_dicts)
@@ -251,6 +263,7 @@ class ShaoyangPipeline(SymbolBase):
         # 路2: ChromaDB 向量库 (vector_store) — v1.50 P0 修复
         try:
             from src.db.vector_store import get_vector_store
+
             vs = get_vector_store()
             if vs is None:
                 logger.warning("[少阳] VectorStore 不可用，跳过向量写入")
@@ -263,12 +276,7 @@ class ShaoyangPipeline(SymbolBase):
             ids = [f"{c.file_hash}_{c.chunk_index}" for c in vectorized]
             embeddings = [c.embedding for c in vectorized]
             metadatas = [
-                {
-                    k: str(v)[:512]
-                    for k, v in c.to_dict().items()
-                    if k not in ("text", "embedding")
-                }
-                for c in vectorized
+                {k: str(v)[:512] for k, v in c.to_dict().items() if k not in ("text", "embedding")} for c in vectorized
             ]
             documents = [c.text for c in vectorized]
             success = vs.add(ids=ids, embeddings=embeddings, metadata=metadatas, documents=documents)
@@ -287,9 +295,9 @@ class ShaoyangPipeline(SymbolBase):
         对提取成功的事件自动生成 embedding 并存入 events 表。
         """
         try:
-            from src.shaoyang.extractor import SAGExtractor
             from src.db.memory_store import get_store
             from src.db.vector_store import embed_texts
+            from src.shaoyang.extractor import SAGExtractor
 
             store = get_store()
             extractor = SAGExtractor()
@@ -315,7 +323,7 @@ class ShaoyangPipeline(SymbolBase):
                             "file_hash": chunk.file_hash,
                             "file_name": chunk.file_name,
                             "category": chunk.category,
-                        }
+                        },
                     )
 
                     # Write events
@@ -342,17 +350,19 @@ class ShaoyangPipeline(SymbolBase):
                 except Exception as extract_err:  # TODO: Narrow exception type
                     error_msg = str(extract_err)
                     logger.warning(f"[少阳] SAG 提取失败 (chunk={chunk_id[:30]}...): {error_msg}")
-                    store.add_event({
-                        "event_id": f"evt_pending_{chunk_id[:60]}",
-                        "chunk_id": chunk_id,
-                        "title": "[PENDING] Extraction failed",
-                        "content": f"SAG extraction pending. Error: {error_msg[:200]}",
-                        "entities": [],
-                        "event_type": "pending",
-                        "file_hash": chunk.file_hash,
-                        "file_name": chunk.file_name,
-                        "status": "pending",
-                    })
+                    store.add_event(
+                        {
+                            "event_id": f"evt_pending_{chunk_id[:60]}",
+                            "chunk_id": chunk_id,
+                            "title": "[PENDING] Extraction failed",
+                            "content": f"SAG extraction pending. Error: {error_msg[:200]}",
+                            "entities": [],
+                            "event_type": "pending",
+                            "file_hash": chunk.file_hash,
+                            "file_name": chunk.file_name,
+                            "status": "pending",
+                        }
+                    )
                     continue
 
             # Phase A Task 3: Event 向量化 — 对已入库事件生成 embedding
@@ -360,14 +370,28 @@ class ShaoyangPipeline(SymbolBase):
                 await self._vectorize_events(total_events, store)
 
             # M-6: 保留实际提取的 events/entities 列表，不再用摘要对象覆盖
-            result.events = [Event(
-                event_id=ev.get("event_id", f"evt_{i}"),
-                title=ev.get("title", ""),
-            ) for i, ev in enumerate(extracted_events)] if extracted_events else []
-            result.entities = [Entity(
-                entity_id=ent.get("entity_id", f"ent_{i}"),
-                name=ent.get("name", ""),
-            ) for i, ent in enumerate(extracted_entities)] if extracted_entities else []
+            result.events = (
+                [
+                    Event(
+                        event_id=ev.get("event_id", f"evt_{i}"),
+                        title=ev.get("title", ""),
+                    )
+                    for i, ev in enumerate(extracted_events)
+                ]
+                if extracted_events
+                else []
+            )
+            result.entities = (
+                [
+                    Entity(
+                        entity_id=ent.get("entity_id", f"ent_{i}"),
+                        name=ent.get("name", ""),
+                    )
+                    for i, ent in enumerate(extracted_entities)
+                ]
+                if extracted_entities
+                else []
+            )
 
             if total_events > 0 or total_entities > 0:
                 logger.info(f"[少阳] SAG 提取完成: {total_events} events, {total_entities} entities")
@@ -385,7 +409,7 @@ class ShaoyangPipeline(SymbolBase):
             # 获取最近入库且没有 embedding 的事件
             recent_events = store._db_conn.execute(
                 "SELECT id, event_id, content FROM events WHERE status='active' AND embedding IS NULL ORDER BY id DESC LIMIT ?",
-                (count,)
+                (count,),
             ).fetchall()
 
             if not recent_events:
@@ -397,11 +421,8 @@ class ShaoyangPipeline(SymbolBase):
             if embeddings:
                 for (row_id, _, _), emb in zip(recent_events, embeddings):
                     if emb:
-                        blob = struct.pack(f'{len(emb)}f', *emb)
-                        store._db_conn.execute(
-                            "UPDATE events SET embedding=? WHERE id=?",
-                            (blob, row_id)
-                        )
+                        blob = struct.pack(f"{len(emb)}f", *emb)
+                        store._db_conn.execute("UPDATE events SET embedding=? WHERE id=?", (blob, row_id))
                 store._db_conn.commit()
                 logger.info(f"[少阳] Event 向量化完成: {len(recent_events)} 条")
             else:

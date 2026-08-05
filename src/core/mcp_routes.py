@@ -3,14 +3,14 @@
 =======================================
 MCP 协议入口、工具列表、工具调用端点。
 """
+
+import inspect
 import logging
 import traceback
-import inspect
 
-from fastapi import FastAPI, Request, Depends
-
+from fastapi import Depends, FastAPI, Request
 from src.api.auth import require_admin
-from src.api.response import success, error
+from src.api.response import error, success
 
 logger = logging.getLogger("server")
 
@@ -19,14 +19,30 @@ _MCP_TOOLS_MODULE = None
 MCP_TOOL_HANDLERS: dict = {}
 
 _MCP_TOOL_PERMISSIONS = {
-    "sag_search": "user", "sag_ingest": "admin", "sag_explain": "user",
-    "sag_status": "user", "kb_search": "user", "kb_list_documents": "user",
-    "kb_get_document": "user", "graph_query": "user", "graph_stats": "user",
-    "wiki_search": "user", "wiki_get": "user", "dream_cycle_run": "admin",
-    "dream_cycle_report": "user", "gap_analyze": "user", "entity_expand": "user",
-    "cross_entity_synthesize": "user", "file_upload": "admin", "file_list": "user",
-    "chat_query": "user", "eval_run": "admin", "notifications_list": "user",
-    "feature_flags_list": "user", "health_check": "public", "audit_logs": "admin",
+    "sag_search": "user",
+    "sag_ingest": "admin",
+    "sag_explain": "user",
+    "sag_status": "user",
+    "kb_search": "user",
+    "kb_list_documents": "user",
+    "kb_get_document": "user",
+    "graph_query": "user",
+    "graph_stats": "user",
+    "wiki_search": "user",
+    "wiki_get": "user",
+    "dream_cycle_run": "admin",
+    "dream_cycle_report": "user",
+    "gap_analyze": "user",
+    "entity_expand": "user",
+    "cross_entity_synthesize": "user",
+    "file_upload": "admin",
+    "file_list": "user",
+    "chat_query": "user",
+    "eval_run": "admin",
+    "notifications_list": "user",
+    "feature_flags_list": "user",
+    "health_check": "public",
+    "audit_logs": "admin",
 }
 
 
@@ -41,20 +57,30 @@ def _init_mcp_handlers():
         return
 
     _tool_map = {
-        "sag_search": "sag_search", "sag_ingest": "sag_ingest",
-        "sag_explain": "sag_explain", "sag_status": "sag_status",
-        "kb_search": "kb_search", "kb_list_documents": "kb_list_documents",
-        "kb_get_document": "kb_get_document", "graph_query": "graph_query",
-        "graph_stats": "graph_stats", "wiki_search": "wiki_search",
-        "wiki_get": "wiki_get", "dream_cycle_run": "dream_cycle_run",
-        "dream_cycle_report": "dream_cycle_report", "gap_analyze": "gap_analyze",
+        "sag_search": "sag_search",
+        "sag_ingest": "sag_ingest",
+        "sag_explain": "sag_explain",
+        "sag_status": "sag_status",
+        "kb_search": "kb_search",
+        "kb_list_documents": "kb_list_documents",
+        "kb_get_document": "kb_get_document",
+        "graph_query": "graph_query",
+        "graph_stats": "graph_stats",
+        "wiki_search": "wiki_search",
+        "wiki_get": "wiki_get",
+        "dream_cycle_run": "dream_cycle_run",
+        "dream_cycle_report": "dream_cycle_report",
+        "gap_analyze": "gap_analyze",
         "entity_expand": "entity_expand",
         "cross_entity_synthesize": "cross_entity_synthesize",
-        "file_upload": "file_upload", "file_list": "file_list",
-        "chat_query": "chat_query", "eval_run": "eval_run",
+        "file_upload": "file_upload",
+        "file_list": "file_list",
+        "chat_query": "chat_query",
+        "eval_run": "eval_run",
         "notifications_list": "notifications_list",
         "feature_flags_list": "feature_flags_list",
-        "health_check": "health_check", "audit_logs": "audit_logs",
+        "health_check": "health_check",
+        "audit_logs": "audit_logs",
     }
 
     for tool_name, attr_name in _tool_map.items():
@@ -90,6 +116,7 @@ def register_mcp_routes(app: FastAPI) -> None:
     async def mcp_handler(request: Request):
         """MCP协议入口 — 标准JSON-RPC 2.0"""
         from src.taiyin.mcp_protocol import get_mcp_server
+
         body = await request.json()
         server = get_mcp_server()
         return await server.handle_request(body)
@@ -98,6 +125,7 @@ def register_mcp_routes(app: FastAPI) -> None:
     async def mcp_list_tools():
         """列出所有MCP工具 — 需要管理员权限"""
         from src.taiyin.mcp_protocol import get_mcp_server
+
         server = get_mcp_server()
         return success(
             data={"tools": [{"name": t.name, "description": t.description} for t in server.tools.values()]},
@@ -112,21 +140,17 @@ def register_mcp_routes(app: FastAPI) -> None:
         args = body.get("args", {})
 
         if not tool_name:
-            return error("缺少 tool 参数", status_code=400,
-                         detail=f"可用工具: {list(MCP_TOOL_HANDLERS.keys())}")
+            return error("缺少 tool 参数", status_code=400, detail=f"可用工具: {list(MCP_TOOL_HANDLERS.keys())}")
 
         if not _check_mcp_permission(tool_name, request):
-            return error(f"无权调用工具: {tool_name}", status_code=403,
-                         detail="权限不足")
+            return error(f"无权调用工具: {tool_name}", status_code=403, detail="权限不足")
 
         handler = MCP_TOOL_HANDLERS.get(tool_name)
         if handler is None:
             available = list(MCP_TOOL_HANDLERS.keys())
             if _MCP_TOOLS_MODULE is None:
-                return error(f"未知工具: {tool_name}（MCP 工具模块未加载）",
-                             status_code=404, detail=str(available))
-            return error(f"未知工具: {tool_name}", status_code=404,
-                         detail=str(available))
+                return error(f"未知工具: {tool_name}（MCP 工具模块未加载）", status_code=404, detail=str(available))
+            return error(f"未知工具: {tool_name}", status_code=404, detail=str(available))
 
         try:
             result = handler(args)
@@ -146,6 +170,7 @@ def register_mcp_routes(app: FastAPI) -> None:
     async def mcp_sag_search(request: Request):
         """MCP: 搜索知识库"""
         from src.taiyin.mcp_tools import sag_search
+
         body = await request.json()
         return await sag_search(body.get("query", ""), body.get("top_k", 10))
 
@@ -153,6 +178,7 @@ def register_mcp_routes(app: FastAPI) -> None:
     async def mcp_sag_ingest(request: Request):
         """MCP: 入库文档 — 需要管理员权限"""
         from src.taiyin.mcp_tools import sag_ingest
+
         body = await request.json()
         return await sag_ingest(body.get("file_path", ""), body.get("category", ""))
 
@@ -160,6 +186,7 @@ def register_mcp_routes(app: FastAPI) -> None:
     async def mcp_sag_explain(request: Request):
         """MCP: 解释查询"""
         from src.taiyin.mcp_tools import sag_explain
+
         body = await request.json()
         return await sag_explain(body.get("query", ""))
 
@@ -167,4 +194,5 @@ def register_mcp_routes(app: FastAPI) -> None:
     async def mcp_sag_status():
         """MCP: 系统状态"""
         from src.taiyin.mcp_tools import sag_status
+
         return await sag_status()

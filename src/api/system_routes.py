@@ -12,7 +12,8 @@
 """
 
 import logging
-from fastapi import APIRouter, Request, Depends
+
+from fastapi import APIRouter, Depends, Request
 from src.api.auth import require_admin
 
 logger = logging.getLogger(__name__)
@@ -22,6 +23,7 @@ router = APIRouter(tags=["system"])
 
 # ============ 审计日志 API ============
 
+
 @router.get("/api/audit/logs", dependencies=[Depends(require_admin)])
 async def audit_logs(
     user: str = None,
@@ -30,8 +32,9 @@ async def audit_logs(
     limit: int = 100,
 ):
     """查询审计日志"""
-    from src.infra.audit_log import query_audit
     from src.api.response import success
+    from src.infra.audit_log import query_audit
+
     results = query_audit(user=user, action=action, days=days, limit=limit)
     return success(data={"entries": results, "count": len(results)})
 
@@ -39,12 +42,14 @@ async def audit_logs(
 @router.get("/api/audit/stats", dependencies=[Depends(require_admin)])
 async def audit_stats(days: int = 7):
     """审计日志统计"""
-    from src.infra.audit_log import get_audit_stats
     from src.api.response import success
+    from src.infra.audit_log import get_audit_stats
+
     return success(data=get_audit_stats(days=days))
 
 
 # ============ 八卦健康状态获取 ============
+
 
 async def _get_bagua_health(request: Request) -> dict:
     """v2.1: 获取所有八卦的健康状态
@@ -93,7 +98,7 @@ async def _get_bagua_health(request: Request) -> dict:
                     bagua_result[api_name] = health.get("status", "unknown")
                 else:
                     bagua_result[api_name] = "unknown"
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             bagua_result[api_name] = "error"
 
     return bagua_result
@@ -101,11 +106,12 @@ async def _get_bagua_health(request: Request) -> dict:
 
 # ============ 健康检查 ============
 
-@router.get("/api/health")
+
+@router.api_route("/api/health", methods=["GET", "HEAD"])
 async def health_check(request: Request):
     """健康检查 — v2.1 扩展响应格式
-    
-    v1.50 R3 Blue 安全修复: 
+
+    v1.50 R3 Blue 安全修复:
     - 未认证用户仅返回基本状态，已认证管理员才返回完整诊断信息
     - 添加速率限制防止滥用
 
@@ -117,17 +123,18 @@ async def health_check(request: Request):
     Header 方式:
       - X-API-Format: legacy | v2 | extended
     """
-    from src.api.response import success, error
-    
+    from src.api.response import error, success
+
     # v1.50 R3 Blue: 健康检查端点速率限制 — 每分钟最多30次请求
     # 防止健康检查端点被滥用进行 DoS 攻击
     client_ip = request.client.host if request.client else "127.0.0.1"
     try:
         from src.infra.rate_limiter import get_global_rate_limiter
+
         limiter = get_global_rate_limiter("health_check", max_requests=30, window_sec=60)
         if not limiter.acquire():
             return error("健康检查请求过于频繁", status_code=429)
-    except Exception:
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
         pass  # 速率限制失败不阻止健康检查
 
     # 确定格式
@@ -136,11 +143,12 @@ async def health_check(request: Request):
         fmt = request.headers.get("X-API-Format", "legacy").lower()
 
     # v1.50 R3 Blue: 判断用户是否已认证
-    is_authenticated = hasattr(request.state, 'user') and request.state.user != 'anonymous'
-    is_admin = hasattr(request.state, 'role') and request.state.role == 'admin'
+    is_authenticated = hasattr(request.state, "user") and request.state.user != "anonymous"
+    is_admin = hasattr(request.state, "role") and request.state.role == "admin"
 
     try:
         from src.infra.health_check import get_health_checker
+
         checker = get_health_checker()
 
         if fmt == "extended":
@@ -162,7 +170,7 @@ async def health_check(request: Request):
                     result["bagua"] = bagua_status
                     result["engine"] = getattr(request.app.state, "engine", "v2")
                     result["intent_mode"] = getattr(request.app.state, "intent_mode", "rule_based")
-            except Exception:  # TODO: Narrow exception type
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
                 pass
         else:
             # v1.50 R3 Blue: 未认证用户 — 移除敏感信息，仅保留基本状态
@@ -177,10 +185,7 @@ async def health_check(request: Request):
                     checks.pop(sk, None)
 
         if fmt == "v2":
-            return success(
-                data=result,
-                message="系统运行正常" if result.get("status") == "healthy" else "部分组件异常"
-            )
+            return success(data=result, message="系统运行正常" if result.get("status") == "healthy" else "部分组件异常")
 
         # 默认保持旧格式兼容
         return result
@@ -192,15 +197,18 @@ async def health_check(request: Request):
 
 # ============ 八卦健康检查 ============
 
+
 @router.get("/api/health/bagua", dependencies=[Depends(require_admin)])
 async def health_check_bagua(request: Request):
     """八卦级健康检查 — v2.1
 
     返回每个八卦模块的健康等级、断路器状态和依赖状态。
     """
-    from src.api.response import success, error
+    from src.api.response import error, success
+
     try:
         from src.infra.health_check import get_health_checker
+
         checker = get_health_checker()
         result = await checker.check_bagua()
         return success(data=result, message="八卦健康检查完成")
@@ -214,9 +222,11 @@ async def health_check_infra(request: Request):
 
     返回连接池、LLM API 等基础设施组件的健康状态。
     """
-    from src.api.response import success, error
+    from src.api.response import error, success
+
     try:
         from src.infra.health_check import get_health_checker
+
         checker = get_health_checker()
         result = await checker.check_infra()
         return success(data=result, message="基础设施健康检查完成")
@@ -230,9 +240,11 @@ async def health_check_alerts(request: Request):
 
     返回当前触发的告警规则列表。
     """
-    from src.api.response import success, error
+    from src.api.response import error, success
+
     try:
         from src.infra.health_check import get_health_checker
+
         checker = get_health_checker()
         result = await checker.evaluate_alerts()
         return success(data={"alerts": result, "count": len(result)}, message="告警评估完成")
@@ -247,8 +259,10 @@ async def health_check_alert_rules(request: Request):
     返回所有已配置的告警规则。
     """
     from src.api.response import success
+
     try:
         from src.infra.health_check import get_health_checker
+
         checker = get_health_checker()
         return success(data={"rules": checker.get_alert_rules()})
     except Exception as e:  # TODO: Narrow exception type
@@ -257,13 +271,16 @@ async def health_check_alert_rules(request: Request):
 
 # ============ 系统资源统计 ============
 
+
 @router.get("/api/system/stats", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def system_stats(request: Request):
     """系统统计"""
-    from src.api.response import success, error
+    from src.api.response import error, success
+
     try:
         from src.infra.system_monitor import get_system_monitor
+
         result = get_system_monitor().get_system_stats()
         if request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2":
             return success(data=result, message="系统统计")
@@ -276,13 +293,16 @@ async def system_stats(request: Request):
 
 # ============ 缓存统计 ============
 
+
 @router.get("/api/cache/stats", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def cache_stats(request: Request):
     """缓存统计"""
-    from src.api.response import success, error
+    from src.api.response import error, success
+
     try:
         from src.infra.cache_stats import get_cache_stats
+
         result = get_cache_stats().get_stats()
         if request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2":
             return success(data=result, message="缓存统计")
@@ -295,13 +315,16 @@ async def cache_stats(request: Request):
 
 # ============ 错误追踪统计 ============
 
+
 @router.get("/api/errors/stats", dependencies=[Depends(require_admin)])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def error_stats(request: Request):
     """错误统计"""
-    from src.api.response import success, error
+    from src.api.response import error, success
+
     try:
         from src.infra.error_tracker import get_error_tracker
+
         result = get_error_tracker().get_error_stats()
         if request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2":
             return success(data=result, message="错误统计")

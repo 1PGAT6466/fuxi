@@ -1,6 +1,6 @@
-"""
-parser.py — DXF文件解析器
-使用ezdxf库解析DXF文件，提取几何实体、文本内容和元数据
+﻿"""
+parser.py 鈥?DXF鏂囦欢瑙ｆ瀽鍣?
+浣跨敤ezdxf搴撹В鏋怐XF鏂囦欢锛屾彁鍙栧嚑浣曞疄浣撱€佹枃鏈唴瀹瑰拰鍏冩暟鎹?
 """
 
 import hashlib
@@ -12,10 +12,11 @@ logger = logging.getLogger("services.dxf-viewer.parser")
 
 try:
     import ezdxf
+
     EZDXF_AVAILABLE = True
 except ImportError:
     EZDXF_AVAILABLE = False
-    logger.warning("ezdxf not installed — DXF parsing disabled. Install: pip install ezdxf")
+    logger.warning("ezdxf not installed 鈥?DXF parsing disabled. Install: pip install ezdxf")
 
 
 def _extract_line(entity) -> Dict[str, Any]:
@@ -119,20 +120,16 @@ def _compute_geometry_hash(entities: List[Dict[str, Any]]) -> str:
             if isinstance(val, float):
                 parts.append(f"{val:.6f}")
             elif isinstance(val, (list, tuple)):
-                parts.append(",".join(
-                    f"{v:.6f}" if isinstance(v, float) else str(v) for v in val
-                ))
+                parts.append(",".join(f"{v:.6f}" if isinstance(v, float) else str(v) for v in val))
             else:
                 parts.append(str(val))
         normalized.append("|".join(parts))
     normalized.sort()
     content = "\n".join(normalized)
-    return hashlib.md5(content.encode("utf-8")).hexdigest()
+    return hashlib.sha256(content.encode("utf-8")).hexdigest()
 
 
-def _compute_bounds(
-    entities: List[Dict[str, Any]]
-) -> Optional[Tuple[float, float, float, float]]:
+def _compute_bounds(entities: List[Dict[str, Any]]) -> Optional[Tuple[float, float, float, float]]:
     min_x = min_y = float("inf")
     max_x = max_y = float("-inf")
     found = False
@@ -164,9 +161,9 @@ def _compute_bounds(
 
 def extract_dxf(file_path: str) -> Dict[str, Any]:
     """
-    解析DXF文件
+    瑙ｆ瀽DXF鏂囦欢
 
-    返回:
+    杩斿洖:
         {
             "metadata": {
                 "version": str,
@@ -179,14 +176,12 @@ def extract_dxf(file_path: str) -> Dict[str, Any]:
             "geometry_hash": str,
         }
 
-    异常:
-        ValueError: 文件不存在或格式无效
-        ImportError: ezdxf未安装
+    寮傚父:
+        ValueError: 鏂囦欢涓嶅瓨鍦ㄦ垨鏍煎紡鏃犳晥
+        ImportError: ezdxf鏈畨瑁?
     """
     if not EZDXF_AVAILABLE:
-        raise ImportError(
-            "ezdxf is required for DXF parsing. Install: pip install ezdxf"
-        )
+        raise ImportError("ezdxf is required for DXF parsing. Install: pip install ezdxf")
 
     path = Path(file_path)
     if not path.exists():

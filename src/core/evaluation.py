@@ -2,10 +2,15 @@
 lib/evaluation.py — 评测引擎
 支持 Precision/Recall/MRR/NDCG 指标计算
 """
-import json, time
-from pathlib import Path
+
+import json
+import time
 from datetime import datetime
-import logging; logger = logging.getLogger(__name__)
+from pathlib import Path
+
+import logging
+
+logger = logging.getLogger(__name__)
 
 BASE = Path(__file__).resolve().parent.parent
 
@@ -29,6 +34,7 @@ DEFAULT_TEST_CASES = [
     ("会议管理系统配置", ["会议", "会议室", "会议类型", "泛微"]),
 ]
 
+
 def load_test_cases():
     """加载测试集，优先从 data/test_cases.json 读取"""
     tc_file = BASE / "data" / "test_cases.json"
@@ -36,8 +42,8 @@ def load_test_cases():
         with open(tc_file) as f:
             return json.load(f)
     # 返回默认测试集
-    return [{"query": q, "relevant_keywords": kw, "id": f"tc_{i}"} 
-            for i, (q, kw) in enumerate(DEFAULT_TEST_CASES)]
+    return [{"query": q, "relevant_keywords": kw, "id": f"tc_{i}"} for i, (q, kw) in enumerate(DEFAULT_TEST_CASES)]
+
 
 def save_test_cases(cases):
     tc_file = BASE / "data" / "test_cases.json"
@@ -45,11 +51,13 @@ def save_test_cases(cases):
     with open(tc_file, "w") as f:
         json.dump(cases, f, ensure_ascii=False, indent=2)
 
+
 # ===== 评测指标 =====
 def precision_at_k(relevant: set, retrieved: list, k: int = 10) -> float:
     """Precision@K"""
     hits = sum(1 for r in retrieved[:k] if any(kw in r for kw in relevant))
     return hits / min(k, len(retrieved)) if retrieved else 0.0
+
 
 def recall_at_k(relevant: set, retrieved: list, k: int = 10) -> float:
     """Recall@K"""
@@ -57,6 +65,7 @@ def recall_at_k(relevant: set, retrieved: list, k: int = 10) -> float:
         return 0.0
     hits = sum(1 for r in retrieved[:k] if any(kw in r for kw in relevant))
     return hits / len(relevant)
+
 
 def mrr(relevant_sets: list, retrieved_lists: list) -> float:
     """Mean Reciprocal Rank"""
@@ -68,18 +77,21 @@ def mrr(relevant_sets: list, retrieved_lists: list) -> float:
                 break
     return total_rr / len(relevant_sets) if relevant_sets else 0.0
 
+
 def ndcg_at_k(relevant: set, retrieved: list, k: int = 10) -> float:
     """NDCG@K (简化版，二值相关)"""
     import math
+
     dcg = 0.0
     for i, r in enumerate(retrieved[:k]):
         if any(kw in r for kw in relevant):
             dcg += 1.0 / math.log2(i + 2)  # i+2 因为 log(1)=0
-    
+
     ideal_count = min(len(relevant), k)
     idcg = sum(1.0 / math.log2(i + 2) for i in range(ideal_count))
-    
+
     return dcg / idcg if idcg > 0 else 0.0
+
 
 # ===== 评测运行器 =====
 def run_evaluation(search_fn, test_cases: list = None) -> dict:
@@ -89,42 +101,46 @@ def run_evaluation(search_fn, test_cases: list = None) -> dict:
     """
     if test_cases is None:
         test_cases = load_test_cases()
-    
+
     results = []
     for tc in test_cases:
         t0 = time.time()
         try:
             retrieved_texts = search_fn(tc["query"], 10)
             latency = time.time() - t0
-            retrieved = [r.get("text", r.get("content", str(r)))[:200] 
-                        if isinstance(r, dict) else str(r)[:200] 
-                        for r in retrieved_texts]
-        except Exception:  # TODO: Narrow exception type
+            retrieved = [
+                r.get("text", r.get("content", str(r)))[:200] if isinstance(r, dict) else str(r)[:200]
+                for r in retrieved_texts
+            ]
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             retrieved = []
             latency = -1
-        
+
         rel = set(tc["relevant_keywords"])
-        results.append({
-            "id": tc.get("id", ""),
-            "query": tc["query"],
-            "latency_ms": round(latency * 1000, 1),
-            "precision_at_10": round(precision_at_k(rel, retrieved, 10), 4),
-            "recall_at_10": round(recall_at_k(rel, retrieved, 10), 4),
-            "ndcg_at_10": round(ndcg_at_k(rel, retrieved, 10), 4),
-            "result_count": len(retrieved),
-        })
-    
+        results.append(
+            {
+                "id": tc.get("id", ""),
+                "query": tc["query"],
+                "latency_ms": round(latency * 1000, 1),
+                "precision_at_10": round(precision_at_k(rel, retrieved, 10), 4),
+                "recall_at_10": round(recall_at_k(rel, retrieved, 10), 4),
+                "ndcg_at_10": round(ndcg_at_k(rel, retrieved, 10), 4),
+                "result_count": len(retrieved),
+            }
+        )
+
     # 汇总
     avg_p = sum(r["precision_at_10"] for r in results) / len(results)
     avg_r = sum(r["recall_at_10"] for r in results) / len(results)
     avg_n = sum(r["ndcg_at_10"] for r in results) / len(results)
     mrr_score = mrr(
         [set(tc["relevant_keywords"]) for tc in test_cases],
-        [[str(r.get("text", str(r)))[:200] for r in search_fn(tc["query"], 10)] 
-         for tc in test_cases]
+        [[str(r.get("text", str(r)))[:200] for r in search_fn(tc["query"], 10)] for tc in test_cases],
     )
-    avg_latency = sum(r["latency_ms"] for r in results if r["latency_ms"] > 0) / max(1, sum(1 for r in results if r["latency_ms"] > 0))
-    
+    avg_latency = sum(r["latency_ms"] for r in results if r["latency_ms"] > 0) / max(
+        1, sum(1 for r in results if r["latency_ms"] > 0)
+    )
+
     return {
         "summary": {
             "precision@10": round(avg_p, 4),
@@ -137,5 +153,6 @@ def run_evaluation(search_fn, test_cases: list = None) -> dict:
         },
         "details": results,
     }
+
 
 logger.info("lib/evaluation.py 加载完成")

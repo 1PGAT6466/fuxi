@@ -2,9 +2,10 @@
 trace_logger.py — 全链路追踪日志器
 trace_id 贯穿 taiyin→shaoyin→taiyang→降级链→growth
 """
-import os
-import logging
+
 import asyncio
+import logging
+import os
 from datetime import datetime
 
 logger = logging.getLogger("infra.trace")

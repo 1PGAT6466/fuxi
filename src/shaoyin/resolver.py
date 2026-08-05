@@ -2,8 +2,9 @@
 resolver.py — 少阴·指代消解
 resolve_query + compress_history
 """
+
 import logging
-from typing import List, Dict
+from typing import Dict, List
 
 logger = logging.getLogger("shaoyin.resolver")
 

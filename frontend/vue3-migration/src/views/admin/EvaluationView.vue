@@ -48,7 +48,7 @@
           </el-button>
         </div>
 
-        <el-table :data="tasks" style="width: 100%" size="small">
+        <el-table :data="Array.isArray(tasks) ? tasks : []" style="width: 100%" size="small">
           <el-table-column prop="name" label="任务名称" min-width="160" />
           <el-table-column prop="dataset_name" label="数据集" min-width="120" />
           <el-table-column prop="model" label="模型" width="120" />
@@ -75,7 +75,7 @@
               </el-tag>
             </template>
           </el-table-column>
-          <el-table-column label="操作" width="140">
+          <el-table-column label="操作" width="180">
             <template #default="{ row }">
               <el-button
                 v-if="row.status === 'completed'"
@@ -95,6 +95,15 @@
               >
                 运行中...
               </el-button>
+              <el-button
+                v-else
+                type="success"
+                link
+                size="small"
+                @click="runTask(row)"
+              >
+                <el-icon class="el-icon--left"><VideoPlay /></el-icon>执行
+              </el-button>
             </template>
           </el-table-column>
         </el-table>
@@ -104,7 +113,7 @@
       <el-tab-pane label="结果对比" name="results">
         <div v-if="selectedResult" class="result-detail">
           <div class="result-header">
-            <h3>{{ selectedResult.task_name }}</h3>
+            <h3>{{ selectedResult?.task_name ?? '未命名任务' }}</h3>
             <el-button size="small" text @click="selectedResult = null">返回</el-button>
           </div>
 
@@ -114,7 +123,7 @@
           <!-- 指标明细 -->
           <div class="result-metrics">
             <div
-              v-for="metric in selectedResult.metrics_detail"
+              v-for="metric in (selectedResult?.metrics_detail || [])"
               :key="metric.name"
               class="result-metric-item"
             >
@@ -131,7 +140,7 @@
           <!-- 单条 Case 分析 -->
           <h4 class="section-title">单条 Case 分析</h4>
           <div class="case-list">
-            <div v-for="c in selectedResult.cases" :key="c.id" class="case-item">
+            <div v-for="c in (selectedResult?.cases || [])" :key="c.id" class="case-item">
               <div class="case-header">
                 <span class="case-id">#{{ c.id }}</span>
                 <el-tag :type="c.pass ? 'success' : 'danger'" size="small">
@@ -160,8 +169,8 @@
         <div v-else class="result-list">
           <div v-for="r in results" :key="r.id" class="result-card" @click="viewResult(r)">
             <div class="result-card-header">
-              <span class="result-name">{{ r.task_name }}</span>
-              <el-tag size="small">{{ r.model }}</el-tag>
+              <span class="result-name">{{ r.task_name ?? '未命名' }}</span>
+              <el-tag size="small">{{ r.model ?? '-' }}</el-tag>
             </div>
             <div class="result-card-body">
               <span v-for="(v, k) in r.scores" :key="k" class="score-chip">
@@ -238,7 +247,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick } from 'vue';
-import { Plus, Collection, DataAnalysis } from '@element-plus/icons-vue';
+import { Plus, Collection, DataAnalysis, VideoPlay } from '@element-plus/icons-vue';
 import { ElMessage } from 'element-plus';
 // P0-3: 按需导入 echarts
 import * as echarts from 'echarts/core';
@@ -247,7 +256,14 @@ import { TooltipComponent, LegendComponent } from 'echarts/components';
 import { CanvasRenderer } from 'echarts/renderers';
 
 echarts.use([RadarChart, TooltipComponent, LegendComponent, CanvasRenderer]);
-import apiClient from '@/api';
+import {
+  createEvaluationDataset,
+  createEvaluationTask,
+  runEvaluationTask,
+  getEvaluationDatasets,
+  getEvaluationTasks,
+  getEvaluationResults,
+} from '@/api/evaluation';
 
 // ─── 类型 ───
 interface Dataset {
@@ -416,88 +432,166 @@ const mockResults: EvalResult[] = [
 ];
 
 // ─── Helpers ───
-function statusLabel(s: string): string {
-  const map: Record<string, string> = {
-    pending: '等待中',
-    running: '运行中',
-    completed: '已完成',
-    failed: '失败',
-  };
-  return map[s] || s;
+function normalizeArray<T>(value: unknown, fallback: T[]): T[] {
+  if (Array.isArray(value)) return value as T[];
+
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+    const candidates = [record.items, record.datasets, record.tasks, record.results, record.data, record.list];
+
+    for (const candidate of candidates) {
+      if (Array.isArray(candidate)) return candidate as T[];
+    }
+  }
+
+  return fallback;
+}
+
+function extractPayload<T>(value: unknown): T {
+  if (value && typeof value === 'object') {
+    const record = value as Record<string, unknown>;
+
+    if ('data' in record && record.data !== undefined) {
+      return record.data as T;
+    }
+  }
+
+  return value as T;
+}
+
+function resolveDatasetName(datasetId: string): string {
+  const ds = datasets.value.find((d) => d.id === datasetId);
+  return ds?.name || '';
 }
 
 // ─── Data Fetch ───
 async function fetchDatasets(): Promise<void> {
   try {
-    datasets.value = (await apiClient.get('/api/evaluation/datasets')) as Dataset[];
-  } catch {
-    datasets.value = mockDatasets;
+    const resp = await getEvaluationDatasets();
+    const data = normalizeArray<Dataset>(extractPayload(resp), []);
+    datasets.value = data.length > 0 ? data : [];
+  } catch (error) {
+    console.error('获取数据集失败:', error);
+    datasets.value = [];
+    ElMessage.warning('获取数据集失败，请检查后端服务');
   }
 }
 
 async function fetchTasks(): Promise<void> {
   try {
-    tasks.value = (await apiClient.get('/api/evaluation/tasks')) as EvalTask[];
-  } catch {
-    tasks.value = mockTasks;
+    const resp = await getEvaluationTasks();
+    const data = normalizeArray<EvalTask>(extractPayload(resp), []);
+    tasks.value = data.length > 0 ? data : [];
+  } catch (error) {
+    console.error('获取任务失败:', error);
+    tasks.value = [];
+    ElMessage.warning('获取评测任务失败，请检查后端服务');
   }
 }
 
 async function fetchResults(): Promise<void> {
   try {
-    results.value = (await apiClient.get('/api/evaluation/results')) as EvalResult[];
-  } catch {
-    results.value = mockResults;
+    const resp = await getEvaluationResults();
+    const data = normalizeArray<EvalResult>(extractPayload(resp), []);
+    results.value = data.length > 0 ? data : [];
+  } catch (error) {
+    console.error('获取结果失败:', error);
+    results.value = [];
+    ElMessage.warning('获取评测结果失败，请检查后端服务');
   }
 }
 
 // ─── Actions ───
-function createDataset(): void {
+async function createDataset(): Promise<void> {
   if (!newDataset.value.name.trim()) {
     ElMessage.warning('请输入数据集名称');
     return;
   }
-  const ds: Dataset = {
-    id: String(Date.now()),
+
+  const payload = {
     name: newDataset.value.name,
     description: newDataset.value.desc,
-    sample_count: 0,
     task_type: newDataset.value.type,
-    created_at: new Date().toISOString().split('T')[0],
   };
-  datasets.value.unshift(ds);
-  showCreateDataset.value = false;
-  newDataset.value = { name: '', desc: '', type: 'qa' };
-  ElMessage.success('数据集创建成功');
+
+  try {
+    const resp = await createEvaluationDataset(payload);
+    const created = (extractPayload(resp) as Dataset) ?? {
+      id: String(Date.now()),
+      name: payload.name,
+      description: payload.description,
+      sample_count: 0,
+      task_type: payload.task_type,
+      created_at: new Date().toISOString().split('T')[0],
+    };
+
+    datasets.value.unshift(created);
+    showCreateDataset.value = false;
+    newDataset.value = { name: '', desc: '', type: 'qa' };
+    ElMessage.success('数据集创建成功');
+  } catch {
+    ElMessage.error('创建数据集失败，请检查后端服务后重试');
+  }
 }
 
-function createTask(): void {
+async function createTask(): Promise<void> {
   if (!newTask.value.name.trim() || !newTask.value.dataset_id) {
     ElMessage.warning('请填写完整信息');
     return;
   }
-  const ds = datasets.value.find((d) => d.id === newTask.value.dataset_id);
-  const task: EvalTask = {
-    id: String(Date.now()),
+
+  const payload = {
     name: newTask.value.name,
-    dataset_name: ds?.name || '',
     dataset_id: newTask.value.dataset_id,
+    dataset_name: resolveDatasetName(newTask.value.dataset_id),
     model: newTask.value.model,
     metrics: newTask.value.metrics,
-    status: 'pending',
   };
-  tasks.value.unshift(task);
-  showCreateTask.value = false;
-  newTask.value = {
-    name: '',
-    dataset_id: '',
-    model: 'deepseek-v4',
-    metrics: ['Recall', 'Precision'],
-  };
-  ElMessage.success('评测任务创建成功');
+
+  try {
+    const resp = await createEvaluationTask(payload);
+    const created = (extractPayload(resp) as EvalTask) ?? {
+      id: String(Date.now()),
+      name: payload.name,
+      dataset_name: payload.dataset_name,
+      dataset_id: payload.dataset_id,
+      model: payload.model,
+      metrics: payload.metrics,
+      status: 'pending' as const,
+    };
+
+    tasks.value.unshift(created);
+    showCreateTask.value = false;
+    newTask.value = {
+      name: '',
+      dataset_id: '',
+      model: 'deepseek-v4',
+      metrics: ['Recall', 'Precision'],
+    };
+    ElMessage.success('评测任务创建成功');
+  } catch {
+    ElMessage.error('创建评测任务失败，请检查后端服务后重试');
+  }
 }
 
-function viewResult(result: EvalResult): void {
+async function runTask(task: EvalTask): Promise<void> {
+  const previousStatus = task.status;
+
+  try {
+    task.status = 'running';
+    await runEvaluationTask(task.id);
+    ElMessage.success('评测任务已开始执行');
+  } catch {
+    task.status = previousStatus === 'running' ? 'pending' : previousStatus;
+    ElMessage.error('执行评测任务失败，请检查后端服务后重试');
+  }
+}
+
+function viewResult(result: EvalResult | null | undefined): void {
+  if (!result || !result.id) {
+    ElMessage.warning('评测结果数据无效');
+    return;
+  }
   selectedResult.value = result;
   nextTick(initRadar);
 }

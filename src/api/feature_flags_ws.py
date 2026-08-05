@@ -6,6 +6,7 @@ WebSocket 端点: ws://host/api/feature-flags/ws
 
 前端 featureFlags store 收到推送后自动更新状态。
 """
+
 import asyncio
 import json
 import logging
@@ -28,7 +29,7 @@ async def _safe_send(ws: WebSocket, data: dict):
     try:
         if ws.client_state == WebSocketState.CONNECTED:
             await ws.send_json(data)
-    except Exception:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         pass
 
 
@@ -78,12 +79,16 @@ async def feature_flags_websocket(websocket: WebSocket):
 
     try:
         # 发送初始快照
-        from src.services.feature_flags import load_flags, DEFAULT_FLAGS
-        await _safe_send(websocket, {
-            "type": "snapshot",
-            "flags": load_flags(),
-            "defaults": DEFAULT_FLAGS,
-        })
+        from src.services.feature_flags import DEFAULT_FLAGS, load_flags
+
+        await _safe_send(
+            websocket,
+            {
+                "type": "snapshot",
+                "flags": load_flags(),
+                "defaults": DEFAULT_FLAGS,
+            },
+        )
 
         # 保持连接，接收心跳消息
         while True:

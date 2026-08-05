@@ -81,9 +81,29 @@
 
       <!-- 空状态 -->
       <div v-else-if="!loading && collections.length === 0" class="empty-collections">
-        <el-empty description="暂无知识集合">
+        <el-empty description="">
           <template #image>
             <el-icon :size="64" color="var(--fuxi-text-tertiary)"><Folder /></el-icon>
+          </template>
+          <template #description>
+            <div class="empty-guide">
+              <p class="empty-guide__title">开始构建您的知识库</p>
+              <p class="empty-guide__desc">上传文档后，系统将自动进行向量化索引，支持智能检索与问答。</p>
+              <div class="empty-guide__steps">
+                <div class="empty-guide__step">
+                  <span class="step-num">1</span>
+                  <span>上传文档（支持 PDF、Word、Markdown 等格式）</span>
+                </div>
+                <div class="empty-guide__step">
+                  <span class="step-num">2</span>
+                  <span>系统自动分块并向量化</span>
+                </div>
+                <div class="empty-guide__step">
+                  <span class="step-num">3</span>
+                  <span>使用检索测试验证效果</span>
+                </div>
+              </div>
+            </div>
           </template>
           <el-button type="primary" @click="showUploadDialog = true">
             <el-icon><Upload /></el-icon>
@@ -704,6 +724,60 @@ onMounted(() => {
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
   padding: 40px 0;
+}
+
+/* ────── 空状态引导 ────── */
+.empty-guide {
+  text-align: center;
+  max-width: 400px;
+  margin: 0 auto;
+
+  &__title {
+    font-size: 16px;
+    font-weight: 600;
+    color: var(--text-primary);
+    margin: 0 0 8px;
+  }
+
+  &__desc {
+    font-size: var(--font-size-caption);
+    color: var(--text-secondary);
+    margin: 0 0 20px;
+    line-height: 1.6;
+  }
+
+  &__steps {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    text-align: left;
+    padding: 16px;
+    background: var(--bg-subtle);
+    border-radius: var(--radius-sm);
+    margin-bottom: 20px;
+  }
+
+  &__step {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: var(--font-size-caption);
+    color: var(--text-secondary);
+
+    .step-num {
+      width: 22px;
+      height: 22px;
+      border-radius: 50%;
+      background: var(--brand);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 600;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      flex-shrink: 0;
+    }
+  }
 }
 
 .collections-grid {

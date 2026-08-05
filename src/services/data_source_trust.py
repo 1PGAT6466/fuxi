@@ -1,0 +1,175 @@
+"""
+知识供应链信任管理器
+按数据来源类型分级信任，控制入库策略
+
+使用方式:
+    from src.services.data_source_trust import DataSourceTrustManager
+
+    manager = DataSourceTrustManager()
+    trust = manager.evaluate("tavily_search", source_url="https://docs.python.org/...")
+    if trust.auto_approve:
+        # 自动入库
+        ...
+    else:
+        # 进入隔离区，等待人工审核
+        days = manager.get_quarantine_duration("tavily_search")
+        ...
+"""
+import logging
+from typing import Dict, Optional
+from dataclasses import dataclass
+from enum import Enum
+
+logger = logging.getLogger(__name__)
+
+
+class TrustLevel(Enum):
+    """信任等级"""
+    VERIFIED = 1.0        # 内部审核过的文档
+    INTERNAL = 0.8        # 内部用户上传
+    TRUSTED_API = 0.6     # 可信合作方 API
+    WEB_SEARCH = 0.3      # Tavily 搜索结果
+    EXTERNAL_API = 0.2    # 其他外部 API
+    UNKNOWN = 0.1         # 未知来源
+
+
+@dataclass
+class SourceTrust:
+    """数据源信任评估结果"""
+    source_type: str
+    trust_level: TrustLevel
+    trust_score: float
+    auto_approve: bool    # 是否自动入库
+    require_review: bool  # 是否需要人工审核
+    max_age_days: int     # 数据最大有效期（天）
+
+
+class DataSourceTrustManager:
+    """知识供应链信任管理器"""
+
+    # 信任策略配置
+    TRUST_POLICIES: Dict[str, SourceTrust] = {
+        "internal_vetted": SourceTrust(
+            source_type="internal_vetted",
+            trust_level=TrustLevel.VERIFIED,
+            trust_score=1.0,
+            auto_approve=True,
+            require_review=False,
+            max_age_days=365
+        ),
+        "internal_upload": SourceTrust(
+            source_type="internal_upload",
+            trust_level=TrustLevel.INTERNAL,
+            trust_score=0.8,
+            auto_approve=True,
+            require_review=False,
+            max_age_days=180
+        ),
+        "tavily_search": SourceTrust(
+            source_type="tavily_search",
+            trust_level=TrustLevel.WEB_SEARCH,
+            trust_score=0.3,
+            auto_approve=False,
+            require_review=True,
+            max_age_days=30
+        ),
+        "external_api": SourceTrust(
+            source_type="external_api",
+            trust_level=TrustLevel.EXTERNAL_API,
+            trust_score=0.2,
+            auto_approve=False,
+            require_review=True,
+            max_age_days=7
+        ),
+        "user_submitted": SourceTrust(
+            source_type="user_submitted",
+            trust_level=TrustLevel.UNKNOWN,
+            trust_score=0.1,
+            auto_approve=False,
+            require_review=True,
+            max_age_days=7
+        ),
+    }
+
+    def evaluate(self, source_type: str, source_url: str = "") -> SourceTrust:
+        """评估数据源信任等级
+
+        Args:
+            source_type: 数据来源类型标识
+            source_url: 来源 URL（用于域名级别的信任提升）
+
+        Returns:
+            SourceTrust: 包含信任评分、自动入库策略、审核要求等
+        """
+        policy = self.TRUST_POLICIES.get(source_type)
+        if not policy:
+            logger.warning(f"[Trust] 未知来源类型: {source_type}，使用最低信任")
+            policy = self.TRUST_POLICIES["user_submitted"]
+
+        # 对 Tavily 来源做域名检查
+        if source_type == "tavily_search" and source_url:
+            domain = self._extract_domain(source_url)
+            if self._is_trusted_domain(domain):
+                # 提升信任分数
+                policy = SourceTrust(
+                    source_type=source_type,
+                    trust_level=policy.trust_level,
+                    trust_score=min(policy.trust_score + 0.2, 0.8),
+                    auto_approve=policy.trust_score + 0.2 >= 0.9,
+                    require_review=policy.trust_score + 0.2 < 0.9,
+                    max_age_days=policy.max_age_days
+                )
+
+        return policy
+
+    def should_auto_approve(self, source_type: str) -> bool:
+        """判断是否自动入库
+
+        Args:
+            source_type: 数据来源类型
+
+        Returns:
+            True 表示可以自动入库，False 表示需要审核
+        """
+        policy = self.evaluate(source_type)
+        return policy.auto_approve
+
+    def get_quarantine_duration(self, source_type: str) -> int:
+        """获取隔离区保留天数
+
+        Args:
+            source_type: 数据来源类型
+
+        Returns:
+            隔离天数（0 表示不需要隔离）
+        """
+        policy = self.evaluate(source_type)
+        if policy.require_review:
+            return policy.max_age_days
+        return 0  # 不需要隔离
+
+    def _extract_domain(self, url: str) -> str:
+        """提取域名"""
+        try:
+            from urllib.parse import urlparse
+            return urlparse(url).hostname or ""
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+            return ""
+
+    def _is_trusted_domain(self, domain: str) -> bool:
+        """检查是否为可信域名
+
+        可信域名包括：
+        - 知名技术文档站点
+        - .edu / .gov 域名
+        """
+        TRUSTED_DOMAINS = {
+            "docs.python.org", "fastapi.tiangolo.com", "vuejs.org",
+            "react.dev", "developer.mozilla.org",
+            "github.com", "stackoverflow.com", "arxiv.org",
+        }
+        return (
+            domain in TRUSTED_DOMAINS
+            or domain.endswith(".edu")
+            or domain.endswith(".gov")
+        )

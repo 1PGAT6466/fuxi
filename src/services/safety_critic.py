@@ -1079,6 +1079,151 @@ class SafetyCritic:
         self._cache.clear()
         logger.info("[SafetyCritic] 缓存已清空")
 
+    # ──────── OWASP LLM Top 10 安全检查 ────────
+
+    def sanitize_output(self, text: str) -> str:
+        """
+        LLM02: 不安全输出处理 — 净化LLM输出，移除潜在有害内容。
+
+        防御范围：
+        - XSS（HTML标签注入）
+        - 脚本注入（javascript: 协议）
+        - Markdown链接注入
+
+        Args:
+            text: LLM 原始输出文本
+
+        Returns:
+            净化后的安全文本
+        """
+        if not text or not isinstance(text, str):
+            return ""
+
+        # 移除HTML标签（防止XSS）
+        text = re.sub(r'<[^>]+>', '', text)
+        # 移除潜在的脚本注入
+        text = re.sub(r'javascript:', '', text, flags=re.IGNORECASE)
+        # 移除潜在的markdown链接注入
+        text = re.sub(r'\[([^\]]+)\]\(javascript:[^)]+\)', r'\1', text)
+        return text.strip()
+
+    def check_excessive_agency(self, action: str, context: dict = None) -> bool:
+        """
+        LLM08: 过度自主权 — 检查操作是否超出授权范围。
+
+        防止 LLM 代理执行高风险操作（删除、系统修改、代码执行等）。
+        仅允许安全的只读/分析类操作。
+
+        Args:
+            action: 待检查的操作名称
+            context: 操作上下文（预留扩展）
+
+        Returns:
+            True 表示操作被允许，False 表示被拒绝
+        """
+        # 定义允许的操作类型（只读/分析类）
+        ALLOWED_ACTIONS = {
+            "search", "read", "summarize", "analyze", "translate",
+            "answer", "suggest", "explain", "compare"
+        }
+        # 定义禁止的操作类型（高风险写操作）
+        BLOCKED_ACTIONS = {
+            "delete", "modify_system", "execute_code", "access_admin",
+            "send_email", "make_payment", "change_password"
+        }
+
+        if not action or not isinstance(action, str):
+            return False
+
+        action_lower = action.lower()
+        if action_lower in BLOCKED_ACTIONS:
+            logger.warning(
+                f"[SafetyCritic] 过度自主权阻止: action={action_lower}"
+            )
+            return False  # 拒绝
+        return action_lower in ALLOWED_ACTIONS
+
+    def detect_retrieval_poisoning(self, query: str, context: str) -> dict:
+        """
+        LLM03: 训练数据投毒 — 检测检索结果是否可能被投毒。
+
+        检测指标：
+        - 过多外部链接（可能是 SEO 投毒）
+        - 重复内容（可能是填充噪音）
+        - 可疑指令模式（试图覆盖 LLM 行为）
+
+        Args:
+            query: 用户原始查询
+            context: 检索到的上下文内容
+
+        Returns:
+            {
+                "risk_score": float,     # 0.0-1.0 投毒风险分数
+                "indicators": dict,        # 各指标检测结果
+                "safe": bool               # 是否安全（风险 < 0.3）
+            }
+        """
+        if not context or not isinstance(context, str):
+            return {
+                "risk_score": 0.0,
+                "indicators": {},
+                "safe": True
+            }
+
+        indicators = {
+            "excessive_links": len(re.findall(r'https?://', context)) > 10,
+            "repetitive_content": self._check_repetition(context),
+            "suspicious_patterns": bool(re.search(
+                r'(?:ignore|forget|disregard).*(?:instructions|rules)',
+                context, re.IGNORECASE
+            )),
+        }
+
+        risk_score = sum(indicators.values()) / len(indicators)
+
+        if risk_score >= 0.3:
+            logger.warning(
+                f"[SafetyCritic] 检索投毒风险: score={risk_score:.2f}, "
+                f"indicators={indicators}"
+            )
+
+        return {
+            "risk_score": round(risk_score, 4),
+            "indicators": indicators,
+            "safe": risk_score < 0.3
+        }
+
+    @staticmethod
+    def _check_repetition(text: str, threshold: float = 0.6) -> bool:
+        """
+        检测文本中的重复内容比例。
+        使用 n-gram 去重率估算内容重复度。
+
+        Args:
+            text: 待检测文本
+            threshold: 重复比例阈值（默认 0.6）
+
+        Returns:
+            True 表示存在大量重复（可能有投毒风险）
+        """
+        if len(text) < 100:
+            return False
+
+        # 使用 5-gram 检测重复
+        n = 5
+        if len(text) < n:
+            return False
+
+        ngrams = [text[i:i + n] for i in range(len(text) - n + 1)]
+        total = len(ngrams)
+        unique = len(set(ngrams))
+
+        if total == 0:
+            return False
+
+        repetition_ratio = 1.0 - (unique / total)
+        return repetition_ratio > threshold
+
     # ──────── 工具方法 ────────
 
     @staticmethod

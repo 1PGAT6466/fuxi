@@ -2,14 +2,16 @@
 trace_cleanup.py — trace文件清理
 保留7天，定时清理
 """
-import time
+
 import logging
+import time
 from pathlib import Path
 from typing import List, Optional
 
 logger = logging.getLogger("infra.trace_cleanup")
 
 from src.config import DATA_DIR as CONFIG_DATA_DIR
+
 TRACE_DIR = Path(CONFIG_DATA_DIR) / "traces"
 RETENTION_DAYS = 7
 
@@ -20,6 +22,7 @@ class TraceCleanup:
     def __init__(self, trace_dir: Path = TRACE_DIR, retention_days: int = RETENTION_DAYS):
         self.trace_dir = trace_dir
         self.retention_days = retention_days
+
     # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def cleanup(self) -> Dict:
@@ -54,12 +57,14 @@ class TraceCleanup:
         for trace_file in self.trace_dir.glob("*.log"):
             try:
                 stat = trace_file.stat()
-                files.append({
-                    "name": trace_file.name,
-                    "size_bytes": stat.st_size,
-                    "modified": stat.st_mtime,
-                    "age_days": (time.time() - stat.st_mtime) / 86400,
-                })
+                files.append(
+                    {
+                        "name": trace_file.name,
+                        "size_bytes": stat.st_size,
+                        "modified": stat.st_mtime,
+                        "age_days": (time.time() - stat.st_mtime) / 86400,
+                    }
+                )
             except Exception as e:  # TODO: Narrow exception type
                 logger.warning("Exception 失败: %s", e, exc_info=True)
 

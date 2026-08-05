@@ -22,15 +22,15 @@ backup.py — 数据库备份与恢复模块 (v1.50 R4)
     restore_latest("chunks.db")
 """
 
-import os
 import json
+import logging
+import os
 import shutil
 import sqlite3
-import logging
-import time
 import threading
-from pathlib import Path
+import time
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Dict, List, Optional
 
 logger = logging.getLogger("infra.backup")
@@ -96,8 +96,7 @@ def backup_sqlite_db(db_path: str, backup_name: str = None) -> Optional[str]:
         src_conn.backup(dst_conn)
         src_conn.close()
         dst_conn.close()
-        logger.info("[Backup] %s → %s (%s)", src_path.name, name,
-                    _format_size(dest_path.stat().st_size))
+        logger.info("[Backup] %s → %s (%s)", src_path.name, name, _format_size(dest_path.stat().st_size))
         return str(dest_path)
     except Exception as e:
         logger.error("[Backup] 备份失败 %s: %s", src_path.name, e)
@@ -256,14 +255,16 @@ def list_backups(filename: str = None) -> List[Dict]:
             continue
         if filename and filename not in f.name:
             continue
-        results.append({
-            "name": f.name,
-            "size": f.stat().st_size,
-            "size_str": _format_size(f.stat().st_size),
-            "age_seconds": round(now - f.stat().st_mtime, 1),
-            "timestamp_iso": datetime.fromtimestamp(f.stat().st_mtime).isoformat(),
-            "path": str(f),
-        })
+        results.append(
+            {
+                "name": f.name,
+                "size": f.stat().st_size,
+                "size_str": _format_size(f.stat().st_size),
+                "age_seconds": round(now - f.stat().st_mtime, 1),
+                "timestamp_iso": datetime.fromtimestamp(f.stat().st_mtime).isoformat(),
+                "path": str(f),
+            }
+        )
     return results
 
 
@@ -281,7 +282,7 @@ def _cleanup_old_backups(days: int = 7) -> int:
             try:
                 f.unlink()
                 deleted += 1
-            except Exception:
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
                 pass
     if deleted > 0:
         logger.info("[Backup] 已清理 %d 个过期备份（超过 %d 天）", deleted, days)
@@ -290,7 +291,7 @@ def _cleanup_old_backups(days: int = 7) -> int:
 
 def _format_size(size_bytes: int) -> str:
     """格式化文件大小"""
-    for unit in ['B', 'KB', 'MB', 'GB']:
+    for unit in ["B", "KB", "MB", "GB"]:
         if abs(size_bytes) < 1024.0:
             return f"{size_bytes:.1f} {unit}"
         size_bytes /= 1024.0

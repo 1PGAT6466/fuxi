@@ -2,8 +2,9 @@
 query_router.py — 统一查询分类（9种类型）
 合并 Brain.Instinct 的6种 + QueryTypeClassifier 的3种
 """
-import re
+
 import logging
+import re
 from typing import Tuple
 
 logger = logging.getLogger("shaoyin.query_router")
@@ -11,6 +12,7 @@ logger = logging.getLogger("shaoyin.query_router")
 
 class UnifiedQueryType:
     """统一查询类型"""
+
     COMPARE = "compare"
     NUMERIC_LOOKUP = "numeric_lookup"
     TABLE_QUERY = "table_query"
@@ -88,13 +90,13 @@ def classify_query(query: str) -> Tuple[str, str, str, int]:
     返回: (类型, 复杂度, 搜索模式, top_k)
     """
     query_lower = query.lower().strip()
-    
+
     for qtype, config in QUERY_TYPE_CONFIG.items():
         for pattern in config["patterns"]:
             if re.search(pattern, query_lower):
                 logger.info(f"[路由] 查询分类: {qtype} (复杂度={config['complexity']}, 模式={config['search_mode']})")
                 return qtype, config["complexity"], config["search_mode"], config["top_k"]
-    
+
     # 默认：中等复杂度
     logger.info(f"[路由] 查询分类: unknown → open_ended (复杂度=medium, 模式=L2_STANDARD)")
     return "open_ended", "medium", "L2_STANDARD", 10

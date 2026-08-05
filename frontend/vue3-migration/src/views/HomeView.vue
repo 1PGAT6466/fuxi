@@ -1,8 +1,9 @@
 <template>
   <!--
-    伏羲 v2.1 — 九宫格动态仪表盘首页
+    伏羲 v2.2 — 九宫格动态仪表盘首页
     后天八卦 3×3 布局，每个宫格是「活卡片」
     读取 /api/symbols/status 获取器官状态
+    Phase 2: 东方科技感美学升级
   -->
   <div class="home-view">
     <!-- 平台标题 -->
@@ -62,7 +63,7 @@
           :style="getCellVars(pos)"
           role="gridcell"
           tabindex="0"
-          :aria-label="`${getCellLabel(pos)}卦·${getCellOrgan(pos)}·${getCellFunction(pos)}`"
+          :aria-label="`${getCellLabel(pos)}卦·${getCellDirection(pos)}·${getCellWuxing(pos)}·${getCellOrgan(pos)}·${getCellFunction(pos)}`"
           @click="navigateTo(getCellRoute(pos))"
           @keydown.enter="navigateTo(getCellRoute(pos))"
           @keydown.space.prevent="navigateTo(getCellRoute(pos))"
@@ -83,6 +84,8 @@
           <div class="bagua-palace__symbol">{{ getCellSymbol(pos) }}</div>
           <!-- 卦名 -->
           <div class="bagua-palace__name">{{ getCellLabel(pos) }}</div>
+          <!-- 方位 & 五行 -->
+          <div class="bagua-palace__wuxing">{{ getCellDirection(pos) }} · {{ getCellWuxing(pos) }}</div>
           <!-- 器官（副标题） -->
           <div class="bagua-palace__organ">{{ getCellOrgan(pos) }}</div>
           <!-- 功能描述 -->
@@ -180,6 +183,22 @@ function getCellOrgan(pos: number): string {
   return getCellByPos(pos)?.organ ?? '';
 }
 
+function getCellDirection(pos: number): string {
+  const cell = getCellByPos(pos);
+  if (!cell || 'id' in cell && cell.id === 'zhonggong') return '中';
+  const dirMap: Record<string, string> = {
+    qian: '西北', kun: '西南', zhen: '东', xun: '东南',
+    kan: '北', li: '南', gen: '东北', dui: '西',
+  };
+  return dirMap[(cell as { id: string }).id] ?? '';
+}
+
+function getCellWuxing(pos: number): string {
+  const cell = getCellByPos(pos);
+  if (!cell || 'id' in cell && cell.id === 'zhonggong') return '土';
+  return (cell as { wuxing?: string }).wuxing ?? '';
+}
+
 function getCellFunction(pos: number): string {
   return getCellByPos(pos)?.functionDesc ?? '';
 }
@@ -241,8 +260,8 @@ function navigateTo(route: string): void {
 
 <style scoped>
 /* ═══════════════════════════════════════════
-   HomeView v2.1 — 九宫格仪表盘
-   小米简约 · 八卦呼吸动画 · 状态驱动
+   HomeView v2.2 — 九宫格仪表盘
+   东方科技感 · 八卦呼吸 · 玻璃态 · 流光动画
    ═══════════════════════════════════════════ */
 
 .home-view {
@@ -264,10 +283,16 @@ function navigateTo(route: string): void {
   gap: 12px;
 }
 
+/* ── 太极图标：光晕 + 旋转 ── */
 .home-brand__icon {
   font-size: 36px;
   color: var(--fuxi-primary, #ff6700);
   animation: taiji-spin 8s linear infinite;
+  text-shadow:
+    0 0 12px rgba(255, 103, 0, 0.5),
+    0 0 28px rgba(255, 103, 0, 0.25),
+    0 0 48px rgba(255, 103, 0, 0.12);
+  filter: drop-shadow(0 0 6px rgba(255, 103, 0, 0.3));
 }
 
 @keyframes taiji-spin {
@@ -275,12 +300,16 @@ function navigateTo(route: string): void {
   to { transform: rotate(360deg); }
 }
 
+/* ── 标题：渐变文字 ── */
 .home-brand__title {
   font-size: 36px;
   font-weight: 800;
-  color: var(--fuxi-text, #333333);
   margin: 0;
   letter-spacing: 0.06em;
+  background: linear-gradient(135deg, var(--fuxi-text, #333333) 0%, var(--fuxi-primary, #ff6700) 60%, var(--fuxi-text-secondary, #999999) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
 }
 
 .home-brand__subtitle {
@@ -291,7 +320,7 @@ function navigateTo(route: string): void {
 }
 
 /* ═══════════════════════════════════════════
-   3×3 Grid
+   3×3 Grid（staggered reveal 入场动画）
    ═══════════════════════════════════════════ */
 .bagua-dashboard {
   display: grid;
@@ -302,14 +331,18 @@ function navigateTo(route: string): void {
 }
 
 /* ═══════════════════════════════════════════
-   卦格卡片
+   卦格卡片（玻璃态 + 入场动画）
    ═══════════════════════════════════════════ */
 .bagua-palace {
   position: relative;
-  background: var(--fuxi-bg-card, #ffffff);
-  border-radius: var(--radius-lg, 12px);
-  box-shadow: 0 2px 16px rgba(255, 103, 0, 0.06);
-  border: 1.5px solid transparent;
+  background: var(--glass-bg, rgba(255, 255, 255, 0.72));
+  backdrop-filter: blur(var(--glass-blur, 20px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 20px));
+  border-radius: var(--radius-lg, 16px);
+  box-shadow:
+    0 2px 16px rgba(255, 103, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
+  border: 1.5px solid var(--glass-border, rgba(255, 255, 255, 0.18));
   padding: 24px 16px;
   display: flex;
   flex-direction: column;
@@ -323,13 +356,36 @@ function navigateTo(route: string): void {
   min-height: 170px;
 
   /* 活卡片呼吸动画 (2s 周期) */
-  animation: palace-breathe 2s ease-in-out infinite;
+  animation: palace-breathe 2s ease-in-out infinite, palace-reveal 0.6s var(--spring-bounce, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
 
   transition:
-    transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-    box-shadow 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94),
-    border-color 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+    transform var(--duration-normal, 350ms) var(--spring-bounce, cubic-bezier(0.34, 1.56, 0.64, 1)),
+    box-shadow var(--duration-normal, 350ms) var(--ease-out, cubic-bezier(0.25, 0.46, 0.45, 0.94)),
+    border-color var(--duration-normal, 350ms) var(--ease-out, cubic-bezier(0.25, 0.46, 0.45, 0.94));
 }
+
+/* ── Staggered Reveal 入场动画（通过 --cell-pos 控制延迟） ── */
+@keyframes palace-reveal {
+  from {
+    opacity: 0;
+    transform: translateY(24px) scale(0.92);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* 用 nth-child 设置 stagger 延迟 */
+.bagua-palace:nth-child(1) { animation-delay: 0ms, 0ms; }
+.bagua-palace:nth-child(2) { animation-delay: 0ms, 60ms; }
+.bagua-palace:nth-child(3) { animation-delay: 0ms, 120ms; }
+.bagua-palace:nth-child(4) { animation-delay: 0ms, 180ms; }
+.bagua-palace:nth-child(5) { animation-delay: 0ms, 240ms; }
+.bagua-palace:nth-child(6) { animation-delay: 0ms, 300ms; }
+.bagua-palace:nth-child(7) { animation-delay: 0ms, 360ms; }
+.bagua-palace:nth-child(8) { animation-delay: 0ms, 420ms; }
+.bagua-palace:nth-child(9) { animation-delay: 0ms, 480ms; }
 
 /* ── 活卡片呼吸动画（opacity 0.85-1.0, 2s） ── */
 @keyframes palace-breathe {
@@ -337,11 +393,22 @@ function navigateTo(route: string): void {
   50% { opacity: 1; transform: scale(1.008); }
 }
 
-/* ── Hover 磁性上浮 ── */
+/* ── Hover：磁性上浮 + 八卦纹理背景 ── */
 .bagua-palace:hover {
   transform: translateY(-4px);
-  box-shadow: 0 6px 28px rgba(255, 103, 0, 0.1);
-  border-color: rgba(255, 103, 0, 0.15);
+  box-shadow:
+    0 8px 32px rgba(255, 103, 0, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  border-color: rgba(255, 103, 0, 0.2);
+  background:
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 8px,
+      rgba(255, 103, 0, 0.015) 8px,
+      rgba(255, 103, 0, 0.015) 16px
+    ),
+    var(--glass-bg-heavy, rgba(255, 255, 255, 0.85));
 }
 
 .bagua-palace:active {
@@ -351,7 +418,7 @@ function navigateTo(route: string): void {
 
 /* ── 活跃状态（暖橙呼吸光晕 2s） ── */
 .bagua-palace--active {
-  animation: palace-glow 2s ease-in-out infinite;
+  animation: palace-glow 2s ease-in-out infinite, palace-reveal 0.6s var(--spring-bounce, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
   border-color: rgba(255, 103, 0, 0.2);
 }
 
@@ -370,7 +437,7 @@ function navigateTo(route: string): void {
 
 .bagua-palace--error {
   border-color: rgba(255, 59, 48, 0.2);
-  animation: palace-glow 1.5s ease-in-out infinite;
+  animation: palace-glow 1.5s ease-in-out infinite, palace-reveal 0.6s var(--spring-bounce, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
 }
 
 /* ── 状态指示灯 ── */
@@ -415,7 +482,7 @@ function navigateTo(route: string): void {
   50% { opacity: 0.4; }
 }
 
-/* ── 左侧卦色装饰线 ── */
+/* ── 左侧卦色装饰线 → 渐变流光效果 ── */
 .bagua-palace__accent {
   position: absolute;
   left: 0;
@@ -424,12 +491,26 @@ function navigateTo(route: string): void {
   width: 4px;
   height: 36px;
   border-radius: 0 2px 2px 0;
-  background: var(--cell-color, #CCCCCC); /* 阳模式禁用文字色 */
-  transition: height 0.35s ease;
+  background: linear-gradient(
+    180deg,
+    transparent 0%,
+    var(--cell-color, #CCCCCC) 30%,
+    rgba(255, 255, 255, 0.6) 50%,
+    var(--cell-color, #CCCCCC) 70%,
+    transparent 100%
+  );
+  background-size: 100% 200%;
+  animation: accent-glow 3s ease-in-out infinite;
+  transition: height var(--duration-normal, 350ms) var(--spring-bounce, cubic-bezier(0.34, 1.56, 0.64, 1));
 }
 
 .bagua-palace:hover .bagua-palace__accent {
   height: 48px;
+}
+
+@keyframes accent-glow {
+  0%, 100% { background-position: 0% 0%; }
+  50% { background-position: 0% 100%; }
 }
 
 /* ── 卦符号 ── */
@@ -438,7 +519,7 @@ function navigateTo(route: string): void {
   font-weight: 600;
   line-height: 1;
   color: var(--fuxi-text, #333333);
-  transition: transform 0.35s ease;
+  transition: transform var(--duration-normal, 350ms) var(--spring-bounce, cubic-bezier(0.34, 1.56, 0.64, 1));
 }
 
 .bagua-palace:hover .bagua-palace__symbol {
@@ -451,6 +532,14 @@ function navigateTo(route: string): void {
   font-weight: 700;
   color: var(--fuxi-text, #333333);
   letter-spacing: 0.06em;
+}
+
+/* ── 方位 & 五行 ── */
+.bagua-palace__wuxing {
+  font-size: 11px;
+  color: var(--fuxi-primary, #ff6700);
+  letter-spacing: 0.06em;
+  font-weight: 500;
 }
 
 /* ── 器官名（副标题） ── */
@@ -509,13 +598,28 @@ function navigateTo(route: string): void {
   background: linear-gradient(135deg, #ff6700, #e55a2b);
   color: #fff;
   border: none;
-  box-shadow: 0 4px 20px rgba(255, 103, 0, 0.25);
-  animation: none;
+  box-shadow:
+    0 4px 20px rgba(255, 103, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  animation: palace-reveal 0.6s var(--spring-bounce, cubic-bezier(0.34, 1.56, 0.64, 1)) both;
+  animation-delay: 240ms;
+  backdrop-filter: none;
 }
 
 .bagua-palace--center:hover {
   transform: translateY(-6px);
-  box-shadow: 0 8px 32px rgba(255, 103, 0, 0.35);
+  box-shadow:
+    0 12px 40px rgba(255, 103, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  background:
+    repeating-linear-gradient(
+      45deg,
+      transparent,
+      transparent 8px,
+      rgba(255, 255, 255, 0.04) 8px,
+      rgba(255, 255, 255, 0.04) 16px
+    ),
+    linear-gradient(135deg, #ff6700, #e55a2b);
 }
 
 .bagua-palace__center-inner {
@@ -535,6 +639,9 @@ function navigateTo(route: string): void {
   line-height: 1;
   animation: taiji-center-spin 8s linear infinite;
   display: inline-block;
+  text-shadow:
+    0 0 16px rgba(255, 255, 255, 0.4),
+    0 0 32px rgba(255, 255, 255, 0.2);
 }
 
 @keyframes taiji-center-spin {
@@ -561,6 +668,7 @@ function navigateTo(route: string): void {
   padding: 8px 16px;
   background: rgba(255, 255, 255, 0.15);
   border-radius: 8px;
+  backdrop-filter: blur(8px);
 }
 
 .center-stat {
@@ -598,16 +706,27 @@ function navigateTo(route: string): void {
 }
 
 /* ═══════════════════════════════════════════
-   底部提示
+   底部提示（毛玻璃标签）
    ═══════════════════════════════════════════ */
 .home-footer {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 8px;
   margin-top: 40px;
   font-size: 12px;
   color: var(--fuxi-text-tertiary, #cccccc);
+  padding: 10px 20px;
+  background: var(--glass-bg, rgba(255, 255, 255, 0.72));
+  backdrop-filter: blur(var(--glass-blur, 20px));
+  -webkit-backdrop-filter: blur(var(--glass-blur, 20px));
+  border: 1px solid var(--glass-border, rgba(255, 255, 255, 0.18));
+  border-radius: var(--radius-xl, 24px);
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.04);
+  margin-left: auto;
+  margin-right: auto;
+  width: fit-content;
+  display: flex;
 }
 
 .home-footer__dot {

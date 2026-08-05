@@ -20,7 +20,7 @@ async def integrated_search(query: str, top_k: int = 10) -> Dict:
     
     # 1. 文档混合检索
     try:
-        from src.services.retrieval import hybrid_search
+        from src.infra import hybrid_search
         from src.db.data_store import load_chunks
         _chunks = await asyncio.to_thread(load_chunks)
         doc_results = await hybrid_search(query, _chunks, top_k=top_k)
@@ -31,7 +31,7 @@ async def integrated_search(query: str, top_k: int = 10) -> Dict:
     
     # 2. 知识图谱
     try:
-        from src.services.graph_router import get_entity_context
+        from src.infra import get_entity_context
         graph_ctx = get_entity_context(query)
         results["graph"] = {"context": graph_ctx} if graph_ctx else {}
     except Exception as e:  # TODO: Narrow exception type
@@ -40,7 +40,7 @@ async def integrated_search(query: str, top_k: int = 10) -> Dict:
     
     # 3. Wiki 召回
     try:
-        from src.services.wiki import get_wiki_engine
+        from src.infra import get_wiki_engine
         we = get_wiki_engine()
         wiki_results = we.search_content(query, limit=3)
         results["wiki"] = wiki_results

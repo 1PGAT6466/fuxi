@@ -7,11 +7,11 @@
   <div class="v2-main-layout" :data-theme="isDark ? 'yin' : 'yang'">
     <!-- ========== 离线横幅 ========== -->
     <Transition name="banner-slide">
-      <div v-if="!isOnline" class="offline-banner">
+      <div v-if="!isOnline && offlineState" class="offline-banner">
         <el-icon :size="16"><WarningFilled /></el-icon>
         <span>网络连接已断开，部分功能不可用</span>
-        <span v-if="offlineState.pendingCount > 0" class="offline-banner-pending">
-          ({{ offlineState.pendingCount }} 项待同步)
+        <span v-if="(offlineState?.pendingCount ?? 0) > 0" class="offline-banner-pending">
+          ({{ offlineState?.pendingCount ?? 0 }} 项待同步)
         </span>
       </div>
     </Transition>
@@ -262,6 +262,7 @@ import MiniBaguaCompass from '@/components/bagua/MiniBaguaCompass.vue';
 import FuxiLing from '@/components/search/FuxiLing.vue';
 import ShortcutHelp from '@/components/common/ShortcutHelp.vue';
 import NotificationCenter from '@/services/notification-center/NotificationCenter.vue';
+import { useNotificationStore } from '@/services/notification-center/store';
 import LayoutManager from '@/services/layout-store/LayoutManager.vue';
 import { useLayoutIntegration } from '@/composables/useLayoutIntegration';
 import type { WindowSnapshot } from '@/types/layout';
@@ -275,11 +276,20 @@ const router = useRouter();
 const authStore = useAuthStore();
 const windowManager = useWindowManager();
 const offlineStore = useOfflineStore();
+const notificationStore = useNotificationStore();
 const { isDark, toggleTheme } = useTheme();
 const { isOnline } = useNetwork();
 
-// 离线状态
-const offlineState = computed(() => offlineStore.state);
+// 离线状态（安全访问，防止 OfflineService 未初始化）
+const offlineState = computed(() => {
+  const s = offlineStore?.state || {};
+  return {
+    connectionStatus: s?.connectionStatus ?? 'online',
+    syncStatus: s?.syncStatus ?? 'idle',
+    pendingCount: s?.pendingCount ?? 0,
+    queueLength: s?.queueLength ?? 0
+  };
+});
 
 // ============================
 // Phase 1: 伏羲令 & 快捷键
@@ -336,7 +346,8 @@ function handleTaijiToggle(): void {
 // ============================
 
 const sidebarCollapsed = ref(false);
-const notificationCount = ref(3);
+// P1-修复: 使用通知 store 的未读计数，而非硬编码值
+const notificationCount = computed(() => notificationStore.unreadCount);
 
 function handleOpenNotificationCenter(): void {
   showNotificationCenter.value = true;
@@ -501,6 +512,9 @@ onMounted(async () => {
     { id: '/workspace/chat', title: 'AI 对话', icon: ChatDotRound, pinned: true, route: '/workspace/chat' },
     { id: '/knowledge', title: '知识库', icon: Document, route: '/knowledge' },
   ];
+
+  // P1-修复: 初始化通知 store，加载未读通知计数
+  notificationStore.init().catch(() => {});
 
   // P3: 自动恢复上次会话的窗口布局
   await autoRestoreLastSession();

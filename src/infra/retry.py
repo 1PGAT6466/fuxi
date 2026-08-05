@@ -2,10 +2,11 @@
 retry.py — 重试机制
 指数退避 + 条件重试 + jitter（防雷鸣羊群效应）
 """
+
 import asyncio
 import logging
 import random
-from typing import Callable, Any, Optional
+from typing import Any, Callable, Optional
 
 logger = logging.getLogger("infra.retry")
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
@@ -51,6 +52,7 @@ def retry_sync(
 ) -> Any:
     """同步重试装饰器"""
     import time
+
     last_exception = None
     current_delay = delay
 

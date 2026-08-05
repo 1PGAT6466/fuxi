@@ -580,7 +580,7 @@ class QueryPlanner:
             if l2_results:
                 try:
                     relations = await auto_build_relations(query=query, chunks=l2_results[:10], categories=categories)
-                except Exception:
+                except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
                     logger.debug("[QueryPlanner] 关系构建跳过")
 
             graph_augmented = _augment_with_graph(l2_results, categories, relations)

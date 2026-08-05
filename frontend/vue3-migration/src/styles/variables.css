@@ -1,7 +1,7 @@
 /* ============================================
-   伏羲 v2.1 — CSS 变量完整体系
-   小米简约风 · 八卦色系 · 阴阳双模式
-   Phase 1 视觉规范更新
+   伏羲 v2.2 — CSS 变量完整体系
+   东方科技感 · 八卦色系 · 阴阳双模式
+   Phase 2 美学升级：色彩深度 · 玻璃态 · 弹性动画
    ============================================ */
 
 :root {
@@ -20,44 +20,106 @@
   --text-inverse: #ffffff;
   --text-link: #ff6700;
 
-  /* ───────── 品牌 ───────── */
+  /* ───────── 品牌（深度梯度） ───────── */
   --brand: #ff6700;
   --brand-soft: #fff3e8;
+  --brand-light: #ff8a33;
+  --brand-deep: #cc5200;
+  --brand-darkest: #993d00;
   --brand-gradient: linear-gradient(135deg, #ff6700, #e55a2b);
+  --brand-gradient-vivid: linear-gradient(135deg, #ff7a1a, #e55a2b, #cc4400);
 
-  /* ───────── Phase 1: 八卦标识色（新版视觉规范） ───────── */
-  --qian-color: #F0C040;       /* 乾金 */
+  /* ───────── Phase 2: 八卦标识色（4级梯度 + 渐变） ───────── */
+
+  /* ── 乾金 ── */
+  --qian-color-50: #FFF9E6;
+  --qian-color-100: #FFF3CC;
+  --qian-color-300: #F5D76E;
+  --qian-color: #F0C040;
+  --qian-color-600: #D4A520;
+  --qian-color-700: #A8840A;
   --qian-color-light: #FFFDE7;
   --qian-color-glow: rgba(240, 192, 64, 0.2);
+  --qian-gradient: linear-gradient(135deg, #FFF3CC, #F0C040, #D4A520);
 
-  --kun-color: #C8A96E;        /* 坤土 */
+  /* ── 坤土 ── */
+  --kun-color-50: #FFF8ED;
+  --kun-color-100: #F0E4CC;
+  --kun-color-300: #D4B880;
+  --kun-color: #C8A96E;
+  --kun-color-600: #A88B50;
+  --kun-color-700: #806A38;
   --kun-color-light: #FFF8E1;
   --kun-color-glow: rgba(200, 169, 110, 0.15);
+  --kun-gradient: linear-gradient(135deg, #F0E4CC, #C8A96E, #806A38);
 
-  --zhen-color: #4CAF50;       /* 震青 */
+  /* ── 震青 ── */
+  --zhen-color-50: #E8F9EB;
+  --zhen-color-100: #C8E6CB;
+  --zhen-color-300: #6ECB73;
+  --zhen-color: #4CAF50;
+  --zhen-color-600: #388E3C;
+  --zhen-color-700: #256427;
   --zhen-color-light: #E8F5E9;
   --zhen-color-glow: rgba(76, 175, 80, 0.15);
+  --zhen-gradient: linear-gradient(135deg, #C8E6CB, #4CAF50, #256427);
 
-  --xun-color: #81C784;        /* 巽绿 */
+  /* ── 巽绿 ── */
+  --xun-color-50: #EBFAEC;
+  --xun-color-100: #CCF0CE;
+  --xun-color-300: #A5DBA8;
+  --xun-color: #81C784;
+  --xun-color-600: #5FA862;
+  --xun-color-700: #3D7A3F;
   --xun-color-light: #E8F5E9;
   --xun-color-glow: rgba(129, 199, 132, 0.15);
+  --xun-gradient: linear-gradient(135deg, #CCF0CE, #81C784, #3D7A3F);
 
-  --kan-color: #424242;        /* 坎黑 */
+  /* ── 坎黑 ── */
+  --kan-color-50: #F0F0F0;
+  --kan-color-100: #D0D0D0;
+  --kan-color-300: #666666;
+  --kan-color: #424242;
+  --kan-color-600: #2E2E2E;
+  --kan-color-700: #1A1A1A;
   --kan-color-light: #EEEEEE;
   --kan-color-glow: rgba(66, 66, 66, 0.15);
+  --kan-gradient: linear-gradient(135deg, #D0D0D0, #424242, #1A1A1A);
 
-  --li-color: #E53935;         /* 离红 */
+  /* ── 离红 ── */
+  --li-color-50: #FFF0EF;
+  --li-color-100: #FFD5D2;
+  --li-color-300: #EF6B68;
+  --li-color: #E53935;
+  --li-color-600: #C62828;
+  --li-color-700: #961E1E;
   --li-color-light: #FFEBEE;
   --li-color-glow: rgba(229, 57, 53, 0.15);
+  --li-gradient: linear-gradient(135deg, #FFD5D2, #E53935, #961E1E);
 
-  --gen-color: #8D6E63;        /* 艮棕 */
+  /* ── 艮棕 ── */
+  --gen-color-50: #F5EFED;
+  --gen-color-100: #D7CBC5;
+  --gen-color-300: #A08A80;
+  --gen-color: #8D6E63;
+  --gen-color-600: #6D544A;
+  --gen-color-700: #4D3A32;
   --gen-color-light: #EFEBE9;
   --gen-color-glow: rgba(141, 110, 99, 0.15);
+  --gen-gradient: linear-gradient(135deg, #D7CBC5, #8D6E63, #4D3A32);
 
-  --dui-color: #FAFAFA;        /* 兑白 */
+  /* ── 兑白 ── */
+  --dui-color-50: #FFFFFF;
+  --dui-color-100: #F5F5F5;
+  --dui-color-300: #E0E0E0;
+  --dui-color: #FAFAFA;
+  --dui-color-600: #C0C0C0;
+  --dui-color-700: #909090;
   --dui-color-light: #FAFAFA;
   --dui-color-glow: rgba(200, 200, 200, 0.2);
+  --dui-gradient: linear-gradient(135deg, #FFFFFF, #FAFAFA, #E0E0E0);
 
+  /* ── 中宫 ── */
   --zhonggong-color: #ff6700;
   --zhonggong-color-light: #fff3e8;
   --zhonggong-gradient: linear-gradient(135deg, #ff6700, #e55a2b);
@@ -71,6 +133,18 @@
   --status-error-bg: rgba(255, 59, 48, 0.12);
   --status-offline: #d1d1d6;
   --status-offline-bg: rgba(209, 209, 214, 0.12);
+
+  /* ───────── 语义化渐变 ───────── */
+  --gradient-success: linear-gradient(135deg, #34c759, #28a745);
+  --gradient-warning: linear-gradient(135deg, #ff9500, #e68a00);
+  --gradient-error: linear-gradient(135deg, #ff3b30, #d32f2f);
+
+  /* ───────── 玻璃态效果 ───────── */
+  --glass-bg: rgba(255, 255, 255, 0.72);
+  --glass-bg-heavy: rgba(255, 255, 255, 0.85);
+  --glass-border: rgba(255, 255, 255, 0.18);
+  --glass-blur: 20px;
+  --glass-blur-heavy: 32px;
 
   /* ───────── 圆角 ───────── */
   --radius-sm: 8px;
@@ -96,9 +170,11 @@
   --space-xl: 32px;
   --space-2xl: 48px;
 
-  /* ───────── 动效 ───────── */
+  /* ───────── 动效（弹性曲线 + 原有缓动） ───────── */
   --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
   --ease-in-out: cubic-bezier(0.42, 0, 0.58, 1);
+  --spring-bounce: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --spring-smooth: cubic-bezier(0.22, 0.68, 0, 1.71);
   --duration-fast: 200ms;
   --duration-normal: 350ms;
   --duration-slow: 600ms;
@@ -152,7 +228,7 @@
   --fuxi-error: #ff3b30;
   --fuxi-error-bg: rgba(255, 59, 48, 0.08);
 
-  /* ─── 语义化圆角（阴模式） ─── */
+  /* ─── 语义化圆角（阳模式） ─── */
   --radius-card: 12px;
   --radius-input: 8px;
   --radius-tag: 4px;
@@ -182,10 +258,17 @@
   --fuxi-error: #ff453a;
   --fuxi-error-bg: rgba(255, 69, 58, 0.12);
 
-  /* ─── 语义化圆角（暗色yin模式） ─── */
+  /* ─── 语义化圆角（阴模式） ─── */
   --radius-card: 12px;
   --radius-input: 8px;
   --radius-tag: 4px;
+
+  /* ─── 玻璃态（阴模式 — 暗色） ─── */
+  --glass-bg: rgba(37, 37, 66, 0.72);
+  --glass-bg-heavy: rgba(37, 37, 66, 0.88);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur: 20px;
+  --glass-blur-heavy: 32px;
 }
 
 /* ============================================
@@ -207,23 +290,73 @@
 
   --brand: #ff8533;
   --brand-soft: rgba(255, 103, 0, 0.12);
+  --brand-light: #ff9a55;
+  --brand-deep: #e05e20;
+  --brand-darkest: #b34a18;
 
   /* 八卦色暗色下提亮 */
+  --qian-color-50: rgba(240, 192, 64, 0.04);
+  --qian-color-100: rgba(240, 192, 64, 0.10);
+  --qian-color-300: #E8C860;
   --qian-color: #F5D060;
+  --qian-color-600: #D4B040;
+  --qian-color-700: #B09020;
   --qian-color-light: rgba(240, 192, 64, 0.08);
+
+  --kun-color-50: rgba(200, 169, 110, 0.04);
+  --kun-color-100: rgba(200, 169, 110, 0.10);
+  --kun-color-300: #CEBC90;
   --kun-color: #D4B880;
+  --kun-color-600: #B09860;
+  --kun-color-700: #8C7848;
   --kun-color-light: rgba(200, 169, 110, 0.08);
+
+  --zhen-color-50: rgba(76, 175, 80, 0.04);
+  --zhen-color-100: rgba(76, 175, 80, 0.10);
+  --zhen-color-300: #58B85C;
   --zhen-color: #5CBF60;
+  --zhen-color-600: #44A048;
+  --zhen-color-700: #2E7830;
   --zhen-color-light: rgba(76, 175, 80, 0.08);
+
+  --xun-color-50: rgba(129, 199, 132, 0.04);
+  --xun-color-100: rgba(129, 199, 132, 0.10);
+  --xun-color-300: #8CC88F;
   --xun-color: #95D498;
+  --xun-color-600: #70B873;
+  --xun-color-700: #4C8A4F;
   --xun-color-light: rgba(129, 199, 132, 0.08);
+
+  --kan-color-50: rgba(66, 66, 66, 0.04);
+  --kan-color-100: rgba(66, 66, 66, 0.10);
+  --kan-color-300: #4E4E4E;
   --kan-color: #5A5A5A;
+  --kan-color-600: #444444;
+  --kan-color-700: #303030;
   --kan-color-light: rgba(66, 66, 66, 0.08);
+
+  --li-color-50: rgba(229, 57, 53, 0.04);
+  --li-color-100: rgba(229, 57, 53, 0.10);
+  --li-color-300: #EA6A66;
   --li-color: #EF5350;
+  --li-color-600: #D32F2F;
+  --li-color-700: #A52424;
   --li-color-light: rgba(229, 57, 53, 0.08);
+
+  --gen-color-50: rgba(141, 110, 99, 0.04);
+  --gen-color-100: rgba(141, 110, 99, 0.10);
+  --gen-color-300: #9A8078;
   --gen-color: #A1887F;
+  --gen-color-600: #856E64;
+  --gen-color-700: #614E46;
   --gen-color-light: rgba(141, 110, 99, 0.08);
+
+  --dui-color-50: rgba(250, 250, 250, 0.04);
+  --dui-color-100: rgba(250, 250, 250, 0.08);
+  --dui-color-300: #E8E8E8;
   --dui-color: #FAFAFA;
+  --dui-color-600: #C8C8C8;
+  --dui-color-700: #989898;
   --dui-color-light: rgba(250, 250, 250, 0.08);
 
   --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.12);
@@ -237,6 +370,62 @@
   --radius-card: 12px;
   --radius-input: 8px;
   --radius-tag: 4px;
+
+  /* ─── 玻璃态（暗色 dark 模式） ─── */
+  --glass-bg: rgba(42, 42, 42, 0.72);
+  --glass-bg-heavy: rgba(42, 42, 42, 0.88);
+  --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-blur: 20px;
+  --glass-blur-heavy: 32px;
+}
+
+/* ============================================
+   全局按钮组件
+   ============================================ */
+
+/* ── 主按钮 ── */
+.btn-primary {
+  background: var(--brand-gradient);
+  color: white;
+  border: none;
+  border-radius: var(--radius-input);
+  padding: 10px 24px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+  box-shadow: 0 2px 8px rgba(255, 103, 0, 0.3);
+}
+
+.btn-primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(255, 103, 0, 0.4);
+}
+
+.btn-primary:active {
+  transform: translateY(0) scale(0.98);
+  box-shadow: 0 1px 4px rgba(255, 103, 0, 0.2);
+}
+
+/* ── 幽灵按钮 ── */
+.btn-ghost {
+  background: transparent;
+  border: 1.5px solid var(--fuxi-border);
+  color: var(--fuxi-text);
+  border-radius: var(--radius-input);
+  padding: 10px 24px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.btn-ghost:hover {
+  border-color: var(--fuxi-primary);
+  color: var(--fuxi-primary);
+  background: var(--fuxi-primary-light);
+}
+
+.btn-ghost:active {
+  transform: scale(0.97);
 }
 
 /* ============================================

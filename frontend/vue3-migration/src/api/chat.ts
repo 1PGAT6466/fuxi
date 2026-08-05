@@ -88,6 +88,35 @@ export async function sendMessageStream(
   });
 
   if (!response.ok) {
+    // v1.50 fix: 401 时尝试刷新 token 重试一次
+    if (response.status === 401 && token) {
+      const { default: TokenManagerRetry } = await import('@/utils/TokenManager');
+      const newToken = await TokenManagerRetry.refreshToken();
+      if (newToken) {
+        const retryResponse = await fetch('/api/chat/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Accept': 'text/event-stream',
+            Authorization: `Bearer ${newToken}`,
+          },
+          body: JSON.stringify(req),
+          signal,
+        });
+        if (retryResponse.ok) {
+          // 重试成功，继续处理
+          const retryContentType = retryResponse.headers.get('Content-Type') || '';
+          if (retryContentType.includes('text/event-stream')) {
+            await processSSEStream(retryResponse, onChunk, signal);
+          } else {
+            await processJSONFallback(retryResponse, onChunk, signal);
+          }
+          if (signal?.aborted) return;
+          onChunk({ type: 'done' });
+          return;
+        }
+      }
+    }
     throw new Error(`HTTP ${response.status}: ${response.statusText}`);
   }
 

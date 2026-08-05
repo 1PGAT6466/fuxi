@@ -96,11 +96,17 @@
       <!-- 左侧：服务列表 -->
       <div class="market-list-pane">
         <!-- 空状态 -->
-        <el-empty
-          v-if="!store.loading && displayServices.length === 0"
-          description="暂无服务"
-          :image-size="120"
-        />
+        <div v-if="!store.loading && displayServices.length === 0" class="market-empty">
+          <el-empty description="暂无可用服务" :image-size="120">
+            <template v-if="store.error" #description>
+              <p class="empty-error-text">{{ store.error }}</p>
+            </template>
+            <template #default>
+              <el-button type="primary" @click="onRefresh">刷新重试</el-button>
+              <p class="empty-hint">请检查后端服务是否正常运行</p>
+            </template>
+          </el-empty>
+        </div>
 
         <!-- 网格列表 -->
         <div v-else class="service-grid">
@@ -525,6 +531,25 @@ onMounted(() => {
 
 .market-loading {
   padding: 24px;
+}
+
+.market-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 400px;
+
+  .empty-error-text {
+    color: var(--el-color-danger, #f56c6c);
+    font-size: 13px;
+    margin-top: 4px;
+  }
+
+  .empty-hint {
+    color: var(--el-text-color-secondary, #909399);
+    font-size: 12px;
+    margin-top: 8px;
+  }
 }
 
 .market-error {

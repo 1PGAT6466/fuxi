@@ -2,12 +2,13 @@
 growth_recorder.py — 成长引擎 Phase 1 记录器
 只记录不调整，建立基线数据
 """
-import os
-import json
-import time
-import logging
-from typing import Dict, List
+
 import asyncio
+import json
+import logging
+import os
+import time
+from typing import Dict, List
 
 logger = logging.getLogger("growth.recorder")
 
@@ -19,10 +20,10 @@ class GrowthRecorder:
 
     def __init__(self):
         os.makedirs(GROWTH_DIR, exist_ok=True)
+
     # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
-    async def record(self, symbol: str, metric: str, value: float,
-                     context: Dict = None):
+    async def record(self, symbol: str, metric: str, value: float, context: Dict = None):
         """记录成长事件"""
         record = {
             "timestamp": time.time(),
@@ -34,16 +35,18 @@ class GrowthRecorder:
 
         log_file = os.path.join(GROWTH_DIR, f"{symbol}_quality.jsonl")
         try:
+
             def _write_log():
                 with open(log_file, "a", encoding="utf-8") as f:
                     f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
             await asyncio.to_thread(_write_log)
         except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Growth] 写入失败: {e}")
+
     # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
-    async def query(self, symbol: str, metric: str = None,
-                    since: str = None) -> List[Dict]:
+    async def query(self, symbol: str, metric: str = None, since: str = None) -> List[Dict]:
         """查询成长记录"""
         log_file = os.path.join(GROWTH_DIR, f"{symbol}_quality.jsonl")
 
@@ -71,6 +74,7 @@ class GrowthRecorder:
                         logger.warning("JSON解析成长记录失败: %s", e, exc_info=True)
                         continue
             return result
+
         records = await asyncio.to_thread(_read_log)
 
         return records
@@ -92,9 +96,9 @@ class GrowthRecordPoints:
     def __init__(self):
         self.recorder = GrowthRecorder()
 
-    async def record_shaoyang_extraction(self, file_hash: str, file_name: str,
-                                          chunk_count: int, event_count: int,
-                                          entity_count: int, duration_ms: float):
+    async def record_shaoyang_extraction(
+        self, file_hash: str, file_name: str, chunk_count: int, event_count: int, entity_count: int, duration_ms: float
+    ):
         """记录少阳提取"""
         success_rate = 1.0 if event_count > 0 else 0.0
         await self.recorder.record(
@@ -108,20 +112,17 @@ class GrowthRecordPoints:
                 "event_count": event_count,
                 "entity_count": entity_count,
                 "duration_ms": duration_ms,
-            }
+            },
         )
 
         entity_coverage = entity_count / max(chunk_count, 1)
         await self.recorder.record(
-            symbol="shaoyang",
-            metric="entity_coverage",
-            value=entity_coverage,
-            context={"file_hash": file_hash}
+            symbol="shaoyang", metric="entity_coverage", value=entity_coverage, context={"file_hash": file_hash}
         )
 
-    async def record_taiyang_search(self, query: str, trace_id: str,
-                                     search_mode: str, result_count: int,
-                                     max_score: float, duration_ms: float):
+    async def record_taiyang_search(
+        self, query: str, trace_id: str, search_mode: str, result_count: int, max_score: float, duration_ms: float
+    ):
         """记录太阳检索"""
         await self.recorder.record(
             symbol="taiyang",
@@ -133,20 +134,26 @@ class GrowthRecordPoints:
                 "search_mode": search_mode,
                 "max_score": max_score,
                 "duration_ms": duration_ms,
-            }
+            },
         )
 
         await self.recorder.record(
             symbol="taiyang",
             metric="search_latency_ms",
             value=duration_ms,
-            context={"query": query[:100], "search_mode": search_mode}
+            context={"query": query[:100], "search_mode": search_mode},
         )
 
-    async def record_shaoyin_decision(self, query: str, trace_id: str,
-                                       intent: str, strategy: str,
-                                       confidence: float, retry_count: int,
-                                       duration_ms: float):
+    async def record_shaoyin_decision(
+        self,
+        query: str,
+        trace_id: str,
+        intent: str,
+        strategy: str,
+        confidence: float,
+        retry_count: int,
+        duration_ms: float,
+    ):
         """记录少阴决策"""
         await self.recorder.record(
             symbol="shaoyin",
@@ -159,19 +166,19 @@ class GrowthRecordPoints:
                 "strategy": strategy,
                 "retry_count": retry_count,
                 "duration_ms": duration_ms,
-            }
+            },
         )
 
         await self.recorder.record(
             symbol="shaoyin",
             metric="retry_rate",
             value=1.0 if retry_count > 0 else 0.0,
-            context={"query": query[:100], "retry_count": retry_count}
+            context={"query": query[:100], "retry_count": retry_count},
         )
 
-    async def record_taiyin_request(self, trace_id: str, endpoint: str,
-                                     method: str, status_code: int,
-                                     duration_ms: float):
+    async def record_taiyin_request(
+        self, trace_id: str, endpoint: str, method: str, status_code: int, duration_ms: float
+    ):
         """记录太阴请求"""
         await self.recorder.record(
             symbol="taiyin",
@@ -183,7 +190,7 @@ class GrowthRecordPoints:
                 "method": method,
                 "status_code": status_code,
                 "duration_ms": duration_ms,
-            }
+            },
         )
 
         is_error = 1.0 if status_code >= 500 else 0.0
@@ -191,5 +198,5 @@ class GrowthRecordPoints:
             symbol="taiyin",
             metric="error_rate",
             value=is_error,
-            context={"endpoint": endpoint, "status_code": status_code}
+            context={"endpoint": endpoint, "status_code": status_code},
         )

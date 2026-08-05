@@ -1,12 +1,36 @@
-"""
+﻿"""
 伏羲 Fuxi 配置
 ===============
-统一配置入口，支持 .env 覆盖
+统一配置入口，支持 .env 覆盖。
+
+配置分组：
+  ─ 路径配置: BASE_DIR, DATA_DIR, UPLOAD_DIR, LOG_DIR 等
+  ─ 数据库: CHUNKS_DB_PATH, CHROMADB_DIR 等
+  ─ 网络配置: HOST, PORT, LOADER_URL, SOLR_URL 等
+  ─ 安全配置: JWT_SECRET, JWT_EXPIRY_HOURS, ADMIN_TOKEN 等
+  ─ LLM 配置: MIMO_API_KEY, MIMO_BASE_URL, MIMO_MODEL 等
+  ─ 缓存配置: CACHE_TTL, CACHE_MAX 等
+  ─ 检索配置: SAG_CONFIG, RERANK_URL 等
+  ─ 降级配置: DEGRADATION_CHAIN 等
+  ─ 敏感信息: SENSITIVE_PATTERNS
+  ─ Prompt 模板: PROMPTS
 """
+
 import os
 import re
 from pathlib import Path
 from typing import List
+
+from dotenv import load_dotenv
+
+# 加载 .env 文件
+env_path = Path(__file__).parent.parent / ".env"
+if env_path.exists():
+    load_dotenv(env_path)
+# 也尝试加载上级目录的 .env
+env_path_parent = Path(__file__).parent.parent.parent / ".env"
+if env_path_parent.exists():
+    load_dotenv(env_path_parent, override=False)
 
 # ============ 路径 ============
 _project_root = Path(__file__).parent.parent
@@ -50,24 +74,19 @@ for d in [DATA_DIR, UPLOAD_DIR, LOG_DIR, BACKUP_DIR, STATIC_DIR, CONFIG_HISTORY_
 (KB_IMAGES_DIR / "thumbs").mkdir(exist_ok=True)
 
 # ============ 网络 ============
-HOST = os.getenv("KB_HOST", "0.0.0.0")
+HOST = os.getenv("KB_HOST", "127.0.0.1")
 PORT = int(os.getenv("KB_PORT", "8080"))
 # 内嵌 embedder 模式，默认不连接外部 embedder 服务（避免端口 8081 冲突）
-EMBEDDER_URL = os.getenv("KB_EMBEDDER_URL", "")
+EMBEDDER_URL = os.getenv("KB_EMBEDDER_URL", "http://127.0.0.1:8081")
+EMBEDDER_MODEL = os.getenv("KB_MODEL", "BAAI/bge-small-zh-v1.5")
 RERANK_URL = os.getenv("KB_RERANK_PROXY", "")
 _default_cors = f"http://localhost:{PORT},http://127.0.0.1:{PORT},http://localhost:3000,http://127.0.0.1:3000"
 _raw_cors = os.getenv("KB_CORS_ORIGINS", _default_cors).split(",")
 # v1.50 R5: 拒绝通配符 *，防止 CORS 保护完全绕过
-CORS_ORIGINS: List[str] = [
-    o.strip() for o in _raw_cors
-    if o.strip() and o.strip() != "*"
-]
+CORS_ORIGINS: List[str] = [o.strip() for o in _raw_cors if o.strip() and o.strip() != "*"]
 if "*" in [o.strip() for o in _raw_cors]:
     logger = logging.getLogger(__name__)
-    logger.warning(
-        "[Config] KB_CORS_ORIGINS 包含通配符 '*', 已拒绝。"
-        "生产环境请明确配置允许的域名。"
-    )
+    logger.warning("[Config] KB_CORS_ORIGINS 包含通配符 '*', 已拒绝。" "生产环境请明确配置允许的域名。")
 if not CORS_ORIGINS:
     CORS_ORIGINS = [f"http://localhost:{PORT}"]
 
@@ -75,15 +94,17 @@ if not CORS_ORIGINS:
 # JWT 配置 (安全相关)
 # v1.44 第2轮修复：未设置环境变量时自动生成随机密钥，保留环境变量覆盖
 import secrets as _secrets
+
 _JWT_SECRET_FROM_ENV = os.getenv("FUXI_JWT_SECRET")
 if not _JWT_SECRET_FROM_ENV:
     _JWT_SECRET_FROM_ENV = _secrets.token_hex(32)
     import warnings
+
     warnings.warn(
         "[Config] FUXI_JWT_SECRET 未设置，已自动生成随机密钥。"
         "服务重启后所有已有 Token 将失效。"
         "生产环境请设置环境变量 FUXI_JWT_SECRET。",
-        RuntimeWarning
+        RuntimeWarning,
     )
 JWT_SECRET = _JWT_SECRET_FROM_ENV
 
@@ -99,12 +120,11 @@ _WEAK_SECRETS = {
 }
 if JWT_SECRET in _WEAK_SECRETS:
     import warnings
+
     _JWT_SECRET_FROM_ENV = _secrets.token_hex(32)
     JWT_SECRET = _JWT_SECRET_FROM_ENV
     warnings.warn(
-        "[Config] 检测到弱 JWT 密钥，已自动替换为随机密钥。"
-        "生产环境请设置 FUXI_JWT_SECRET 环境变量。",
-        RuntimeWarning
+        "[Config] 检测到弱 JWT 密钥，已自动替换为随机密钥。" "生产环境请设置 FUXI_JWT_SECRET 环境变量。", RuntimeWarning
     )
 
 JWT_EXPIRY_HOURS = int(os.getenv("JWT_EXPIRY_HOURS", "24"))
@@ -115,14 +135,16 @@ UPLOAD_MAX_MB = MAX_FILE_MB
 LOADER_URL = os.getenv("LOADER_URL", "http://localhost:8090")
 AI_TIMEOUT_SECONDS = int(os.getenv("KB_AI_TIMEOUT", "30"))
 
+# ============ Tavily 联网搜索 API 配置 ============
+TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
+
 # ============ MiMo API 配置 ============
 MIMO_API_KEY = os.getenv("MIMO_API_KEY", "")
 if not MIMO_API_KEY:
     import warnings
+
     warnings.warn(
-        "⚠️  MIMO_API_KEY 未设置！LLM 服务将不可用。"
-        "请在 .env 或系统环境变量中设置 MIMO_API_KEY。",
-        RuntimeWarning
+        "⚠️  MIMO_API_KEY 未设置！LLM 服务将不可用。" "请在 .env 或系统环境变量中设置 MIMO_API_KEY。", RuntimeWarning
     )
 MIMO_BASE_URL = os.getenv("MIMO_BASE_URL", "https://token-plan-cn.xiaomimimo.com/v1")
 MIMO_MODEL = os.getenv("MIMO_MODEL", "mimo-v2.5")
@@ -194,39 +216,181 @@ START_TIME = __import__("time").time()
 
 # ============ 工具与 FAQ 默认数据 ============
 TOOLS_DATA = [
-    {"id":"vpn","name":"VPN 连接","icon":"\U0001f510","category":"网络","url":"#vpn","desc":"远程接入公司内网","available":False},
-    {"id":"email","name":"企业邮箱","icon":"\U0001f4e7","category":"办公","url":"#email","desc":"伏羲企业邮箱入口","available":False},
-    {"id":"oa","name":"OA 系统","icon":"\U0001f3e2","category":"办公","url":"#oa","desc":"审批、考勤、公告","available":False},
-    {"id":"nps","name":"NPS 认证","icon":"\U0001f6e1\ufe0f","category":"网络","url":"#nps","desc":"802.1X 网络准入认证","available":False},
-    {"id":"fileshare","name":"文件共享","icon":"\U0001f4c1","category":"办公","url":"#fileshare","desc":"部门共享文件夹","available":False},
-    {"id":"printer","name":"网络打印","icon":"\U0001f5a8\ufe0f","category":"办公","url":"#printer","desc":"打印机驱动与配置","available":False},
-    {"id":"phone","name":"通讯录","icon":"\U0001f4de","category":"办公","url":"#phone","desc":"全员通讯录查询","available":False},
-    {"id":"ithelp","name":"IT 工单","icon":"\U0001f3ab","category":"IT","url":"#ithelp","desc":"报修 / 账号申请","available":False},
-    {"id":"wiki","name":"IT 知识库","icon":"\U0001f4da","category":"IT","url":"#wiki","desc":"拓扑图、配置手册","available":False},
-    {"id":"hr","name":"人事系统","icon":"\U0001f464","category":"HR","url":"#hr","desc":"薪资查询、假期","available":False},
-    {"id":"erp","name":"ERP 系统","icon":"\U0001f4ca","category":"生产","url":"#erp","desc":"采购、库存、生产","available":False},
-    {"id":"monitor","name":"网络监控","icon":"\U0001f4e1","category":"网络","url":"#monitor","desc":"设备状态、流量","available":False},
+    {
+        "id": "vpn",
+        "name": "VPN 连接",
+        "icon": "\U0001f510",
+        "category": "网络",
+        "url": "#vpn",
+        "desc": "远程接入公司内网",
+        "available": False,
+    },
+    {
+        "id": "email",
+        "name": "企业邮箱",
+        "icon": "\U0001f4e7",
+        "category": "办公",
+        "url": "#email",
+        "desc": "伏羲企业邮箱入口",
+        "available": False,
+    },
+    {
+        "id": "oa",
+        "name": "OA 系统",
+        "icon": "\U0001f3e2",
+        "category": "办公",
+        "url": "#oa",
+        "desc": "审批、考勤、公告",
+        "available": False,
+    },
+    {
+        "id": "nps",
+        "name": "NPS 认证",
+        "icon": "\U0001f6e1\ufe0f",
+        "category": "网络",
+        "url": "#nps",
+        "desc": "802.1X 网络准入认证",
+        "available": False,
+    },
+    {
+        "id": "fileshare",
+        "name": "文件共享",
+        "icon": "\U0001f4c1",
+        "category": "办公",
+        "url": "#fileshare",
+        "desc": "部门共享文件夹",
+        "available": False,
+    },
+    {
+        "id": "printer",
+        "name": "网络打印",
+        "icon": "\U0001f5a8\ufe0f",
+        "category": "办公",
+        "url": "#printer",
+        "desc": "打印机驱动与配置",
+        "available": False,
+    },
+    {
+        "id": "phone",
+        "name": "通讯录",
+        "icon": "\U0001f4de",
+        "category": "办公",
+        "url": "#phone",
+        "desc": "全员通讯录查询",
+        "available": False,
+    },
+    {
+        "id": "ithelp",
+        "name": "IT 工单",
+        "icon": "\U0001f3ab",
+        "category": "IT",
+        "url": "#ithelp",
+        "desc": "报修 / 账号申请",
+        "available": False,
+    },
+    {
+        "id": "wiki",
+        "name": "IT 知识库",
+        "icon": "\U0001f4da",
+        "category": "IT",
+        "url": "#wiki",
+        "desc": "拓扑图、配置手册",
+        "available": False,
+    },
+    {
+        "id": "hr",
+        "name": "人事系统",
+        "icon": "\U0001f464",
+        "category": "HR",
+        "url": "#hr",
+        "desc": "薪资查询、假期",
+        "available": False,
+    },
+    {
+        "id": "erp",
+        "name": "ERP 系统",
+        "icon": "\U0001f4ca",
+        "category": "生产",
+        "url": "#erp",
+        "desc": "采购、库存、生产",
+        "available": False,
+    },
+    {
+        "id": "monitor",
+        "name": "网络监控",
+        "icon": "\U0001f4e1",
+        "category": "网络",
+        "url": "#monitor",
+        "desc": "设备状态、流量",
+        "available": False,
+    },
 ]
 FAQ_DATA = []
 
 # ============ 文件白名单 ============
 ALLOWED_EXTENSIONS = {
-    ".txt", ".md", ".csv", ".docx", ".doc", ".xlsx", ".xls",
-    ".pdf", ".pptx", ".ppt",
-    ".cfg", ".log", ".ini", ".conf", ".json", ".xml", ".html", ".htm",
-    ".zip", ".wps", ".dwg", ".dxf", ".stp", ".step", ".igs", ".iges",
-    ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".svg",
-    ".py", ".js", ".ts", ".java", ".c", ".cpp", ".h",
-    ".yaml", ".yml",
-    ".7z", ".rar", ".tar", ".gz",
+    ".txt",
+    ".md",
+    ".csv",
+    ".docx",
+    ".doc",
+    ".xlsx",
+    ".xls",
+    ".pdf",
+    ".pptx",
+    ".ppt",
+    ".cfg",
+    ".log",
+    ".ini",
+    ".conf",
+    ".json",
+    ".xml",
+    ".html",
+    ".htm",
+    ".zip",
+    ".wps",
+    ".dwg",
+    ".dxf",
+    ".stp",
+    ".step",
+    ".igs",
+    ".iges",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".bmp",
+    ".svg",
+    ".py",
+    ".js",
+    ".ts",
+    ".java",
+    ".c",
+    ".cpp",
+    ".h",
+    ".yaml",
+    ".yml",
+    ".7z",
+    ".rar",
+    ".tar",
+    ".gz",
 }
 
 # ============ 敏感信息脱敏 ============
 SENSITIVE_PATTERNS: List[re.Pattern] = [
     re.compile(r"(password|passwd|pwd)\s*[:=]\s*\S+", re.I),
     re.compile(r"(secret|token|api[_-]?key)\s*[:=]\s*\S+", re.I),
+    # v1.50 安全修复: 增强身份证号匹配（15位+18位）
     re.compile(r"\b\d{6}(19|20)\d{2}(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}[\dxX]\b"),
+    re.compile(r"\b\d{6}(\d{2})(0[1-9]|1[0-2])(0[1-9]|[12]\d|3[01])\d{3}\b"),  # 15位身份证
+    # v1.50 安全修复: 手机号覆盖全号段（含14/16/17/19）
     re.compile(r"\b1[3-9]\d{9}\b"),
+    # v1.50 安全修复: 新增银行卡号（16-19位数字）
+    re.compile(r"\b\d{16,19}\b"),
+    # v1.50 安全修复: 新增邮箱地址
+    re.compile(r"\b[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}\b"),
+    # v1.50 安全修复: 新增 IP 地址
+    re.compile(r"\b(?:\d{1,3}\.){3}\d{1,3}\b"),
 ]
 
 
@@ -251,16 +415,13 @@ SAG_CONFIG = {
     "MAX_SEED_CHUNKS": int(os.getenv("SAG_MAX_SEED_CHUNKS", "200")),
     "PATH_A_TOP_K": int(os.getenv("SAG_PATH_A_TOP_K", "100")),
     "PATH_B_TOP_K": int(os.getenv("SAG_PATH_B_TOP_K", "100")),
-
     # 阶段 2: 多跳扩展
     "MAX_MULTI_HOP_EVENTS": int(os.getenv("SAG_MAX_MULTI_HOP_EVENTS", "50")),
     "MAX_EVENTS_TO_CHUNKS": int(os.getenv("SAG_MAX_EVENTS_TO_CHUNKS", "30")),
     "MULTI_HOP_DEPTH": int(os.getenv("SAG_MULTI_HOP_DEPTH", "1")),
-
     # 阶段 3: LLM 精排
     "COARSE_RANK_TOP": int(os.getenv("SAG_COARSE_RANK_TOP", "100")),
     "LLM_RERANK_TOP_K": int(os.getenv("SAG_LLM_RERANK_TOP_K", "15")),
-
     # 降级阈值
     "DEGRADE_CHUNK_MIN": int(os.getenv("SAG_DEGRADE_CHUNK_MIN", "3")),
     "SEARCH_TIMEOUT_MS": int(os.getenv("SAG_SEARCH_TIMEOUT_MS", "30000")),
@@ -299,12 +460,6 @@ SEED_SCORE_TEST_CONFIG = {
         },
     },
 }
-
-# ============ Tavily 联网搜索配置 ============
-TAVILY_API_KEY = os.getenv("TAVILY_API_KEY", "")
-# Tavily API Key 未配置时静默降级，不打印警告（服务可选）
-TAVILY_MAX_RESULTS = int(os.getenv("TAVILY_MAX_RESULTS", "5"))
-TAVILY_TIMEOUT = int(os.getenv("TAVILY_TIMEOUT", "10"))
 
 # ============ 影子模式配置 (Shadow Mode) ============
 # 通过环境变量 FUXI_SHADOW_ENABLED=true 启用

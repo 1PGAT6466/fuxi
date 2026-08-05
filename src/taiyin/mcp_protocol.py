@@ -2,10 +2,11 @@
 mcp_protocol.py — MCP协议深度集成
 支持MCP标准协议格式 + 工具发现 + 资源暴露
 """
+
 import json
 import logging
-from typing import Dict, Any, Callable
 from dataclasses import dataclass
+from typing import Any, Callable, Dict
 
 logger = logging.getLogger("taiyin.mcp_protocol")
 
@@ -13,6 +14,7 @@ logger = logging.getLogger("taiyin.mcp_protocol")
 @dataclass
 class MCPTool:
     """MCP工具定义"""
+
     name: str
     description: str
     input_schema: Dict
@@ -22,6 +24,7 @@ class MCPTool:
 @dataclass
 class MCPResource:
     """MCP资源定义"""
+
     uri: str
     name: str
     description: str
@@ -104,11 +107,13 @@ class MCPServer:
         """处理工具列表请求"""
         tools = []
         for name, tool in self.tools.items():
-            tools.append({
-                "name": tool.name,
-                "description": tool.description,
-                "inputSchema": tool.input_schema,
-            })
+            tools.append(
+                {
+                    "name": tool.name,
+                    "description": tool.description,
+                    "inputSchema": tool.input_schema,
+                }
+            )
 
         return {
             "jsonrpc": "2.0",
@@ -161,12 +166,14 @@ class MCPServer:
         """处理资源列表请求"""
         resources = []
         for uri, resource in self.resources.items():
-            resources.append({
-                "uri": resource.uri,
-                "name": resource.name,
-                "description": resource.description,
-                "mimeType": resource.mime_type,
-            })
+            resources.append(
+                {
+                    "uri": resource.uri,
+                    "name": resource.name,
+                    "description": resource.description,
+                    "mimeType": resource.mime_type,
+                }
+            )
 
         return {
             "jsonrpc": "2.0",
@@ -199,17 +206,20 @@ class MCPServer:
             },
         }
 
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def _read_resource(self, uri: str) -> Dict:
         """读取资源内容"""
         if uri == "fuxi://symbols/status":
             from src.taiyin.growth_api import get_symbols_status
+
             return get_symbols_status()
         elif uri == "fuxi://growth/overview":
             from src.taiyin.growth_api import get_growth_overview
+
             return get_growth_overview()
         elif uri == "fuxi://flags":
             from src.taiyin.flags import load_flags
+
             return {"flags": load_flags()}
         else:
             return {"error": f"Unknown resource: {uri}"}
@@ -243,112 +253,172 @@ def get_mcp_server() -> MCPServer:
 def _register_default_tools(server: MCPServer):
     """注册默认工具 — v1.50 Phase F: 24 工具 (原 4 + 新增 20)"""
     from src.taiyin.mcp_tools import (
-        sag_search, sag_ingest, sag_explain, sag_status,
-        kb_search, kb_list_documents, kb_get_document,
-        graph_query, graph_stats,
-        wiki_search, wiki_get,
-        dream_cycle_run, dream_cycle_report,
-        gap_analyze, entity_expand, cross_entity_synthesize,
-        file_upload, file_list,
-        chat_query, eval_run,
-        notifications_list, feature_flags_list,
-        health_check, audit_logs,
+        audit_logs,
+        chat_query,
+        cross_entity_synthesize,
+        dream_cycle_report,
+        dream_cycle_run,
+        entity_expand,
+        eval_run,
+        feature_flags_list,
+        file_list,
+        file_upload,
+        gap_analyze,
+        graph_query,
+        graph_stats,
+        health_check,
+        kb_get_document,
+        kb_list_documents,
+        kb_search,
+        notifications_list,
+        sag_explain,
+        sag_ingest,
+        sag_search,
+        sag_status,
+        wiki_get,
+        wiki_search,
     )
 
     # ── 原有 4 个 ──
-    _reg(server, "sag_search", "搜索伏羲知识库",
-         {"query": "s|搜索查询", "top_k": "i|返回结果数量|10"},
-         ["query"], sag_search)
+    _reg(
+        server,
+        "sag_search",
+        "搜索伏羲知识库",
+        {"query": "s|搜索查询", "top_k": "i|返回结果数量|10"},
+        ["query"],
+        sag_search,
+    )
 
-    _reg(server, "sag_ingest", "入库文档到伏羲知识库",
-         {"file_path": "s|文件路径", "category": "s|分类|"},
-         ["file_path"], sag_ingest)
+    _reg(
+        server,
+        "sag_ingest",
+        "入库文档到伏羲知识库",
+        {"file_path": "s|文件路径", "category": "s|分类|"},
+        ["file_path"],
+        sag_ingest,
+    )
 
-    _reg(server, "sag_explain", "解释查询结果",
-         {"query": "s|查询"},
-         ["query"], sag_explain)
+    _reg(server, "sag_explain", "解释查询结果", {"query": "s|查询"}, ["query"], sag_explain)
 
     _reg(server, "sag_status", "获取系统状态", {}, [], sag_status)
 
     # ── 新增 20 个 ──
-    _reg(server, "kb_search", "知识库语义搜索 — 向量相似度+全文搜索",
-         {"query": "s|搜索查询", "top_k": "i|返回结果数量|5",
-          "mode": "s|搜索模式(semantic/keyword/hybrid)|semantic"},
-         ["query"], kb_search)
+    _reg(
+        server,
+        "kb_search",
+        "知识库语义搜索 — 向量相似度+全文搜索",
+        {"query": "s|搜索查询", "top_k": "i|返回结果数量|5", "mode": "s|搜索模式(semantic/keyword/hybrid)|semantic"},
+        ["query"],
+        kb_search,
+    )
 
-    _reg(server, "kb_list_documents", "列出知识库文档",
-         {}, [], kb_list_documents)
+    _reg(server, "kb_list_documents", "列出知识库文档", {}, [], kb_list_documents)
 
-    _reg(server, "kb_get_document", "获取单个文档内容",
-         {"doc_id": "s|文档ID(file_hash)"},
-         ["doc_id"], kb_get_document)
+    _reg(server, "kb_get_document", "获取单个文档内容", {"doc_id": "s|文档ID(file_hash)"}, ["doc_id"], kb_get_document)
 
-    _reg(server, "graph_query", "知识图谱查询",
-         {"entity": "s|实体名称|", "source": "s|源实体过滤|",
-          "target": "s|目标实体过滤|", "edge_type": "s|边类型|",
-          "min_confidence": "n|最小置信度|0.0", "limit": "i|返回上限|100"},
-         [], graph_query)
+    _reg(
+        server,
+        "graph_query",
+        "知识图谱查询",
+        {
+            "entity": "s|实体名称|",
+            "source": "s|源实体过滤|",
+            "target": "s|目标实体过滤|",
+            "edge_type": "s|边类型|",
+            "min_confidence": "n|最小置信度|0.0",
+            "limit": "i|返回上限|100",
+        },
+        [],
+        graph_query,
+    )
 
     _reg(server, "graph_stats", "图谱统计", {}, [], graph_stats)
 
-    _reg(server, "wiki_search", "Wiki页面搜索",
-         {"q": "s|搜索关键词|", "category": "s|分类过滤|",
-          "limit": "i|返回上限|20"},
-         [], wiki_search)
+    _reg(
+        server,
+        "wiki_search",
+        "Wiki页面搜索",
+        {"q": "s|搜索关键词|", "category": "s|分类过滤|", "limit": "i|返回上限|20"},
+        [],
+        wiki_search,
+    )
 
-    _reg(server, "wiki_get", "获取Wiki页面",
-         {"page_id": "s|Wiki页面ID"},
-         ["page_id"], wiki_get)
+    _reg(server, "wiki_get", "获取Wiki页面", {"page_id": "s|Wiki页面ID"}, ["page_id"], wiki_get)
 
-    _reg(server, "dream_cycle_run", "触发夜间消化循环",
-         {}, [], dream_cycle_run)
+    _reg(server, "dream_cycle_run", "触发夜间消化循环", {}, [], dream_cycle_run)
 
-    _reg(server, "dream_cycle_report", "获取最新日报",
-         {}, [], dream_cycle_report)
+    _reg(server, "dream_cycle_report", "获取最新日报", {}, [], dream_cycle_report)
 
-    _reg(server, "gap_analyze", "运行Gap Analysis — 分析知识库覆盖缺口",
-         {"query": "s|分析主题|", "topic": "s|分析主题(备用)|"},
-         [], gap_analyze)
+    _reg(
+        server,
+        "gap_analyze",
+        "运行Gap Analysis — 分析知识库覆盖缺口",
+        {"query": "s|分析主题|", "topic": "s|分析主题(备用)|"},
+        [],
+        gap_analyze,
+    )
 
-    _reg(server, "entity_expand", "实体向量扩展",
-         {"entity_name": "s|实体名称", "top_k": "i|返回扩展数|10"},
-         ["entity_name"], entity_expand)
+    _reg(
+        server,
+        "entity_expand",
+        "实体向量扩展",
+        {"entity_name": "s|实体名称", "top_k": "i|返回扩展数|10"},
+        ["entity_name"],
+        entity_expand,
+    )
 
-    _reg(server, "cross_entity_synthesize", "跨实体合成 — 查找实体间关联路径",
-         {"entity_a": "s|实体A名称", "entity_b": "s|实体B名称"},
-         ["entity_a", "entity_b"], cross_entity_synthesize)
+    _reg(
+        server,
+        "cross_entity_synthesize",
+        "跨实体合成 — 查找实体间关联路径",
+        {"entity_a": "s|实体A名称", "entity_b": "s|实体B名称"},
+        ["entity_a", "entity_b"],
+        cross_entity_synthesize,
+    )
 
-    _reg(server, "file_upload", "文件上传 — 从本地路径入库",
-         {"file_path": "s|本地文件路径", "category": "s|分类标签|"},
-         ["file_path"], file_upload)
+    _reg(
+        server,
+        "file_upload",
+        "文件上传 — 从本地路径入库",
+        {"file_path": "s|本地文件路径", "category": "s|分类标签|"},
+        ["file_path"],
+        file_upload,
+    )
 
-    _reg(server, "file_list", "文件列表",
-         {"page": "i|页码|1", "page_size": "i|每页数量|50"},
-         [], file_list)
+    _reg(server, "file_list", "文件列表", {"page": "i|页码|1", "page_size": "i|每页数量|50"}, [], file_list)
 
-    _reg(server, "chat_query", "对话查询（简单版）",
-         {"query": "s|用户问题", "history": "a|对话历史|[]"},
-         ["query"], chat_query)
+    _reg(
+        server,
+        "chat_query",
+        "对话查询（简单版）",
+        {"query": "s|用户问题", "history": "a|对话历史|[]"},
+        ["query"],
+        chat_query,
+    )
 
-    _reg(server, "eval_run", "运行评测",
-         {"dataset": "s|评测数据集|", "test_name": "s|测试名称|"},
-         [], eval_run)
+    _reg(server, "eval_run", "运行评测", {"dataset": "s|评测数据集|", "test_name": "s|测试名称|"}, [], eval_run)
 
-    _reg(server, "notifications_list", "获取通知列表",
-         {"page": "i|页码|1", "page_size": "i|每页数量|20",
-          "unread_only": "b|只返回未读|false"},
-         [], notifications_list)
+    _reg(
+        server,
+        "notifications_list",
+        "获取通知列表",
+        {"page": "i|页码|1", "page_size": "i|每页数量|20", "unread_only": "b|只返回未读|false"},
+        [],
+        notifications_list,
+    )
 
-    _reg(server, "feature_flags_list", "列出功能开关",
-         {}, [], feature_flags_list)
+    _reg(server, "feature_flags_list", "列出功能开关", {}, [], feature_flags_list)
 
-    _reg(server, "health_check", "系统健康检查",
-         {}, [], health_check)
+    _reg(server, "health_check", "系统健康检查", {}, [], health_check)
 
-    _reg(server, "audit_logs", "审计日志查询",
-         {"user": "s|按用户过滤|", "action": "s|按操作类型过滤|",
-          "days": "i|最近几天|1", "limit": "i|返回上限|100"},
-         [], audit_logs)
+    _reg(
+        server,
+        "audit_logs",
+        "审计日志查询",
+        {"user": "s|按用户过滤|", "action": "s|按操作类型过滤|", "days": "i|最近几天|1", "limit": "i|返回上限|100"},
+        [],
+        audit_logs,
+    )
 
 
 def _reg(server, name: str, desc: str, params: dict, required: list, handler):

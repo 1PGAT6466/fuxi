@@ -5,17 +5,19 @@ circuit_breaker.py — 断路器
 提供统一的 CircuitBreaker 实现，供 IntentBus 和 GuaBase 共享使用。
 IntentBus._get_circuit_breaker() 和 GuaBase._circuits 使用同一套断路器实例。
 """
-import time
+
 import logging
+import time
 from dataclasses import dataclass
-from typing import Dict
 from enum import Enum
+from typing import Dict
 
 logger = logging.getLogger("infra.circuit_breaker")
 
 
 class CircuitState(Enum):
     """断路器状态"""
+
     CLOSED = "closed"  # 正常
     OPEN = "open"  # 断开
     HALF_OPEN = "half_open"  # 半开
@@ -53,7 +55,7 @@ class CircuitBreaker:
             try:
                 result = do_something()
                 cb.record_success()
-            except Exception:  # TODO: Narrow exception type
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
                 cb.record_failure()
                 raise
 
@@ -138,7 +140,8 @@ class CircuitBreaker:
                 self._failure_count = 0
                 logger.info(
                     "Circuit [%s] 已恢复 → CLOSED (连续 %d 次探测成功)",
-                    self.name, self._half_open_calls,
+                    self.name,
+                    self._half_open_calls,
                 )
         elif self._state == CircuitState.CLOSED:
             # 成功后重置失败计数（连续失败才熔断）
@@ -152,14 +155,16 @@ class CircuitBreaker:
         if self._state == CircuitState.HALF_OPEN:
             self._transition_to(CircuitState.OPEN)
             logger.warning(
-                "Circuit [%s] 半开探测失败 → OPEN", self.name,
+                "Circuit [%s] 半开探测失败 → OPEN",
+                self.name,
             )
         elif self._state == CircuitState.CLOSED:
             if self._failure_count >= self.failure_threshold:
                 self._transition_to(CircuitState.OPEN)
                 logger.warning(
                     "Circuit [%s] 熔断触发 → OPEN (连续失败 %d 次)",
-                    self.name, self._failure_count,
+                    self.name,
+                    self._failure_count,
                 )
 
     def can_execute(self) -> bool:

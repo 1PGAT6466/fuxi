@@ -1,12 +1,14 @@
 import asyncio
+
 """
 伏羲 v1.50 — 元数据路由（真实数据版）
 数据来源：系统版本 + 文档统计 + 矢量库统计
 """
-from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
 import logging
 import time
+
+from fastapi import APIRouter, Request
+from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
@@ -42,6 +44,7 @@ async def metadata(request: Request = None):
         try:
             from src.db.data_store import load_chunks
             from src.db.vector_store import get_vector_store
+
             chunks = await asyncio.to_thread(load_chunks) or []
             vs = get_vector_store()
             vector_count = 0
@@ -50,7 +53,13 @@ async def metadata(request: Request = None):
                     vector_count = vs.count
                     if vector_count < 0:
                         vector_count = 0
-                except Exception:  # TODO: Narrow exception type
+                except (
+                    OSError,
+                    ValueError,
+                    KeyError,
+                    ConnectionError,
+                    TimeoutError,
+                ) as e:  # TODO: Narrow exception type
                     pass
 
             metadata_items.append({"key": "total_chunks", "value": len(chunks), "label": "文档块数"})
@@ -64,12 +73,13 @@ async def metadata(request: Request = None):
         # 4. Wiki 统计
         try:
             from src.taiyang.wiki import get_wiki_engine
+
             engine = get_wiki_engine()
             pages = engine.list_pages() or []
             metadata_items.append({"key": "wiki_pages", "value": len(pages), "label": "Wiki 页面数"})
         except ImportError:
             pass
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             pass
 
         # 5. 系统运行时间
@@ -81,11 +91,11 @@ async def metadata(request: Request = None):
         data = {"metadata": metadata_items, "total": len(metadata_items)}
 
         _wants_v2 = request and (
-            request.query_params.get("format") == "v2"
-            or request.headers.get("X-API-Format", "").lower() == "v2"
+            request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
         )
         if _wants_v2:
             from src.api.response import success
+
             return success(data=data, message="元数据")
         return data
     except Exception as e:  # TODO: Narrow exception type

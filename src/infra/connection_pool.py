@@ -2,11 +2,12 @@
 connection_pool.py — 数据库连接池
 SQLite连接复用 + 线程安全
 """
+
+import logging
 import sqlite3
 import threading
-import logging
-from typing import Optional
 from contextlib import contextmanager
+from typing import Optional
 
 logger = logging.getLogger("infra.connection_pool")
 
@@ -44,6 +45,7 @@ class SQLiteConnectionPool:
         if conn is None:
             # 等待连接释放
             import time
+
             for _ in range(10):
                 time.sleep(0.1)
                 with self._lock:
@@ -83,5 +85,6 @@ def get_connection_pool(db_path: str = None) -> SQLiteConnectionPool:
     global _pool
     if _pool is None:
         from src.config import DB_PATH
+
         _pool = SQLiteConnectionPool(db_path or str(DB_PATH))
     return _pool

@@ -12,9 +12,11 @@ from typing import Dict, List, Optional
 
 # ---- 从 services 导入原有实现 ----
 from src.services.feedback_store import (
-    log_feedback_unified,
-    get_feedback_stats as _store_get_stats,
     clear_feedback_cache,
+)
+from src.services.feedback_store import get_feedback_stats as _store_get_stats
+from src.services.feedback_store import (
+    log_feedback_unified,
 )
 
 logger = logging.getLogger("evolution.feedback_loop")
@@ -78,6 +80,7 @@ class FeedbackLoop:
 
 
 # ---- 便捷函数 ----
+
 
 def has_feedback_loop() -> bool:
     """检查反馈闭环是否就绪（始终返回 True，因为 feedback_store 是无状态模块）

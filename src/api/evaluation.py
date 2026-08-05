@@ -2,16 +2,24 @@
 伏羲 v1.50 — 评测路由（真实数据版）
 数据来源：eval_automation + 数据目录
 """
-from fastapi import APIRouter, Request
-from fastapi.responses import JSONResponse
-import logging
+
 import json
+import logging
 import time
 from pathlib import Path
 
+from fastapi import APIRouter, Depends, Request
+from fastapi.responses import JSONResponse
+
+# v2.2 安全修复: 评测数据端点要求认证
+from src.auth.auth_middleware import require_auth_dep
+
 logger = logging.getLogger(__name__)
 
-router = APIRouter(tags=["评测"])
+router = APIRouter(
+    tags=["评测"],
+    dependencies=[Depends(require_auth_dep)],
+)
 
 # 评测数据路径
 from src.config import DATA_DIR as CONFIG_DATA_DIR
@@ -24,15 +32,16 @@ def _get_real_search_stats() -> dict:
     """从运行时指标获取真实搜索统计数据"""
     try:
         from src.infra.request_metrics import get_request_metrics
+
         metrics = get_request_metrics()
         return {
             "total_searches": metrics.total_requests or 0,
             "avg_results": 0,  # 需要额外追踪
-            "avg_latency_ms": round(getattr(metrics, 'avg_latency_ms', 0) or 0, 1),
+            "avg_latency_ms": round(getattr(metrics, "avg_latency_ms", 0) or 0, 1),
             "zero_result_rate": 0.0,
             "p50_latency_ms": 0,
         }
-    except Exception:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
         return {
             "total_searches": 0,
             "avg_results": 0,
@@ -81,8 +90,7 @@ def _get_rag_eval_status() -> dict:
         "report_count": report_count,
         "last_run": last_report_time,
         "last_run_formatted": (
-            time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(last_report_time))
-            if last_report_time else None
+            time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(last_report_time)) if last_report_time else None
         ),
     }
 
@@ -103,12 +111,13 @@ async def evaluation_overview(request: Request = None):
         test_cases_count = 0
         try:
             from src.services.eval_dataset import get_ground_truth
+
             gt = get_ground_truth()
             if gt and isinstance(gt, list):
                 test_cases_count = len(gt)
         except ImportError:
             pass
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
             pass
 
         data = {
@@ -120,11 +129,11 @@ async def evaluation_overview(request: Request = None):
         }
 
         _wants_v2 = request and (
-            request.query_params.get("format") == "v2"
-            or request.headers.get("X-API-Format", "").lower() == "v2"
+            request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
         )
         if _wants_v2:
             from src.api.response import success
+
             return success(data=data, message="评测概览")
         return data
     except Exception as e:  # TODO: Narrow exception type
@@ -144,18 +153,20 @@ async def evaluation_datasets(request: Request = None):
     """
     try:
         from src.services.eval_automation import get_eval_automation
+
         automation = get_eval_automation()
         history = None
         try:
             import asyncio
+
             history = await automation.get_eval_history()
         except RuntimeError:
             try:
                 loop = asyncio.get_event_loop()
                 history = loop.run_until_complete(automation.get_eval_history())
-            except Exception:  # TODO: Narrow exception type
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
                 pass
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
             pass
 
         datasets = history or []
@@ -163,33 +174,39 @@ async def evaluation_datasets(request: Request = None):
         # 如果仍为空，检查 ground_truth.json
         if not datasets:
             from src.services.eval_dataset import get_ground_truth
+
             try:
                 gt = get_ground_truth()
                 if gt and isinstance(gt, list) and len(gt) > 0:
-                    datasets = [{
-                        "id": "ground_truth",
-                        "name": "基准测试集",
-                        "test_count": len(gt),
-                        "status": "ready",
-                        "created_at": None,
-                        "note": "评测尚未执行，数据集已就绪",
-                    }]
+                    datasets = [
+                        {
+                            "id": "ground_truth",
+                            "name": "基准测试集",
+                            "test_count": len(gt),
+                            "status": "ready",
+                            "created_at": None,
+                            "note": "评测尚未执行，数据集已就绪",
+                        }
+                    ]
             except ImportError:
                 pass
-            except Exception:  # TODO: Narrow exception type
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
                 pass
 
         _wants_v2 = request and (
-            request.query_params.get("format") == "v2"
-            or request.headers.get("X-API-Format", "").lower() == "v2"
+            request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
         )
         if _wants_v2:
             from src.api.response import success
-            return success(data={
-                "datasets": datasets,
-                "total": len(datasets),
-                "hint": None if datasets else "暂无数据集。上传评测数据或导入 ground_truth.json。",
-            }, message="数据集列表")
+
+            return success(
+                data={
+                    "datasets": datasets,
+                    "total": len(datasets),
+                    "hint": None if datasets else "暂无数据集。上传评测数据或导入 ground_truth.json。",
+                },
+                message="数据集列表",
+            )
         return {"datasets": datasets, "total": len(datasets)}
     except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"evaluation_datasets 失败: {e}")
@@ -205,32 +222,37 @@ async def evaluation_tasks(request: Request = None):
     """评测任务列表 — v1.50 真实数据版"""
     try:
         from src.services.eval_automation import get_eval_automation
+
         automation = get_eval_automation()
         history = None
         try:
             import asyncio
+
             history = await automation.get_eval_history()
         except RuntimeError:
             try:
                 loop = asyncio.get_event_loop()
                 history = loop.run_until_complete(automation.get_eval_history())
-            except Exception:  # TODO: Narrow exception type
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
                 pass
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
             pass
 
         tasks = history or []
 
         _wants_v2 = request and (
-            request.query_params.get("format") == "v2"
-            or request.headers.get("X-API-Format", "").lower() == "v2"
+            request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
         )
         if _wants_v2:
             from src.api.response import success
-            return success(data={
-                "tasks": tasks,
-                "hint": None if tasks else "暂无评测任务。前往评测页面创建第一个评测任务。",
-            }, message="任务列表")
+
+            return success(
+                data={
+                    "tasks": tasks,
+                    "hint": None if tasks else "暂无评测任务。前往评测页面创建第一个评测任务。",
+                },
+                message="任务列表",
+            )
         return {"tasks": tasks, "hint": None if tasks else "暂无评测任务"}
     except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"evaluation_tasks 失败: {e}")
@@ -246,11 +268,13 @@ async def evaluation_results(request: Request = None):
     """评测结果列表 — v1.50 真实数据版"""
     try:
         from src.services.eval_automation import get_eval_automation
+
         automation = get_eval_automation()
 
         report = history = None
         try:
             import asyncio
+
             report = await automation.get_latest_report()
             history = await automation.get_eval_history()
         except RuntimeError:
@@ -258,9 +282,9 @@ async def evaluation_results(request: Request = None):
                 loop = asyncio.get_event_loop()
                 report = loop.run_until_complete(automation.get_latest_report())
                 history = loop.run_until_complete(automation.get_eval_history())
-            except Exception:  # TODO: Narrow exception type
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
                 pass
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
             pass
 
         # 如果自动化没有报告，尝试从文件系统读取
@@ -270,16 +294,19 @@ async def evaluation_results(request: Request = None):
         results = history or []
 
         _wants_v2 = request and (
-            request.query_params.get("format") == "v2"
-            or request.headers.get("X-API-Format", "").lower() == "v2"
+            request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
         )
         if _wants_v2:
             from src.api.response import success
-            return success(data={
-                "results": results,
-                "latest_report": report,
-                "hint": None if results else "暂无评测结果。执行评测后结果将显示在此处。",
-            }, message="结果列表")
+
+            return success(
+                data={
+                    "results": results,
+                    "latest_report": report,
+                    "hint": None if results else "暂无评测结果。执行评测后结果将显示在此处。",
+                },
+                message="结果列表",
+            )
         return {
             "results": results,
             "latest_report": report,
@@ -295,24 +322,19 @@ async def evaluation_results(request: Request = None):
 
 @router.post("/api/evaluation")
 async def evaluation_create(request: Request):
-    """创建评测任务 — v1.44 Phase1: 发布到异步任务队列
-    """
+    """创建评测任务 — v1.44 Phase1: 发布到异步任务队列"""
     try:
         body = await request.json()
         logger.info(f"[evaluation] 创建评测请求: user={getattr(request.state, 'user', 'anonymous')}")
 
-        from src.infra.task_queue import get_task_queue, TASK_EVAL_RUN
-        
+        from src.infra.task_queue import TASK_EVAL_RUN, get_task_queue
+
         # 发布到异步任务队列
         task_queue = await get_task_queue()
         task_id = await task_queue.publish_task(
-            TASK_EVAL_RUN,
-            {
-                "trigger": "api",
-                "user": getattr(request.state, 'user', 'anonymous')
-            }
+            TASK_EVAL_RUN, {"trigger": "api", "user": getattr(request.state, "user", "anonymous")}
         )
-        
+
         return {
             "ok": True,
             "task_id": task_id,
@@ -340,5 +362,5 @@ def _load_latest_report_from_disk() -> dict:
         latest = report_files[0]
         with open(latest, "r", encoding="utf-8") as f:
             return json.load(f)
-    except Exception:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
         return None

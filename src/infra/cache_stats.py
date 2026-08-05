@@ -2,10 +2,11 @@
 cache_stats.py — 缓存统计
 命中率 + 性能监控
 """
-import time
+
 import logging
-from typing import Dict
+import time
 from collections import deque
+from typing import Dict
 
 logger = logging.getLogger("infra.cache_stats")
 

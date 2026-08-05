@@ -7,19 +7,21 @@ base.py — DataSource 抽象基类
 - fetch()    — 获取原始数据
 - transform() — 转换为统一格式
 """
+
+import logging
+import time
+import uuid
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
 from typing import Any, Dict, List, Optional
-import time
-import uuid
-import logging
 
 logger = logging.getLogger(__name__)
 
 
 class ConnectorStatus(str, Enum):
     """连接器状态枚举"""
+
     UNINITIALIZED = "uninitialized"
     CONNECTING = "connecting"
     CONNECTED = "connected"
@@ -29,6 +31,7 @@ class ConnectorStatus(str, Enum):
 
 class SourceType(str, Enum):
     """数据源类型枚举"""
+
     DATABASE = "database"
     API = "api"
     FILE = "file"
@@ -38,6 +41,7 @@ class SourceType(str, Enum):
 @dataclass
 class UnifiedDocument:
     """统一文档格式 — 所有数据源转换后的目标格式"""
+
     doc_id: str = field(default_factory=lambda: uuid.uuid4().hex[:16])
     title: str = ""
     content: str = ""
@@ -70,6 +74,7 @@ class UnifiedDocument:
 @dataclass
 class ConnectorConfig:
     """连接器通用配置"""
+
     name: str = ""
     source_type: SourceType = SourceType.FILE
     timeout: int = 30
@@ -237,10 +242,7 @@ class DataSource(ABC):
         if not self.is_connected:
             success = await self.connect()
             if not success:
-                raise ConnectionError(
-                    self.name,
-                    f"无法连接数据源 (状态: {self._status.value})"
-                )
+                raise ConnectionError(self.name, f"无法连接数据源 (状态: {self._status.value})")
 
         try:
             raw_data = await self.fetch(**kwargs)
@@ -249,10 +251,7 @@ class DataSource(ABC):
             documents = await self.transform(raw_data)
             self._doc_count += len(documents)
 
-            logger.info(
-                "[%s] 接入完成：获取 %d 条原始数据 → %d 个统一文档",
-                self.name, len(raw_data), len(documents)
-            )
+            logger.info("[%s] 接入完成：获取 %d 条原始数据 → %d 个统一文档", self.name, len(raw_data), len(documents))
             return documents
 
         except (ConnectionError, FetchError, TransformError):
@@ -288,9 +287,7 @@ class DataSource(ABC):
         """
         missing = [k for k in required_keys if k not in self.config.extra]
         if missing:
-            raise ValueError(
-                f"[{self.name}] 缺少必要配置: {', '.join(missing)}"
-            )
+            raise ValueError(f"[{self.name}] 缺少必要配置: {', '.join(missing)}")
 
     async def disconnect(self) -> None:
         """
@@ -312,7 +309,7 @@ class DataSource(ABC):
             if not self.is_connected:
                 return await self.connect()
             return True
-        except Exception:
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
             return False
 
     def __repr__(self) -> str:

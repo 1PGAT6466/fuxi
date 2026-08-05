@@ -1,4 +1,4 @@
-"""
+﻿"""
 retrieval.py — 太阳·筑基 混合检索管线
 合并肾(精炼)+肝(免疫)+鼻(嗅探)+胆(果断)+四肢(执行)+骨骼(结构)
 """
@@ -43,7 +43,7 @@ class TaiyangRetrieval(SymbolBase):
         start_time = time.time()
 
         if not trace_id:
-            from src.infra.logging import get_trace_id
+            from src.infra.fuxi_logging import get_trace_id
             trace_id = get_trace_id()
 
         try:
@@ -144,8 +144,8 @@ class TaiyangRetrieval(SymbolBase):
             except Exception as e:  # TODO: Narrow exception type
                 logger.debug(f"[{trace_id}] [太阳] 图谱查询跳过: {e}")
 
-            # L3: 融合
-            fused = self._fuse(bm25_results, vector_results)
+            # L3: 融合 (Phase 2 优化: 动态 alpha 加权)
+            fused = self._fuse(bm25_results, vector_results, query=query)
 
             # L4: 精排
             reranked = await self._rerank(query, fused)
@@ -232,11 +232,12 @@ class TaiyangRetrieval(SymbolBase):
             results = await asyncio.to_thread(
                 lambda: store.keyword_search(query, top_k, tenant_id=tenant_id)
             )
-            return [
-                {"text": r.get("text", ""), "file_name": r.get("file_name", ""),
-                 "score": r.get("score", 0), "_source": "bm25"}
-                for r in results
-            ]
+            # 保留原始字段（file_hash/chunk_index 等），RRF 融合需要它们做去重 key
+            out = []
+            for r in results:
+                r["_source"] = "bm25"
+                out.append(r)
+            return out
         except Exception:  # TODO: Narrow exception type
             return []
 
@@ -255,16 +256,24 @@ class TaiyangRetrieval(SymbolBase):
             result = vs.query(q_emb[0], n_results=top_k, where=where_filter)
             if not result.get("ids") or not result["ids"][0]:
                 return []
+            # v1.44 R3: 从 documents 字段获取 text（metadata 中可能没有 text）
+            docs = result.get("documents", [[]])
             results = []
             for i, vid in enumerate(result["ids"][0]):
                 meta = result["metadatas"][0][i] if i < len(result["metadatas"][0]) else {}
                 dist = result["distances"][0][i] if i < len(result["distances"][0]) else 0
+                doc_text = docs[0][i] if i < len(docs[0]) else ""
+                # 处理 NaN 值
+                import math
+                if math.isnan(dist) or math.isinf(dist):
+                    dist = 1.0  # 如果距离是 NaN 或 Inf，设置为最大距离
                 sim = 1.0 - float(dist)
-                if sim > 0.15:
+                if sim > 0.20:  # Phase 3 优化: 提升阈值 0.15→0.20, 过滤低质量向量结果
                     results.append({
                         "file_hash": meta.get("file_hash", ""),
-                        "text": meta.get("text", ""),
+                        "text": meta.get("text", "") or doc_text or "",
                         "file_name": meta.get("file_name", ""),
+                        "chunk_index": meta.get("chunk_index"),
                         "score": round(sim * 10, 2),
                         "_source": "vector",
                         "_similarity": round(sim, 4),
@@ -273,19 +282,29 @@ class TaiyangRetrieval(SymbolBase):
         except Exception:  # TODO: Narrow exception type
             return []
 
-    def _fuse(self, bm25_results: List[Dict], vector_results: List[Dict]) -> List[Dict[str, Any]]:
-        """RRF 融合"""
+    def _fuse(self, bm25_results: List[Dict], vector_results: List[Dict], query: str = "") -> List[Dict[str, Any]]:
+        """Phase 2 优化: 动态 alpha 加权 RRF 融合
+        
+        对于精确查询(型号/编号)偏重 BM25(alpha=0.78),
+        对于语义查询(如何/为什么)偏重向量(alpha=0.25),
+        通用查询使用平衡权重(alpha=0.50)。
+        """
         try:
-            from src.taiyang.fusion import rrf_fusion
-            return rrf_fusion(bm25_results, vector_results)
+            from src.taiyang.fusion import rrf_fusion, weighted_fusion_adjust
+            # 先进行基础 RRF 融合
+            merged = rrf_fusion(bm25_results, vector_results)
+            # 再应用动态 alpha 加权调整
+            if query and len(merged) > 1:
+                merged = weighted_fusion_adjust(query, merged, bm25_results, vector_results)
+            return merged
         except Exception:  # TODO: Narrow exception type
             return bm25_results + vector_results
 
     async def _rerank(self, query: str, results: List[Dict]) -> List[Dict[str, Any]]:
-        """精排"""
+        """精排 — 优先使用 SiliconFlow Rerank，降级到 DeepSeek Rerank"""
         try:
-            from src.taiyang.rerank import rerank_with_deepseek
-            reranked = await rerank_with_deepseek(query, results, top_k=len(results))
+            from src.taiyang.rerank import rerank
+            reranked = await rerank(query, results, top_k=len(results))
             if reranked:
                 return reranked
         except Exception:  # TODO: Narrow exception type
@@ -319,7 +338,7 @@ class TaiyangRetrieval(SymbolBase):
             }
         """
         if not trace_id:
-            from src.infra.logging import get_trace_id
+            from src.infra.fuxi_logging import get_trace_id
             trace_id = get_trace_id()
 
             if logger.isEnabledFor(logging.DEBUG):
@@ -587,7 +606,7 @@ _retrieval_instance = None
 def get_retrieval(meridian=None) -> TaiyangRetrieval:
     """获取全局检索实例"""
     global _retrieval_instance
-    if _retrieval_instance is None and meridian:
+    if _retrieval_instance is None:
         _retrieval_instance = TaiyangRetrieval(meridian)
     return _retrieval_instance
 
@@ -596,7 +615,18 @@ async def hybrid_search(query: str, **kwargs) -> List[Dict]:
     instance = get_retrieval()
     if instance:
         return await instance.refine(query, **kwargs)
-    return []
+    # 降级：直接调用 BM25（检索管线未初始化时）
+    import asyncio
+    from src.db.memory_store import get_store
+    top_k = kwargs.get('top_k', 15)
+    tenant_id = kwargs.get('tenant_id', 'default')
+    store = get_store()
+    results = await asyncio.to_thread(
+        lambda: store.keyword_search(query, top_k, tenant_id=tenant_id)
+    )
+    for r in results:
+        r['_source'] = 'bm25'
+    return results
 
 
 async def event_search(query: str, top_k: int = 15, trace_id: str = None, tenant_id: str = "default") -> Dict[str, Any]:
@@ -614,3 +644,4 @@ async def event_search(query: str, top_k: int = 15, trace_id: str = None, tenant
     if instance:
         return await instance.event_search(query, top_k=top_k, trace_id=trace_id)
     return {"events": [], "mapped_chunks": [], "granularity": "event", "source": "unavailable"}
+

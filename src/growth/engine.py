@@ -3,23 +3,27 @@ engine.py — 成长引擎
 运行在四象之上的元层，监控四象的"进步"
 三阶段：Phase 1只记录不调整 → Phase 2参数自动调整 → Phase 3策略和知识成长
 """
+
 import json
 import logging
 import time
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Dict, List
-from dataclasses import dataclass, field
 
 logger = logging.getLogger("growth.engine")
 
-from src.config import DATA_DIR as CONFIG_DATA_DIR
 import asyncio
+
+from src.config import DATA_DIR as CONFIG_DATA_DIR
+
 GROWTH_DIR = Path(CONFIG_DATA_DIR) / "growth"
 
 
 @dataclass
 class GrowthEvent:
     """成长事件"""
+
     symbol: str
     metric: str
     value: float
@@ -30,6 +34,7 @@ class GrowthEvent:
 @dataclass
 class AdjustmentRecord:
     """调整记录"""
+
     param: str
     old_value: float
     new_value: float
@@ -48,6 +53,7 @@ class GrowthEngine:
         self._events: Dict[str, list] = {}
         self._baselines: Dict[str, float] = {}
         self._adjustments: List[AdjustmentRecord] = []
+
     # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def record_event(self, symbol: str, metric: str, value: float, context: Dict = None):
@@ -65,9 +71,11 @@ class GrowthEngine:
         }
 
         try:
+
             def _write_log():
                 with open(log_file, "a", encoding="utf-8") as f:
                     f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
             await asyncio.to_thread(_write_log)
         except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[Growth] 写入失败: {e}")
@@ -79,42 +87,64 @@ class GrowthEngine:
 
         logger.debug(f"[Growth] {symbol}.{metric} = {value}")
 
-    async def record_search(self, query: str, results_count: int, duration_ms: float,
-                           confidence: float = 0, trace_id: str = ""):
+    async def record_search(
+        self, query: str, results_count: int, duration_ms: float, confidence: float = 0, trace_id: str = ""
+    ):
         """记录搜索事件"""
-        await self.record_event("taiyang", "search_result_count", results_count, {
-            "query": query[:100],
-            "duration_ms": duration_ms,
-            "confidence": confidence,
-            "trace_id": trace_id,
-        })
+        await self.record_event(
+            "taiyang",
+            "search_result_count",
+            results_count,
+            {
+                "query": query[:100],
+                "duration_ms": duration_ms,
+                "confidence": confidence,
+                "trace_id": trace_id,
+            },
+        )
 
-    async def record_decision(self, query: str, confidence: float, duration_ms: float,
-                            strategy: str = "", trace_id: str = ""):
+    async def record_decision(
+        self, query: str, confidence: float, duration_ms: float, strategy: str = "", trace_id: str = ""
+    ):
         """记录决策事件"""
-        await self.record_event("shaoyin", "decision_confidence", confidence, {
-            "query": query[:100],
-            "duration_ms": duration_ms,
-            "strategy": strategy,
-            "trace_id": trace_id,
-        })
+        await self.record_event(
+            "shaoyin",
+            "decision_confidence",
+            confidence,
+            {
+                "query": query[:100],
+                "duration_ms": duration_ms,
+                "strategy": strategy,
+                "trace_id": trace_id,
+            },
+        )
 
-    async def record_extraction(self, file_name: str, chunks: int, events: int,
-                              entities: int, duration_ms: float):
+    async def record_extraction(self, file_name: str, chunks: int, events: int, entities: int, duration_ms: float):
         """记录提取事件"""
-        await self.record_event("shaoyang", "extraction_chunks", chunks, {
-            "file_name": file_name,
-            "events": events,
-            "entities": entities,
-            "duration_ms": duration_ms,
-        })
+        await self.record_event(
+            "shaoyang",
+            "extraction_chunks",
+            chunks,
+            {
+                "file_name": file_name,
+                "events": events,
+                "entities": entities,
+                "duration_ms": duration_ms,
+            },
+        )
 
     async def record_request(self, endpoint: str, status_code: int, duration_ms: float):
         """记录请求事件"""
-        await self.record_event("taiyin", "request_duration", duration_ms, {
-            "endpoint": endpoint,
-            "status_code": status_code,
-        })
+        await self.record_event(
+            "taiyin",
+            "request_duration",
+            duration_ms,
+            {
+                "endpoint": endpoint,
+                "status_code": status_code,
+            },
+        )
+
     # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def evaluate(self, symbol: str) -> Dict:
@@ -125,6 +155,7 @@ class GrowthEngine:
 
         events = []
         try:
+
             def _read_log():
                 result = []
                 with open(log_file, "r", encoding="utf-8") as f:
@@ -134,6 +165,7 @@ class GrowthEngine:
                         except Exception as e:
                             logger.warning("JSON解析成长事件失败: %s", e, exc_info=True)
                 return result
+
             events = await asyncio.to_thread(_read_log)
         except Exception as e:  # TODO: Narrow exception type
             logger.warning("Exception 失败: %s", e, exc_info=True)
@@ -178,9 +210,11 @@ class GrowthEngine:
         for log_file in GROWTH_DIR.glob("*_quality.jsonl"):
             symbol = log_file.stem.replace("_quality", "")
             try:
+
                 def _rd():
                     with open(log_file, "r", encoding="utf-8") as f:
                         lines = f.readlines()
+
                 stats[symbol] = {"events": len(lines)}
             except Exception as e:  # TODO: Narrow exception type
                 logger.warning("读取成长统计失败 [%s]: %s", symbol, e, exc_info=True)

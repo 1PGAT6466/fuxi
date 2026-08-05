@@ -2,11 +2,12 @@
 state_manager.py — 对话状态管理 v4.0
 多轮上下文 + 中间结果缓存
 """
-import time
+
 import logging
-from typing import Dict, List, Any
-from dataclasses import dataclass, field
+import time
 from collections import OrderedDict
+from dataclasses import dataclass, field
+from typing import Any, Dict, List
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +15,7 @@ logger = logging.getLogger(__name__)
 @dataclass
 class ConversationState:
     """单个对话的状态"""
+
     session_id: str
     history: List[Dict] = field(default_factory=list)
     intermediate_results: List[Dict] = field(default_factory=list)
@@ -74,6 +76,7 @@ class StateManager:
 
 # 全局实例
 _state_manager = None
+
 
 def get_state_manager() -> StateManager:
     global _state_manager

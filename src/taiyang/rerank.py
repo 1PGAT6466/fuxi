@@ -97,7 +97,7 @@ async def rerank_with_embedder(query: str, candidates: list, top_k: int = 30) ->
                             r["_rerank_rank"] = rank + 1
                             scored.append(r)
                     return scored[:top_k]
-    except Exception:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.warning(f"[rerank] suppressed exception", exc_info=True)
         pass
     return []

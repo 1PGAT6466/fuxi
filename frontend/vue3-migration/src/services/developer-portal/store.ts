@@ -116,7 +116,7 @@ export const useDeveloperPortalStore = defineStore('developerPortal', () => {
 
   /** 设置社区帖子 */
   function setCommunityPosts(posts: CommunityPost[], total: number, page: number): void {
-    communityPosts.value = posts;
+    communityPosts.value = Array.isArray(posts) ? posts : [];
     communityTotal.value = total;
     communityPage.value = page;
     communityError.value = null;

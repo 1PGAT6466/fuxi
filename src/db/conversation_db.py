@@ -9,16 +9,18 @@ conversation_db.py — 对话历史持久化 (P1 核心缺陷修复)
 - 幂等初始化，可重复调用 ensure_tables()
 - 线程安全单例模式
 """
-import sqlite3
+
+import json
+import logging
 import os
+import sqlite3
 import time
 import uuid
-import logging
-import json
 from pathlib import Path
-from typing import Dict, List, Optional, Any
+from typing import Any, Dict, List, Optional
 
 from src.config import DATA_DIR
+from src.db.transaction import transaction_context
 
 logger = logging.getLogger(__name__)
 
@@ -28,6 +30,7 @@ _CONVERSATIONS_DB_PATH = str(Path(DATA_DIR) / "conversation_sessions.db")
 
 
 # ============ SQLite 连接工具 ============
+
 
 def _connect(db_path: str = None, row_factory: bool = True) -> sqlite3.Connection:
     """创建 SQLite 连接，配置 WAL + busy_timeout + foreign_keys"""
@@ -44,6 +47,7 @@ def _connect(db_path: str = None, row_factory: bool = True) -> sqlite3.Connectio
 
 
 # ============ 工具函数 ============
+
 
 def _safe_json_dumps(obj: Any) -> str:
     """安全 JSON 序列化，失败返回 '{}'"""
@@ -71,6 +75,7 @@ def _truncate_text(text: Optional[str], max_len: int) -> Optional[str]:
 
 
 # ============ ConversationDB 类 ============
+
 
 class ConversationDB:
     """对话历史持久化数据库
@@ -112,6 +117,7 @@ class ConversationDB:
         """获取单例实例（线程安全）"""
         if cls._instance is None:
             import threading
+
             if cls._lock is None:
                 cls._lock = threading.Lock()
             with cls._lock:
@@ -156,21 +162,11 @@ class ConversationDB:
             """)
             # 索引
             conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_conv_user_id "
-                "ON conversations(user_id) WHERE is_deleted = 0"
+                "CREATE INDEX IF NOT EXISTS idx_conv_user_id " "ON conversations(user_id) WHERE is_deleted = 0"
             )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_conv_updated_at "
-                "ON conversations(updated_at DESC)"
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_msg_conv_id "
-                "ON messages(conversation_id)"
-            )
-            conn.execute(
-                "CREATE INDEX IF NOT EXISTS idx_msg_timestamp "
-                "ON messages(conversation_id, timestamp)"
-            )
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_conv_updated_at " "ON conversations(updated_at DESC)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_msg_conv_id " "ON messages(conversation_id)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_msg_timestamp " "ON messages(conversation_id, timestamp)")
             conn.commit()
 
     def ensure_tables(self):
@@ -200,12 +196,13 @@ class ConversationDB:
             title = f"对话 {time.strftime('%m-%d %H:%M', time.localtime(now))}"
 
         with _connect(self._db_path) as conn:
-            conn.execute(
-                """INSERT INTO conversations (id, user_id, title, created_at, updated_at)
-                   VALUES (?, ?, ?, ?, ?)""",
-                (conv_id, user_id, title, now, now),
-            )
-            conn.commit()
+            with transaction_context(conn):
+                # 创建对话并在同一事务中写入
+                conn.execute(
+                    """INSERT INTO conversations (id, user_id, title, created_at, updated_at)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (conv_id, user_id, title, now, now),
+                )
 
         logger.debug("[ConversationDB] 创建对话 %s (user=%s)", conv_id, user_id)
         return {
@@ -234,9 +231,7 @@ class ConversationDB:
         """
         with _connect(self._db_path) as conn:
             where = "WHERE id = ?" if include_deleted else "WHERE id = ? AND is_deleted = 0"
-            conv = conn.execute(
-                f"SELECT * FROM conversations {where}", (conversation_id,)
-            ).fetchone()
+            conv = conn.execute(f"SELECT * FROM conversations {where}", (conversation_id,)).fetchone()
             if conv is None:
                 return None
 
@@ -318,18 +313,16 @@ class ConversationDB:
             bool — 是否成功删除
         """
         with _connect(self._db_path) as conn:
-            if hard:
-                cursor = conn.execute(
-                    "DELETE FROM conversations WHERE id = ?", (conversation_id,)
-                )
-            else:
-                cursor = conn.execute(
-                    """UPDATE conversations
-                       SET is_deleted = 1, updated_at = ?
-                       WHERE id = ? AND is_deleted = 0""",
-                    (time.time(), conversation_id),
-                )
-            conn.commit()
+            with transaction_context(conn):
+                if hard:
+                    cursor = conn.execute("DELETE FROM conversations WHERE id = ?", (conversation_id,))
+                else:
+                    cursor = conn.execute(
+                        """UPDATE conversations
+                           SET is_deleted = 1, updated_at = ?
+                           WHERE id = ? AND is_deleted = 0""",
+                        (time.time(), conversation_id),
+                    )
             deleted = cursor.rowcount > 0
 
         if deleted:
@@ -371,30 +364,27 @@ class ConversationDB:
         meta_json = _safe_json_dumps(metadata or {})
 
         with _connect(self._db_path) as conn:
-            # 校验对话存在且未删除
-            conv = conn.execute(
-                "SELECT id FROM conversations WHERE id = ? AND is_deleted = 0",
-                (conversation_id,)
-            ).fetchone()
-            if conv is None:
-                raise ValueError(f"对话不存在或已删除: {conversation_id}")
+            with transaction_context(conn):
+                # 校验对话存在且未删除
+                conv = conn.execute(
+                    "SELECT id FROM conversations WHERE id = ? AND is_deleted = 0", (conversation_id,)
+                ).fetchone()
+                if conv is None:
+                    raise ValueError(f"对话不存在或已删除: {conversation_id}")
 
-            cursor = conn.execute(
-                """INSERT INTO messages (conversation_id, role, content, timestamp, metadata)
-                   VALUES (?, ?, ?, ?, ?)""",
-                (conversation_id, role, content, now, meta_json),
-            )
-            # 更新父对话时间戳
-            conn.execute(
-                "UPDATE conversations SET updated_at = ? WHERE id = ?",
-                (now, conversation_id),
-            )
-            conn.commit()
+                cursor = conn.execute(
+                    """INSERT INTO messages (conversation_id, role, content, timestamp, metadata)
+                       VALUES (?, ?, ?, ?, ?)""",
+                    (conversation_id, role, content, now, meta_json),
+                )
+                # 更新父对话时间戳
+                conn.execute(
+                    "UPDATE conversations SET updated_at = ? WHERE id = ?",
+                    (now, conversation_id),
+                )
             msg_id = cursor.lastrowid
 
-        logger.debug(
-            "[ConversationDB] 添加 %s 消息到对话 %s", role, conversation_id
-        )
+        logger.debug("[ConversationDB] 添加 %s 消息到对话 %s", role, conversation_id)
         return {
             "id": msg_id,
             "conversation_id": conversation_id,
@@ -417,13 +407,13 @@ class ConversationDB:
             return False
 
         with _connect(self._db_path) as conn:
-            cursor = conn.execute(
-                """UPDATE conversations
-                   SET title = ?, updated_at = ?
-                   WHERE id = ? AND is_deleted = 0""",
-                (title, time.time(), conversation_id),
-            )
-            conn.commit()
+            with transaction_context(conn):
+                cursor = conn.execute(
+                    """UPDATE conversations
+                       SET title = ?, updated_at = ?
+                       WHERE id = ? AND is_deleted = 0""",
+                    (title, time.time(), conversation_id),
+                )
         return cursor.rowcount > 0
 
     def get_message_count(self, conversation_id: str) -> int:
@@ -442,17 +432,18 @@ class ConversationDB:
             bool — 是否恢复成功
         """
         with _connect(self._db_path) as conn:
-            cursor = conn.execute(
-                """UPDATE conversations
-                   SET is_deleted = 0, updated_at = ?
-                   WHERE id = ? AND is_deleted = 1""",
-                (time.time(), conversation_id),
-            )
-            conn.commit()
+            with transaction_context(conn):
+                cursor = conn.execute(
+                    """UPDATE conversations
+                       SET is_deleted = 0, updated_at = ?
+                       WHERE id = ? AND is_deleted = 1""",
+                    (time.time(), conversation_id),
+                )
         return cursor.rowcount > 0
 
 
 # ============ 启动初始化 ============
+
 
 def init_conversation_db() -> ConversationDB:
     """服务启动时初始化对话数据库（幂等）

@@ -6,7 +6,7 @@ import logging; logger = logging.getLogger(__name__)
 import asyncio
 
 # v11: Concurrent control for ChromaDB
-_VECTOR_SEM = asyncio.Semaphore(2)
+_VECTOR_SEM = asyncio.Semaphore(5)  # 优化: 从2增加到5，提高并发处理能力
 
 try:
     import jieba
@@ -67,11 +67,11 @@ async def vector_recall(query: str, n_results: int = 30, category: str = "") -> 
             sim = 1.0 - float(dist)
             if sim > 0.15:
                 results.append({
-                    "file_hash": meta.get("file_hash", ""),
+                    "file_hash": fh,
                     "text": meta.get("text", ""),
                     "file_name": meta.get("file_name", ""),
                     "category": meta.get("category", ""),
-                    "chunk_index": meta.get("chunk_index", 0),
+                    "chunk_index": ci,
                     "score": round(sim * 10, 2),
                     "_source": "vector",
                     "_similarity": round(sim, 4),
@@ -244,8 +244,21 @@ def _l3_fusion_and_boost(bm25_results: list, vector_results: list,
                           query: str, wiki_hits: list, table_results: list,
                           top_k: int) -> list:
     """L3+L4: RRF 融合 + Wiki/Table 注入 + 排序 + 精排"""
+    # v1.44: 用 file_hash+chunk_index 构建集合，标记双路命中
+    def _result_key(r):
+        return f"{r.get('file_hash', '')}:{r.get('chunk_index', 0)}"
+    bm25_keys = {_result_key(r) for r in bm25_results}
+    vec_keys = {_result_key(r) for r in vector_results}
+    fused_keys = bm25_keys & vec_keys
+    
     # L3: RRF 融合
     merged = rrf_fusion(bm25_results, vector_results, k=60)
+    
+    # 标记双路命中
+    for item in merged:
+        if _result_key(item) in fused_keys:
+            item["_fused"] = True
+            item["_source"] = "bm25+vector"
 
     # Wiki results injection
     if wiki_hits:

@@ -2,10 +2,11 @@
 rate_limiter.py — 速率限制
 令牌桶 + 滑动窗口
 """
-import time
+
 import logging
-from typing import Dict
+import time
 from collections import deque
+from typing import Dict
 
 logger = logging.getLogger("infra.rate_limiter")
 
@@ -30,6 +31,7 @@ class TokenBucketRateLimiter:
     def acquire(self, tokens: int = 1) -> bool:
         """获取令牌"""
         import threading
+
         if self._lock is None:
             self._lock = threading.Lock()
 
@@ -109,15 +111,15 @@ def get_rate_limiter(name: str, max_requests: int = 60, window_seconds: int = 60
 
 def get_global_rate_limiter(name: str, max_requests: int = 60, window_sec: int = 60) -> SlidingWindowRateLimiter:
     """获取全局限速器 — v1.50 R3 Blue 新增
-    
+
     用于健康检查等公共端点的速率限制。
     基于客户端 IP 进行限流。
-    
+
     Args:
         name: 限速器名称（如 "health_check"）
         max_requests: 窗口内最大请求数
         window_sec: 窗口秒数
-    
+
     Returns:
         SlidingWindowRateLimiter 实例
     """

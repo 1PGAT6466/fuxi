@@ -3,8 +3,9 @@
 ========================================
 所有模块必须从这里导入分类信息，禁止自行定义。
 """
+
 import logging
-from typing import List, Dict, Optional
+from typing import Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
@@ -16,174 +17,382 @@ CATEGORIES: Dict[str, Dict] = {
     "模具设计": {
         "priority": 10,
         "keywords": [
-            "模具", "导柱", "导套", "顶针", "滑块", "浇口", "分型面", "模架",
-            "型腔", "注塑模具", "塑胶模具", "双色模具", "压铸模具", "冲压模具",
-            "锻模", "吹塑", "模具设计大典", "热流道", "冷流道", "脱模", "排气槽"
+            "模具",
+            "导柱",
+            "导套",
+            "顶针",
+            "滑块",
+            "浇口",
+            "分型面",
+            "模架",
+            "型腔",
+            "注塑模具",
+            "塑胶模具",
+            "双色模具",
+            "压铸模具",
+            "冲压模具",
+            "锻模",
+            "吹塑",
+            "模具设计大典",
+            "热流道",
+            "冷流道",
+            "脱模",
+            "排气槽",
         ],
         "domain": "mold_design",
-        "desc": "模具设计、模架、标准件、浇注系统"
+        "desc": "模具设计、模架、标准件、浇注系统",
     },
     "标准件": {
         "priority": 8,
         "keywords": [
-            "标准件", "螺丝", "螺母", "轴承", "弹簧", "垫圈", "销", "键",
-            "O型圈", "密封圈", "导柱", "导套", "顶针", "滑块", "紧固件",
-            "螺栓", "螺钉", "铆钉", "卡簧", "挡圈", "六角", "内六角"
+            "标准件",
+            "螺丝",
+            "螺母",
+            "轴承",
+            "弹簧",
+            "垫圈",
+            "销",
+            "键",
+            "O型圈",
+            "密封圈",
+            "导柱",
+            "导套",
+            "顶针",
+            "滑块",
+            "紧固件",
+            "螺栓",
+            "螺钉",
+            "铆钉",
+            "卡簧",
+            "挡圈",
+            "六角",
+            "内六角",
         ],
         "domain": "standard_parts",
-        "desc": "标准件、紧固件、密封件、轴承等"
+        "desc": "标准件、紧固件、密封件、轴承等",
     },
     "品质测量": {
         "priority": 8,
         "keywords": [
-            "测量", "检测", "量具", "卡尺", "千分尺", "三坐标", "粗糙度",
-            "硬度", "公差", "形位公差", "GD&T", "CMM", "投影仪", "高度仪",
-            "圆度", "同心度", "平行度", "垂直度", "平面度"
+            "测量",
+            "检测",
+            "量具",
+            "卡尺",
+            "千分尺",
+            "三坐标",
+            "粗糙度",
+            "硬度",
+            "公差",
+            "形位公差",
+            "GD&T",
+            "CMM",
+            "投影仪",
+            "高度仪",
+            "圆度",
+            "同心度",
+            "平行度",
+            "垂直度",
+            "平面度",
         ],
         "domain": "quality_measure",
-        "desc": "品质检测、量具、公差、形位公差"
+        "desc": "品质检测、量具、公差、形位公差",
     },
     "品质体系": {
         "priority": 6,
         "keywords": [
-            "ISO9001", "IATF16949", "ISO14001", "体系", "审核", "内审",
-            "外审", "管理评审", "纠正措施", "预防措施", "FMEA", "PPAP",
-            "APQP", "SPC", "MSA", "质量手册", "程序文件"
+            "ISO9001",
+            "IATF16949",
+            "ISO14001",
+            "体系",
+            "审核",
+            "内审",
+            "外审",
+            "管理评审",
+            "纠正措施",
+            "预防措施",
+            "FMEA",
+            "PPAP",
+            "APQP",
+            "SPC",
+            "MSA",
+            "质量手册",
+            "程序文件",
         ],
         "domain": "quality_system",
-        "desc": "品质体系、审核、五大工具"
+        "desc": "品质体系、审核、五大工具",
     },
     "供应链": {
         "priority": 6,
         "keywords": [
-            "采购", "供应商", "物流", "库存", "仓储", "ERP", "BOM",
-            "物料", "交期", "订单", "送货", "验收", "入库", "出库",
-            "供应链", "VMI", "JIT", "安全库存"
+            "采购",
+            "供应商",
+            "物流",
+            "库存",
+            "仓储",
+            "ERP",
+            "BOM",
+            "物料",
+            "交期",
+            "订单",
+            "送货",
+            "验收",
+            "入库",
+            "出库",
+            "供应链",
+            "VMI",
+            "JIT",
+            "安全库存",
         ],
         "domain": "supply_chain",
-        "desc": "采购、供应商、物流、库存管理"
+        "desc": "采购、供应商、物流、库存管理",
     },
     "安全环保": {
         "priority": 7,
         "keywords": [
-            "安全", "环保", "消防", "应急", "事故", "隐患", "EHS",
-            "危废", "废水", "废气", "噪音", "PPE", "劳保", "安全培训",
-            "危险源", "风险评估", "安全生产"
+            "安全",
+            "环保",
+            "消防",
+            "应急",
+            "事故",
+            "隐患",
+            "EHS",
+            "危废",
+            "废水",
+            "废气",
+            "噪音",
+            "PPE",
+            "劳保",
+            "安全培训",
+            "危险源",
+            "风险评估",
+            "安全生产",
         ],
         "domain": "safety",
-        "desc": "安全环保、消防、EHS"
+        "desc": "安全环保、消防、EHS",
     },
     "项目管理": {
         "priority": 5,
         "keywords": [
-            "项目", "进度", "里程碑", "甘特图", "WBS", "项目计划",
-            "风险管理", "变更管理", "验收", "交付", "预算", "成本"
+            "项目",
+            "进度",
+            "里程碑",
+            "甘特图",
+            "WBS",
+            "项目计划",
+            "风险管理",
+            "变更管理",
+            "验收",
+            "交付",
+            "预算",
+            "成本",
         ],
         "domain": "project_mgmt",
-        "desc": "项目管理、进度、成本"
+        "desc": "项目管理、进度、成本",
     },
     "人力资源": {
         "priority": 5,
         "keywords": [
-            "人力", "招聘", "培训", "考核", "薪酬", "绩效", "考勤",
-            "入职", "离职", "劳动合同", "社保", "公积金", "面试"
+            "人力",
+            "招聘",
+            "培训",
+            "考核",
+            "薪酬",
+            "绩效",
+            "考勤",
+            "入职",
+            "离职",
+            "劳动合同",
+            "社保",
+            "公积金",
+            "面试",
         ],
         "domain": "hr",
-        "desc": "人力资源、招聘、培训、考核"
+        "desc": "人力资源、招聘、培训、考核",
     },
     "IT网络": {
         "priority": 4,
         "keywords": [
-            "网络", "服务器", "防火墙", "交换机", "路由器", "VLAN",
-            "IP", "DNS", "VPN", "运维", "数据库", "OA", "邮箱", "权限", "账号"
+            "网络",
+            "服务器",
+            "防火墙",
+            "交换机",
+            "路由器",
+            "VLAN",
+            "IP",
+            "DNS",
+            "VPN",
+            "运维",
+            "数据库",
+            "OA",
+            "邮箱",
+            "权限",
+            "账号",
         ],
         "domain": "it_network",
-        "desc": "IT基础设施、网络、服务器、安全"
+        "desc": "IT基础设施、网络、服务器、安全",
     },
     "研发设计": {
         "priority": 6,
         "keywords": [
-            "研发", "设计", "CAD", "CAE", "仿真", "3D", "2D",
-            "SolidWorks", "UG", "ProE", "CATIA", "AutoCAD", "有限元",
-            "模流分析", "热分析", "结构分析"
+            "研发",
+            "设计",
+            "CAD",
+            "CAE",
+            "仿真",
+            "3D",
+            "2D",
+            "SolidWorks",
+            "UG",
+            "ProE",
+            "CATIA",
+            "AutoCAD",
+            "有限元",
+            "模流分析",
+            "热分析",
+            "结构分析",
         ],
         "domain": "rd_design",
-        "desc": "研发设计、CAD/CAE、仿真分析"
+        "desc": "研发设计、CAD/CAE、仿真分析",
     },
     "元数据": {
         "priority": 2,
         "keywords": [
-            "清单", "BOM", "明细", "汇总", "台账", "目录", "索引",
-            "对照表", "配置表", "参数表", "说明", "手册"
+            "清单",
+            "BOM",
+            "明细",
+            "汇总",
+            "台账",
+            "目录",
+            "索引",
+            "对照表",
+            "配置表",
+            "参数表",
+            "说明",
+            "手册",
         ],
         "domain": "metadata",
-        "desc": "清单、BOM、台账、目录类文档"
+        "desc": "清单、BOM、台账、目录类文档",
     },
     "技术文档": {
         "priority": 3,
         "keywords": [
-            "技术", "规范", "标准", "工艺", "流程", "参数", "规格",
-            "说明书", "图纸", "SOP", "SIP", "作业指导书", "检验标准"
+            "技术",
+            "规范",
+            "标准",
+            "工艺",
+            "流程",
+            "参数",
+            "规格",
+            "说明书",
+            "图纸",
+            "SOP",
+            "SIP",
+            "作业指导书",
+            "检验标准",
         ],
         "domain": "technical",
-        "desc": "技术规范、工艺、SOP、图纸"
+        "desc": "技术规范、工艺、SOP、图纸",
     },
     "办公文档": {
         "priority": 2,
         "keywords": [
-            "报告", "总结", "计划", "通知", "会议", "纪要", "申请",
-            "审批", "函", "公告", "制度", "规章", "合同"
+            "报告",
+            "总结",
+            "计划",
+            "通知",
+            "会议",
+            "纪要",
+            "申请",
+            "审批",
+            "函",
+            "公告",
+            "制度",
+            "规章",
+            "合同",
         ],
         "domain": "office",
-        "desc": "报告、总结、通知、制度等办公文档"
+        "desc": "报告、总结、通知、制度等办公文档",
     },
     "财务": {
         "priority": 5,
         "keywords": [
-            "财务", "会计", "税务", "发票", "报销", "预算", "成本",
-            "利润", "资产负债", "现金流量", "审计", "核算"
+            "财务",
+            "会计",
+            "税务",
+            "发票",
+            "报销",
+            "预算",
+            "成本",
+            "利润",
+            "资产负债",
+            "现金流量",
+            "审计",
+            "核算",
         ],
         "domain": "finance",
-        "desc": "财务、会计、税务、审计"
+        "desc": "财务、会计、税务、审计",
     },
     "销售市场": {
         "priority": 5,
-        "keywords": [
-            "销售", "客户", "市场", "营销", "报价", "合同", "订单",
-            "CRM", "线索", "商机", "成交", "回款"
-        ],
+        "keywords": ["销售", "客户", "市场", "营销", "报价", "合同", "订单", "CRM", "线索", "商机", "成交", "回款"],
         "domain": "sales",
-        "desc": "销售、客户、市场营销"
+        "desc": "销售、客户、市场营销",
     },
     "法律法规": {
         "priority": 6,
         "keywords": [
-            "法律", "法规", "合规", "知识产权", "专利", "商标", "著作权",
-            "诉讼", "仲裁", "合同法", "劳动法", "环保法"
+            "法律",
+            "法规",
+            "合规",
+            "知识产权",
+            "专利",
+            "商标",
+            "著作权",
+            "诉讼",
+            "仲裁",
+            "合同法",
+            "劳动法",
+            "环保法",
         ],
         "domain": "legal",
-        "desc": "法律法规、合规、知识产权"
+        "desc": "法律法规、合规、知识产权",
     },
     "通用办公": {
         "priority": 1,
-        "keywords": [
-            "Excel", "Word", "PPT", "表格", "文档", "幻灯片",
-            "邮件", "日程", "任务", "笔记", "通讯录"
-        ],
+        "keywords": ["Excel", "Word", "PPT", "表格", "文档", "幻灯片", "邮件", "日程", "任务", "笔记", "通讯录"],
         "domain": "default",
         "desc": "兜底分类 — 无法归入以上任何类的文件",
     },
     # ── 操作手册类 ──
     "操作手册_泛微OA": {
         "keywords": [
-            "流程引擎", "审批", "表单", "门户", "公文", "人事管理",
-            "后台维护", "前台使用", "功能模块", "E-cology", "泛微",
-            "协同办公", "组织架构", "权限设置", "模块配置", "考勤",
-            "合同", "招聘", "培训", "报表", "资产", "客户", "预算"
+            "流程引擎",
+            "审批",
+            "表单",
+            "门户",
+            "公文",
+            "人事管理",
+            "后台维护",
+            "前台使用",
+            "功能模块",
+            "E-cology",
+            "泛微",
+            "协同办公",
+            "组织架构",
+            "权限设置",
+            "模块配置",
+            "考勤",
+            "合同",
+            "招聘",
+            "培训",
+            "报表",
+            "资产",
+            "客户",
+            "预算",
         ],
         "priority": 8,
         "domain": "oa_manual",
-        "desc": "泛微OA系统各模块的后台维护和前端使用手册"
+        "desc": "泛微OA系统各模块的后台维护和前端使用手册",
     },
 }
 
@@ -284,6 +493,7 @@ MATCH_CONFIG = {
 # 工具函数
 # ============================================================
 
+
 def normalize_category(raw: str) -> str:
     """归一化分类名"""
     if not raw:
@@ -309,8 +519,8 @@ def match_category(text: str, file_ext: str = "", max_len: int = 5000, file_name
     # 文件名模式匹配：操作手册类直接命中
     if file_name:
         _fn_lower = file_name.lower()
-        if '泛微' in _fn_lower or 'e-cology' in _fn_lower or 'ecology' in _fn_lower:
-            return '操作手册_泛微OA'
+        if "泛微" in _fn_lower or "e-cology" in _fn_lower or "ecology" in _fn_lower:
+            return "操作手册_泛微OA"
 
     if not text or len(text) < 5:
         return None
@@ -348,7 +558,10 @@ def match_category(text: str, file_ext: str = "", max_len: int = 5000, file_name
             best_count += 1
 
     # 高绝对分兜底
-    if sorted_scores[0] > MATCH_CONFIG["high_score_threshold"] and best_count >= MATCH_CONFIG["high_score_min_keywords"]:
+    if (
+        sorted_scores[0] > MATCH_CONFIG["high_score_threshold"]
+        and best_count >= MATCH_CONFIG["high_score_min_keywords"]
+    ):
         return best
 
     if confidence < MATCH_CONFIG["min_confidence"]:
@@ -365,7 +578,7 @@ def match_categories_multi(text: str, top_k: int = 3) -> List[Dict]:
         return [{"category": "通用办公", "confidence": 1.0, "matched_keywords": []}]
 
     if len(text) > MATCH_CONFIG["max_text_len"]:
-        text = text[:MATCH_CONFIG["max_text_len"]]
+        text = text[: MATCH_CONFIG["max_text_len"]]
 
     scores = {}
     text_lower = text.lower()
@@ -385,11 +598,9 @@ def match_categories_multi(text: str, top_k: int = 3) -> List[Dict]:
     total = sum(v["score"] for v in scores.values())
     results = []
     for cat_name, info in sorted(scores.items(), key=lambda x: -x[1]["score"])[:top_k]:
-        results.append({
-            "category": cat_name,
-            "confidence": round(info["score"] / total, 3),
-            "matched_keywords": info["keywords"]
-        })
+        results.append(
+            {"category": cat_name, "confidence": round(info["score"] / total, 3), "matched_keywords": info["keywords"]}
+        )
     return results
 
 
@@ -413,19 +624,23 @@ def llm_classify(text: str) -> str:
     """1.5.12 LLM 辅助分类（三级管线兜底）"""
     try:
         import requests
+
         r = requests.post(
             "https://token-plan-cn.xiaomimimo.com/v1/chat/completions",
             json={
                 "model": "mimo-v2.5",
                 "messages": [
                     {"role": "system", "content": "只输出分类名"},
-                    {"role": "user", "content": f"分类：机械设计/电气自动化/IT系统/质量管理/项目管理/通用办公\n文档：{text[:500]}"}
+                    {
+                        "role": "user",
+                        "content": f"分类：机械设计/电气自动化/IT系统/质量管理/项目管理/通用办公\n文档：{text[:500]}",
+                    },
                 ],
                 "max_tokens": 20,
-                "temperature": 0.1
+                "temperature": 0.1,
             },
             headers={"Authorization": "Bearer {os.getenv('MIMO_API_KEY', '')}"},
-            timeout=10
+            timeout=10,
         )
         return r.json().get("choices", [{}])[0].get("message", {}).get("content", "").strip()
     except Exception as e:  # TODO: Narrow exception type

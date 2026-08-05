@@ -1,0 +1,300 @@
+﻿"""
+pattern_store.py 鈥?璇箟妯″紡搴擄紙v2.0 鏂板锛?
+鍩轰簬 self-improving-agent 鐨勫璁板繂鏋舵瀯锛?- 璇箟璁板繂锛氬彲澶嶇敤鐨勭煡璇嗘ā寮忥紙璺ㄤ笂涓嬫枃锛?- 鎯呮櫙璁板繂锛氬叿浣撶粡鍘嗗拰缁撴灉
+- 宸ヤ綔璁板繂锛氬綋鍓嶄細璇濅笂涓嬫枃
+
+鐏垫劅鏉ユ簮锛?- SimpleMem: Efficient Lifelong Memory for LLM Agents
+- Multi-Memory Survey (ACM 2025)
+- Evo-Memory: DeepMind's Benchmark
+"""
+
+import json
+import logging
+import threading
+import time
+from collections import defaultdict
+from pathlib import Path
+from typing import Dict, List, Optional
+
+from src.config import DATA_DIR
+
+logger = logging.getLogger(__name__)
+
+PATTERNS_DIR = Path(DATA_DIR) / "patterns"
+PATTERNS_DIR.mkdir(parents=True, exist_ok=True)
+
+# 鈹€鈹€ 璇箟妯″紡搴擄紙鎶借薄鐭ヨ瘑锛岃法涓婁笅鏂囧彲澶嶇敤锛夆攢鈹€
+SEMANTIC_FILE = PATTERNS_DIR / "semantic_patterns.json"
+
+# 鈹€鈹€ 鎯呮櫙璁板繂搴擄紙鍏蜂綋缁忓巻锛屽甫鏃堕棿鎴冲拰缁撴灉锛夆攢鈹€
+EPISODIC_DIR = PATTERNS_DIR / "episodic"
+EPISODIC_DIR.mkdir(parents=True, exist_ok=True)
+
+# 鈹€鈹€ 杩涘寲鏃ュ織锛堝彲杩芥函鐨勫彉鏇磋褰曪級鈹€鈹€
+EVOLUTION_LOG = PATTERNS_DIR / "evolution_log.jsonl"
+
+# 鈹€鈹€ 妯″紡缃俊搴﹂槇鍊?鈹€鈹€
+CONFIDENCE_THRESHOLD = 0.6  # 浣庝簬姝ゅ€肩殑妯″紡涓嶆帹鑽?AUTO_ADD_THRESHOLD = 0.9  # 楂樹簬姝ゅ€肩殑妯″紡鑷姩搴旂敤
+
+_pattern_lock = threading.Lock()
+
+
+def _load_semantic() -> Dict:
+    """鍔犺浇璇箟妯″紡搴?""
+    if SEMANTIC_FILE.exists():
+        try:
+            return json.loads(SEMANTIC_FILE.read_text(encoding="utf-8"))
+        except (json.JSONDecodeError, OSError) as e:
+            logger.warning(f"[PatternStore] 鍔犺浇璇箟妯″紡澶辫触: {e}")
+    return {"patterns": {}, "version": "2.0", "updated": time.time()}
+
+
+def _save_semantic(data: Dict):
+    """淇濆瓨璇箟妯″紡搴?""
+    data["updated"] = time.time()
+    SEMANTIC_FILE.write_text(
+        json.dumps(data, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def record_pattern(
+    name: str,
+    category: str,
+    pattern: str,
+    solution: str,
+    source: str = "implementation",
+    confidence: float = 0.8,
+    target_skills: Optional[List[str]] = None,
+    metadata: Optional[Dict] = None,
+) -> Dict:
+    """璁板綍涓€涓柊鍙戠幇鐨勮涔夋ā寮?
+    Args:
+        name: 妯″紡鍚嶇О锛堢畝鐭弿杩帮級
+        category: 鍒嗙被锛坮etrieval/generation/security/performance/ux锛?        pattern: 闂妯″紡鎻忚堪
+        solution: 瑙ｅ喅鏂规
+        source: 鏉ユ簮锛坲ser_feedback/implementation_review/retrospective/error_fix锛?        confidence: 鍒濆缃俊搴︼紙0-1锛?        target_skills: 閫傜敤鐨勬妧鑳?妯″潡鍒楄〃
+        metadata: 闄勫姞鍏冩暟鎹?
+    Returns:
+        妯″紡璁板綍
+    """
+    import hashlib
+
+    pat_id = hashlib.sha256(f"{name}{category}{time.time()}".encode()).hexdigest()[:12]
+    pat_id = f"pat-{time.strftime('%Y%m%d')}-{pat_id}"
+
+    entry = {
+        "id": pat_id,
+        "name": name,
+        "category": category,
+        "pattern": pattern,
+        "solution": solution,
+        "source": source,
+        "confidence": confidence,
+        "applications": 0,
+        "successes": 0,
+        "failures": 0,
+        "created": time.strftime("%Y-%m-%d"),
+        "last_used": None,
+        "target_skills": target_skills or [],
+        "metadata": metadata or {},
+    }
+
+    with _pattern_lock:
+        data = _load_semantic()
+        data["patterns"][pat_id] = entry
+        _save_semantic(data)
+
+    # 璁板綍杩涘寲鏃ュ織
+    _log_evolution("pattern_created", pat_id, entry)
+
+    logger.info(f"[PatternStore] 鏂版ā寮? {pat_id} ({name})")
+    return entry
+
+
+def apply_pattern(pat_id: str, success: bool = True):
+    """璁板綍妯″紡鐨勫簲鐢ㄧ粨鏋滐紝鏇存柊缃俊搴?""
+    with _pattern_lock:
+        data = _load_semantic()
+        pat = data["patterns"].get(pat_id)
+        if not pat:
+            return
+
+        pat["applications"] += 1
+        pat["last_used"] = time.strftime("%Y-%m-%d")
+
+        if success:
+            pat["successes"] += 1
+            # 缃俊搴﹁礉鍙舵柉鏇存柊锛氭垚鍔熸椂寰
+            pat["confidence"] = min(1.0, pat["confidence"] + 0.02)
+        else:
+            pat["failures"] += 1
+            # 澶辫触鏃堕檷浣庣疆淇″害
+            pat["confidence"] = max(0.0, pat["confidence"] - 0.05)
+
+        _save_semantic(data)
+
+
+def get_patterns(
+    category: Optional[str] = None,
+    min_confidence: float = CONFIDENCE_THRESHOLD,
+    limit: int = 20,
+) -> List[Dict]:
+    """鑾峰彇鎺ㄨ崘鐨勮涔夋ā寮?""
+    data = _load_semantic()
+    patterns = list(data.get("patterns", {}).values())
+
+    # 杩囨护
+    if category:
+        patterns = [p for p in patterns if p.get("category") == category]
+    patterns = [p for p in patterns if p.get("confidence", 0) >= min_confidence]
+
+    # 鎺掑簭锛氱疆淇″害 脳 搴旂敤娆℃暟
+    patterns.sort(
+        key=lambda p: p.get("confidence", 0) * (1 + p.get("applications", 0) * 0.1),
+        reverse=True,
+    )
+
+    return patterns[:limit]
+
+
+def get_pattern_by_id(pat_id: str) -> Optional[Dict]:
+    """鑾峰彇鍗曚釜妯″紡"""
+    data = _load_semantic()
+    return data.get("patterns", {}).get(pat_id)
+
+
+def search_patterns(query: str, limit: int = 5) -> List[Dict]:
+    """鎼滅储鐩稿叧妯″紡锛堝叧閿瘝鍖归厤 + 缃俊搴︽帓搴忥級"""
+    data = _load_semantic()
+    patterns = list(data.get("patterns", {}).values())
+
+    # 鍏抽敭璇嶅尮閰?    query_lower = query.lower()
+    scored = []
+    for pat in patterns:
+        score = 0
+        text = f"{pat.get('name', '')} {pat.get('pattern', '')} {pat.get('solution', '')}".lower()
+        for word in query_lower.split():
+            if len(word) >= 2 and word in text:
+                score += 1
+        if score > 0:
+            scored.append((score, pat))
+
+    scored.sort(key=lambda x: (x[0], x[1].get("confidence", 0)), reverse=True)
+    return [p for _, p in scored[:limit]]
+
+
+# 鈹€鈹€ 鎯呮櫙璁板繂 鈹€鈹€
+
+
+def record_episode(
+    skill: str,
+    situation: str,
+    action: str,
+    outcome: str,
+    lesson: str,
+    related_pattern: Optional[str] = None,
+    user_feedback: Optional[Dict] = None,
+) -> Dict:
+    """璁板綍涓€娆″叿浣撶粡鍘嗭紙鎯呮櫙璁板繂锛?""
+    episode = {
+        "id": f"ep-{time.strftime('%Y%m%d-%H%M%S')}",
+        "timestamp": time.time(),
+        "skill": skill,
+        "situation": situation,
+        "action": action,
+        "outcome": outcome,
+        "lesson": lesson,
+        "related_pattern": related_pattern,
+        "user_feedback": user_feedback,
+    }
+
+    # 鍐欏叆鎸夋棩鏈熷垎鏂囦欢
+    date_str = time.strftime("%Y-%m-%d")
+    ep_file = EPISODIC_DIR / f"{date_str}.jsonl"
+    with open(ep_file, "a", encoding="utf-8") as f:
+        f.write(json.dumps(episode, ensure_ascii=False) + "\n")
+
+    # 璁板綍杩涘寲鏃ュ織
+    _log_evolution("episode_recorded", episode["id"], {"skill": skill, "outcome": outcome, "lesson": lesson})
+
+    logger.info(f"[PatternStore] 鎯呮櫙璁板綍: {episode['id']} ({skill})")
+    return episode
+
+
+def get_recent_episodes(days: int = 7, skill: Optional[str] = None) -> List[Dict]:
+    """鑾峰彇鏈€杩?N 澶╃殑鎯呮櫙璁板繂"""
+    episodes = []
+    for i in range(days):
+        date_str = time.time() - i * 86400
+        date_str = time.strftime("%Y-%m-%d", time.localtime(date_str))
+        ep_file = EPISODIC_DIR / f"{date_str}.jsonl"
+        if ep_file.exists():
+            for line in ep_file.read_text(encoding="utf-8").strip().split("\n"):
+                if line.strip():
+                    try:
+                        ep = json.loads(line)
+                        if skill and ep.get("skill") != skill:
+                            continue
+                        episodes.append(ep)
+                    except json.JSONDecodeError:
+                        continue
+    return episodes
+
+
+# 鈹€鈹€ 杩涘寲鏃ュ織 鈹€鈹€
+
+
+def _log_evolution(event_type: str, target_id: str, details: Dict):
+    """璁板綍杩涘寲浜嬩欢锛堝彲杩芥函锛?""
+    entry = {
+        "timestamp": time.time(),
+        "time_str": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "event": event_type,
+        "target": target_id,
+        "details": details,
+    }
+    with open(EVOLUTION_LOG, "a", encoding="utf-8") as f:
+        f.write(json.dumps(entry, ensure_ascii=False) + "\n")
+
+
+def get_evolution_log(limit: int = 50) -> List[Dict]:
+    """鑾峰彇杩涘寲鏃ュ織"""
+    if not EVOLUTION_LOG.exists():
+        return []
+    lines = EVOLUTION_LOG.read_text(encoding="utf-8").strip().split("\n")
+    entries = []
+    for line in lines[-limit:]:
+        if line.strip():
+            try:
+                entries.append(json.loads(line))
+            except json.JSONDecodeError:
+                continue
+    return entries
+
+
+# 鈹€鈹€ 缁熻 鈹€鈹€
+
+
+def get_pattern_stats() -> Dict:
+    """鑾峰彇妯″紡搴撶粺璁?""
+    data = _load_semantic()
+    patterns = list(data.get("patterns", {}).values())
+
+    categories = defaultdict(int)
+    total_apps = 0
+    total_confidence = 0
+    for p in patterns:
+        categories[p.get("category", "unknown")] += 1
+        total_apps += p.get("applications", 0)
+        total_confidence += p.get("confidence", 0)
+
+    avg_confidence = total_confidence / len(patterns) if patterns else 0
+
+    return {
+        "total_patterns": len(patterns),
+        "categories": dict(categories),
+        "total_applications": total_apps,
+        "average_confidence": round(avg_confidence, 3),
+        "high_confidence": len([p for p in patterns if p.get("confidence", 0) >= AUTO_ADD_THRESHOLD]),
+    }

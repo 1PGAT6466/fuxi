@@ -18,9 +18,9 @@ def _load_synonyms():
     if _SYNONYM_MAP:
         return
     try:
-        from src.services.synonym_loader import load_synonyms
+        from src.infra import load_synonyms
         _SYNONYM_MAP = load_synonyms()
-    except Exception:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         _SYNONYM_MAP = {}
 
 

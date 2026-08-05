@@ -11,6 +11,13 @@ logger = logging.getLogger("graph_traversal")
 GRAPH_FILE = os.path.join(os.path.dirname(__file__), "../../data/knowledge_graph.json")
 DB_PATH = Path(os.path.join(os.path.dirname(__file__), "../../data/chunks.db"))
 
+# ============================================================================
+# 查询缓存 — 避免重复读取 JSON 文件
+# ============================================================================
+_graph_cache = None        # 缓存的图数据
+_graph_cache_time = 0      # 缓存时间戳
+_CACHE_TTL = 300           # 缓存有效期（秒）
+
 
 def _get_conn():
     conn = sqlite3.connect(str(DB_PATH), timeout=10)
@@ -62,10 +69,47 @@ def build_adjacency():
 
 
 def load_graph() -> dict:
+    """加载图谱数据（带缓存）
+    
+    缓存策略：TTL 300秒，文件修改时自动失效。
+    
+    Returns:
+        {"nodes": [...], "edges": [...]}
+    """
+    global _graph_cache, _graph_cache_time
+    import time
+    
+    now = time.time()
+    
+    # 检查缓存是否有效
+    if _graph_cache is not None and (now - _graph_cache_time) < _CACHE_TTL:
+        return _graph_cache
+    
+    # 加载数据
     if os.path.exists(GRAPH_FILE):
-        with open(GRAPH_FILE, 'r', encoding='utf-8') as f:
-            return json.load(f)
+        try:
+            with open(GRAPH_FILE, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            _graph_cache = data
+            _graph_cache_time = now
+            return data
+        except Exception as e:
+            logger.warning("图谱文件读取失败: %s", e)
+            if _graph_cache is not None:
+                return _graph_cache
+    
     return {"nodes": [], "edges": []}
+
+
+def invalidate_graph_cache():
+    """手动使图谱缓存失效
+    
+    在图谱数据更新后调用此方法。
+    """
+    global _graph_cache, _graph_cache_time
+    _graph_cache = None
+    _graph_cache_time = 0
+    logger.info("[GraphTraversal] 图谱缓存已清除")
 
 
 def _build_adj_from_graph(graph: dict, relation_filter: Optional[str] = None) -> dict:

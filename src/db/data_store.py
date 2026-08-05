@@ -3,22 +3,30 @@ data_store.py — 数据存储工具（v10.0）
 负责：chunks 加载/保存、配置加载/保存、搜索日志、图谱操作
 抽取自 server.py，供各 router 模块共享
 """
-import os, json, time, threading
-from datetime import datetime, timezone
 
-from src.db.memory_store import get_store
+import json
+import os
+import sqlite3
+import threading
+import time
+from datetime import datetime, timezone
+from typing import Any
+
 from src.config import (
-    LOG_DIR,
     CONFIG_FILE,
     CONFIG_HISTORY_DIR,
-    GRAPH_PATH,
-    TOOLS_DATA,
     FAQ_DATA,
+    GRAPH_PATH,
+    LOG_DIR,
+    TOOLS_DATA,
 )
+from src.db.memory_store import get_store
+from src.db.transaction import transaction_context
 
 # ============ 索引初始化 ============
 
-def _ensure_indexes(conn):
+
+def _ensure_indexes(conn) -> Any:
     """确保常用查询有索引"""
     conn.execute("CREATE INDEX IF NOT EXISTS idx_chunks_file ON chunks(file_name)")
     conn.execute("CREATE INDEX IF NOT EXISTS idx_chunks_category ON chunks(category)")
@@ -26,10 +34,11 @@ def _ensure_indexes(conn):
     conn.commit()
 
 
-def init_db():
+def init_db() -> Any:
     """初始化数据库索引（幂等，可重复调用）"""
     store = get_store()
     _ensure_indexes(store._db_conn)
+
 
 # ============ Chunks ============
 
@@ -45,6 +54,7 @@ def _calculate_dynamic_ttl(access_count: int, last_access: float) -> int:
         return 60
     else:
         return 30
+
 
 def load_chunks(filter_junk: bool = True, limit: int = None, offset: int = 0) -> list:
     """从 SQLite 分页加载 chunk（带动态 TTL 缓存，threadsafe）"""
@@ -62,17 +72,31 @@ def load_chunks(filter_junk: bool = True, limit: int = None, offset: int = 0) ->
     if not filter_junk:
         return chunks
     _JUNK_PATTERNS = [
-        'draft_meta_info', 'draft_virtual_store', 'draft_content', 'draft_cloud',
-        'draft_enterprise', 'key_value.json', 'excanvas.js', 'search.cfg',
-        '.step', '.sldprt', '.prt', '.igs', '.dwg', '.stl', '.iges'
+        "draft_meta_info",
+        "draft_virtual_store",
+        "draft_content",
+        "draft_cloud",
+        "draft_enterprise",
+        "key_value.json",
+        "excanvas.js",
+        "search.cfg",
+        ".step",
+        ".sldprt",
+        ".prt",
+        ".igs",
+        ".dwg",
+        ".stl",
+        ".iges",
     ]
-    def _is_junk(fname):
-        fn = (fname or '').lower()
+
+    def _is_junk(fname) -> Any:
+        fn = (fname or "").lower()
         for pat in _JUNK_PATTERNS:
             if pat in fn:
                 return True
         return False
-    result = [c for c in chunks if not _is_junk(c.get('file_name', ''))]
+
+    result = [c for c in chunks if not _is_junk(c.get("file_name", ""))]
 
     if limit is None and offset == 0:
         with _chunk_cache_lock:
@@ -84,7 +108,7 @@ def load_chunks(filter_junk: bool = True, limit: int = None, offset: int = 0) ->
     return result
 
 
-def invalidate_chunk_cache():
+def invalidate_chunk_cache() -> Any:
     """在数据写入/删除后调用，清除缓存 — v1.50 R3: 锁保护完整操作"""
     with _chunk_cache_lock:
         _CHUNK_CACHE["data"] = None
@@ -93,20 +117,20 @@ def invalidate_chunk_cache():
         _CHUNK_CACHE["last_access"] = 0
 
 
-def save_chunks(chunks: list):
+def save_chunks(chunks: list) -> Any:
     """全量替换保存 chunks：清空现有数据，再批量写入（带缓存失效）
-    
+
     调用方期望：提供完整的 chunk 列表，完全替换数据库中的现有数据。
     实现：通过 MemoryStore 先清空再批量插入，保证原子性。
     v1.50 R3: 使用 write_lock 保护 atomic delete+insert 操作
     v1.50 R4: DELETE + INSERT 包装在同一事务中，防止中间状态被读取
+    v1.50 R5: 使用 transaction_context 确保异常时自动 rollback
     """
     store = get_store()
     # v1.50 R3: 加写入锁防止并发 save_chunks 调用交错
     with store._write_lock:
-        # v1.50 R4: DELETE + INSERT 在同一事务中
-        with store._db_conn:
-            store._db_conn.execute("BEGIN IMMEDIATE")
+        # v1.50 R5: 使用 transaction_context 包裹事务，异常自动 rollback
+        with transaction_context(store._db_conn):
             # 1) 先清空现有数据
             store._db_conn.execute("DELETE FROM chunks")
             # 重置自增计数器，避免 id 无限增长
@@ -116,22 +140,23 @@ def save_chunks(chunks: list):
                 rows = []
                 for c in chunks:
                     tenant_id = c.get("tenant_id", "default")
-                    rows.append((
-                        json.dumps(c, ensure_ascii=False),
-                        c.get("file_hash", ""),
-                        c.get("file_name", ""),
-                        c.get("category", ""),
-                        c.get("chunk_index", 0),
-                        "active",
-                        c.get("created_at", ""),
-                        c.get("loader_path", ""),
-                        tenant_id,
-                    ))
+                    rows.append(
+                        (
+                            json.dumps(c, ensure_ascii=False),
+                            c.get("file_hash", ""),
+                            c.get("file_name", ""),
+                            c.get("category", ""),
+                            c.get("chunk_index", 0),
+                            "active",
+                            c.get("created_at", ""),
+                            c.get("loader_path", ""),
+                            tenant_id,
+                        )
+                    )
                 store._db_conn.executemany(
                     "INSERT INTO chunks (doc, file_hash, file_name, category, chunk_index, status, created_at, loader_path, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    rows
+                    rows,
                 )
-            store._db_conn.commit()
         # 3) 清除内存缓存
         store._cache_hash.clear()
         store._cache_name.clear()
@@ -145,31 +170,34 @@ def save_chunks(chunks: list):
 
 # ============ Config ============
 
+
 def load_config() -> dict:
     try:
         if CONFIG_FILE.exists():
             return json.loads(CONFIG_FILE.read_text(encoding="utf-8"))
-    except Exception:
-        logger.warning(f"[data_store] load_config 失败", exc_info=True)
+    except (json.JSONDecodeError, FileNotFoundError, OSError) as e:
+        # JSONDecodeError - 配置文件格式错误
+        # FileNotFoundError/OSError - 文件系统错误
+        logger.warning(f"[data_store] load_config 失败: {e}", exc_info=True)
     return {"tools": TOOLS_DATA, "faq": FAQ_DATA}
 
 
-def save_config(config: dict):
+def save_config(config: dict) -> Any:
     tmp = str(CONFIG_FILE) + ".tmp"
     with open(tmp, "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False)
     os.replace(tmp, str(CONFIG_FILE))
 
 
-def save_config_history(config: dict):
+def save_config_history(config: dict) -> Any:
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    (CONFIG_HISTORY_DIR / f"config_{ts}.json").write_text(
-        json.dumps(config, ensure_ascii=False), encoding="utf-8")
+    (CONFIG_HISTORY_DIR / f"config_{ts}.json").write_text(json.dumps(config, ensure_ascii=False), encoding="utf-8")
 
 
 # ============ 搜索日志 ============
 
-def log_search(query: str, results: int, ms: float, top_items: list = None):
+
+def log_search(query: str, results: int, ms: float, top_items: list = None) -> Any:
     try:
         f = LOG_DIR / f"search_{datetime.now().strftime('%Y%m%d')}.jsonl"
         entry = {
@@ -187,8 +215,10 @@ def log_search(query: str, results: int, ms: float, top_items: list = None):
         with open(f, "a", encoding="utf-8") as fh:
             json.dump(entry, fh, ensure_ascii=False)
             fh.write("\n")
-    except Exception:
-        logger.warning(f"[data_store] log_search 写入失败", exc_info=True)
+    except (OSError, TypeError) as e:
+        # OSError - 文件写入失败（磁盘满/权限）
+        # TypeError - json.dump 参数类型错误
+        logger.warning(f"[data_store] log_search 写入失败: {e}", exc_info=True)
 
 
 def search_history(days: int = 7) -> list:
@@ -205,17 +235,22 @@ def search_history(days: int = 7) -> list:
                                 ts = datetime.fromisoformat(e["time"]).timestamp()
                                 if ts >= cutoff:
                                     hist.append(e)
-                        except Exception:
-                            logger.debug(f"[data_store] 搜索日志行解析失败，跳过", exc_info=True)
-    except Exception:
-        logger.warning(f"[data_store] search_history 读取失败", exc_info=True)
-    
+                        except (json.JSONDecodeError, KeyError, ValueError) as e:
+                            # JSONDecodeError - 行格式错误
+                            # KeyError/ValueError - 字典键缺失或值类型错误
+                            logger.debug(f"[data_store] 搜索日志行解析失败，跳过: {e}", exc_info=True)
+    except (OSError, json.JSONDecodeError) as e:
+        # OSError - 目录遍历或文件读取失败
+        # JSONDecodeError - 日志行 JSON 解析失败
+        logger.warning(f"[data_store] search_history 读取失败: {e}", exc_info=True)
+
     # v1.50 R4: 修复语法错误 — sorted 调用必须在 except 之外且需要赋值
     hist.sort(key=lambda x: x.get("time", ""), reverse=True)
     return hist[:30]
 
 
 # ============ 知识图谱 ============
+
 
 def load_graph() -> dict:
     """加载知识图谱，兼容三种来源：
@@ -241,17 +276,20 @@ def load_graph() -> dict:
             for r in rels:
                 parts = r.split(":", 1)
                 if len(parts) == 2:
-                    edges.append({
-                        "from": entity,
-                        "to": parts[0],
-                        "relation": parts[1],
-                    })
+                    edges.append(
+                        {
+                            "from": entity,
+                            "to": parts[0],
+                            "relation": parts[1],
+                        }
+                    )
         if nodes:
             return {"nodes": nodes, "edges": edges}
-    
+
     # Fallback: load from worldtree.db
     try:
         from src.core.db import connect
+
         with connect("worldtree") as wt_db:
             ents = wt_db.execute("SELECT id, name, type, category_path FROM entities").fetchall()
             if ents:
@@ -262,7 +300,7 @@ def load_graph() -> dict:
                         "id": d["id"],
                         "type": d["type"],
                         "label": d["type"],
-                        "category_path": d.get("category_path", "") or ""
+                        "category_path": d.get("category_path", "") or "",
                     }
                 edges = []
                 rels = wt_db.execute(
@@ -274,18 +312,16 @@ def load_graph() -> dict:
                 for r in rels:
                     d = dict(r)
                     if d["from_name"] and d["to_name"]:
-                        edges.append({
-                            "from": d["from_name"],
-                            "to": d["to_name"],
-                            "relation": d["relation_type"]
-                        })
+                        edges.append({"from": d["from_name"], "to": d["to_name"], "relation": d["relation_type"]})
                 return {"nodes": nodes, "edges": edges}
-    except Exception as e:
+    except (sqlite3.Error, ValueError, KeyError) as e:
+        # sqlite3.Error - 数据库查询错误
+        # ValueError/KeyError - 结果字典键缺失或值类型错误
         logger.warning(f"[data_store] load_graph worldtree 回退失败: {e}", exc_info=True)
     return {"nodes": {}, "edges": []}
 
 
-def save_graph(graph: dict):
+def save_graph(graph: dict) -> Any:
     """保存知识图谱，空图不覆盖已有数据"""
     nodes = graph.get("nodes", graph.get("entities", {}))
     if not nodes and GRAPH_PATH.exists():
@@ -297,21 +333,28 @@ def save_graph(graph: dict):
 
 # ============ 行为日志 ============
 
-def log_behavior(entry: dict):
+
+def log_behavior(entry: dict) -> Any:
     f = LOG_DIR / f"behavior_{datetime.now().strftime('%Y%m%d')}.jsonl"
     entry["time"] = datetime.now(timezone.utc).isoformat()
     try:
         with open(f, "a", encoding="utf-8") as fh:
             json.dump(entry, fh, ensure_ascii=False)
             fh.write("\n")
-    except Exception:
-        logger.warning(f"[data_store] log_behavior 写入失败", exc_info=True)
+    except (OSError, TypeError) as e:
+        # OSError - 文件写入失败（磁盘满/权限）
+        # TypeError - json.dump 参数类型错误
+        logger.warning(f"[data_store] log_behavior 写入失败: {e}", exc_info=True)
 
 
 # ============ 用户偏好 ============
 
 from src.config import USER_PREFERENCES_FILE
-import logging; logger = logging.getLogger(__name__)
+
+import logging
+
+logger = logging.getLogger(__name__)
+
 
 def get_user_preferences(uid: str) -> dict:
     prefs = {}
@@ -319,17 +362,21 @@ def get_user_preferences(uid: str) -> dict:
         try:
             all_prefs = json.loads(USER_PREFERENCES_FILE.read_text(encoding="utf-8"))
             prefs = all_prefs.get(uid, {})
-        except Exception:
-            logger.warning(f"[data_store] get_user_preferences 读取失败", exc_info=True)
+        except (json.JSONDecodeError, OSError) as e:
+            # JSONDecodeError - 配置文件格式错误
+            # OSError - 文件读取失败
+            logger.warning(f"[data_store] get_user_preferences 读取失败: {e}", exc_info=True)
     return prefs
 
 
-def save_user_preferences(uid: str, prefs: dict):
+def save_user_preferences(uid: str, prefs: dict) -> Any:
     all_prefs = {}
     if USER_PREFERENCES_FILE.exists():
         try:
             all_prefs = json.loads(USER_PREFERENCES_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            logger.warning(f"[data_store] save_user_preferences 读取失败", exc_info=True)
+        except (json.JSONDecodeError, OSError) as e:
+            # JSONDecodeError - 配置文件格式错误
+            # OSError - 文件读取失败
+            logger.warning(f"[data_store] save_user_preferences 读取失败: {e}", exc_info=True)
     all_prefs[uid] = prefs
     USER_PREFERENCES_FILE.write_text(json.dumps(all_prefs, ensure_ascii=False, indent=2), encoding="utf-8")

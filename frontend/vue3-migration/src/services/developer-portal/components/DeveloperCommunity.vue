@@ -81,7 +81,7 @@
         <div class="developer-community__post-footer">
           <div class="developer-community__post-author">
             <el-avatar :size="24" :src="post.author.avatar">
-              {{ post.author.name.charAt(0) }}
+              {{ (post?.author?.name || '?').charAt(0) }}
             </el-avatar>
             <span class="developer-community__post-author-name">{{ post.author.name }}</span>
           </div>

@@ -1,6 +1,7 @@
 """
 tools.py — 少阴·FC工具定义
 """
+
 import logging
 
 logger = logging.getLogger("shaoyin.tools")
@@ -37,11 +38,11 @@ YANG_TOOLS = [
                 "type": "object",
                 "properties": {
                     "query": {"type": "string", "description": "搜索关键词"},
-                    "top_k": {"type": "integer", "default": 5, "description": "返回结果数"}
+                    "top_k": {"type": "integer", "default": 5, "description": "返回结果数"},
                 },
-                "required": ["query"]
-            }
-        }
+                "required": ["query"],
+            },
+        },
     },
     {
         "type": "function",
@@ -50,13 +51,11 @@ YANG_TOOLS = [
             "description": "完成任务并返回答案",
             "parameters": {
                 "type": "object",
-                "properties": {
-                    "answer": {"type": "string", "description": "完整回答"}
-                },
-                "required": ["answer"]
-            }
-        }
-    }
+                "properties": {"answer": {"type": "string", "description": "完整回答"}},
+                "required": ["answer"],
+            },
+        },
+    },
 ]
 
 

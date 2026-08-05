@@ -1,6 +1,11 @@
 /**
  * 伏羲 v2.1 — Chat Store
  * 会话管理 + 消息发送 + SSE 流式处理
+ *
+ * 增强功能（v2.1）：
+ * - 消息状态管理：sending / streaming / done / error
+ * - SSE 自动重连（指数退避，最多 3 次）
+ * - 打字机效果回调支持
  */
 import { defineStore } from 'pinia';
 import { ref, shallowRef, computed } from 'vue';
@@ -18,6 +23,13 @@ import { createLogger } from '@/utils/logger';
 const logger = createLogger('ChatStore');
 
 const MAX_MESSAGES: number = Number(import.meta.env.VITE_CHAT_MAX_MESSAGES) || 100;
+
+/** 消息状态类型 */
+export type MessageStatus = 'sending' | 'streaming' | 'done' | 'error';
+
+/** SSE 自动重连配置 */
+const MAX_RECONNECT_ATTEMPTS = 3;
+const RECONNECT_BASE_DELAY = 1000; // 1 秒基础延迟
 
 export const useChatStore = defineStore('chat', () => {
   // ============================
@@ -37,6 +49,15 @@ export const useChatStore = defineStore('chat', () => {
   const error = ref<string | null>(null);
   /** SAG 检索追踪数据（当前活跃的追踪） */
   const sagTrace = ref<SAGRetrievalTrace | null>(null);
+
+  /** 消息状态映射（index → status） */
+  const messageStatuses = ref<Map<number, MessageStatus>>(new Map());
+
+  /** 打字机回调（外部组件可注册） */
+  let typewriterCallback: ((char: string, index: number) => void) | null = null;
+
+  /** 当前重连次数 */
+  let reconnectAttempts = 0;
 
   // AbortController for cancelling stream
   let streamController: AbortController | null = null;
@@ -132,6 +153,27 @@ export const useChatStore = defineStore('chat', () => {
       streamController = null;
     }
     streaming.value = false;
+    reconnectAttempts = 0;
+  }
+
+  /** 注册打字机效果回调 */
+  function onTypewriter(callback: (char: string, index: number) => void): void {
+    typewriterCallback = callback;
+  }
+
+  /** 清除打字机回调 */
+  function offTypewriter(): void {
+    typewriterCallback = null;
+  }
+
+  /** 设置消息状态 */
+  function setMessageStatus(index: number, status: MessageStatus): void {
+    messageStatuses.value = new Map(messageStatuses.value).set(index, status);
+  }
+
+  /** 获取消息状态 */
+  function getMessageStatus(index: number): MessageStatus {
+    return messageStatuses.value.get(index) ?? 'done';
   }
 
   async function sendMessage(query: string): Promise<void> {
@@ -140,6 +182,7 @@ export const useChatStore = defineStore('chat', () => {
     loading.value = true;
     error.value = null;
     streaming.value = false;
+    reconnectAttempts = 0;
 
     // 添加用户消息
     const userMsg: ChatMessage = {
@@ -158,12 +201,14 @@ export const useChatStore = defineStore('chat', () => {
     };
     messages.value = [...messages.value, aiMsg];
     const aiIndex = messages.value.length - 1;
+    setMessageStatus(aiIndex, 'sending');
 
     streamController = new AbortController();
 
     // 调用流式 API（后端 JSON 或 SSE）
     streaming.value = true;
     loading.value = false;
+    setMessageStatus(aiIndex, 'streaming');
 
     try {
       await sendMessageStream(
@@ -176,10 +221,43 @@ export const useChatStore = defineStore('chat', () => {
     } catch (err: unknown) {
       const errMsg = err instanceof Error ? err.message : String(err);
       logger.error('发送消息失败', errMsg);
-      error.value = errMsg || '发送消息失败';
-      streaming.value = false;
+
+      // 自动重连：网络错误或超时时尝试重连
+      if (shouldReconnect(errMsg) && reconnectAttempts < MAX_RECONNECT_ATTEMPTS) {
+        reconnectAttempts++;
+        const delay = RECONNECT_BASE_DELAY * Math.pow(2, reconnectAttempts - 1);
+        logger.info(`SSE 自动重连 (${reconnectAttempts}/${MAX_RECONNECT_ATTEMPTS})，${delay}ms 后重试`);
+        setMessageStatus(aiIndex, 'sending');
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        if (!streamController?.signal.aborted) {
+          try {
+            streamController = new AbortController();
+            setMessageStatus(aiIndex, 'streaming');
+            await sendMessageStream(
+              { sessionId: activeSessionId.value, query },
+              (chunk: ChatStreamChunk) => handleStreamChunk(chunk, aiIndex),
+              streamController.signal,
+            );
+            reconnectAttempts = 0;
+          } catch (retryErr) {
+            const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
+            logger.error('SSE 重连失败', retryMsg);
+            error.value = retryMsg || '重连失败';
+            setMessageStatus(aiIndex, 'error');
+            streaming.value = false;
+          }
+        }
+      } else {
+        error.value = errMsg || '发送消息失败';
+        setMessageStatus(aiIndex, 'error');
+        streaming.value = false;
+      }
     }
 
+    // 如果消息状态仍为 streaming，标记为 done
+    if (getMessageStatus(aiIndex) === 'streaming') {
+      setMessageStatus(aiIndex, 'done');
+    }
     streaming.value = false;
     streamController = null;
 
@@ -201,6 +279,7 @@ export const useChatStore = defineStore('chat', () => {
     // 如果 AI 消息为空，标记错误
     if (!error.value && !messages.value[aiIndex].content) {
       error.value = '未收到有效的 AI 回复';
+      setMessageStatus(aiIndex, 'error');
     }
   }
 
@@ -208,13 +287,22 @@ export const useChatStore = defineStore('chat', () => {
     if (!messages.value[aiIndex]) return;
 
     switch (chunk.type) {
-      case 'content':
+      case 'content': {
         // 【修复 HIGH-1】shallowRef 不追踪深层属性变更，需创建新对象触发响应
+        const prevContent = messages.value[aiIndex].content;
+        const newPart = chunk.content || '';
         messages.value[aiIndex] = {
           ...messages.value[aiIndex],
-          content: messages.value[aiIndex].content + (chunk.content || ''),
+          content: prevContent + newPart,
         };
+        // 触发打字机效果回调
+        if (typewriterCallback && newPart) {
+          for (let i = 0; i < newPart.length; i++) {
+            typewriterCallback(newPart[i], prevContent.length + i);
+          }
+        }
         break;
+      }
       case 'references':
         // 【修复 HIGH-2】shallowRef 不追踪深层属性变更，需创建新对象触发响应
         messages.value[aiIndex] = {
@@ -226,11 +314,12 @@ export const useChatStore = defineStore('chat', () => {
         sagTrace.value = chunk.sag_trace || null;
         break;
       case 'done':
-        // 流结束，无需额外处理
+        setMessageStatus(aiIndex, 'done');
         break;
       case 'error':
         error.value = chunk.error || '流式响应错误';
         streaming.value = false;
+        setMessageStatus(aiIndex, 'error');
         break;
     }
   }
@@ -274,6 +363,21 @@ export const useChatStore = defineStore('chat', () => {
     cancelStream();
   }
 
+  // ============================
+  // 重连判断
+  // ============================
+
+  /** 判断是否应该自动重连 */
+  function shouldReconnect(errMsg: string): boolean {
+    const reconnectable = [
+      'network', 'fetch', 'Failed to fetch', 'NetworkError',
+      'aborted', 'timeout', 'ERR_NETWORK', 'ERR_CONNECTION',
+      'ECONNRESET', 'ECONNREFUSED', 'socket hang up',
+    ];
+    const lower = errMsg.toLowerCase();
+    return reconnectable.some((kw) => lower.includes(kw.toLowerCase()));
+  }
+
   return {
     // 状态
     sessions,
@@ -284,6 +388,7 @@ export const useChatStore = defineStore('chat', () => {
     loading,
     error,
     sagTrace,
+    messageStatuses,
     // 计算
     activeSession,
     hasSessions,
@@ -297,5 +402,11 @@ export const useChatStore = defineStore('chat', () => {
     enforceMaxMessages,
     clearMessages,
     cancelStream,
+    // 消息状态
+    setMessageStatus,
+    getMessageStatus,
+    // 打字机效果
+    onTypewriter,
+    offTypewriter,
   };
 });

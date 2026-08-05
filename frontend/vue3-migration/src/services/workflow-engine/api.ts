@@ -64,7 +64,16 @@ async function apiRequest<T>(
 
 /** 获取工作流列表 */
 export async function getWorkflows(): Promise<WorkflowListResponse> {
-  return apiRequest<WorkflowListResponse>('/');
+  try {
+    const resp = await apiClient.get(`${API_BASE}/`) as Record<string, unknown>;
+    // 兼容后端返回 {items: [...], total: N} 或 {workflows: [...], total: N}
+    if (resp && Array.isArray(resp.items)) {
+      return { workflows: resp.items as Workflow[], total: (resp.total as number) ?? resp.items.length };
+    }
+    return resp as unknown as WorkflowListResponse;
+  } catch (error) {
+    throw new WorkflowApiError('/', error);
+  }
 }
 
 /** 获取工作流详情 */
@@ -96,7 +105,13 @@ export async function executeWorkflow(
   id: string,
   data?: ExecuteWorkflowRequest,
 ): Promise<WorkflowExecution> {
-  return apiRequest<WorkflowExecution>(`/${id}/execute`, 'POST', data ?? {});
+  // 后端端点为 /run，兼容 /execute
+  try {
+    return await apiRequest<WorkflowExecution>(`/${id}/run`, 'POST', data ?? {});
+  } catch {
+    // 如果 /run 不存在，尝试 /execute
+    return apiRequest<WorkflowExecution>(`/${id}/execute`, 'POST', data ?? {});
+  }
 }
 
 /** 获取执行历史 */

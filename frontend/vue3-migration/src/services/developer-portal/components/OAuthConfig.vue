@@ -83,7 +83,7 @@
           <span class="oauth-config__app-card-date">创建于 {{ app.createdAt }}</span>
         </div>
 
-        <p v-if="app.description" class="oauth-config__app-card-desc">{{ app.description }}</p>
+        <p v-if="app?.description" class="oauth-config__app-card-desc">{{ app?.description || '' }}</p>
 
         <div class="oauth-config__app-card-details">
           <div class="oauth-config__app-card-field">

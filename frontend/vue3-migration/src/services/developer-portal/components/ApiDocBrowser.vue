@@ -1,6 +1,6 @@
 <template>
   <div class="api-doc-browser">
-    <!-- 版本选择 & 刷新 -->
+    <!-- 鐗堟湰閫夋嫨 & 刷新 -->
     <div class="api-doc-browser__toolbar">
       <div class="api-doc-browser__version-selector">
         <span class="api-doc-browser__label">API 版本：</span>
@@ -13,13 +13,12 @@
           <el-option
             v-for="v in versions"
             :key="v.version"
-            :label="`v${v.version} — ${v.title}`"
+            :label="`v${v.version} 鈥?${v.title || ''}`"
             :value="v.version"
           >
-            <span>{{ `v${v.version} — ${v.title}` }}</span>
+            <span>{{ `v${v.version} 鈥?${v.title || ''}` }}</span>
             <el-tag v-if="v.deprecated" size="small" type="warning" class="api-doc-browser__deprecated-tag">
-              已弃用
-            </el-tag>
+              已弃用            </el-tag>
           </el-option>
         </el-select>
       </div>
@@ -48,9 +47,9 @@
       </template>
     </el-alert>
 
-    <!-- 内容：左右布局 -->
+    <!-- 鍐呭锛氬乏鍙冲竷灞€ -->
     <div v-else-if="doc" class="api-doc-browser__content">
-      <!-- 左侧：分组导航 -->
+      <!-- 宸︿晶锛氬垎缁勫鑸?-->
       <aside class="api-doc-browser__sidebar">
         <div
           v-for="group in groups"
@@ -64,24 +63,24 @@
         </div>
       </aside>
 
-      <!-- 右侧：端点详情 -->
+      <!-- 鍙充晶锛氱鐐硅鎯?-->
       <main class="api-doc-browser__main">
         <div class="api-doc-browser__info">
-          <h2 class="api-doc-browser__title">{{ doc.info.title }}</h2>
-          <p class="api-doc-browser__desc">{{ doc.info.description }}</p>
+          <h2 class="api-doc-browser__title">{{ doc?.info?.title || 'API 鏂囨。' }}</h2>
+          <p class="api-doc-browser__desc">{{ doc?.info?.description || '暂无描述' }}</p>
           <div class="api-doc-browser__meta">
             <el-tag size="small" type="info">{{ doc.openapi }}</el-tag>
-            <span class="api-doc-browser__meta-item">版本：v{{ doc.info.version }}</span>
+            <span class="api-doc-browser__meta-item">鐗堟湰锛歷{{ doc.info.version }}</span>
             <span
               v-if="doc.info.contact?.email"
               class="api-doc-browser__meta-item"
             >
-              联系：{{ doc.info.contact.email }}
+              鑱旂郴锛歿{ doc.info.contact.email }}
             </span>
           </div>
 
           <div v-if="doc.servers?.length" class="api-doc-browser__servers">
-            <span class="api-doc-browser__servers-label">服务器：</span>
+            <span class="api-doc-browser__servers-label">鏈嶅姟鍣細</span>
             <el-tag
               v-for="(server, idx) in doc.servers"
               :key="idx"
@@ -94,7 +93,7 @@
           </div>
         </div>
 
-        <!-- 端点分组 -->
+        <!-- 绔偣鍒嗙粍 -->
         <div
           v-for="group in groups"
           :key="group.tag"
@@ -127,8 +126,8 @@
             <div v-if="ep.parameters.length" class="api-doc-browser__section">
               <span class="api-doc-browser__section-title">参数</span>
               <el-table :data="ep.parameters" size="small" border stripe style="width: 100%">
-                <el-table-column prop="name" label="名称" width="140" />
-                <el-table-column prop="in" label="位置" width="80">
+                <el-table-column prop="name" label="鍚嶇О" width="140" />
+                <el-table-column prop="in" label="浣嶇疆" width="80">
                   <template #default="{ row }">
                     <el-tag size="small" type="info">{{ row.in }}</el-tag>
                   </template>
@@ -140,7 +139,7 @@
                     </span>
                   </template>
                 </el-table-column>
-                <el-table-column prop="description" label="说明" min-width="180" />
+                <el-table-column prop="description" label="璇存槑" min-width="180" />
               </el-table>
             </div>
 
@@ -164,19 +163,19 @@
           </div>
         </div>
 
-        <!-- 空状态 -->
-        <el-empty v-if="!groups.length" description="暂无 API 端点" />
+        <!-- 绌虹姸鎬?-->
+        <el-empty v-if="!groups.length" description="鏆傛棤 API 绔偣" />
       </main>
     </div>
 
-    <!-- 无文档状态 -->
-    <el-empty v-else-if="!loading && !error" description="暂无 API 文档数据" />
+    <!-- 鏃犳枃妗ｇ姸鎬?-->
+    <el-empty v-else-if="!loading && !error" description="暂无 API 文档鏁版嵁" />
   </div>
 </template>
 
 <script setup lang="ts">
 /**
- * API 文档浏览器 — 展示 OpenAPI/Swagger 文档
+ * API 鏂囨。娴忚鍣?鈥?灞曠ず OpenAPI/Swagger 鏂囨。
  */
 import { ref } from 'vue';
 import { Refresh } from '@element-plus/icons-vue';
@@ -251,7 +250,7 @@ function scrollToGroup(tag: string): void {
   align-items: start;
 }
 
-/* ── 侧边栏导航 ── */
+/* 鈹€鈹€ 渚ц竟鏍忓鑸?鈹€鈹€ */
 .api-doc-browser__sidebar {
   position: sticky;
   top: 16px;
@@ -296,7 +295,7 @@ function scrollToGroup(tag: string): void {
   color: var(--text-tertiary);
 }
 
-/* ── 主内容 ── */
+/* 鈹€鈹€ 涓诲唴瀹?鈹€鈹€ */
 .api-doc-browser__main {
   min-width: 0;
 }
@@ -350,7 +349,7 @@ function scrollToGroup(tag: string): void {
   font-size: 12px;
 }
 
-/* ── 端点分组 ── */
+/* 鈹€鈹€ 绔偣鍒嗙粍 鈹€鈹€ */
 .api-doc-browser__endpoint-group {
   margin-bottom: 28px;
   scroll-margin-top: 20px;
@@ -372,7 +371,7 @@ function scrollToGroup(tag: string): void {
   margin: 0 0 12px;
 }
 
-/* ── 端点 ── */
+/* 鈹€鈹€ 绔偣 鈹€鈹€ */
 .api-doc-browser__endpoint {
   padding: 14px 16px;
   background: var(--bg-subtle);
@@ -427,7 +426,7 @@ function scrollToGroup(tag: string): void {
   margin: 4px 0 10px;
 }
 
-/* ── 参数/响应 子段 ── */
+/* 鈹€鈹€ 参数/响应 瀛愭 鈹€鈹€ */
 .api-doc-browser__section {
   margin-top: 10px;
 }
@@ -452,7 +451,7 @@ function scrollToGroup(tag: string): void {
   color: var(--text-secondary);
 }
 
-/* ── 响应式 ── */
+/* 鈹€鈹€ 响应寮?鈹€鈹€ */
 @media (max-width: 767px) {
   .api-doc-browser__content {
     grid-template-columns: 1fr;
@@ -463,3 +462,4 @@ function scrollToGroup(tag: string): void {
   }
 }
 </style>
+

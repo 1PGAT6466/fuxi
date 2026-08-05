@@ -1,12 +1,13 @@
 """
 connectors/__init__.py — 连接器模块导出
 """
+
+from .api_connector import APIConnector
 from .base import DataSource
 from .database import DatabaseConnector
-from .api_connector import APIConnector
 from .file_connector import FileConnector
-from .web_connector import WebConnector
 from .manager import ConnectorManager
+from .web_connector import WebConnector
 
 __all__ = [
     "DataSource",

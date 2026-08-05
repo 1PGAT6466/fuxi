@@ -297,6 +297,18 @@ MAX_TOP_K = 50       # API 层最大允许值
 DEFAULT_TOP_K = 15   # 默认值
 RAG_CONTEXT_MAX_RESULTS = 20  # 送入 LLM 的最大结果数
 
+def sanitize_template_var(value: str) -> str:
+    """净化prompt模板变量，防止间接注入"""
+    if not value:
+        return ""
+    # 移除指令覆盖模式
+    value = re.sub(r'(?:忽略|无视|跳过|重写|覆盖).*(?:指令|规则|限制)', '', value)
+    # 移除角色扮演模式
+    value = re.sub(r'(?:你现在是|假装你是|扮演|你不再是)', '', value)
+    # 截断超长变量
+    return value[:2000]
+
+
 def clamp_top_k(requested: int, max_allowed: int = MAX_TOP_K) -> int:
     """限制 top_k 在安全范围内
 

@@ -4,6 +4,7 @@ knowledge_evolver — 知识图谱进化模块 (v1.50)
 为 auto_classifier 提供 EntityGraph 接口，
 内部委托到 src/services/evolver.py 的图谱函数。
 """
+
 import json
 import logging
 from datetime import datetime
@@ -11,16 +12,15 @@ from datetime import datetime
 from src.services.evolver import (
     GRAPH_FILE,
     discover_entities,
-    infer_relations,
     evolve_graph,
-    get_graph_stats,
     get_graph_nodes,
+    get_graph_stats,
+    infer_relations,
 )
 
 logger = logging.getLogger(__name__)
 
-__all__ = ["EntityGraph", "discover_entities", "infer_relations", "evolve_graph",
-           "get_graph_stats", "get_graph_nodes"]
+__all__ = ["EntityGraph", "discover_entities", "infer_relations", "evolve_graph", "get_graph_stats", "get_graph_nodes"]
 
 
 class EntityGraph:
@@ -29,13 +29,15 @@ class EntityGraph:
     """
 
     def __init__(self):
-        self._graph = {"nodes": {}, "edges": [], "meta": {
-            "total_entities": 0, "total_edges": 0, "last_updated": "", "source_files": []
-        }}
+        self._graph = {
+            "nodes": {},
+            "edges": [],
+            "meta": {"total_entities": 0, "total_edges": 0, "last_updated": "", "source_files": []},
+        }
         if GRAPH_FILE.exists():
             try:
                 self._graph = json.loads(GRAPH_FILE.read_text(encoding="utf-8"))
-            except Exception:  # TODO: Narrow exception type
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
                 pass
         self._graph.setdefault("nodes", {})
         self._graph.setdefault("edges", [])
@@ -76,6 +78,7 @@ class EntityGraph:
         self._graph["meta"]["last_updated"] = datetime.now().isoformat()
 
         import os as _os
+
         GRAPH_FILE.parent.mkdir(parents=True, exist_ok=True)
         tmp = str(GRAPH_FILE) + ".tmp"
         with open(tmp, "w", encoding="utf-8") as f:

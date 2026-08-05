@@ -2,8 +2,9 @@
 system_monitor.py — 系统监控
 CPU + 内存 + 磁盘
 """
-import time
+
 import logging
+import time
 from typing import Dict
 
 logger = logging.getLogger("infra.system_monitor")
@@ -19,9 +20,10 @@ class SystemMonitor:
         """获取系统统计"""
         try:
             import psutil
+
             cpu_percent = psutil.cpu_percent(interval=0.1)
             memory = psutil.virtual_memory()
-            disk = psutil.disk_usage('/')
+            disk = psutil.disk_usage("/")
 
             return {
                 "cpu_percent": cpu_percent,

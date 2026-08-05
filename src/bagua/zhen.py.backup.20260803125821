@@ -1,0 +1,888 @@
+﻿#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+"""
+zhen.py 鈥?闇囧崷 鈽?路 浼忕静 v2.1
+
+闇囦负闆凤紝涓讳富鍔ㄦ帹閫佷笌閫氱煡銆?
+瀵瑰簲鑳藉姏锛歐ebSocket 鎺ㄩ€併€佹秷鎭€氱煡銆佷簨浠跺箍鎾€?
+
+Phase 1 鍣ㄥ畼杩佺Щ锛氳偤(LungAgent) 鈫?闇囧崷
+  - 鏂囦欢鎸囩汗鍙樺寲妫€娴嬶紙compute_file_fingerprint / check_file_changed锛?
+  - 鑴忔爣璁版満鍒讹紙_dirty + 鏂囦欢 change 妫€娴嬶級
+  - 鍛煎惛闂撮殧 BREATH_INTERVAL = 25s
+"""
+
+import hashlib
+import logging
+import time
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+from src.bagua.base_gua import GuaBase
+
+logger = logging.getLogger("bagua.zhen")
+
+# ============================================================================
+# 闇囧崷 鈥?涓诲姩鎺ㄩ€佷笌閫氱煡锛堝惈鏂囦欢鍙樺寲妫€娴嬭兘鍔涳級
+# ============================================================================
+
+
+class ZhenGua(GuaBase):
+    """闇囧崷 鈥?涓诲姩鎺ㄩ€佷笌閫氱煡
+
+    缁ф壙鑷?GuaBase锛屾嫢鏈夊畬鏁寸殑鍋ュ悍绠＄悊銆侀檷绾х煩闃靛拰鏂矾鍣ㄣ€?
+
+    Phase 1 浠庤偤(LungAgent)杩佺Щ鐨勮兘鍔涳細
+      - 鏂囦欢鎸囩汗鍙樺寲妫€娴?
+      - 鑴忔爣璁版満鍒?
+      - 鍛煎惛闂撮殧
+    """
+
+    GUA_NAME = "zhen"
+    GUA_EMOJI = "鈽?
+    GUA_DESCRIPTION = "涓诲姩鎺ㄩ€佷笌閫氱煡 鈥?WebSocket銆佹秷鎭€佷簨浠跺箍鎾?
+
+    # 鍛煎惛闂撮殧锛堢锛夆€?浠庤偤杩佺Щ
+    BREATH_INTERVAL: float = 25.0
+
+    def __init__(self, **kwargs) -> None:
+        super().__init__(**kwargs)
+
+        # ---- 鏂囦欢鎸囩汗缂撳瓨 {file_path: fingerprint} ----
+        self._fingerprint_cache: Dict[str, str] = {}
+
+        # ---- 鑴忔爣璁帮細鏈夋湭澶勭悊鐨勫彉鍖栨椂涓?True ----
+        self._dirty: bool = True
+
+        # ---- 缁熻 ----
+        self._check_count: int = 0
+        self._change_count: int = 0
+        self._digested_count: int = 0
+
+    # ========================================================================
+    # GuaBase 鎶借薄鏂规硶瀹炵幇
+    # ========================================================================
+
+    def _setup_dependencies(self) -> None:
+        """娉ㄥ唽闇囧崷澶栭儴渚濊禆鏂矾鍣?""
+        self.register_dependency(
+            "file_io",
+            failure_threshold=5,
+            recovery_timeout=30.0,
+            half_open_max_calls=3,
+        )
+        self.register_dependency(
+            "vector_store",
+            failure_threshold=3,
+            recovery_timeout=60.0,
+            half_open_max_calls=2,
+        )
+        self.register_dependency(
+            "embedder_server",
+            failure_threshold=3,
+            recovery_timeout=60.0,
+            half_open_max_calls=2,
+        )
+        self.register_dependency(
+            "kun_store",
+            failure_threshold=3,
+            recovery_timeout=30.0,
+            half_open_max_calls=2,
+        )
+
+    # ========================================================================
+    # GuaBase 鎶借薄鏂规硶瀹炵幇
+    # ========================================================================
+
+    def _setup_degradation_rules(self) -> None:
+        """闇囧崷闄嶇骇瑙勫垯锛氭枃浠?I/O / 鍚戦噺瀛樺偍 / embedder / kun 鏁呴殰鏃堕檷绾?""
+        from src.bagua.base_gua import DegradationRule, FallbackAction
+
+        # 瑙勫垯 1: 鏂囦欢 I/O 鎸佺画澶辫触 鈫?杩斿洖绌烘寚绾?
+        def _empty_fingerprint_fallback(params: Dict[str, Any]) -> str:
+            return ""
+
+        self.add_rule(
+            DegradationRule(
+                name="file_read_degraded",
+                condition_fn=lambda: not self._fingerprint_cache and self._check_count > 10,
+                fallback=FallbackAction(
+                    name="empty_fingerprint",
+                    handler=_empty_fingerprint_fallback,
+                    description="鏂囦欢璇诲彇鎸佺画澶辫触鏃惰繑鍥炵┖鎸囩汗",
+                ),
+                priority=10,
+            )
+        )
+
+        # 瑙勫垯 2: 鍚戦噺瀛樺偍鏂矾鍣ㄦ柇寮€ 鈫?璺宠繃鍚戦噺鍖栵紝浠呭瓨鏂囨湰
+        def _vector_store_unavailable() -> bool:
+            cb = self.get_dependency("vector_store")
+            return cb is not None and not cb.is_healthy
+
+        def _skip_vectorization_fallback(params: Dict[str, Any]) -> Dict[str, Any]:
+            file_path = params.get("file_path", "")
+            return {
+                "ok": True,
+                "file_path": file_path,
+                "digested": True,
+                "degraded": True,
+                "message": "鍚戦噺瀛樺偍涓嶅彲鐢紝浠呭瓨鏂囨湰鍧?,
+            }
+
+        self.add_rule(
+            DegradationRule(
+                name="vector_store_degraded",
+                condition_fn=_vector_store_unavailable,
+                fallback=FallbackAction(
+                    name="skip_vectorization",
+                    handler=_skip_vectorization_fallback,
+                    description="鍚戦噺瀛樺偍鏂矾鏃惰烦杩囧悜閲忓寲",
+                ),
+                priority=20,
+            )
+        )
+
+        # 瑙勫垯 3: embedder_server 鏂矾 鈫?璺宠繃鍚戦噺鍖?
+        def _embedder_unavailable() -> bool:
+            cb = self.get_dependency("embedder_server")
+            return cb is not None and not cb.is_healthy
+
+        self.add_rule(
+            DegradationRule(
+                name="embedder_degraded",
+                condition_fn=_embedder_unavailable,
+                fallback=FallbackAction(
+                    name="skip_embedding",
+                    handler=_skip_vectorization_fallback,
+                    description="embedder 鏂矾鏃惰烦杩囧悜閲忓寲",
+                ),
+                priority=25,
+            )
+        )
+
+        # 瑙勫垯 4: kun_store 鏂矾 鈫?璺宠繃鍧ゅ崷瀛樺偍
+        def _kun_store_unavailable() -> bool:
+            cb = self.get_dependency("kun_store")
+            return cb is not None and not cb.is_healthy
+
+        def _skip_kun_fallback(params: Dict[str, Any]) -> Dict[str, Any]:
+            file_path = params.get("file_path", "")
+            return {
+                "ok": True,
+                "file_path": file_path,
+                "digested": True,
+                "degraded": True,
+                "message": "鍧ゅ崷瀛樺偍涓嶅彲鐢紝璺宠繃鐭ヨ瘑搴撳瓨鍌?,
+            }
+
+        self.add_rule(
+            DegradationRule(
+                name="kun_store_degraded",
+                condition_fn=_kun_store_unavailable,
+                fallback=FallbackAction(
+                    name="skip_kun_store",
+                    handler=_skip_kun_fallback,
+                    description="鍧ゅ崷鏂矾鏃惰烦杩囩煡璇嗗簱瀛樺偍",
+                ),
+                priority=30,
+            )
+        )
+
+    def _execute_core(self, params: Dict[str, Any]) -> Any:
+        """鏍稿績鎺ㄩ€侀€昏緫
+
+        params:
+          - action: "push" | "notify" | "broadcast" | "check_file" | "digest_file" |
+                    "digest_and_store" | "batch_digest"
+          - file_path: 鏂囦欢璺緞锛坈heck_file / digest_file / digest_and_store 鏃跺繀闇€锛?
+          - message: 鎺ㄩ€佹秷鎭紙push 鏃朵娇鐢級
+          - event: 浜嬩欢鏁版嵁锛坆roadcast 鏃朵娇鐢級
+          - store_in_kun: 鏄惁灏嗘秷鍖栫粨鏋滃瓨鍏ュ潳鍗︼紙digest_and_store 鏃讹紝榛樿 True锛?
+          - file_paths: 鎵归噺鏂囦欢璺緞鍒楄〃锛坆atch_digest 鏃讹級
+        """
+        action = params.get("action", "")
+
+        if action == "check_file":
+            file_path = params.get("file_path", "")
+            if not file_path:
+                raise ValueError("check_file 闇€瑕?file_path 鍙傛暟")
+            return self.check_file_changed(file_path)
+
+        if action == "digest_file":
+            file_path = params.get("file_path", "")
+            if not file_path:
+                raise ValueError("digest_file 闇€瑕?file_path 鍙傛暟")
+            self.on_file_digested(file_path)
+            return {"ok": True, "file_path": file_path}
+
+        if action == "digest_and_store":
+            file_path = params.get("file_path", "")
+            if not file_path:
+                raise ValueError("digest_and_store 闇€瑕?file_path 鍙傛暟")
+            store_in_kun = params.get("store_in_kun", True)
+            return self.digest_and_store(file_path, store_in_kun=store_in_kun)
+
+        if action == "batch_digest":
+            file_paths = params.get("file_paths", [])
+            if not file_paths:
+                raise ValueError("batch_digest 闇€瑕?file_paths 鍙傛暟")
+            store_in_kun = params.get("store_in_kun", True)
+            return self.batch_digest(file_paths, store_in_kun=store_in_kun)
+
+        if action == "fingerprint":
+            file_path = params.get("file_path", "")
+            if not file_path:
+                raise ValueError("fingerprint 闇€瑕?file_path 鍙傛暟")
+            return self.compute_file_fingerprint(file_path)
+
+        if action == "stats":
+            return self.stats()
+
+        if action == "upload_progress":
+            return self.track_upload_progress(params)
+
+        if action == "get_progress":
+            return self.get_upload_progress(params.get("file_path", ""))
+
+        # 榛樿锛氭帹閫?閫氱煡/骞挎挱 鈥?Phase 0 鍗犱綅妯″紡
+        message = params.get("message", "")
+        event = params.get("event", {})
+        logger.info(
+            "[%s] 鎺ㄩ€佽姹? action=%s, message=%s, event=%s",
+            self.GUA_NAME,
+            action,
+            message,
+            event,
+        )
+        return {
+            "ok": True,
+            "action": action,
+            "message": message,
+            "event": event,
+            "timestamp": time.time(),
+        }
+
+    # ========================================================================
+    # 鏂囦欢鎸囩汗鍙樺寲妫€娴嬶紙浠庤偤杩佺Щ锛?
+    # ========================================================================
+
+    def compute_file_fingerprint(self, file_path: str) -> str:
+        """璁＄畻鏂囦欢鎸囩汗
+
+        浣跨敤 MD5 璁＄畻鏂囦欢鍐呭鐨?hash 浣滀负鎸囩汗銆?
+        濡傛灉鏂囦欢涓嶅瓨鍦ㄦ垨鏃犳硶璇诲彇锛岃繑鍥炵┖瀛楃涓层€?
+
+        Args:
+            file_path: 鏂囦欢璺緞
+
+        Returns:
+            鏂囦欢鍐呭鐨?MD5 hash锛?2 浣?hex 瀛楃涓诧級锛屽け璐ユ椂杩斿洖 ""
+        """
+        try:
+            with open(file_path, "rb") as f:
+                content = f.read()
+            return hashlib.sha256(content).hexdigest()
+        except FileNotFoundError:
+            logger.debug("[%s] 鏂囦欢涓嶅瓨鍦紝fingerprint='': %s", self.GUA_NAME, file_path)
+            return ""
+        except PermissionError:
+            logger.warning("[%s] 鏃犳潈闄愯鍙栨枃浠? %s", self.GUA_NAME, file_path)
+            return ""
+        except OSError as e:
+            logger.warning("[%s] 鏂囦欢璇诲彇澶辫触: %s 鈥?%s", self.GUA_NAME, file_path, e)
+            return ""
+        except Exception as e:  # TODO: Narrow exception type
+            logger.error(
+                "[%s] compute_file_fingerprint 寮傚父: %s 鈥?%s",
+                self.GUA_NAME,
+                file_path,
+                e,
+                exc_info=True,
+            )
+            return ""
+
+    def check_file_changed(self, file_path: str) -> bool:
+        """妫€娴嬫枃浠舵槸鍚﹀彂鐢熷彉鍖?
+
+        瀵规瘮褰撳墠鏂囦欢鎸囩汗涓庣紦瀛樹腑鐨勪笂涓€杞寚绾广€?
+        棣栨妫€娴嬶紙鏃犵紦瀛橈級鏃惰涓烘湁鍙樺寲銆?
+        姣忔妫€娴嬪悗鑷姩鏇存柊鎸囩汗缂撳瓨锛堝榻愯偤鐨?_inhale 琛屼负锛夈€?
+
+        鍓綔鐢細
+          - 鏇存柊 _dirty 鏍囪
+          - 鏇存柊 _fingerprint_cache
+
+        Args:
+            file_path: 鏂囦欢璺緞
+
+        Returns:
+            True 琛ㄧず鏂囦欢鏈夊彉鍖栨垨棣栨妫€娴嬶紝False 琛ㄧず鏃犲彉鍖?
+        """
+        self._check_count += 1
+
+        current_fp = self.compute_file_fingerprint(file_path)
+        cached_fp = self._fingerprint_cache.get(file_path, "")
+
+        # 姣忔妫€娴嬮兘鏇存柊鎸囩汗缂撳瓨锛堝榻愯偤鐨?_inhale 鈫?self._last_fingerprint = fingerprint锛?
+        self._fingerprint_cache[file_path] = current_fp
+
+        # 鏍囪鑴忔暟鎹?
+        if current_fp != cached_fp:
+            self._dirty = True
+            self._change_count += 1
+            logger.info(
+                "[%s] 鏂囦欢宸插彉鍖? %s (fp: %s... 鈫?%s...)",
+                self.GUA_NAME,
+                file_path,
+                cached_fp[:16] if cached_fp else "<none>",
+                current_fp[:16] if current_fp else "<empty>",
+            )
+            return True
+
+        logger.debug("[%s] 鏂囦欢鏃犲彉鍖? %s", self.GUA_NAME, file_path)
+        return False
+
+    def on_file_digested(self, file_path: str) -> None:
+        """鏂囦欢娑堝寲瀹屾垚鍚庢洿鏂版寚绾圭紦瀛?
+
+        褰撴枃浠跺唴瀹瑰凡琚秷璐?钂搁鍚庤皟鐢ㄦ鏂规硶锛?
+        灏嗗綋鍓嶆寚绾瑰啓鍏ョ紦瀛橈紝骞舵竻闄よ剰鏍囪銆?
+
+        Args:
+            file_path: 鏂囦欢璺緞
+        """
+        current_fp = self.compute_file_fingerprint(file_path)
+        self._fingerprint_cache[file_path] = current_fp
+        self._dirty = False
+        self._digested_count += 1
+        logger.info(
+            "[%s] 鏂囦欢宸叉秷鍖栵紝鎸囩汗宸叉洿鏂? %s 鈫?%s",
+            self.GUA_NAME,
+            file_path,
+            current_fp[:16] if current_fp else "<empty>",
+        )
+
+    # ========================================================================
+    # 鑴忔爣璁扮鐞?
+    # ========================================================================
+
+    @property
+    def is_dirty(self) -> bool:
+        """鏄惁鏈夋湭澶勭悊鐨勬枃浠跺彉鍖?""
+        return self._dirty
+
+    def mark_dirty(self) -> None:
+        """鎵嬪姩鏍囪涓鸿剰锛堝閮ㄨЕ鍙戯級"""
+        self._dirty = True
+        logger.debug("[%s] 鑴忔爣璁板凡璁剧疆", self.GUA_NAME)
+
+    def clear_dirty(self) -> None:
+        """鎵嬪姩娓呴櫎鑴忔爣璁?""
+        self._dirty = False
+        logger.debug("[%s] 鑴忔爣璁板凡娓呴櫎", self.GUA_NAME)
+
+    def invalidate_cache(self, file_path: Optional[str] = None) -> None:
+        """浣挎寚绾圭紦瀛樺け鏁?
+
+        Args:
+            file_path: 鎸囧畾鏂囦欢璺緞锛屼负 None 鏃舵竻绌哄叏閮ㄧ紦瀛?
+        """
+        if file_path is None:
+            self._fingerprint_cache.clear()
+            self._dirty = True
+            logger.info("[%s] 鍏ㄩ儴鎸囩汗缂撳瓨宸叉竻闄?, self.GUA_NAME)
+        else:
+            self._fingerprint_cache.pop(file_path, None)
+            self._dirty = True
+            logger.info("[%s] 鎸囩汗缂撳瓨宸叉竻闄? %s", self.GUA_NAME, file_path)
+
+    # ========================================================================
+    # 缁熻
+    # ========================================================================
+
+    # ========================================================================
+    # 绔埌绔秷鍖栫绾匡紙闇囧崷鏍稿績锛氭枃浠朵笂浼犫啋瑙ｆ瀽鈫掓竻娲椻啋鍒嗗潡鈫掑叆搴擄級
+    # ========================================================================
+
+    def _check_file_fingerprint(self, file_path: str, result: Dict) -> Optional[str]:
+        """妫€鏌ユ枃浠舵寚绾癸紝杩斿洖 None 琛ㄧず闇€瑕佸鐞嗭紝杩斿洖 hash 琛ㄧず璺宠繃"""
+        file_hash = self.compute_file_fingerprint(file_path)
+        cached_fp = self._fingerprint_cache.get(file_path, "")
+        result["file_hash"] = file_hash
+
+        if file_hash and file_hash == cached_fp and cached_fp:
+            logger.info("[%s] 鏂囦欢鏈彉鍖栵紝璺宠繃娑堝寲: %s", self.GUA_NAME, file_path)
+            result["ok"] = True
+            result["digested"] = False
+            result["message"] = "鏂囦欢鏈彉鍖栵紝璺宠繃"
+            self._check_count += 1
+            return None
+        return file_hash
+
+    def _parse_file_content(self, file_path: str, errors: list) -> Optional[Dict]:
+        """瑙ｆ瀽鏂囦欢鍐呭锛岃繑鍥?parsed dict 鎴?None"""
+        from src.pipeline.unified import UnifiedParser
+
+        parser = UnifiedParser({})
+
+        file_io_cb = self.get_dependency("file_io")
+        if file_io_cb and not file_io_cb.is_healthy:
+            logger.warning("[%s] file_io 鏂矾鍣ㄦ柇寮€锛岃烦杩囨枃浠惰В鏋? %s", self.GUA_NAME, file_path)
+            errors.append("file_io 鏂矾鍣ㄦ柇寮€")
+            return None
+
+        try:
+            parsed = parser.parse(file_path)
+            if file_io_cb:
+                file_io_cb.record_success()
+            return parsed
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+            if file_io_cb:
+                file_io_cb.record_failure()
+            raise
+
+    def _clean_parsed_content(self, parsed: Dict, errors: list) -> str:
+        """娓呮礂瑙ｆ瀽鍐呭"""
+        from src.pipeline.unified import UnifiedCleaner
+
+        cleaner = UnifiedCleaner({})
+        raw_text = parsed.get("text", "")
+
+        try:
+            cleaned = cleaner.clean(parsed)
+            return cleaned.get("text", raw_text)
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+            logger.warning("[%s] 娓呮礂澶辫触锛屼娇鐢ㄥ師鏂? %s", self.GUA_NAME, e)
+            errors.append(f"CleanWarning: {e}")
+            return raw_text
+
+    def _chunk_parsed_content(self, parsed: Dict, cleaned_text: str, errors: list) -> list:
+        """鍒嗗潡澶勭悊"""
+        from src.models.chunk import Chunk
+        from src.pipeline.unified import UnifiedChunker
+
+        chunker = UnifiedChunker({})
+
+        try:
+            tables = parsed.get("tables", [])
+            return chunker.chunk(parsed, tables)
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+            logger.warning("[%s] 鍒嗗潡澶辫触锛岄檷绾т负鍗曞潡: %s", self.GUA_NAME, e)
+            errors.append(f"ChunkWarning: {e}")
+            return [Chunk(text=cleaned_text, chunk_index=0)]
+
+    def _classify_chunks(self, chunks: list) -> None:
+        """瀵?chunks 杩涜鍒嗙被"""
+        from src.pipeline.unified import UnifiedClassifier
+
+        classifier = UnifiedClassifier({})
+        for chunk in chunks:
+            try:
+                chunk.category = classifier.classify(chunk)
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError):
+                chunk.category = "閫氱敤鍔炲叕"
+
+    def _set_chunk_metadata(self, chunks: list, file_hash: str, file_path: str) -> None:
+        """璁剧疆 chunks 鍏冩暟鎹?""
+        path = Path(file_path)
+        for chunk in chunks:
+            chunk.file_hash = file_hash
+            chunk.file_name = path.name
+            chunk.file_type = path.suffix.lower()
+            chunk.source_pipeline = "zhen_digest"
+            chunk.source_file = str(path)
+
+    async def _embed_chunks_async(self, chunks: list, errors: list) -> None:
+        """寮傛鍚戦噺鍖?chunks"""
+        embedder_cb = self.get_dependency("embedder_server")
+        if embedder_cb and not embedder_cb.is_healthy:
+            logger.warning("[%s] embedder_server 鏂矾鍣ㄦ柇寮€锛岃烦杩囧悜閲忓寲", self.GUA_NAME)
+            errors.append("embedder_server 鏂矾鍣ㄦ柇寮€锛岃烦杩囧悜閲忓寲")
+            return
+
+        try:
+            from src.pipeline.unified import UnifiedEmbedder
+
+            # 濡傛灉 chunks 宸叉湁 embedding锛岃烦杩?
+            if chunks and hasattr(chunks[0], "embedding") and chunks[0].embedding is not None:
+                return
+
+            embedder = UnifiedEmbedder({})
+            embeddings = await embedder.embed_batch([c.text for c in chunks])
+            if embeddings:
+                for chunk, emb in zip(chunks, embeddings):
+                    if emb is not None:
+                        chunk.embedding = emb
+            if embedder_cb:
+                embedder_cb.record_success()
+        except (ConnectionError, TimeoutError, OSError, ValueError) as e:
+            if embedder_cb:
+                embedder_cb.record_failure()
+            logger.warning("[%s] 鍚戦噺鍖栧け璐? %s", self.GUA_NAME, e)
+            errors.append(f"EmbedWarning: {e}")
+
+    async def _save_chunks_async(self, chunks: list, errors: list) -> None:
+        """寮傛淇濆瓨 chunks"""
+        vector_store_cb = self.get_dependency("vector_store")
+        if vector_store_cb and not vector_store_cb.is_healthy:
+            logger.warning("[%s] vector_store 鏂矾鍣ㄦ柇寮€锛岃烦杩囧悜閲忓瓨鍌?, self.GUA_NAME)
+            errors.append("vector_store 鏂矾鍣ㄦ柇寮€锛岃烦杩囧悜閲忓瓨鍌?)
+            return
+
+        try:
+            from src.pipeline.unified import UnifiedSaver
+
+            saver = UnifiedSaver({})
+            await saver.save(chunks)
+            logger.info("[%s] 宸插瓨鍌?%d 涓?chunk: %s", self.GUA_NAME, len(chunks), file_path)
+            if vector_store_cb:
+                vector_store_cb.record_success()
+        except (ConnectionError, TimeoutError, OSError, ValueError) as e:
+            if vector_store_cb:
+                vector_store_cb.record_failure()
+            logger.error("[%s] 瀛樺偍澶辫触: %s", self.GUA_NAME, e)
+            errors.append(f"SaveError: {e}")
+            raise
+
+    def _store_to_kun_gua(self, file_path: str, chunks: list, cleaned_text: str, errors: list) -> None:
+        """瀛樺叆鍧ゅ崷鐭ヨ瘑搴?""
+        kun_store_cb = self.get_dependency("kun_store")
+        if kun_store_cb and not kun_store_cb.is_healthy:
+            logger.warning("[%s] kun_store 鏂矾鍣ㄦ柇寮€锛岃烦杩囧潳鍗﹀瓨鍌?, self.GUA_NAME)
+            errors.append("kun_store 鏂矾鍣ㄦ柇寮€锛岃烦杩囧潳鍗﹀瓨鍌?)
+            return
+
+        try:
+            self._store_to_kun(file_path, chunks, cleaned_text)
+            if kun_store_cb:
+                kun_store_cb.record_success()
+        except (ConnectionError, TimeoutError, OSError, ValueError) as e:
+            if kun_store_cb:
+                kun_store_cb.record_failure()
+            logger.warning("[%s] 鍧ゅ崷瀛樺偍澶辫触: %s", self.GUA_NAME, e)
+            errors.append(f"KunStoreWarning: {e}")
+
+    def digest_and_store(
+        self,
+        file_path: str,
+        store_in_kun: bool = True,
+    ) -> Dict[str, Any]:
+        """绔埌绔枃浠舵秷鍖栵紙閲嶆瀯 v1.50锛?""
+        start_time = time.time()
+        errors: List[str] = []
+        result: Dict[str, Any] = {
+            "ok": False,
+            "file_path": file_path,
+            "file_hash": "",
+            "chunks_count": 0,
+            "digested": False,
+            "duration_ms": 0,
+            "errors": [],
+        }
+
+        path = Path(file_path)
+        if not path.exists():
+            errors.append(f"鏂囦欢涓嶅瓨鍦? {file_path}")
+            result["errors"] = errors
+            return result
+
+        # Step 0: 鎸囩汗妫€娴?
+        file_hash = self._check_file_fingerprint(file_path, result)
+        if file_hash is None:
+            result["duration_ms"] = (time.time() - start_time) * 1000
+            return result
+
+        try:
+            # Step 1: 瑙ｆ瀽
+            parsed = self._parse_file_content(file_path, errors)
+            if parsed is None:
+                result["errors"] = errors
+                result["duration_ms"] = (time.time() - start_time) * 1000
+                return result
+
+            raw_text = parsed.get("text", "")
+            if not raw_text.strip():
+                errors.append("鏂囦欢瑙ｆ瀽缁撴灉涓虹┖")
+                result["errors"] = errors
+                result["duration_ms"] = (time.time() - start_time) * 1000
+                return result
+
+            # Step 2: 娓呮礂
+            cleaned_text = self._clean_parsed_content(parsed, errors)
+
+            # Step 3: 鍒嗗潡
+            chunks = self._chunk_parsed_content(parsed, cleaned_text, errors)
+
+            # Step 4: 鍒嗙被
+            self._classify_chunks(chunks)
+
+            # Step 5: 璁剧疆鍏冩暟鎹?
+            self._set_chunk_metadata(chunks, file_hash, file_path)
+
+            # Step 6: 鍚戦噺鍖?
+            import asyncio
+
+            loop = asyncio.get_event_loop()
+            if loop.is_running():
+                asyncio.ensure_future(self._embed_chunks_async(chunks, errors))
+            else:
+                loop.run_until_complete(self._embed_chunks_async(chunks, errors))
+
+            # Step 7: 瀛樺偍
+            if loop.is_running():
+                asyncio.ensure_future(self._save_chunks_async(chunks, errors))
+            else:
+                loop.run_until_complete(self._save_chunks_async(chunks, errors))
+
+            result["chunks_count"] = len(chunks)
+            self._digested_count += 1
+            self._fingerprint_cache[file_path] = file_hash
+            self._dirty = False
+
+            # Step 8: 鍧ゅ崷瀛樺偍
+            if store_in_kun:
+                self._store_to_kun_gua(file_path, chunks, cleaned_text, errors)
+
+            result["ok"] = True
+            result["digested"] = True
+            result["errors"] = errors
+            result["duration_ms"] = (time.time() - start_time) * 1000
+
+            logger.info(
+                "[%s] 娑堝寲瀹屾垚: %s 鈫?%d chunks, %.0fms",
+                self.GUA_NAME,
+                file_path,
+                len(chunks),
+                result["duration_ms"],
+            )
+            return result
+
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+            logger.error("[%s] 娑堝寲寮傚父: %s 鈥?%s", self.GUA_NAME, file_path, e, exc_info=True)
+            errors.append(f"DigestError: {e}")
+            result["errors"] = errors
+            result["duration_ms"] = (time.time() - start_time) * 1000
+            return result
+
+    def batch_digest(
+        self,
+        file_paths: List[str],
+        store_in_kun: bool = True,
+    ) -> Dict[str, Any]:
+        """鎵归噺娑堝寲澶氫釜鏂囦欢
+
+        Args:
+            file_paths: 鏂囦欢璺緞鍒楄〃
+            store_in_kun: 鏄惁瀛樺叆鍧ゅ崷鐭ヨ瘑搴?
+
+        Returns:
+            {
+                "ok": True,
+                "total_files": int,
+                "digested": int,
+                "skipped": int,
+                "failed": int,
+                "results": [...],
+            }
+        """
+        results = []
+        digested = 0
+        skipped = 0
+        failed = 0
+
+        for fp in file_paths:
+            r = self.digest_and_store(fp, store_in_kun=store_in_kun)
+            results.append(r)
+            if r.get("digested"):
+                digested += 1
+            elif r.get("ok"):
+                skipped += 1
+            else:
+                failed += 1
+
+        return {
+            "ok": failed == 0,
+            "total_files": len(file_paths),
+            "digested": digested,
+            "skipped": skipped,
+            "failed": failed,
+            "results": results,
+        }
+
+    def _store_to_kun(
+        self,
+        file_path: str,
+        chunks: list,
+        cleaned_text: str,
+    ) -> None:
+        """灏嗘秷鍖栫粨鏋滃瓨鍏ュ潳鍗︾煡璇嗗簱
+
+        璋冪敤鍧ゅ崷鐨?store_vector / store_wiki / build_knowledge_graph
+        寤虹珛瀹屾暣鐨勭煡璇嗗瓨鍌ㄩ摼璺€?
+
+        Args:
+            file_path: 婧愭枃浠惰矾寰?
+            chunks: 鍒嗗潡鍒楄〃
+            cleaned_text: 娓呮礂鍚庣殑鏂囨湰
+        """
+        try:
+            from src.bagua.kun import KunGua
+
+            # 浠庡叏灞€涓婁笅鏂囪幏鍙栧潳鍗﹀疄渚嬶紝鎴栧垱寤烘柊瀹炰緥
+            kun = _get_kun_instance()
+            if kun is None:
+                logger.warning("[%s] 鍧ゅ崷瀹炰緥涓嶅彲鐢紝璺宠繃鐭ヨ瘑搴撳瓨鍌?, self.GUA_NAME)
+                return
+
+            file_name = Path(file_path).name
+            file_hash = self.compute_file_fingerprint(file_path)
+            doc_id = file_hash[:16] if file_hash else file_name
+
+            # 1. 瀛樺偍鍚戦噺
+            vectorized_chunks = [c for c in chunks if hasattr(c, "embedding") and c.embedding]
+            if vectorized_chunks:
+                kun.store_vector(
+                    doc_id=doc_id,
+                    chunks=vectorized_chunks,
+                    metadata={
+                        "source_file": file_path,
+                        "file_name": file_name,
+                        "file_hash": file_hash,
+                    },
+                )
+
+            # 2. 瀛樺偍 Wiki
+            kun.store_wiki(
+                doc_id=doc_id,
+                content=cleaned_text,
+                title=file_name,
+                source=file_path,
+                category=chunks[0].category if chunks else "閫氱敤鍔炲叕",
+            )
+
+            # 3. 鏋勫缓鐭ヨ瘑鍥捐氨
+            kun.build_knowledge_graph(doc_id=doc_id)
+
+            logger.info("[%s] 鍧ゅ崷鐭ヨ瘑搴撳凡鏇存柊: %s", self.GUA_NAME, doc_id)
+
+        except Exception as e:  # TODO: Narrow exception type
+            logger.warning("[%s] _store_to_kun 寮傚父: %s", self.GUA_NAME, e)
+
+    # ========================================================================
+    # 涓婁紶杩涘害璺熻釜
+    # ========================================================================
+
+    def track_upload_progress(self, params: Dict[str, Any]) -> Dict[str, Any]:
+        """璁板綍澶ф枃浠朵笂浼犺繘搴?
+
+        鐢辫皟鐢ㄦ柟鍦ㄤ笂浼犺繃绋嬩腑瀹氭湡璋冪敤锛屾洿鏂版寚瀹氭枃浠剁殑杩涘害銆?
+        杩涘害鏁版嵁鍐欏叆 in-memory dict锛岀敱 get_upload_progress 鏌ヨ銆?
+
+        Args:
+            params: {
+                "file_path": str,   # 鏂囦欢璺緞/鏍囪瘑
+                "progress": float,  # 杩涘害 [0.0, 1.0]
+                "status": str,      # "uploading"|"processing"|"done"|"error"
+                "message": str,     # 闄勫甫淇℃伅
+            }
+
+        Returns:
+            {"ok": bool, "file_path": str, "progress": float}
+        """
+        file_path = params.get("file_path", "")
+        if not file_path:
+            return {"ok": False, "error": "缂哄皯 file_path"}
+
+        if not hasattr(self, "_upload_progress"):
+            self._upload_progress: Dict[str, Dict[str, Any]] = {}
+
+        progress = max(0.0, min(1.0, float(params.get("progress", 0))))
+        self._upload_progress[file_path] = {
+            "progress": progress,
+            "status": params.get("status", "uploading"),
+            "message": params.get("message", ""),
+            "updated_at": time.time(),
+        }
+
+        # 骞挎挱杩涘害鍙樺寲锛堥€氳繃 IntentBus 閫氱煡鍏戝崷锛?
+        try:
+            self._broadcast_progress(file_path, progress, params.get("status", ""), params.get("message", ""))
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
+            pass
+
+        return {
+            "ok": True,
+            "file_path": file_path,
+            "progress": round(progress, 4),
+        }
+
+    def get_upload_progress(self, file_path: str) -> Dict[str, Any]:
+        """鏌ヨ鏂囦欢鐨勪笂浼犺繘搴?
+
+        Args:
+            file_path: 鏂囦欢璺緞/鏍囪瘑
+
+        Returns:
+            {"progress": float, "status": str, ...} 鎴?{"error": "not_found"}
+        """
+        if not hasattr(self, "_upload_progress"):
+            return {"error": "not_found", "message": "鏃犱笂浼犺褰?}
+
+        entry = self._upload_progress.get(file_path)
+        if entry is None:
+            return {"error": "not_found", "message": f"鏈壘鍒版枃浠? {file_path}"}
+
+        return dict(entry)
+
+    def _broadcast_progress(self, file_path: str, progress: float, status: str, message: str) -> None:
+        """閫氳繃 IntentBus 骞挎挱杩涘害淇″彿鍒板厬鍗?""
+        try:
+            self._intent_bus.send_progress(
+                session_id="upload",
+                source="闇?,
+                target="鍏?,
+                progress=progress,
+                message=f"{file_path}: {status} 鈥?{message}"[:100],
+            )
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
+            pass
+
+    def stats(self) -> Dict[str, Any]:
+        """杩斿洖闇囧崷杩愯缁熻"""
+        return {
+            "gua": self.GUA_NAME,
+            "emoji": self.GUA_EMOJI,
+            "dirty": self._dirty,
+            "cached_files": len(self._fingerprint_cache),
+            "check_count": self._check_count,
+            "change_count": self._change_count,
+            "digested_count": self._digested_count,
+            "health": self._health.value,
+            "uptime_sec": round(self.uptime_sec, 1),
+        }
+
+
+# ============================================================================
+# 鍏ㄥ眬鍧ゅ崷瀹炰緥缂撳瓨锛堥伩鍏嶉噸澶嶅垱寤猴級
+# ============================================================================
+
+_kun_instance: Optional[Any] = None
+
+
+def _get_kun_instance():
+    """鑾峰彇鎴栧垱寤哄潳鍗﹀疄渚?""
+    global _kun_instance
+    if _kun_instance is None:
+        try:
+            from src.bagua.kun import KunGua
+
+            _kun_instance = KunGua()
+            _kun_instance.start()
+        except Exception as e:  # TODO: Narrow exception type
+            logger.warning("鍧ゅ崷瀹炰緥鍒涘缓澶辫触: %s", e)
+            return None
+    return _kun_instance
+
+
+__all__ = ["ZhenGua"]

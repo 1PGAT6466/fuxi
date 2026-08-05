@@ -4,19 +4,22 @@ relation_builder.py — 实体关系自动构建 (RAG 3.0 v2)
   1. 快速通道: 从 chunks 文本中匹配已有 entities，共现=关系
   2. LLM 通道: DeepSeek 辅助抽取新实体关系 (限速)
 """
+
+import asyncio
 import logging
 import sqlite3
-import asyncio
 
 logger = logging.getLogger(__name__)
 
 # ============ 快速通道: 共现分析 ============
+
 
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def extract_relations_cooccurrence(chunks: list) -> list:
     """基于共现: 在同一 chunk 中出现的 entities → 建立关系"""
     try:
         from src.config import WORLDTREE_DB_PATH
+
         def _load_entities():
             db = sqlite3.connect(str(WORLDTREE_DB_PATH), timeout=10)
             db.execute("PRAGMA journal_mode=WAL")
@@ -25,55 +28,54 @@ async def extract_relations_cooccurrence(chunks: list) -> list:
             entity_names = {r[1]: (r[0], r[2]) for r in entities}
             db.close()
             return entity_names
+
         entity_names = await asyncio.to_thread(_load_entities)
-    except Exception:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         return []
-    
+
     if len(entity_names) < 2:
         return []
-    
+
     # 构建 name→id 的快速查找
     relations = []
     seen_pairs = set()
-    
+
     for chunk in chunks:
         text = chunk.get("text", "")
         if len(text) < 30:
             continue
-        
+
         # 找出文本中出现过的所有实体
         found = []
         text_lower = text.lower()
         for name, (eid, etype) in entity_names.items():
             if name.lower() in text_lower:
                 found.append((name, eid, etype))
-        
+
         # 两两配对 → 关系
         for i in range(len(found)):
-            for j in range(i+1, len(found)):
+            for j in range(i + 1, len(found)):
                 name_a, id_a, type_a = found[i]
                 name_b, id_b, type_b = found[j]
-                
+
                 pair_key = f"{id_a}|{id_b}"
                 if pair_key in seen_pairs:
                     continue
                 seen_pairs.add(pair_key)
-                
+
                 # 推断关系类型
                 rel_type = _infer_relation(name_a, name_b, type_a, type_b, text)
-                relations.append({
-                    "from_name": name_a, "from_id": id_a,
-                    "to_name": name_b, "to_id": id_b,
-                    "relation_type": rel_type
-                })
-    
+                relations.append(
+                    {"from_name": name_a, "from_id": id_a, "to_name": name_b, "to_id": id_b, "relation_type": rel_type}
+                )
+
     return relations
 
 
 def _infer_relation(name_a: str, name_b: str, type_a: str, type_b: str, text: str) -> str:
     """根据实体类型和文本内容推断关系类型"""
     text_lower = text.lower()
-    
+
     # 关键词匹配
     if any(kw in text_lower for kw in ["供应商", "采购", "supplier", "从", "购买"]):
         return "supplier_of"
@@ -89,7 +91,7 @@ def _infer_relation(name_a: str, name_b: str, type_a: str, type_b: str, text: st
         return "standard_of"
     if any(kw in text_lower for kw in ["零件", "组件", "部件", "part of"]):
         return "part_of"
-    
+
     # 默认
     return "related_to"
 
@@ -98,19 +100,20 @@ async def build_relations_from_chunks(chunks: list, batch_size: int = 50) -> dic
     """批量构建实体关系"""
     if not chunks:
         return {"extracted": 0, "inserted": 0}
-    
+
     # 快速通道: 共现分析
     relations = await extract_relations_cooccurrence(chunks[:batch_size])
-    
+
     inserted = 0
     if relations:
         try:
             from src.config import WORLDTREE_DB_PATH
+
             def _insert_relations():
                 db = sqlite3.connect(str(WORLDTREE_DB_PATH), timeout=10)
                 db.execute("PRAGMA journal_mode=WAL")
                 db.execute("PRAGMA busy_timeout=5000")
-                
+
                 # Batch: executemany 替代循环 INSERT
                 rel_rows = [(r["from_id"], r["to_id"], r["relation_type"]) for r in relations]
                 count = 0
@@ -118,7 +121,7 @@ async def build_relations_from_chunks(chunks: list, batch_size: int = 50) -> dic
                     try:
                         db.executemany(
                             "INSERT OR IGNORE INTO entity_relations (from_id, to_id, relation_type) VALUES (?, ?, ?)",
-                            rel_rows
+                            rel_rows,
                         )
                         count = len(rel_rows)
                     except Exception as e:
@@ -126,17 +129,19 @@ async def build_relations_from_chunks(chunks: list, batch_size: int = 50) -> dic
                 db.commit()
                 db.close()
                 return count
+
             inserted = await asyncio.to_thread(_insert_relations)
             logger.info(f"[RelationBuilder] Extracted {len(relations)} relations (co-occurrence), inserted {inserted}")
         except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[RelationBuilder] DB write failed: {e}")
-    
+
     return {"extracted": len(relations), "inserted": inserted}
 
 
 def get_relation_stats() -> dict:
     try:
         from src.config import WORLDTREE_DB_PATH
+
         db = sqlite3.connect(str(WORLDTREE_DB_PATH), timeout=10)
         db.execute("PRAGMA journal_mode=WAL")
         db.execute("PRAGMA busy_timeout=5000")
@@ -144,13 +149,14 @@ def get_relation_stats() -> dict:
         entities = db.execute("SELECT COUNT(1) FROM entities").fetchone()[0]
         db.close()
         return {"total_relations": total, "total_entities": entities, "density": round(total / max(1, entities), 3)}
-    except Exception:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         return {"total_relations": 0, "total_entities": 0, "density": 0}
 
 
 async def auto_build_relations(limit: int = 100) -> dict:
     try:
         from src.db.data_store import load_chunks
+
         chunks = await asyncio.to_thread(load_chunks, limit=limit)
         if not chunks:
             return {"message": "no chunks to process"}

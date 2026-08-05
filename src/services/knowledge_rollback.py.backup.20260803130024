@@ -1,0 +1,366 @@
+"""
+knowledge_rollback.py — 知识回滚机制 (v1.50 P0 安全修复)
+
+提供知识回滚能力：
+  - 按来源+时间批量回滚（如：回滚所有联网搜索入库的知识）
+  - 按 ID 回滚单条知识
+
+回滚操作：
+  1. 从 ChromaDB 向量库中删除对应向量
+  2. 从 SQLite 中标记为 deleted（软删除，保留审计记录）
+  3. 记录回滚日志
+
+使用场景：
+  - 联网搜索引入了错误/污染的知识 → 批量回滚
+  - 手动发现某条知识有误 → 单条回滚
+  - 安全审计发现可疑来源 → 按来源回滚
+
+所有从联网搜索入库的知识，必须标记：
+  - source: "web_search"
+  - imported_at: ISO 时间戳
+"""
+
+import json
+import logging
+import sqlite3
+import time
+from datetime import datetime
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger("knowledge_rollback")
+
+# 回滚日志目录
+from src.config import DATA_DIR as CONFIG_DATA_DIR
+
+ROLLBACK_DIR = Path(CONFIG_DATA_DIR) / "rollback_logs"
+ROLLBACK_DIR.mkdir(parents=True, exist_ok=True)
+
+
+class KnowledgeRollback:
+    """知识回滚器
+
+    用法：
+        rollback = KnowledgeRollback()
+
+        # 回滚所有来自联网搜索的知识（2024-01-01 之前入库的）
+        count = await rollback.rollback_by_source("web_search", "2024-01-01T00:00:00")
+
+        # 回滚单条知识
+        success = await rollback.rollback_by_id("chunk_12345")
+    """
+
+    def __init__(self):
+        self._rollback_count = 0
+
+    async def rollback_by_source(
+        self,
+        source: str,
+        before_time: str,
+        reason: str = "manual_rollback",
+    ) -> int:
+        """按来源+时间批量回滚知识
+
+        Args:
+            source:     知识来源标识（如 "web_search"）
+            before_time: ISO 格式时间戳，回滚此时间之前入库的知识
+            reason:     回滚原因（用于审计日志）
+
+        Returns:
+            成功回滚的知识条数
+        """
+        logger.info(
+            "[KnowledgeRollback] 开始按来源回滚: source=%s, before=%s, reason=%s",
+            source,
+            before_time,
+            reason,
+        )
+
+        rolled_back = 0
+        knowledge_ids: List[str] = []
+
+        try:
+            # 1. 查询符合条件的知识条目
+            knowledge_ids = await self._query_by_source(source, before_time)
+            if not knowledge_ids:
+                logger.info("[KnowledgeRollback] 未找到符合条件的知识条目")
+                return 0
+
+            logger.info(
+                "[KnowledgeRollback] 找到 %d 条待回滚知识",
+                len(knowledge_ids),
+            )
+
+            # 2. 逐条回滚
+            for kid in knowledge_ids:
+                success = await self._rollback_single(kid)
+                if success:
+                    rolled_back += 1
+
+            # 3. 记录回滚日志
+            await self._log_rollback(
+                operation="batch_by_source",
+                source=source,
+                before_time=before_time,
+                reason=reason,
+                knowledge_ids=knowledge_ids,
+                rolled_back=rolled_back,
+                total=len(knowledge_ids),
+            )
+
+            logger.info(
+                "[KnowledgeRollback] 批量回滚完成: %d/%d 条",
+                rolled_back,
+                len(knowledge_ids),
+            )
+
+        except (sqlite3.Error, OSError, IOError) as e:
+            logger.error("[KnowledgeRollback] 批量回滚失败: %s", e, exc_info=True)
+            # 记录失败日志
+            await self._log_rollback(
+                operation="batch_by_source",
+                source=source,
+                before_time=before_time,
+                reason=reason,
+                knowledge_ids=knowledge_ids,
+                rolled_back=rolled_back,
+                total=len(knowledge_ids),
+                error=str(e),
+            )
+
+        return rolled_back
+
+    async def rollback_by_id(
+        self,
+        knowledge_id: str,
+        reason: str = "manual_rollback",
+    ) -> bool:
+        """按 ID 回滚单条知识
+
+        Args:
+            knowledge_id: 知识条目 ID
+            reason:       回滚原因
+
+        Returns:
+            是否回滚成功
+        """
+        logger.info(
+            "[KnowledgeRollback] 回滚单条知识: id=%s, reason=%s",
+            knowledge_id,
+            reason,
+        )
+
+        try:
+            success = await self._rollback_single(knowledge_id)
+
+            # 记录回滚日志
+            await self._log_rollback(
+                operation="single_by_id",
+                knowledge_id=knowledge_id,
+                reason=reason,
+                rolled_back=1 if success else 0,
+                total=1,
+            )
+
+            if success:
+                logger.info("[KnowledgeRollback] 单条回滚成功: %s", knowledge_id)
+            else:
+                logger.warning("[KnowledgeRollback] 单条回滚失败（未找到）: %s", knowledge_id)
+
+            return success
+
+        except (sqlite3.Error, OSError, IOError) as e:
+            logger.error(
+                "[KnowledgeRollback] 单条回滚异常: id=%s, error=%s",
+                knowledge_id,
+                e,
+                exc_info=True,
+            )
+            await self._log_rollback(
+                operation="single_by_id",
+                knowledge_id=knowledge_id,
+                reason=reason,
+                rolled_back=0,
+                total=1,
+                error=str(e),
+            )
+            return False
+
+    # ──────── 内部方法 ────────
+
+    async def _query_by_source(
+        self,
+        source: str,
+        before_time: str,
+    ) -> List[str]:
+        """查询指定来源+时间范围内的知识 ID 列表
+
+        Args:
+            source:     来源标识
+            before_time: ISO 时间戳
+
+        Returns:
+            知识 ID 列表
+        """
+        try:
+            from src.db.memory_store import get_store
+
+            store = get_store()
+
+            # 查询 chunks 表中 source 和 created_at 符合条件的条目
+            cursor = store._db_conn.execute(
+                "SELECT id FROM chunks " "WHERE source = ? AND created_at < ? AND status != 'deleted'",
+                (source, before_time),
+            )
+            rows = cursor.fetchall()
+            return [str(row["id"]) if isinstance(row, dict) else str(row[0]) for row in rows]
+
+        except ImportError:
+            logger.error("[KnowledgeRollback] memory_store 模块不可用")
+            return []
+        except sqlite3.Error as e:
+            logger.error("[KnowledgeRollback] SQLite 查询失败: %s", e)
+            return []
+
+    async def _rollback_single(self, knowledge_id: str) -> bool:
+        """回滚单条知识（从 ChromaDB 删除 + SQLite 标记删除）
+
+        Args:
+            knowledge_id: 知识 ID
+
+        Returns:
+            是否成功
+        """
+        try:
+            from src.db.memory_store import get_store
+
+            store = get_store()
+
+            # 1. 从 SQLite 标记为 deleted（软删除）
+            try:
+                cursor = store._db_conn.execute(
+                    "UPDATE chunks SET status = 'deleted', " "deleted_at = ? WHERE id = ?",
+                    (datetime.utcnow().isoformat(), knowledge_id),
+                )
+                store._db_conn.commit()
+                if cursor.rowcount == 0:
+                    logger.warning(
+                        "[KnowledgeRollback] SQLite 未找到条目: %s",
+                        knowledge_id,
+                    )
+                    return False
+            except sqlite3.Error as e:
+                logger.error(
+                    "[KnowledgeRollback] SQLite 标记删除失败: id=%s, error=%s",
+                    knowledge_id,
+                    e,
+                )
+                return False
+
+            # 2. 从 ChromaDB 向量库删除
+            try:
+                from src.db.vector_store import get_vector_store
+
+                vs = get_vector_store()
+                if vs is not None:
+                    # ChromaDB 使用 "chunk_{id}" 格式的 ID
+                    vector_id = f"chunk_{knowledge_id}"
+                    try:
+                        vs._collection.delete(ids=[vector_id])
+                        logger.debug(
+                            "[KnowledgeRollback] ChromaDB 删除成功: %s",
+                            vector_id,
+                        )
+                    except Exception as e:
+                        # ChromaDB 删除失败不影响整体回滚（SQLite 已标记）
+                        logger.warning(
+                            "[KnowledgeRollback] ChromaDB 删除失败（已回退 SQLite）: " "id=%s, error=%s",
+                            vector_id,
+                            e,
+                        )
+            except ImportError:
+                logger.warning("[KnowledgeRollback] vector_store 不可用，仅完成 SQLite 标记删除")
+
+            return True
+
+        except ImportError:
+            logger.error("[KnowledgeRollback] memory_store 模块不可用")
+            return False
+        except Exception as e:
+            logger.error(
+                "[KnowledgeRollback] 回滚单条异常: id=%s, error=%s",
+                knowledge_id,
+                e,
+                exc_info=True,
+            )
+            return False
+
+    async def _log_rollback(
+        self,
+        operation: str,
+        reason: str = "",
+        source: str = "",
+        before_time: str = "",
+        knowledge_id: str = "",
+        knowledge_ids: Optional[List[str]] = None,
+        rolled_back: int = 0,
+        total: int = 0,
+        error: str = "",
+    ) -> None:
+        """记录回滚操作日志（持久化到 JSONL 文件）
+
+        Args:
+            operation:     操作类型（batch_by_source / single_by_id）
+            reason:        回滚原因
+            source:        来源标识
+            before_time:   时间范围
+            knowledge_id:  单条回滚的 ID
+            knowledge_ids: 批量回滚的 ID 列表
+            rolled_back:   成功回滚数
+            total:         总计数
+            error:         错误信息（如有）
+        """
+        try:
+            log_entry = {
+                "timestamp": datetime.utcnow().isoformat(),
+                "operation": operation,
+                "reason": reason,
+                "source": source,
+                "before_time": before_time,
+                "knowledge_id": knowledge_id,
+                "knowledge_ids_count": len(knowledge_ids) if knowledge_ids else 0,
+                "rolled_back": rolled_back,
+                "total": total,
+                "error": error,
+                "success": rolled_back == total and not error,
+            }
+
+            log_file = ROLLBACK_DIR / f"{datetime.utcnow().strftime('%Y-%m-%d')}.jsonl"
+
+            def _write():
+                with open(log_file, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(log_entry, ensure_ascii=False) + "\n")
+
+            import asyncio
+
+            await asyncio.to_thread(_write)
+
+            logger.info(
+                "[KnowledgeRollback] 回滚日志已记录: operation=%s, rolled=%d/%d",
+                operation,
+                rolled_back,
+                total,
+            )
+
+        except (OSError, IOError) as e:
+            logger.error("[KnowledgeRollback] 日志写入失败: %s", e)
+
+
+# ============================================================================
+# 全局便捷函数
+# ============================================================================
+
+
+def get_knowledge_rollback() -> KnowledgeRollback:
+    """获取 KnowledgeRollback 实例"""
+    return KnowledgeRollback()

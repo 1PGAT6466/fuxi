@@ -1,0 +1,1268 @@
+﻿"""
+evaluation.py 鈥?妯″瀷璐ㄩ噺璇勪及闂幆 (v1.44 P1 鏍稿績淇)
+
+璇勪及缁村害锛?
+  1. 鐩稿叧鎬э紙Relevancy锛?    鈥?鍥炵瓟鏄惁涓庣敤鎴烽棶棰樼浉鍏?
+  2. 鍑嗙‘鎬э紙Accuracy锛?     鈥?鍥炵瓟涓簨瀹炴€у０鏄庢槸鍚︽纭?
+  3. 瀹屾暣鎬э紙Completeness锛?  鈥?鍥炵瓟鏄惁鍏呭垎瑕嗙洊闂
+  4. 骞昏妫€娴嬶紙Hallucination锛?鈥?鍥炵瓟涓槸鍚﹀瓨鍦ㄦ棤鍑哄鍐呭
+
+鏋舵瀯闆嗘垚鐐癸細
+  - evaluate_response() 宓屽叆 SAG 涓夐樁娈电绾垮嚭鍙?
+  - 璇勪及缁撴灉鑷姩鍐欏叆 evaluation/pipeline 鎸佷箙鍖?
+  - 涓?feedback_store 鍙屽悜鑱斿姩锛堣瘎浼?鈫?鍙嶉 鈫?瀛︿範锛?
+  - 涓?shaoyin.fact_check 鍗忓悓锛堝噺灏戦噸澶?LLM 璋冪敤锛?
+  - 璇勪及鎶ュ憡瑙﹀彂 learner 鏉冮噸璋冩暣锛圥0-B锛?
+
+绾︽潫锛?
+  - 涓嶄慨鏀圭幇鏈夋鏋朵唬鐮?
+  - 寮傛缂栫▼妯″紡锛坅sync/await锛?
+  - LLM 璋冪敤澶嶇敤 llm.call_llm_fast
+  - 鎸佷箙鍖栧鐢?JSONL 鏂囦欢瀛樺偍锛堜笌 eval_pipeline 涓€鑷达級
+"""
+
+import hashlib
+import json
+import logging
+import time
+from dataclasses import asdict, dataclass, field
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
+
+import asyncio
+
+# ============ 閰嶇疆 ============
+from src.config import DATA_DIR as CONFIG_DATA_DIR
+
+EVAL_DIR = Path(CONFIG_DATA_DIR) / "evaluation"
+EVAL_DIR.mkdir(parents=True, exist_ok=True)
+EVAL_REPORTS_DIR = EVAL_DIR / "quality_reports"
+EVAL_REPORTS_DIR.mkdir(parents=True, exist_ok=True)
+EVAL_DB_PATH = EVAL_DIR / "evaluation_results.jsonl"
+EVAL_INDEX_PATH = EVAL_DIR / "evaluation_index.json"
+
+# 鍘婚噸绐楀彛锛堢锛夛細鐩稿悓 (query, response_hash) 300 绉掑唴涓嶉噸澶嶈瘎浼?
+DEDUP_WINDOW = 300
+# 鎵归噺鎸佷箙鍖栭槇鍊?
+BATCH_FLUSH_SIZE = 50
+# 鏈€澶у苟鍙戣瘎浼版暟
+MAX_CONCURRENT_EVALS = 10
+
+# 璇勪及 LLM 璋冪敤鎴愭湰鎺у埗锛氬崟娆¤瘎浼版渶澶?use 3 娆¤交閲?LLM 璋冪敤
+MAX_LLM_CALLS_PER_EVAL = 3
+
+
+# ============ 鏁版嵁妯″瀷 ============
+
+
+@dataclass
+class DimensionScore:
+    """鍗曚釜璇勪及缁村害鐨勫緱鍒?""
+
+    dimension: str  # relevancy / accuracy / completeness / hallucination
+    score: float  # 0.0 - 1.0
+    confidence: float  # 璇勪及缃俊搴?0.0 - 1.0
+    detail: str  # 璇勪及璇︽儏
+    citations: List[str] = field(default_factory=list)  # 寮曠敤鏉ユ簮
+    issues: List[str] = field(default_factory=list)  # 鍙戠幇鐨勯棶棰?
+
+
+@dataclass
+class EvaluationResult:
+    """瀹屾暣璇勪及缁撴灉"""
+
+    eval_id: str  # 鍞竴璇勪及 ID
+    timestamp: float  # Unix 鏃堕棿鎴?
+    query: str  # 鍘熷鐢ㄦ埛鏌ヨ
+    response: str  # 妯″瀷鍥炵瓟
+    context: str  # 妫€绱笂涓嬫枃
+
+    # 鍥涚淮寰楀垎
+    relevancy_score: float = 0.0
+    accuracy_score: float = 0.0
+    completeness_score: float = 0.0
+    hallucination_score: float = 0.0  # 鍊艰秺浣庤秺濂斤紙0 = 鏃犲够瑙夛級
+
+    # 缁煎悎寰楀垎锛堝姞鏉冨钩鍧囷級
+    overall_score: float = 0.0
+    # 璇勪及鏄惁閫氳繃闃堝€?
+    passed: bool = False
+    # 闃堝€奸厤缃?
+    threshold: float = 0.6
+
+    # 缁村害璇︽儏
+    dimensions: List[Dict] = field(default_factory=list)
+
+    # 鍏冩暟鎹?
+    model: str = "mimo-v2.5"
+    trace_id: str = ""
+    session_id: str = ""
+    latency_ms: float = 0.0
+    token_usage: Dict = field(default_factory=dict)
+
+    # 寤鸿
+    recommendations: List[str] = field(default_factory=list)
+    flags: List[str] = field(default_factory=list)  # 鏍囪濡?"hallucination_detected"
+
+
+# ============ 璇勪及鏍稿績绫?============
+
+
+class Evaluation:
+    """
+    妯″瀷璐ㄩ噺璇勪及闂幆
+
+    鐢ㄦ硶:
+        evaluator = Evaluation()
+        result = await evaluator.evaluate_response(
+            query="浠€涔堟槸 SAG 涓夐樁娈?,
+            response="SAG 鏄竴绉嶆绱㈠寮虹敓鎴愮瓥鐣?..",
+            context="妫€绱㈠埌鐨勬枃妗ｅ唴瀹?.."
+        )
+        print(f"缁煎悎寰楀垎: {result.overall_score}")
+    """
+
+    # 鏉冮噸閰嶇疆锛氬洓缁村姞鏉冩眰鍜岋紙鍙€氳繃鐜鍙橀噺瑕嗙洊锛?
+    WEIGHTS = {
+        "relevancy": 0.25,
+        "accuracy": 0.30,
+        "completeness": 0.20,
+        "hallucination": 0.25,
+    }
+
+    # 鍒嗘暟闃堝€?
+    PASS_THRESHOLD = 0.60  # 缁煎悎寰楀垎閫氳繃绾?
+    WARNING_THRESHOLD = 0.50  # 缁煎悎寰楀垎璀﹀憡绾?
+    CRITICAL_THRESHOLD = 0.35  # 缁煎悎寰楀垎涓ラ噸绾?
+    HALLUCINATION_ALERT = 0.30  # 骞昏寰楀垎 > 姝ゅ€艰Е鍙戝憡璀︼紙鍊艰秺楂樿秺宸級
+
+    def __init__(self):
+        self._eval_semaphore = asyncio.Semaphore(MAX_CONCURRENT_EVALS)
+        self._batch_buffer: List[Dict] = []
+        self._dedup_cache: Dict[str, float] = {}
+        self._last_dedup_cleanup = time.time()
+        self._eval_index: Dict[str, str] = {}
+        self._load_index()
+
+    # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 涓诲叆鍙?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    async def evaluate_response(
+        self,
+        query: str,
+        response: str,
+        context: str = "",
+        sources: List[str] = None,
+        model: str = "mimo-v2.5",
+        trace_id: str = "",
+        session_id: str = "",
+        threshold: float = None,
+    ) -> EvaluationResult:
+        """
+        瀵逛竴娆?RAG 鍥炵瓟杩涜鍏ㄧ淮搴﹁川閲忚瘎浼般€?
+
+        Args:
+            query: 鐢ㄦ埛鍘熷鏌ヨ
+            response: 妯″瀷鐢熸垚鐨勫洖绛?
+            context: 妫€绱㈠埌鐨勪笂涓嬫枃鍐呭
+            sources: 妫€绱㈡潵婧愬垪琛紙鐢ㄤ簬骞昏妫€娴嬶級
+            model: 浣跨敤鐨勬ā鍨嬪悕绉?
+            trace_id: 閾捐矾杩借釜 ID
+            session_id: 浼氳瘽 ID
+            threshold: 鑷畾涔夐€氳繃闃堝€?
+
+        Returns:
+            EvaluationResult: 鍖呭惈鍥涚淮寰楀垎鍜岀患鍚堝緱鍒嗙殑璇勪及缁撴灉
+        """
+        t0 = time.time()
+
+        if threshold is None:
+            threshold = self.PASS_THRESHOLD
+
+        # 1. 鍘婚噸妫€鏌?
+        dedup_key = self._make_dedup_key(query, response)
+        if self._is_duplicate(dedup_key):
+            logger.debug(f"[Evaluation] 璺宠繃閲嶅璇勪及: {dedup_key[:16]}")
+            # 杩斿洖缂撳瓨鏍囪
+            return EvaluationResult(
+                eval_id=dedup_key,
+                timestamp=t0,
+                query=query[:200],
+                response=response[:200],
+                context=context[:200],
+                overall_score=-1.0,
+                passed=True,
+                dimensions=[],
+                flags=["cached_duplicate"],
+            )
+
+        async with self._eval_semaphore:
+            # 鐢熸垚璇勪及 ID
+            eval_id = self._make_eval_id(query, response, t0)
+
+            # 2. 骞惰璇勪及鍥涗釜缁村害锛堟帶鍒?LLM 璋冪敤娆℃暟 鈮?3锛?
+            dim_results = await self._evaluate_dimensions(query, response, context, sources)
+
+            # 3. 璁＄畻缁煎悎寰楀垎
+            overall, dim_scores = self._compute_overall(dim_results)
+            passed = overall >= threshold
+
+            # 4. 骞昏鍛婅妫€娴?
+            flags = self._check_flags(dim_scores)
+
+            # 5. 鐢熸垚鏀硅繘寤鸿
+            recommendations = self._generate_recommendations(dim_scores, overall)
+
+            # 6. 鏋勫缓缁撴灉
+            latency = (time.time() - t0) * 1000
+
+            result = EvaluationResult(
+                eval_id=eval_id,
+                timestamp=t0,
+                query=query[:500],
+                response=response[:500],
+                context=context[:500],
+                relevancy_score=dim_scores.get("relevancy", 0.0),
+                accuracy_score=dim_scores.get("accuracy", 0.0),
+                completeness_score=dim_scores.get("completeness", 0.0),
+                hallucination_score=dim_scores.get("hallucination", 0.0),
+                overall_score=round(overall, 4),
+                passed=passed,
+                threshold=threshold,
+                dimensions=[
+                    {
+                        "dimension": k,
+                        "score": v,
+                        "detail": dim_results.get(f"{k}_detail", ""),
+                        "issues": dim_results.get(f"{k}_issues", []),
+                    }
+                    for k, v in dim_scores.items()
+                ],
+                model=model,
+                trace_id=trace_id,
+                session_id=session_id,
+                latency_ms=round(latency, 1),
+                recommendations=recommendations,
+                flags=flags,
+            )
+
+            # 7. 寮傛鎸佷箙鍖?+ 瑙﹀彂鍙嶉闂幆
+            asyncio.create_task(self._persist_and_trigger(result))
+
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
+                    f"[Evaluation] {eval_id[:12]} 瀹屾垚: overall={overall:.3f}, "
+                    f"relevancy={dim_scores.get('relevancy', 0):.2f}, "
+                    f"accuracy={dim_scores.get('accuracy', 0):.2f}, "
+                    f"completeness={dim_scores.get('completeness', 0):.2f}, "
+                    f"hallucination={dim_scores.get('hallucination', 0):.2f}, "
+                    f"passed={passed}, flags={flags}"
+                )
+            elif logger.isEnabledFor(logging.INFO):
+                if not passed:
+                    logger.warning(f"[Evaluation] {eval_id[:12]} 鏈€氳繃: overall={overall:.3f}, " f"flags={flags}")
+
+            # 璁板綍鍘婚噸
+            self._dedup_cache[dedup_key] = t0
+
+            return result
+
+    # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 缁村害璇勪及 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    async def _evaluate_dimensions(
+        self,
+        query: str,
+        response: str,
+        context: str,
+        sources: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """骞惰璇勪及鍥涗釜缁村害銆侺LM 璋冪敤娆℃暟锛?-3 娆★紙鐩稿叧鎬?鍑嗙‘鎬?1 娆★紝瀹屾暣鎬?1 娆★紝骞昏 0-1 娆★級"""
+
+        dimensions = {}
+
+        # 璋冪敤 1: 鐩稿叧鎬?+ 鍑嗙‘鎬э紙鍚堝苟涓轰竴娆?LLM 璋冪敤锛?
+        rel_acc_task = self._eval_relevancy_accuracy(query, response, context)
+
+        # 璋冪敤 2: 瀹屾暣鎬э紙鐙珛璋冪敤锛?
+        comp_task = self._eval_completeness(query, response)
+
+        rel_acc_result, comp_result = await asyncio.gather(rel_acc_task, comp_task, return_exceptions=True)
+
+        # 澶勭悊鐩稿叧鎬?鍑嗙‘鎬х粨鏋?
+        if isinstance(rel_acc_result, Exception):
+            logger.warning(f"[Evaluation] 鐩稿叧鎬?鍑嗙‘鎬ц瘎浼板け璐? {rel_acc_result}")
+            dimensions.update(
+                {
+                    "relevancy": 0.5,
+                    "relevancy_detail": f"璇勪及澶辫触: {rel_acc_result}",
+                    "accuracy": 0.5,
+                    "accuracy_detail": f"璇勪及澶辫触: {rel_acc_result}",
+                }
+            )
+        else:
+            dimensions.update(rel_acc_result)
+
+        # 澶勭悊瀹屾暣鎬х粨鏋?
+        if isinstance(comp_result, Exception):
+            logger.warning(f"[Evaluation] 瀹屾暣鎬ц瘎浼板け璐? {comp_result}")
+            dimensions["completeness"] = 0.5
+            dimensions["completeness_detail"] = f"璇勪及澶辫触: {comp_result}"
+        else:
+            dimensions["completeness"] = comp_result.get("completeness", 0.5)
+            dimensions["completeness_detail"] = comp_result.get("detail", "")
+            dimensions["completeness_issues"] = comp_result.get("issues", [])
+
+        # 璋冪敤 3: 骞昏妫€娴嬶紙浠呭湪涓婁笅鏂囧瓨鍦ㄦ椂鎵嶈繘琛?LLM 妫€娴嬶級
+        if context and len(context.strip()) > 20:
+            try:
+                hall_result = await self._eval_hallucination(query, response, context, sources)
+                if isinstance(hall_result, Exception):
+                    logger.warning(f"[Evaluation] 骞昏妫€娴嬪け璐? {hall_result}")
+                    dimensions["hallucination"] = 0.5
+                    dimensions["hallucination_detail"] = f"妫€娴嬪け璐? {hall_result}"
+                else:
+                    dimensions.update(hall_result)
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+                logger.warning(f"[Evaluation] 骞昏妫€娴嬪紓甯? {e}")
+                dimensions["hallucination"] = 0.5
+                dimensions["hallucination_detail"] = f"妫€娴嬪紓甯? {e}"
+        else:
+            # 鏃犱笂涓嬫枃鏃朵娇鐢ㄥ惎鍙戝紡瑙勫垯
+            dims = self._heuristic_hallucination_check(query, response)
+            dimensions.update(dims)
+
+        return dimensions
+
+    async def _eval_relevancy_accuracy(self, query: str, response: str, context: str) -> Dict[str, Any]:
+        """璇勪及鐩稿叧鎬у拰鍑嗙‘鎬э紙鍚堝苟 LLM 璋冪敤锛?""
+        from src.services.llm import call_llm_fast
+
+        context_snippet = context[:2000] if context else "锛堟棤涓婁笅鏂囷級"
+        prompt = (
+            "浣犳槸 RAG 璐ㄩ噺璇勬祴涓撳銆傝璇勪及浠ヤ笅鍥炵瓟鐨勭浉鍏虫€у拰鍑嗙‘鎬с€俓n\n"
+            f"鐢ㄦ埛闂锛歿query[:500]}\n\n"
+            f"涓婁笅鏂囷細{context_snippet}\n\n"
+            f"鍥炵瓟锛歿response[:1500]}\n\n"
+            "璇疯緭鍑?JSON锛堜笉瑕佸叾浠栨枃瀛楋級锛歕n"
+            "{\n"
+            '  "relevancy": {\n'
+            '    "score": 0.0-1.0,\n'
+            '    "detail": "璇勪及璇存槑锛堜腑鏂囷級",\n'
+            '    "issues": ["闂1", "闂2"]\n'
+            "  },\n"
+            '  "accuracy": {\n'
+            '    "score": 0.0-1.0,\n'
+            '    "detail": "璇勪及璇存槑锛堜腑鏂囷級",\n'
+            '    "issues": ["涓嶅噯纭０鏄?"]\n'
+            "  }\n"
+            "}"
+        )
+
+        try:
+            result = await call_llm_fast(
+                prompt,
+                max_tokens=400,
+                temperature=0.1,
+                system_prompt="浣犳槸 RAG 璐ㄩ噺璇勬祴涓撳銆傚彧杈撳嚭 JSON銆?,
+            )
+            if not result:
+                return {"relevancy": 0.5, "accuracy": 0.5}
+
+            parsed = self._safe_json_parse(result)
+            return {
+                "relevancy": (
+                    parsed.get("relevancy", {}).get("score", 0.5) if isinstance(parsed.get("relevancy"), dict) else 0.5
+                ),
+                "relevancy_detail": (
+                    parsed.get("relevancy", {}).get("detail", "") if isinstance(parsed.get("relevancy"), dict) else ""
+                ),
+                "relevancy_issues": (
+                    parsed.get("relevancy", {}).get("issues", []) if isinstance(parsed.get("relevancy"), dict) else []
+                ),
+                "accuracy": (
+                    parsed.get("accuracy", {}).get("score", 0.5) if isinstance(parsed.get("accuracy"), dict) else 0.5
+                ),
+                "accuracy_detail": (
+                    parsed.get("accuracy", {}).get("detail", "") if isinstance(parsed.get("accuracy"), dict) else ""
+                ),
+                "accuracy_issues": (
+                    parsed.get("accuracy", {}).get("issues", []) if isinstance(parsed.get("accuracy"), dict) else []
+                ),
+            }
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+            logger.warning(f"[Evaluation] 鐩稿叧鎬?鍑嗙‘鎬ц瘎浼板紓甯? {e}", exc_info=True)
+            return {"relevancy": 0.5, "accuracy": 0.5}
+
+    async def _eval_completeness(self, query: str, response: str) -> Dict[str, Any]:
+        """璇勪及鍥炵瓟瀹屾暣鎬?""
+        from src.services.llm import call_llm_fast
+
+        prompt = (
+            "璇勪及浠ヤ笅鍥炵瓟鏄惁瀹屾暣鍥炵瓟浜嗙敤鎴烽棶棰樸€俓n\n"
+            f"鐢ㄦ埛闂锛歿query[:500]}\n\n"
+            f"鍥炵瓟锛歿response[:1500]}\n\n"
+            "杈撳嚭 JSON锛歕n"
+            "{\n"
+            '  "completeness": 0.0-1.0,\n'
+            '  "detail": "璇勪及璇存槑锛堜腑鏂囷級",\n'
+            '  "missing": ["缂哄け淇℃伅1"]\n'
+            "}"
+        )
+
+        try:
+            result = await call_llm_fast(
+                prompt,
+                max_tokens=200,
+                temperature=0.1,
+                system_prompt="浣犳槸鍥炵瓟璐ㄩ噺璇勪及涓撳銆傚彧杈撳嚭 JSON銆?,
+            )
+            if not result:
+                return {"completeness": 0.5}
+
+            parsed = self._safe_json_parse(result)
+            return {
+                "completeness": parsed.get("completeness", 0.5),
+                "detail": parsed.get("detail", ""),
+                "issues": parsed.get("missing", []),
+            }
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+            logger.warning(f"[Evaluation] 瀹屾暣鎬ц瘎浼板紓甯? {e}", exc_info=True)
+            return {"completeness": 0.5}
+
+    async def _eval_hallucination(
+        self,
+        query: str,
+        response: str,
+        context: str,
+        sources: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        妫€娴嬪够瑙夛細浣跨敤 SafetyCritic 杩涜澶氱淮搴︽娴嬨€?
+
+        闆嗘垚 SafetyCritic锛堜笁缁村害锛氭棤涓敓鏈?浜嬪疄鎵洸/閫昏緫鐭涚浘锛夛紝
+        鏇挎崲鍘熸湁鐨勫崟涓€ LLM prompt 鏂瑰紡銆?
+
+        SafetyCritic 杩斿洖鐨?overall_score = 0 琛ㄧず鏃犲够瑙夈€? 琛ㄧず涓ラ噸骞昏锛?
+        涓?evaluation 鐨?hallucination 瀛楁璇箟涓€鑷淬€?
+        """
+        try:
+            from src.services.safety_critic import get_safety_critic
+
+            critic = get_safety_critic()
+            report = await critic.detect_hallucination(
+                query=query,
+                response=response,
+                context=context,
+                sources=sources,
+                use_llm=True,  # 浣滀负娣卞害璇勪及鐜妭锛屼娇鐢?LLM
+            )
+
+            # 灏?SafetyCritic 鐨勮缁嗘姤鍛婃槧灏勫洖璇勪及缁村害
+            return {
+                "hallucination": report.overall_score,
+                "hallucination_detail": (
+                    f"涓夌淮妫€娴? 鏃犱腑鐢熸湁={report.fabrication_score:.2f}, "
+                    f"浜嬪疄鎵洸={report.fact_distortion_score:.2f}, "
+                    f"閫昏緫鐭涚浘={report.logic_contradiction_score:.2f} "
+                    f"[鏂规硶: {report.detection_method}]"
+                ),
+                "hallucination_issues": [f"[{s.get('type', '?')}] {s.get('text', '')[:80]}" for s in report.spans[:5]],
+                # 闄勫姞 SafetyCritic 鐨勮缁嗘姤鍛婏紙鐢ㄤ簬鍚庣画鍒嗘瀽锛?
+                "_safety_critic_report": {
+                    "report_id": report.report_id,
+                    "fabrication_score": report.fabrication_score,
+                    "fact_distortion_score": report.fact_distortion_score,
+                    "logic_contradiction_score": report.logic_contradiction_score,
+                    "spans": report.spans[:10],
+                    "detection_method": report.detection_method,
+                    "flags": report.flags,
+                    "recommendations": report.recommendations,
+                },
+            }
+        except ImportError:
+            logger.warning("[Evaluation] SafetyCritic 涓嶅彲鐢紝鍥為€€鍒板師鏈?LLM prompt 鏂瑰紡")
+            return await self._eval_hallucination_fallback(query, response, context, sources)
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+            logger.warning(f"[Evaluation] SafetyCritic 妫€娴嬪紓甯革紝鍥為€€: {e}")
+            return await self._eval_hallucination_fallback(query, response, context, sources)
+
+    async def _eval_hallucination_fallback(
+        self,
+        query: str,
+        response: str,
+        context: str,
+        sources: Optional[List[str]] = None,
+    ) -> Dict[str, Any]:
+        """
+        鍥為€€鐨勫够瑙夋娴嬶紙鍘熸湁鏂瑰紡锛夛細鍗曚竴 LLM prompt銆?
+        褰?SafetyCritic 涓嶅彲鐢ㄦ椂鑷姩鍥為€€銆?
+        """
+        from src.services.llm import call_llm_fast
+
+        src_text = context[:2000]
+        if sources:
+            src_text += "\n\n鏉ユ簮锛歕n" + "\n".join(f"- {s[:100]}" for s in sources[:10])
+
+        prompt = (
+            "妫€娴嬩互涓嬪洖绛斾腑鏄惁瀛樺湪涓婁笅鏂囦笉鏀寔鐨勫唴瀹癸紙骞昏锛夈€俓n\n"
+            f"鐢ㄦ埛闂锛歿query[:300]}\n\n"
+            f"涓婁笅鏂囷紙鏉冨▉鏉ユ簮锛夛細{src_text}\n\n"
+            f"鍥炵瓟锛歿response[:1500]}\n\n"
+            "杈撳嚭 JSON锛歕n"
+            "{\n"
+            '  "hallucination_score": 0.0-1.0,\n'
+            '  "detail": "妫€娴嬭鏄庯紙涓枃锛?,\n'
+            '  "hallucinated_claims": ["骞昏澹版槑1"],\n'
+            '  "supported_claims": ["鏈夊嚭澶勫０鏄?"]\n'
+            "}"
+        )
+
+        try:
+            result = await call_llm_fast(
+                prompt,
+                max_tokens=300,
+                temperature=0.1,
+                system_prompt="浣犳槸浜嬪疄鎬ф牎楠屼笓瀹躲€傚彧杈撳嚭 JSON銆?,
+            )
+            if not result:
+                return {"hallucination": 0.5}
+
+            parsed = self._safe_json_parse(result)
+            return {
+                "hallucination": parsed.get("hallucination_score", 0.5),
+                "hallucination_detail": parsed.get("detail", ""),
+                "hallucination_issues": parsed.get("hallucinated_claims", []),
+            }
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+            logger.warning(f"[Evaluation] 骞昏妫€娴嬪洖閫€寮傚父: {e}", exc_info=True)
+            return {"hallucination": 0.5}
+
+    def _heuristic_hallucination_check(self, query: str, response: str) -> Dict[str, Any]:
+        """鏃犱笂涓嬫枃鏃剁殑鍚彂寮忓够瑙夋娴?""
+        issues = []
+        hallucination_score = 0.0
+
+        # 妫€鏌ユ槸鍚﹀寘鍚槑鏄剧殑缂栭€犳ā寮?
+        fabricate_patterns = [
+            "鏍规嵁鍐呴儴鏁版嵁鏄剧ず",
+            "鎹叕鍙哥粺璁?,
+            "鏍规嵁鏈€鏂扮爺绌惰〃鏄?,
+            "涓撳鎸囧嚭",
+        ]
+        for pattern in fabricate_patterns:
+            if pattern in response:
+                issues.append(f"鍙兘缂栭€? '{pattern}' 缂哄皯鍑哄")
+                hallucination_score += 0.1
+
+        # 妫€鏌ユ槸鍚﹀寘鍚繃澶氱殑鍏蜂綋鏁板瓧锛堝彲鑳芥槸缂栭€犵殑锛?
+        import re
+
+        numbers = re.findall(r"\d+(?:\.\d+)?%?", response)
+        if len(numbers) > 10:
+            issues.append("鍖呭惈澶ч噺鍏蜂綋鏁板瓧锛屽缓璁獙璇佸嚭澶?)
+            hallucination_score += 0.05
+
+        hallucination_score = min(hallucination_score, 1.0)
+
+        return {
+            "hallucination": round(hallucination_score, 2),
+            "hallucination_detail": "鍚彂寮忔娴嬶紙鏃犱笂涓嬫枃锛?,
+            "hallucination_issues": issues,
+        }
+
+    # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 寰楀垎璁＄畻 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    def _compute_overall(self, dim_results: Dict[str, Any]) -> Tuple[float, Dict[str, float]]:
+        """璁＄畻鍔犳潈缁煎悎寰楀垎銆?
+
+        Returns:
+            overall: 缁煎悎寰楀垎 (0.0-1.0)
+            dim_scores: 鍘熷缁村害寰楀垎锛坔allucination 淇濇寔鍘熷鍊硷紝0=鏃犲够瑙?1=涓ラ噸骞昏锛?
+        """
+        raw_relevancy = dim_results.get("relevancy", 0.5)
+        raw_accuracy = dim_results.get("accuracy", 0.5)
+        raw_completeness = dim_results.get("completeness", 0.5)
+        raw_hallucination = dim_results.get("hallucination", 0.5)  # 鍘熷鍊硷細0=鏃犲够瑙?
+
+        # 缁煎悎寰楀垎璁＄畻锛氬够瑙夌淮搴﹀弽杞紙浣庡够瑙?楂樺垎锛?
+        overall = (
+            raw_relevancy * self.WEIGHTS["relevancy"]
+            + raw_accuracy * self.WEIGHTS["accuracy"]
+            + raw_completeness * self.WEIGHTS["completeness"]
+            + (1.0 - raw_hallucination) * self.WEIGHTS["hallucination"]
+        )
+
+        # 杩斿洖鍘熷缁村害寰楀垎锛坔allucination 淇濇寔鍘熷璇箟锛?
+        dim_scores = {
+            "relevancy": raw_relevancy,
+            "accuracy": raw_accuracy,
+            "completeness": raw_completeness,
+            "hallucination": raw_hallucination,
+        }
+
+        return overall, dim_scores
+
+    def _check_flags(self, scores: Dict[str, float]) -> List[str]:
+        """妫€鏌ュ憡璀︽爣璁般€俿cores["hallucination"] 涓哄師濮嬪€硷紙0=鏃犲够瑙夛級銆?""
+        flags = []
+
+        if scores.get("relevancy", 1) < 0.4:
+            flags.append("low_relevancy")
+        if scores.get("accuracy", 1) < 0.4:
+            flags.append("low_accuracy")
+        if scores.get("completeness", 1) < 0.4:
+            flags.append("low_completeness")
+        if scores.get("hallucination", 0) > self.HALLUCINATION_ALERT:
+            flags.append("hallucination_detected")
+
+        return flags
+
+    def _generate_recommendations(self, scores: Dict[str, float], overall: float) -> List[str]:
+        """鍩轰簬寰楀垎鐢熸垚鏀硅繘寤鸿銆俿cores["hallucination"] 涓哄師濮嬪€硷紙0=鏃犲够瑙夛級銆?""
+        recs = []
+
+        if scores.get("relevancy", 1) < 0.5:
+            recs.append("鐩稿叧鎬т笉瓒筹細寤鸿浼樺寲鏌ヨ鏀瑰啓鎴栨绱㈢瓥鐣?)
+        if scores.get("accuracy", 1) < 0.5:
+            recs.append("鍑嗙‘鎬т笉瓒筹細寤鸿澧炲姞浜嬪疄鎬ф牎楠屾垨鍑忓皯鐢熸垚鑷敱搴?)
+        if scores.get("completeness", 1) < 0.5:
+            recs.append("瀹屾暣鎬т笉瓒筹細寤鸿鎵╁睍妫€绱㈣寖鍥存垨澧炲姞澶氳烦鎺㈢储")
+        if scores.get("hallucination", 0) > 0.3:
+            recs.append("妫€娴嬪埌骞昏锛氬缓璁惎鐢ㄤ弗鏍间簨瀹炴牎楠屾ā寮忔垨闄嶄綆鍥炵瓟缃俊搴?)
+
+        if overall < self.CRITICAL_THRESHOLD:
+            recs.append("涓ラ噸璐ㄩ噺闂锛氬缓璁Е鍙戜汉宸ュ鏍告祦绋?)
+        elif overall < self.WARNING_THRESHOLD:
+            recs.append("璐ㄩ噺璀﹀憡锛氬缓璁鏌ユā鍨嬪弬鏁板拰妫€绱㈤厤缃?)
+
+        return recs
+
+    # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 鎸佷箙鍖?鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    async def _persist_and_trigger(self, result: EvaluationResult) -> Any:
+        """鎸佷箙鍖栬瘎浼扮粨鏋滃苟瑙﹀彂鍙嶉闂幆"""
+        try:
+            # 1. 鍐欏叆璇勪及缁撴灉
+            await self._save_evaluation(result)
+
+            # 2. 鏇存柊绱㈠紩
+            self._eval_index[result.eval_id] = str(result.timestamp)
+            if len(self._eval_index) % 100 == 0:
+                await self._flush_index()
+
+            # 3. 濡傛灉璇勪及鏈€氳繃锛岃Е鍙戝弽棣堥棴鐜?
+            if not result.passed:
+                asyncio.create_task(self._trigger_feedback_loop(result))
+
+            # 4. 濡傛灉妫€娴嬪埌骞昏锛岃褰曢珮浼樺厛绾у憡璀?
+            if "hallucination_detected" in result.flags:
+                await self._log_hallucination_alert(result)
+
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+            logger.warning(f"[Evaluation] 鎸佷箙鍖栧け璐? {e}", exc_info=True)
+
+    async def _save_evaluation(self, result: EvaluationResult) -> Any:
+        """淇濆瓨璇勪及缁撴灉鍒?JSONL 鏂囦欢"""
+        try:
+            record = {
+                "eval_id": result.eval_id,
+                "timestamp": result.timestamp,
+                "query": result.query,
+                "response": result.response[:200],
+                "context": result.context[:200],
+                "scores": {
+                    "relevancy": result.relevancy_score,
+                    "accuracy": result.accuracy_score,
+                    "completeness": result.completeness_score,
+                    "hallucination": result.hallucination_score,
+                    "overall": result.overall_score,
+                },
+                "passed": result.passed,
+                "threshold": result.threshold,
+                "dimensions": result.dimensions,
+                "model": result.model,
+                "trace_id": result.trace_id,
+                "session_id": result.session_id,
+                "latency_ms": result.latency_ms,
+                "flags": result.flags,
+                "recommendations": result.recommendations,
+            }
+
+            # 鎵归噺鍐欏叆浼樺寲
+            self._batch_buffer.append(record)
+            if len(self._batch_buffer) >= BATCH_FLUSH_SIZE:
+                await self._flush_buffer()
+
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+            logger.warning(f"[Evaluation] 搴忓垪鍖栬瘎浼扮粨鏋滃け璐? {e}", exc_info=True)
+
+    async def _flush_buffer(self) -> Any:
+        """鎵归噺鍒锋柊缂撳啿鍖哄埌鏂囦欢"""
+        if not self._batch_buffer:
+            return
+
+        buf = list(self._batch_buffer)
+        self._batch_buffer.clear()
+
+        try:
+
+            def _write() -> Any:
+                with open(EVAL_DB_PATH, "a", encoding="utf-8") as f:
+                    for record in buf:
+                        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+            await asyncio.to_thread(_write)
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"[Evaluation] 鎵归噺鍐欏叆 {len(buf)} 鏉¤瘎浼扮粨鏋?)
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+            logger.warning(f"[Evaluation] 鎵归噺鍐欏叆澶辫触: {e}", exc_info=True)
+            # 澶辫触鏃舵斁鍥炵紦鍐插尯
+            self._batch_buffer = buf + self._batch_buffer
+
+    async def _flush_index(self) -> Any:
+        """淇濆瓨璇勪及绱㈠紩"""
+        try:
+
+            def _write_index() -> Any:
+                with open(EVAL_INDEX_PATH, "w", encoding="utf-8") as f:
+                    json.dump(self._eval_index, f, ensure_ascii=False)
+
+            await asyncio.to_thread(_write_index)
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+            logger.warning(f"[Evaluation] 绱㈠紩鍐欏叆澶辫触: {e}", exc_info=True)
+
+    async def _trigger_feedback_loop(self, result: EvaluationResult) -> Any:
+        """
+        璇勪及鏈€氳繃鏃惰Е鍙戝弽棣堥棴鐜細
+        1. 灏嗚瘎浼扮粨鏋滃啓鍏?feedback_store
+        2. 瑙﹀彂 learner 鏉冮噸璋冩暣锛圥0-B锛?
+        """
+        try:
+            from src.services.feedback_store import log_feedback_unified
+
+            action = "eval_fail" if not result.passed else "eval_pass"
+            await log_feedback_unified(
+                user_id="evaluation_system",
+                query=result.query,
+                action=action,
+                metadata={
+                    "scores": {
+                        "overall": result.overall_score,
+                        "relevancy": result.relevancy_score,
+                        "accuracy": result.accuracy_score,
+                        "completeness": result.completeness_score,
+                        "hallucination": result.hallucination_score,
+                    },
+                    "flags": result.flags,
+                    "recommendations": result.recommendations,
+                    "eval_id": result.eval_id,
+                },
+            )
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(f"[Evaluation] 鍙嶉闂幆宸茶Е鍙? {result.eval_id[:12]}")
+        except ImportError:
+            logger.debug("[Evaluation] feedback_store 涓嶅彲鐢紝璺宠繃鍙嶉闂幆")
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+            logger.warning(f"[Evaluation] 鍙嶉闂幆瑙﹀彂澶辫触: {e}", exc_info=True)
+
+    async def _log_hallucination_alert(self, result: EvaluationResult) -> Any:
+        """璁板綍骞昏鍛婅鍒伴珮浼樺厛绾ф棩蹇?""
+        alert = {
+            "type": "hallucination_alert",
+            "timestamp": result.timestamp,
+            "eval_id": result.eval_id,
+            "query": result.query[:100],
+            "hallucination_score": result.hallucination_score,
+            "overall_score": result.overall_score,
+            "flags": result.flags,
+        }
+        logger.warning(f"[Evaluation] 骞昏鍛婅: {json.dumps(alert, ensure_ascii=False)}")
+
+        # 鍚屾椂鍐欏叆鍛婅鏂囦欢
+        try:
+            alert_file = EVAL_DIR / "hallucination_alerts.jsonl"
+
+            def _write_alert() -> Any:
+                with open(alert_file, "a", encoding="utf-8") as f:
+                    f.write(json.dumps(alert, ensure_ascii=False) + "\n")
+
+            await asyncio.to_thread(_write_alert)
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+            logger.warning(f"[Evaluation] 骞昏鍛婅鍐欏叆澶辫触: {e}", exc_info=True)
+
+    # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 鎵归噺璇勪及 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    async def evaluate_batch(
+        self,
+        items: List[Dict[str, str]],
+        model: str = "mimo-v2.5",
+        threshold: float = None,
+    ) -> List[EvaluationResult]:
+        """
+        鎵归噺璇勪及澶氫釜 query-response 瀵广€?
+
+        Args:
+            items: [{"query": "...", "response": "...", "context": "..."}, ...]
+
+        Returns:
+            璇勪及缁撴灉鍒楄〃
+        """
+        tasks = [
+            self.evaluate_response(
+                query=item.get("query", ""),
+                response=item.get("response", ""),
+                context=item.get("context", ""),
+                sources=item.get("sources"),
+                model=model,
+                trace_id=item.get("trace_id", ""),
+                session_id=item.get("session_id", ""),
+                threshold=threshold,
+            )
+            for item in items
+        ]
+
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
+        validated = []
+        for i, r in enumerate(results):
+            if isinstance(r, Exception):
+                logger.warning(f"[Evaluation] 鎵归噺璇勪及 #{i} 澶辫触: {r}")
+                validated.append(
+                    EvaluationResult(
+                        eval_id=f"batch_error_{i}",
+                        timestamp=time.time(),
+                        query=items[i].get("query", "")[:200],
+                        response="",
+                        context="",
+                        overall_score=0.0,
+                        passed=False,
+                        flags=["evaluation_error"],
+                    )
+                )
+            else:
+                validated.append(r)
+
+        return validated
+
+    # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ RAG 绠＄嚎闆嗘垚 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    async def evaluate_rag_output(
+        self,
+        query: str,
+        answer: str,
+        context: str,
+        sources: List[str] = None,
+        trace_id: str = "",
+    ) -> Dict[str, Any]:
+        """
+        闆嗘垚鍒?SAG/RAG 绠＄嚎鍑哄彛鐨勪究鎹锋柟娉曘€?
+        杩斿洖鍙洿鎺ュ簭鍒楀寲鐨?dict銆?
+
+        鐢ㄦ硶锛堥泦鎴愬埌 sag_pipeline.py 鍑哄彛锛?
+            from src.services.evaluation import get_evaluator
+            eval_result = await get_evaluator().evaluate_rag_output(
+                query=query, answer=generated_answer,
+                context=merged_context, sources=source_chunks,
+            )
+            if not eval_result["passed"]:
+                logger.warning(f"RAG 杈撳嚭璐ㄩ噺涓嶅悎鏍? {eval_result['overall_score']}")
+        """
+        result = await self.evaluate_response(
+            query=query,
+            response=answer,
+            context=context,
+            sources=sources,
+            trace_id=trace_id,
+        )
+
+        return {
+            "eval_id": result.eval_id,
+            "overall_score": result.overall_score,
+            "passed": result.passed,
+            "scores": {
+                "relevancy": result.relevancy_score,
+                "accuracy": result.accuracy_score,
+                "completeness": result.completeness_score,
+                "hallucination": result.hallucination_score,
+            },
+            "flags": result.flags,
+            "recommendations": result.recommendations,
+            "latency_ms": result.latency_ms,
+        }
+
+    # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 璇勪及鎶ュ憡 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    async def generate_report(
+        self,
+        start_time: float = None,
+        end_time: float = None,
+        min_samples: int = 1,
+    ) -> Dict[str, Any]:
+        """
+        鐢熸垚璇勪及鎶ュ憡锛氭眹鎬绘寚瀹氭椂闂磋寖鍥村唴鐨勮瘎浼扮粨鏋溿€?
+
+        Args:
+            start_time: 寮€濮嬫椂闂存埑
+            end_time: 缁撴潫鏃堕棿鎴?
+            min_samples: 鏈€灏忔牱鏈暟锛堜笉瓒虫椂杩斿洖 insufficient_data锛?
+
+        Returns:
+            璇勪及鎶ュ憡 dict
+        """
+        if start_time is None:
+            start_time = time.time() - 3600  # 榛樿鏈€杩?1 灏忔椂
+        if end_time is None:
+            end_time = time.time()
+
+        records = await self._load_evaluations(start_time, end_time)
+
+        if len(records) < min_samples:
+            return {
+                "status": "insufficient_data",
+                "sample_count": len(records),
+                "required_min": min_samples,
+                "period": {
+                    "start": start_time,
+                    "end": end_time,
+                },
+            }
+
+        # 姹囨€荤粺璁?
+        overall_scores = []
+        dim_scores = {"relevancy": [], "accuracy": [], "completeness": [], "hallucination": []}
+        pass_count = 0
+        flag_counts = {}
+        hallucination_count = 0
+
+        for r in records:
+            scores = r.get("scores", r)
+            ov = scores.get("overall", 0)
+            if ov > 0:  # 鎺掗櫎缂撳瓨鐨勯噸澶嶉」
+                overall_scores.append(ov)
+            for dim in dim_scores:
+                val = scores.get(dim, 0)
+                dim_scores[dim].append(val)
+
+            if r.get("passed", False):
+                pass_count += 1
+
+            for flag in r.get("flags", []):
+                flag_counts[flag] = flag_counts.get(flag, 0) + 1
+            if "hallucination_detected" in r.get("flags", []):
+                hallucination_count += 1
+
+        total = len(records)
+        report = {
+            "status": "ok",
+            "timestamp": time.time(),
+            "period": {
+                "start": start_time,
+                "end": end_time,
+            },
+            "sample_count": total,
+            "overall": {
+                "avg": round(sum(overall_scores) / len(overall_scores), 4) if overall_scores else 0,
+                "min": round(min(overall_scores), 4) if overall_scores else 0,
+                "max": round(max(overall_scores), 4) if overall_scores else 0,
+                "p50": self._percentile(overall_scores, 50),
+                "p95": self._percentile(overall_scores, 95),
+            },
+            "pass_rate": round(pass_count / total, 4) if total > 0 else 0,
+            "dimensions": {
+                dim: {
+                    "avg": round(sum(vals) / len(vals), 4) if vals else 0,
+                    "min": round(min(vals), 4) if vals else 0,
+                }
+                for dim, vals in dim_scores.items()
+                if vals
+            },
+            "flags_summary": flag_counts,
+            "hallucination_rate": round(hallucination_count / total, 4) if total > 0 else 0,
+            "recommendations": self._report_recommendations(pass_count, total, hallucination_count, dim_scores),
+        }
+
+        # 淇濆瓨鎶ュ憡
+        asyncio.create_task(self._save_report(report))
+
+        return report
+
+    def _report_recommendations(
+        self,
+        pass_count: int,
+        total: int,
+        hallucination_count: int,
+        dim_scores: Dict[str, List[float]],
+    ) -> List[str]:
+        """鐢熸垚鎶ュ憡绾у埆鐨勬敼杩涘缓璁?""
+        recs = []
+        pass_rate = pass_count / total if total > 0 else 0
+
+        if pass_rate < 0.6:
+            recs.append(f"閫氳繃鐜囦粎 {pass_rate:.1%}锛屽缓璁鏌ユā鍨嬪拰妫€绱㈤厤缃?)
+        if hallucination_count / total > 0.2 if total > 0 else False:
+            recs.append(f"骞昏鐜?{hallucination_count/total:.1%} 鍋忛珮锛屽缓璁惎鐢ㄤ弗鏍间簨瀹炴牎楠?)
+
+        for dim, vals in dim_scores.items():
+            if vals:
+                avg = sum(vals) / len(vals)
+                if dim == "relevancy" and avg < 0.5:
+                    recs.append("妫€绱㈢浉鍏虫€у亸浣庯紝寤鸿浼樺寲鏌ヨ鏀瑰啓")
+                elif dim == "accuracy" and avg < 0.5:
+                    recs.append("鍥炵瓟鍑嗙‘鎬у亸浣庯紝寤鸿闄嶄綆鐢熸垚娓╁害")
+                elif dim == "completeness" and avg < 0.5:
+                    recs.append("鍥炵瓟瀹屾暣鎬т笉瓒筹紝寤鸿澧炲姞妫€绱㈡繁搴?)
+
+        return recs
+
+    async def _save_report(self, report: Dict) -> Any:
+        """淇濆瓨璇勪及鎶ュ憡鍒版枃浠?""
+        try:
+            date_str = datetime.fromtimestamp(report["timestamp"]).strftime("%Y%m%d_%H%M%S")
+            report_file = EVAL_REPORTS_DIR / f"quality_report_{date_str}.json"
+
+            def _write_report() -> Any:
+                with open(report_file, "w", encoding="utf-8") as f:
+                    json.dump(report, f, ensure_ascii=False, indent=2)
+
+            await asyncio.to_thread(_write_report)
+            logger.info(f"[Evaluation] 璐ㄩ噺鎶ュ憡宸蹭繚瀛? {report_file}")
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+            logger.warning(f"[Evaluation] 鎶ュ憡淇濆瓨澶辫触: {e}", exc_info=True)
+
+    # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 鏁版嵁鍔犺浇 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    async def _load_evaluations(self, start_time: float, end_time: float) -> List[Dict]:
+        """鍔犺浇鎸囧畾鏃堕棿鑼冨洿鍐呯殑璇勪及缁撴灉"""
+        if not EVAL_DB_PATH.exists():
+            return []
+
+        # 鍏堝埛鏂扮紦鍐插尯
+        if self._batch_buffer:
+            await self._flush_buffer()
+
+        records = []
+        try:
+
+            def _read() -> Any:
+                result = []
+                with open(EVAL_DB_PATH, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            record = json.loads(line)
+                            ts = record.get("timestamp", 0)
+                            if start_time <= ts <= end_time:
+                                result.append(record)
+                        except json.JSONDecodeError:
+                            continue
+                return result
+
+            records = await asyncio.to_thread(_read)
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+            logger.warning(f"[Evaluation] 鍔犺浇璇勪及鏁版嵁澶辫触: {e}", exc_info=True)
+
+        return records
+
+    def _load_index(self) -> Any:
+        """鍔犺浇璇勪及绱㈠紩"""
+        if EVAL_INDEX_PATH.exists():
+            try:
+                self._eval_index = json.loads(EVAL_INDEX_PATH.read_text(encoding="utf-8"))
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+                self._eval_index = {}
+
+    # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 鏌ヨ鎺ュ彛 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    async def get_stats(self, hours: int = 24) -> Dict[str, Any]:
+        """鑾峰彇璇勪及缁熻鎽樿"""
+        cutoff = time.time() - hours * 3600
+        records = await self._load_evaluations(cutoff, time.time())
+
+        total = len(records)
+        if total == 0:
+            return {
+                "total_evaluations": 0,
+                "avg_overall_score": 0,
+                "pass_rate": 0,
+                "hallucination_rate": 0,
+            }
+
+        scores = []
+        passed = 0
+        hallucinations = 0
+        for r in records:
+            s = r.get("scores", r)
+            ov = s.get("overall", 0)
+            if ov > 0:
+                scores.append(ov)
+            if r.get("passed"):
+                passed += 1
+            if "hallucination_detected" in r.get("flags", []):
+                hallucinations += 1
+
+        return {
+            "total_evaluations": total,
+            "avg_overall_score": round(sum(scores) / len(scores), 4) if scores else 0,
+            "pass_rate": round(passed / total, 4),
+            "hallucination_rate": round(hallucinations / total, 4),
+            "dimensions": self._aggregate_dimensions(records),
+        }
+
+    def _aggregate_dimensions(self, records: List[Dict]) -> Dict[str, float]:
+        """姹囨€荤淮搴﹀緱鍒?""
+        dims = {"relevancy": [], "accuracy": [], "completeness": [], "hallucination": []}
+        for r in records:
+            scores = r.get("scores", r.get("dimensions", r))
+            for dim in dims:
+                val = scores.get(dim, None)
+                if val is not None:
+                    dims[dim].append(val)
+
+        return {dim: round(sum(vals) / len(vals), 4) if vals else 0.0 for dim, vals in dims.items()}
+
+    async def get_recent_failures(self, limit: int = 20) -> List[Dict]:
+        """鑾峰彇鏈€杩戣瘎浼板け璐ョ殑璁板綍"""
+        cutoff = time.time() - 86400  # 鏈€杩?24 灏忔椂
+        records = await self._load_evaluations(cutoff, time.time())
+        failures = [r for r in records if not r.get("passed", True)]
+        failures.sort(key=lambda x: x.get("timestamp", 0), reverse=True)
+        return failures[:limit]
+
+    # 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€ 宸ュ叿鏂规硶 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
+
+    def _make_dedup_key(self, query: str, response: str) -> str:
+        """鐢熸垚鍘婚噸 key"""
+        raw = f"{query[:200]}|{response[:200]}"
+        return hashlib.sha256(raw.encode()).hexdigest()[:32]
+
+    def _is_duplicate(self, key: str) -> bool:
+        """妫€鏌ユ槸鍚﹂噸澶?""
+        now = time.time()
+        # 瀹氭湡娓呯悊杩囨湡鍘婚噸椤?
+        if now - self._last_dedup_cleanup > 600:  # 姣?10 鍒嗛挓娓呯悊
+            self._dedup_cache = {k: v for k, v in self._dedup_cache.items() if now - v < DEDUP_WINDOW}
+            self._last_dedup_cleanup = now
+
+        return key in self._dedup_cache and now - self._dedup_cache[key] < DEDUP_WINDOW
+
+    def _make_eval_id(self, query: str, response: str, timestamp: float) -> str:
+        """鐢熸垚鍞竴璇勪及 ID"""
+        raw = f"{query[:100]}|{response[:100]}|{timestamp}"
+        return "eval_" + hashlib.sha256(raw.encode()).hexdigest()[:16]
+
+    @staticmethod
+    def _safe_json_parse(text: str) -> Dict[str, Any]:
+        """瀹夊叏瑙ｆ瀽 LLM 杩斿洖鐨?JSON"""
+        text = text.strip()
+        # 鎻愬彇 JSON 鍧?
+        s = text.find("{")
+        e = text.rfind("}")
+        if s >= 0 and e > s:
+            try:
+                return json.loads(text[s : e + 1])
+            except json.JSONDecodeError:
+                pass
+        # 灏濊瘯淇甯歌鏍煎紡闂
+        try:
+            return json.loads(text)
+        except json.JSONDecodeError:
+            pass
+        return {}
+
+    @staticmethod
+    def _percentile(data: List[float], p: float) -> float:
+        """璁＄畻鐧惧垎浣嶆暟"""
+        if not data:
+            return 0.0
+        sorted_data = sorted(data)
+        k = (len(sorted_data) - 1) * p / 100.0
+        f = int(k)
+        c = k - f
+        if f + 1 < len(sorted_data):
+            return round(sorted_data[f] + c * (sorted_data[f + 1] - sorted_data[f]), 4)
+        return round(sorted_data[f], 4)
+
+    async def flush(self) -> Any:
+        """寮哄埗鍒锋柊鎵€鏈夌紦鍐插尯锛坓raceful shutdown 鏃惰皟鐢級"""
+        await self._flush_buffer()
+        await self._flush_index()
+        logger.info("[Evaluation] 宸插埛鏂版墍鏈夌紦鍐叉暟鎹?)
+
+    async def clear_dedup_cache(self) -> Any:
+        """娓呯┖鍘婚噸缂撳瓨"""
+        self._dedup_cache.clear()
+        self._last_dedup_cleanup = time.time()
+        logger.info("[Evaluation] 鍘婚噸缂撳瓨宸叉竻绌?)
+
+
+# ============ 鍏ㄥ眬瀹炰緥 ============
+
+_evaluator: Optional[Evaluation] = None
+
+
+def get_evaluator() -> Evaluation:
+    """鑾峰彇鍏ㄥ眬 Evaluation 瀹炰緥锛堢嚎绋嬪畨鍏ㄦ噿鍔犺浇锛?""
+    global _evaluator
+    if _evaluator is None:
+        _evaluator = Evaluation()
+    return _evaluator
+
+
+# ============ 渚挎嵎鍑芥暟锛堝吋瀹圭幇鏈夎皟鐢ㄦā寮忥級 ============
+
+
+async def evaluate_response(
+    query: str,
+    response: str,
+    context: str = "",
+    sources: List[str] = None,
+    **kwargs,
+) -> Dict[str, Any]:
+    """
+    渚挎嵎鍑芥暟锛氳瘎浼板崟娆″洖绛旇川閲忋€?
+    鏇夸唬 evaluator.py 涓殑 eval_faithfulness + eval_answer_relevancy銆?
+
+    杩斿洖: {
+        "overall_score": 0.85,
+        "passed": True,
+        "scores": {...},
+        "flags": [...],
+        ...
+    }
+    """
+    evaluator = get_evaluator()
+    result = await evaluator.evaluate_rag_output(
+        query=query,
+        answer=response,
+        context=context,
+        sources=sources,
+        trace_id=kwargs.get("trace_id", ""),
+    )
+    return result
+
+
+async def evaluate_batch(
+    items: List[Dict[str, str]],
+    **kwargs,
+) -> List[Dict[str, Any]]:
+    """
+    渚挎嵎鍑芥暟锛氭壒閲忚瘎娴嬨€?
+    """
+    evaluator = get_evaluator()
+    results = await evaluator.evaluate_batch(items, **kwargs)
+    return [asdict(r) for r in results]
+
+
+async def generate_quality_report(
+    hours: int = 24,
+) -> Dict[str, Any]:
+    """
+    渚挎嵎鍑芥暟锛氱敓鎴愯川閲忔姤鍛娿€?
+    """
+    evaluator = get_evaluator()
+    cutoff = time.time() - hours * 3600
+    return await evaluator.generate_report(start_time=cutoff)

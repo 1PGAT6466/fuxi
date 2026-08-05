@@ -1,11 +1,55 @@
 """
 graph.py — 太阳·图谱路由
-route_to_categories + get_entity_context
+route_to_categories + get_entity_context + get_graph_stats
 """
 import logging
 from typing import Dict, List
 
 logger = logging.getLogger("taiyang.graph")
+
+
+def get_graph_stats() -> Dict:
+    """获取知识图谱统计信息
+    
+    Returns:
+        {
+            "nodes_count": int,
+            "edges_count": int,
+            "status": str
+        }
+    """
+    try:
+        from src.db.memory_store import get_store
+        store = get_store()
+        
+        # 获取实体数量（节点）
+        try:
+            nodes = store._db_conn.execute(
+                "SELECT COUNT(DISTINCT name) FROM entities"
+            ).fetchone()[0]
+        except Exception:
+            nodes = 0
+        
+        # 获取关系数量（边）
+        try:
+            edges = store._db_conn.execute(
+                "SELECT COUNT(*) FROM relations"
+            ).fetchone()[0]
+        except Exception:
+            edges = 0
+        
+        return {
+            "nodes_count": nodes,
+            "edges_count": edges,
+            "status": "connected" if nodes > 0 else "empty"
+        }
+    except Exception as e:
+        logger.warning("获取图谱统计失败: %s", e)
+        return {
+            "nodes_count": 0,
+            "edges_count": 0,
+            "status": "unavailable"
+        }
 
 
 class GraphRouter:

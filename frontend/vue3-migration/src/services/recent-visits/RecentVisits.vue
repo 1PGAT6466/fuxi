@@ -28,6 +28,21 @@
       </div>
     </header>
 
+    <!-- ═══════════════════════════ 搜索框 ═══════════════════════════ -->
+    <div class="search-bar">
+      <el-input
+        v-model="searchText"
+        placeholder="搜索访问记录..."
+        size="default"
+        clearable
+        @input="handleSearchInput"
+      >
+        <template #prefix>
+          <el-icon :size="14"><Search /></el-icon>
+        </template>
+      </el-input>
+    </div>
+
     <!-- ═══════════════════════════ 筛选栏 ═══════════════════════════ -->
     <div class="filter-bar">
       <el-radio-group
@@ -180,6 +195,7 @@ import {
   Document,
   Collection,
   Grid,
+  Search,
 } from '@element-plus/icons-vue';
 import { useRecentVisitsStore } from './store';
 import {
@@ -201,6 +217,7 @@ const router = useRouter();
 // ══════════════════════════════════════
 
 const activeFilter = ref<VisitItemType | 'all'>('all');
+const searchText = ref('');
 const currentPage = ref(1);
 const pageSize = ref(20);
 
@@ -212,6 +229,15 @@ const filteredVisits = computed(() => {
   let list = store.visits;
   if (activeFilter.value !== 'all') {
     list = list.filter((v) => v.type === activeFilter.value);
+  }
+  // 搜索过滤
+  if (searchText.value.trim()) {
+    const q = searchText.value.trim().toLowerCase();
+    list = list.filter(
+      (v) =>
+        v.title.toLowerCase().includes(q) ||
+        (v.description && v.description.toLowerCase().includes(q)),
+    );
   }
   return list;
 });
@@ -310,6 +336,10 @@ function handleFilterChange(): void {
   currentPage.value = 1;
 }
 
+function handleSearchInput(): void {
+  currentPage.value = 1;
+}
+
 function handlePageChange(page: number): void {
   currentPage.value = page;
 }
@@ -371,6 +401,11 @@ onMounted(async () => {
 .header-right {
   display: flex;
   gap: 8px;
+}
+
+/* ─── 搜索框 ─── */
+.search-bar {
+  margin-bottom: var(--space-md, 16px);
 }
 
 /* ─── 筛选栏 ─── */

@@ -1,16 +1,16 @@
-﻿"""
+"""
 浼忕静 v1.50 鈥?涓棿浠舵ā鍧?
 =======================
 浠?server.py 鎷嗗垎: 鎵€鏈変腑闂翠欢閰嶇疆 鈥?瀹夊叏澶淬€佽璇併€丆ORS銆丟Zip銆佸紩鎿庤矾鐢便€佽姹傛寚鏍囥€侀檺娴併€?
 """
-import time
+
 import logging
 import os
+import time
 
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.gzip import GZipMiddleware
-
 from src.config import CORS_ORIGINS
 
 logger = logging.getLogger("server")
@@ -41,13 +41,15 @@ def setup_middleware(app: FastAPI) -> None:
             response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
         response.headers["X-XSS-Protection"] = "1; mode=block"
         response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+        # P1修复：CSP connect-src 从环境变量读取内网地址，而非硬编码
+        _internal_origins = os.getenv("FUXI_INTERNAL_ORIGINS", "http://localhost:* ws://localhost:*")
         csp_policy = (
             "default-src 'self'; "
             "script-src 'self'; "
-            "style-src 'self'; "
+            "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; "
             "img-src 'self' data: blob: https:; "
             "font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com; "
-            "connect-src 'self' http://localhost:* ws://localhost:* https:; "
+            f"connect-src 'self' {_internal_origins} https:; "
             "frame-ancestors 'none'"
         )
         response.headers["Content-Security-Policy"] = csp_policy
@@ -56,6 +58,7 @@ def setup_middleware(app: FastAPI) -> None:
 
     # 鈹€鈹€ API 璁よ瘉涓棿浠?鈹€鈹€
     from src.api.auth import AuthMiddleware, InputLimitMiddleware
+
     app.add_middleware(AuthMiddleware)
     app.add_middleware(InputLimitMiddleware)
 
@@ -95,6 +98,7 @@ def setup_middleware(app: FastAPI) -> None:
             duration_ms = (time.time() - start) * 1000
             try:
                 from src.infra.request_metrics import get_request_metrics
+
                 get_request_metrics().record_request(duration_ms, response.status_code < 500)
             except (ImportError, AttributeError, TypeError) as e:
                 logger.warning("璇锋眰鎸囨爣璁板綍澶辫触锛堟甯稿搷搴旓級: %s", e, exc_info=True)
@@ -103,6 +107,7 @@ def setup_middleware(app: FastAPI) -> None:
             duration_ms = (time.time() - start) * 1000
             try:
                 from src.infra.request_metrics import get_request_metrics
+
                 get_request_metrics().record_request(duration_ms, False)
             except (ImportError, AttributeError, TypeError) as e:
                 logger.warning("璇锋眰鎸囨爣璁板綍澶辫触锛堝紓甯稿搷搴旓級: %s", e, exc_info=True)
@@ -111,8 +116,9 @@ def setup_middleware(app: FastAPI) -> None:
     # 鈹€鈹€ 璇锋眰闄愭祦 鈹€鈹€
     try:
         from slowapi import Limiter, _rate_limit_exceeded_handler
-        from slowapi.util import get_remote_address
         from slowapi.errors import RateLimitExceeded
+        from slowapi.util import get_remote_address
+
         limiter = Limiter(
             key_func=get_remote_address,
             default_limits=["60/minute"],

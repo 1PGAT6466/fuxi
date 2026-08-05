@@ -59,7 +59,7 @@ class CacheManager:
     async def get_semantic(self, query: str) -> Optional[list]:
         """L2: 语义匹配"""
         try:
-            from src.services.embedder import embed
+            from src.infra import embed
             q_emb = embed([query])
             if q_emb is None:
                 return None
@@ -79,7 +79,7 @@ class CacheManager:
             if best_result:
                 self._hits["L2"] += 1
                 return best_result
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             logger.debug("[suppressed] return best_result")
             pass
         return None

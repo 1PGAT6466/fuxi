@@ -14,16 +14,17 @@ import logging
 logger = logging.getLogger(__name__)
 
 # LRU 缓存配置
-MAX_CACHE_SIZE = 200
+MAX_CACHE_SIZE = 500  # 优化: 从200增加到500
 MAX_CACHE_AGE_SECONDS = 3600  # 1小时
-SIMILARITY_THRESHOLD = 0.92   # 语义匹配阈值
+SIMILARITY_THRESHOLD = 0.85  # 优化: 从0.92降低到0.85，提高缓存命中率   # 语义匹配阈值
 
 # v1.44 R2: 缓存穿透防护 — 空值缓存 TTL（比正常缓存短，避免长期缓存空结果）
-EMPTY_CACHE_TTL = 300  # 5 分钟
+EMPTY_CACHE_TTL = 600  # 优化: 从5分钟增加到10分钟  # 5 分钟
 _EMPTY_SENTINEL = "__EMPTY__"  # 空值标记
 
 _l1_cache: OrderedDict = OrderedDict()  # exact match
 _l2_cache: list = []  # semantic match: [(embedding, results, timestamp)]
+_MAX_L2_CACHE_SIZE = 1000  # 优化: 从500增加到1000  # v1.50: L2 语义缓存硬上限，防止内存无限增长
 _cache_lock = asyncio.Lock()
 _cache_hits = 0
 _cache_misses = 0
@@ -124,10 +125,10 @@ async def set_cache(query: str, results: list, category: str = "", top_k: int = 
                 # v1.44 R3: L2 也使用空值标记，保持一致性
                 l2_value = _EMPTY_SENTINEL if not results else results
                 _l2_cache.append((q_emb[0], l2_value, now))
-                # 清理过期条目 + 大小淘汰
+                # v1.50: 清理过期条目 + 硬上限淘汰
                 _l2_cache[:] = [(e, r, t) for e, r, t in _l2_cache
                                 if now - t < MAX_CACHE_AGE_SECONDS]
-                while len(_l2_cache) > MAX_CACHE_SIZE // 2:
+                while len(_l2_cache) > _MAX_L2_CACHE_SIZE:
                     _l2_cache.pop(0)
         except Exception as e:  # TODO: Narrow exception type
 

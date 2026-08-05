@@ -537,16 +537,19 @@ async function handleLogin(): Promise<void> {
   box-shadow: none;
   transition:
     border-color 0.3s ease,
-    box-shadow 0.3s ease;
+    box-shadow 0.3s ease,
+    transform 0.2s ease;
 }
 
 .login-form :deep(.el-input__wrapper:hover) {
   border-color: var(--fuxi-primary, #FF6700);
+  transform: translateY(-1px);
 }
 
 .login-form :deep(.el-input__wrapper.is-focus) {
   border-color: var(--fuxi-primary, #FF6700);
-  box-shadow: 0 0 0 2px rgba(255, 103, 0, 0.15);
+  box-shadow: 0 0 0 3px rgba(255, 103, 0, 0.12);
+  transform: translateY(-1px);
 }
 
 .login-form :deep(.el-input__prefix) {

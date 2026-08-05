@@ -547,7 +547,7 @@ class XunGua(GuaBase):
                     return text.strip()[:self.MAX_CONTENT_LENGTH]
         except aiohttp.ClientError:
             logger.debug("[巽卦] 抓取失败: %s", url, exc_info=True)
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             logger.debug("[巽卦] 抓取异常: %s", url, exc_info=True)
 
         return ""

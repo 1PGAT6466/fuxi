@@ -44,7 +44,7 @@
           <el-tag size="small">{{ sdk.version }}</el-tag>
         </div>
 
-        <p class="sdk-download-page__card-desc">{{ sdk.description }}</p>
+        <p class="sdk-download-page__card-desc">{{ sdk?.description || '' }}</p>
 
         <div class="sdk-download-page__card-meta">
           <div class="sdk-download-page__card-meta-item">

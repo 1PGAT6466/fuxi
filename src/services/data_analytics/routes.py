@@ -25,9 +25,10 @@ import sqlite3
 import uuid
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Optional, List
+from typing import List, Optional
 
-from fastapi import APIRouter, HTTPException, Query, Body
+from fastapi import APIRouter, Body, HTTPException, Query
+from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
 
 # ── 从项目配置获取路径 ──
@@ -39,72 +40,51 @@ logger = logging.getLogger("services.data-analytics.routes")
 SHARED_REPORTS_DIR = DATA_DIR / "shared_reports"
 TEMPLATES_DIR = DATA_DIR / "export_templates"
 
-router = APIRouter(prefix="", tags=["Data Analytics"])
+router = APIRouter(prefix="/api/analytics", tags=["Data Analytics"])
 
 # ── Pydantic 请求模型 ──
 
+
 class TrendsRequest(BaseModel):
     """趋势查询请求"""
-    period: str = Field(
-        default="day",
-        description="时间维度: day / week / month",
-        examples=["day", "week", "month"]
-    )
+
+    period: str = Field(default="day", description="时间维度: day / week / month", examples=["day", "week", "month"])
     start_date: Optional[str] = Field(
-        default=None,
-        description="起始日期 (YYYY-MM-DD)，不填则默认最近 30 天",
-        examples=["2026-01-01"]
+        default=None, description="起始日期 (YYYY-MM-DD)，不填则默认最近 30 天", examples=["2026-01-01"]
     )
     end_date: Optional[str] = Field(
-        default=None,
-        description="结束日期 (YYYY-MM-DD)，不填则默认今天",
-        examples=["2026-01-31"]
+        default=None, description="结束日期 (YYYY-MM-DD)，不填则默认今天", examples=["2026-01-31"]
     )
 
 
 class ReportRequest(BaseModel):
     """报表请求"""
+
     report_type: str = Field(
-        default="summary",
-        description="报表类型: summary / detailed",
-        examples=["summary", "detailed"]
+        default="summary", description="报表类型: summary / detailed", examples=["summary", "detailed"]
     )
-    period: str = Field(
-        default="month",
-        description="时间范围: today / week / month / all",
-        examples=["month"]
-    )
+    period: str = Field(default="month", description="时间范围: today / week / month / all", examples=["month"])
 
 
 class ExportRequest(BaseModel):
     """导出请求（v2.2 增强版：支持 PDF/Excel/CSV/JSON）"""
+
     format: str = Field(
-        default="csv",
-        description="导出格式: pdf / excel / csv / json",
-        examples=["csv", "excel", "pdf", "json"]
+        default="csv", description="导出格式: pdf / excel / csv / json", examples=["csv", "excel", "pdf", "json"]
     )
     fields: List[str] = Field(
-        default=[],
-        description="导出字段列表",
-        examples=[["date", "queries", "documents", "users"]]
+        default=[], description="导出字段列表", examples=[["date", "queries", "documents", "users"]]
     )
     date_range: Optional[dict] = Field(
-        default=None,
-        description="时间范围 {start, end}",
-        examples=[{"start": "2026-01-01", "end": "2026-06-30"}]
+        default=None, description="时间范围 {start, end}", examples=[{"start": "2026-01-01", "end": "2026-06-30"}]
     )
-    template_id: Optional[str] = Field(
-        default=None,
-        description="报表模板 ID（可选）"
-    )
-    title: Optional[str] = Field(
-        default=None,
-        description="导出标题（可选）"
-    )
+    template_id: Optional[str] = Field(default=None, description="报表模板 ID（可选）")
+    title: Optional[str] = Field(default=None, description="导出标题（可选）")
 
 
 class TemplateCreateRequest(BaseModel):
     """创建模板请求"""
+
     name: str = Field(description="模板名称")
     description: str = Field(default="", description="模板描述")
     default_fields: List[str] = Field(description="预设字段列表")
@@ -113,6 +93,7 @@ class TemplateCreateRequest(BaseModel):
 
 class TemplateUpdateRequest(BaseModel):
     """更新模板请求"""
+
     name: Optional[str] = None
     description: Optional[str] = None
     default_fields: Optional[List[str]] = None
@@ -121,28 +102,18 @@ class TemplateUpdateRequest(BaseModel):
 
 class ShareRequest(BaseModel):
     """报表分享请求"""
+
     report_id: str = Field(description="报表 ID")
-    permissions: List[str] = Field(
-        default=["view"],
-        description="权限列表: view / edit / download"
-    )
-    expires_at: Optional[str] = Field(
-        default=None,
-        description="过期时间（ISO 格式）"
-    )
-    password: Optional[str] = Field(
-        default=None,
-        description="访问密码（6-20 位）"
-    )
-    note: Optional[str] = Field(
-        default=None,
-        description="分享备注"
-    )
+    permissions: List[str] = Field(default=["view"], description="权限列表: view / edit / download")
+    expires_at: Optional[str] = Field(default=None, description="过期时间（ISO 格式）")
+    password: Optional[str] = Field(default=None, description="访问密码（6-20 位）")
+    note: Optional[str] = Field(default=None, description="分享备注")
 
 
 # ══════════════════════════════════════════════════
 #  数据采集层 — 从各数据源提取统计信息
 # ══════════════════════════════════════════════════
+
 
 def _get_chroma_stats() -> dict:
     """从 ChromaDB 获取向量存储统计"""
@@ -181,11 +152,7 @@ def _get_chroma_stats() -> dict:
         # 存储大小：chroma 目录总大小
         chroma_dir = DATA_DIR / "chromadb"
         if chroma_dir.exists():
-            total_bytes = sum(
-                f.stat().st_size
-                for f in chroma_dir.rglob("*")
-                if f.is_file()
-            )
+            total_bytes = sum(f.stat().st_size for f in chroma_dir.rglob("*") if f.is_file())
             result["storage_size_bytes"] = total_bytes
 
     except Exception as e:  # TODO: Narrow exception type
@@ -222,10 +189,7 @@ def _get_chunks_stats() -> dict:
             result["active_chunks"] = row["cnt"] if row else 0
 
             # 按 category 分布
-            cur.execute(
-                "SELECT category, COUNT(*) as cnt FROM chunks "
-                "GROUP BY category ORDER BY cnt DESC"
-            )
+            cur.execute("SELECT category, COUNT(*) as cnt FROM chunks " "GROUP BY category ORDER BY cnt DESC")
             cats = {}
             for row in cur.fetchall():
                 cat = row["category"] or "未分类"
@@ -233,9 +197,7 @@ def _get_chunks_stats() -> dict:
             result["categories"] = cats
 
             # 不同文档数（按 file_hash 去重）
-            cur.execute(
-                "SELECT COUNT(DISTINCT file_hash) as cnt FROM chunks WHERE file_hash IS NOT NULL"
-            )
+            cur.execute("SELECT COUNT(DISTINCT file_hash) as cnt FROM chunks WHERE file_hash IS NOT NULL")
             row = cur.fetchone()
             result["total_documents"] = row["cnt"] if row else 0
 
@@ -307,9 +269,7 @@ def _get_search_logs_stats(start_date: Optional[str] = None, end_date: Optional[
                         date_key = ts[:10] if ts else None
                         if date_key and date_key in daily_counts:
                             daily_counts[date_key]["count"] += 1
-                            daily_counts[date_key]["total_latency"] += entry.get(
-                                "latency_ms", 0
-                            )
+                            daily_counts[date_key]["total_latency"] += entry.get("latency_ms", 0)
                     except json.JSONDecodeError:
                         continue
             except Exception as e:  # TODO: Narrow exception type
@@ -320,9 +280,7 @@ def _get_search_logs_stats(start_date: Optional[str] = None, end_date: Optional[
             {
                 "date": k,
                 "query_count": v["count"],
-                "avg_latency_ms": round(v["total_latency"] / v["count"], 1)
-                if v["count"] > 0
-                else 0,
+                "avg_latency_ms": round(v["total_latency"] / v["count"], 1) if v["count"] > 0 else 0,
             }
             for k, v in sorted(daily_counts.items())
         ]
@@ -389,10 +347,7 @@ def _get_audit_stats() -> dict:
                 result["total_events"] = row["cnt"] if row else 0
 
                 # 按端点聚合
-                cur.execute(
-                    "SELECT endpoint, COUNT(*) as cnt FROM audit_events "
-                    "GROUP BY endpoint ORDER BY cnt DESC"
-                )
+                cur.execute("SELECT endpoint, COUNT(*) as cnt FROM audit_events " "GROUP BY endpoint ORDER BY cnt DESC")
                 api_calls = {}
                 for row in cur.fetchall():
                     api_calls[row["endpoint"]] = row["cnt"]
@@ -409,13 +364,15 @@ def _get_audit_stats() -> dict:
 #  API 端点
 # ══════════════════════════════════════════════════
 
+
 # ── 健康检查 ──
 @router.get("/health")
-def health_check():
+def health_check() -> JSONResponse:
     """服务健康检查"""
     import platform
-    from src.config import VERSION, START_TIME
     import time
+
+    from src.config import START_TIME, VERSION
 
     uptime_seconds = int(time.time() - START_TIME)
 
@@ -432,14 +389,14 @@ def health_check():
 
 # ── GET /api/analytics/stats 也支持（方便浏览器调试）──
 @router.get("/stats")
-def get_stats_get():
+def get_stats_get() -> JSONResponse:
     """综合统计 (GET)"""
     return _build_stats()
 
 
 # ── POST /api/analytics/stats — 综合统计 ──
 @router.post("/stats")
-def get_stats():
+def get_stats() -> JSONResponse:
     """
     综合统计
     返回文档数、用户数、向量数、存储大小等综合信息
@@ -489,7 +446,7 @@ def _build_stats() -> dict:
 
 # ── POST /api/analytics/trends — 趋势数据 ──
 @router.post("/trends")
-def get_trends(request: TrendsRequest):
+def get_trends(request: TrendsRequest) -> JSONResponse:
     """
     趋势数据
     按日/周/月维度返回文档增长、查询量、API 调用量
@@ -515,13 +472,13 @@ def get_trends(request: TrendsRequest):
             aggregated[month_key]["total_latency"] += entry["avg_latency_ms"] * entry["query_count"]
         records = []
         for v in aggregated.values():
-            records.append({
-                "period": v["period"],
-                "query_count": v["query_count"],
-                "avg_latency_ms": round(
-                    v["total_latency"] / v["query_count"], 1
-                ) if v["query_count"] > 0 else 0,
-            })
+            records.append(
+                {
+                    "period": v["period"],
+                    "query_count": v["query_count"],
+                    "avg_latency_ms": round(v["total_latency"] / v["query_count"], 1) if v["query_count"] > 0 else 0,
+                }
+            )
         records.sort(key=lambda x: x["period"])
     elif period == "week":
         aggregated = {}
@@ -539,13 +496,13 @@ def get_trends(request: TrendsRequest):
             aggregated[week_key]["total_latency"] += entry["avg_latency_ms"] * entry["query_count"]
         records = []
         for v in aggregated.values():
-            records.append({
-                "period": v["period"],
-                "query_count": v["query_count"],
-                "avg_latency_ms": round(
-                    v["total_latency"] / v["query_count"], 1
-                ) if v["query_count"] > 0 else 0,
-            })
+            records.append(
+                {
+                    "period": v["period"],
+                    "query_count": v["query_count"],
+                    "avg_latency_ms": round(v["total_latency"] / v["query_count"], 1) if v["query_count"] > 0 else 0,
+                }
+            )
         records.sort(key=lambda x: x["period"])
     else:
         records = [
@@ -610,10 +567,7 @@ def _get_chunk_creation_trends(start_date: Optional[str] = None, end_date: Optio
                 daily[d] += row["cnt"]
         conn.close()
 
-        records = [
-            {"date": k, "new_documents": v}
-            for k, v in sorted(daily.items())
-        ]
+        records = [{"date": k, "new_documents": v} for k, v in sorted(daily.items())]
 
     except Exception as e:  # TODO: Narrow exception type
         logger.warning(f"获取 chunk 趋势失败: {e}")
@@ -623,7 +577,7 @@ def _get_chunk_creation_trends(start_date: Optional[str] = None, end_date: Optio
 
 # ── POST /api/analytics/report — 统计报表 ──
 @router.post("/report")
-def generate_report(request: ReportRequest):
+def generate_report(request: ReportRequest) -> JSONResponse:
     """
     生成统计报表
     返回结构化数据供前端渲染
@@ -665,7 +619,7 @@ def generate_report(request: ReportRequest):
 
 # ── POST /api/analytics/storage — 存储分布 ──
 @router.post("/storage")
-def get_storage_distribution():
+def get_storage_distribution() -> JSONResponse:
     """
     存储分布
     按文档类型、按用户等维度展示存储分布
@@ -680,19 +634,19 @@ def get_storage_distribution():
         key=lambda x: x[1]["size_bytes"],
         reverse=True,
     ):
-        extensions.append({
-            "extension": ext,
-            "file_count": info["count"],
-            "size_bytes": info["size_bytes"],
-            "size_mb": round(info["size_bytes"] / (1024 * 1024), 2),
-        })
+        extensions.append(
+            {
+                "extension": ext,
+                "file_count": info["count"],
+                "size_bytes": info["size_bytes"],
+                "size_mb": round(info["size_bytes"] / (1024 * 1024), 2),
+            }
+        )
 
     # 按类别
     categories = [
         {"category": cat, "chunk_count": count}
-        for cat, count in sorted(
-            chunks["categories"].items(), key=lambda x: x[1], reverse=True
-        )
+        for cat, count in sorted(chunks["categories"].items(), key=lambda x: x[1], reverse=True)
     ]
 
     # 向量存储大小
@@ -714,7 +668,7 @@ def get_storage_distribution():
 
 # ── POST /api/analytics/export — 多格式导出（v2.2 增强版）──
 @router.post("/export")
-def export_report_v2(request: ExportRequest):
+def export_report_v2(request: ExportRequest) -> JSONResponse:
     """
     多格式数据导出：PDF / Excel / CSV / JSON
     支持字段筛选、时间范围过滤
@@ -763,6 +717,7 @@ def _build_export_data(stats: dict) -> dict:
 def _export_json(data: dict, title: str, now_str: str):
     """导出 JSON 格式"""
     from fastapi.responses import Response
+
     export_obj = {
         "title": title,
         "generated_at": datetime.now().isoformat(),
@@ -781,16 +736,23 @@ def _export_json(data: dict, title: str, now_str: str):
 def _export_csv(data: dict, title: str, now_str: str):
     """导出 CSV 格式"""
     from fastapi.responses import Response
+
     output = io.StringIO()
     writer = csv.writer(output)
     # BOM for Excel
     output.write("\ufeff")
     writer.writerow(["指标", "数值"])
     field_labels = {
-        "date": "日期", "queries": "查询量", "documents": "文档数",
-        "users": "用户数", "storage": "存储(MB)", "vectors": "向量数",
-        "active_chunks": "活跃分块", "collections": "集合数",
-        "upload_files": "上传文件数", "audit_events": "审计事件数",
+        "date": "日期",
+        "queries": "查询量",
+        "documents": "文档数",
+        "users": "用户数",
+        "storage": "存储(MB)",
+        "vectors": "向量数",
+        "active_chunks": "活跃分块",
+        "collections": "集合数",
+        "upload_files": "上传文件数",
+        "audit_events": "审计事件数",
     }
     for key, val in data.items():
         label = field_labels.get(key, key)
@@ -809,9 +771,10 @@ def _export_csv(data: dict, title: str, now_str: str):
 def _export_excel(data: dict, title: str, now_str: str):
     """导出 Excel (.xlsx) 格式 — 使用 openpyxl，不可用时降级为 CSV"""
     from fastapi.responses import Response
+
     try:
         import openpyxl
-        from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
+        from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
 
         wb = openpyxl.Workbook()
         ws = wb.active
@@ -820,8 +783,7 @@ def _export_excel(data: dict, title: str, now_str: str):
         header_fill = PatternFill(start_color="4472C4", end_color="4472C4", fill_type="solid")
         header_font = Font(bold=True, size=12, color="FFFFFF")
         thin_border = Border(
-            left=Side(style="thin"), right=Side(style="thin"),
-            top=Side(style="thin"), bottom=Side(style="thin")
+            left=Side(style="thin"), right=Side(style="thin"), top=Side(style="thin"), bottom=Side(style="thin")
         )
 
         ws.merge_cells("A1:B1")
@@ -843,10 +805,16 @@ def _export_excel(data: dict, title: str, now_str: str):
             cell.alignment = Alignment(horizontal="center")
 
         field_labels = {
-            "date": "日期", "queries": "查询量", "documents": "文档数",
-            "users": "用户数", "storage": "存储(MB)", "vectors": "向量数",
-            "active_chunks": "活跃分块", "collections": "集合数",
-            "upload_files": "上传文件数", "audit_events": "审计事件数",
+            "date": "日期",
+            "queries": "查询量",
+            "documents": "文档数",
+            "users": "用户数",
+            "storage": "存储(MB)",
+            "vectors": "向量数",
+            "active_chunks": "活跃分块",
+            "collections": "集合数",
+            "upload_files": "上传文件数",
+            "audit_events": "审计事件数",
         }
         row = 5
         for key, val in data.items():
@@ -879,15 +847,20 @@ def _export_excel(data: dict, title: str, now_str: str):
 def _export_pdf(data: dict, title: str, now_str: str):
     """导出 PDF 格式 — 使用 reportlab，不可用时降级为 JSON"""
     from fastapi.responses import Response
+
     try:
-        from reportlab.lib.pagesizes import A4
         from reportlab.lib import colors
-        from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-        from reportlab.platypus import (
-            SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
-        )
+        from reportlab.lib.pagesizes import A4
+        from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
         from reportlab.pdfbase import pdfmetrics
         from reportlab.pdfbase.ttfonts import TTFont
+        from reportlab.platypus import (
+            Paragraph,
+            SimpleDocTemplate,
+            Spacer,
+            Table,
+            TableStyle,
+        )
 
         buf = io.BytesIO()
         doc = SimpleDocTemplate(buf, pagesize=A4, title=title)
@@ -905,7 +878,7 @@ def _export_pdf(data: dict, title: str, now_str: str):
                     pdfmetrics.registerFont(TTFont("ChineseFont", font_path))
                     _chinese_font_available = True
                     break
-        except Exception:
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
             pass
 
         font_name = "ChineseFont" if _chinese_font_available else "Helvetica"
@@ -913,16 +886,20 @@ def _export_pdf(data: dict, title: str, now_str: str):
         title_style = ParagraphStyle("Title_CN", parent=styles["Title"], fontName=font_name)
         story.append(Paragraph(title, title_style))
         story.append(Spacer(1, 12))
-        story.append(Paragraph(
-            f'生成时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}', styles["Normal"]
-        ))
+        story.append(Paragraph(f'生成时间: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}', styles["Normal"]))
         story.append(Spacer(1, 20))
 
         field_labels = {
-            "date": "日期", "queries": "查询量", "documents": "文档数",
-            "users": "用户数", "storage": "存储(MB)", "vectors": "向量数",
-            "active_chunks": "活跃分块", "collections": "集合数",
-            "upload_files": "上传文件数", "audit_events": "审计事件数",
+            "date": "日期",
+            "queries": "查询量",
+            "documents": "文档数",
+            "users": "用户数",
+            "storage": "存储(MB)",
+            "vectors": "向量数",
+            "active_chunks": "活跃分块",
+            "collections": "集合数",
+            "upload_files": "上传文件数",
+            "audit_events": "审计事件数",
         }
         table_data = [["指标", "数值"]]
         for key, val in data.items():
@@ -930,16 +907,20 @@ def _export_pdf(data: dict, title: str, now_str: str):
             table_data.append([label, str(val)])
 
         t = Table(table_data, colWidths=[200, 100])
-        t.setStyle(TableStyle([
-            ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4472C4")),
-            ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
-            ("FONTNAME", (0, 0), (-1, -1), font_name),
-            ("FONTSIZE", (0, 0), (-1, 0), 12),
-            ("FONTSIZE", (0, 1), (-1, -1), 10),
-            ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-            ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
-            ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F2F2F2")]),
-        ]))
+        t.setStyle(
+            TableStyle(
+                [
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#4472C4")),
+                    ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                    ("FONTNAME", (0, 0), (-1, -1), font_name),
+                    ("FONTSIZE", (0, 0), (-1, 0), 12),
+                    ("FONTSIZE", (0, 1), (-1, -1), 10),
+                    ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+                    ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                    ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F2F2F2")]),
+                ]
+            )
+        )
         story.append(t)
         doc.build(story)
         buf.seek(0)
@@ -958,8 +939,9 @@ def _export_pdf(data: dict, title: str, now_str: str):
 
 # ── 模板管理端点 ──
 
+
 @router.get("/templates")
-def get_templates():
+def get_templates() -> JSONResponse:
     """获取报表模板列表"""
     TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
     templates = []
@@ -976,7 +958,7 @@ def get_templates():
 
 
 @router.post("/templates")
-def create_template(request: TemplateCreateRequest):
+def create_template(request: TemplateCreateRequest) -> JSONResponse:
     """创建报表模板"""
     TEMPLATES_DIR.mkdir(parents=True, exist_ok=True)
     template_id = uuid.uuid4().hex[:12]
@@ -997,7 +979,7 @@ def create_template(request: TemplateCreateRequest):
 
 
 @router.put("/templates/{template_id}")
-def update_template(template_id: str, request: TemplateUpdateRequest):
+def update_template(template_id: str, request: TemplateUpdateRequest) -> JSONResponse:
     """更新报表模板"""
     file_path = TEMPLATES_DIR / f"{template_id}.json"
     if not file_path.exists():
@@ -1019,7 +1001,7 @@ def update_template(template_id: str, request: TemplateUpdateRequest):
 
 
 @router.delete("/templates/{template_id}")
-def delete_template(template_id: str):
+def delete_template(template_id: str) -> JSONResponse:
     """删除报表模板"""
     file_path = TEMPLATES_DIR / f"{template_id}.json"
     if not file_path.exists():
@@ -1030,8 +1012,9 @@ def delete_template(template_id: str):
 
 # ── 报表分享端点 ──
 
+
 @router.post("/reports/share")
-def share_report(request: ShareRequest):
+def share_report(request: ShareRequest) -> JSONResponse:
     """生成报表分享链接，返回分享 URL 和 token"""
     if not request.permissions:
         raise HTTPException(400, "请至少选择一种分享权限")
@@ -1119,14 +1102,16 @@ def get_shared_report(token: str, password: Optional[str] = Query(None)):
             "title": f"分享报表 - {report_id}",
             "type": "shared",
             "generated_at": share_record["created_at"],
-            "sections": [{
-                "title": "综合统计",
-                "content": f"文档数: {stats.get('documents', {}).get('total_documents', 0)}，用户数: {stats.get('users', {}).get('total_users', 0)}",
-                "metrics": {
-                    "avg_value": stats.get("documents", {}).get("total_documents", 0),
-                    "peak_value": stats.get("vectors", {}).get("embeddings", 0),
-                },
-            }],
+            "sections": [
+                {
+                    "title": "综合统计",
+                    "content": f"文档数: {stats.get('documents', {}).get('total_documents', 0)}，用户数: {stats.get('users', {}).get('total_users', 0)}",
+                    "metrics": {
+                        "avg_value": stats.get("documents", {}).get("total_documents", 0),
+                        "peak_value": stats.get("vectors", {}).get("embeddings", 0),
+                    },
+                }
+            ],
             "permissions": share_record["permissions"],
             "owner_name": "系统用户",
             "password_protected": bool(stored_password),
@@ -1137,7 +1122,7 @@ def get_shared_report(token: str, password: Optional[str] = Query(None)):
 
 
 @router.delete("/reports/share/{token}")
-def revoke_share(token: str):
+def revoke_share(token: str) -> JSONResponse:
     """撤销分享链接"""
     file_path = SHARED_REPORTS_DIR / f"{token}.json"
     if not file_path.exists():
@@ -1149,7 +1134,7 @@ def revoke_share(token: str):
 
 # ── POST /api/analytics/storage 也支持 GET（方便调试）──
 @router.get("/storage")
-async def get_storage_distribution_get():
+async def get_storage_distribution_get() -> JSONResponse:
     """存储分布 (GET)"""
     return await get_storage_distribution()
 
@@ -1161,9 +1146,7 @@ async def generate_report_get(
     period: str = Query("month", description="today / week / month / all"),
 ):
     """统计报表 (GET)"""
-    return await generate_report(
-        ReportRequest(report_type=report_type, period=period)
-    )
+    return await generate_report(ReportRequest(report_type=report_type, period=period))
 
 
 @router.get("/trends")
@@ -1174,9 +1157,7 @@ async def get_trends_get(
     end_date: Optional[str] = Query(None),
 ):
     """趋势数据 (GET)"""
-    return await get_trends(
-        TrendsRequest(period=period, start_date=start_date, end_date=end_date)
-    )
+    return await get_trends(TrendsRequest(period=period, start_date=start_date, end_date=end_date))
 
 
 @router.get("/export")
@@ -1185,6 +1166,4 @@ async def export_report_get(
     format: str = Query("csv"),
 ):
     """导出报表 (GET) — 向后兼容"""
-    return await export_report_v2(
-        ExportRequest(format=format, fields=[])
-    )
+    return await export_report_v2(ExportRequest(format=format, fields=[]))

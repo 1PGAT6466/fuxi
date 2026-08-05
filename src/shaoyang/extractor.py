@@ -2,10 +2,11 @@
 extractor.py — 少阳·SAG式事件/实体提取器
 六段式Prompt + Pydantic约束 + 代词消歧 + 层级事件
 """
+
 import json
 import logging
-from typing import List, Dict
 from dataclasses import dataclass, field
+from typing import Dict, List
 
 logger = logging.getLogger("shaoyang.extractor")
 
@@ -13,6 +14,7 @@ logger = logging.getLogger("shaoyang.extractor")
 @dataclass
 class ExtractionResult:
     """提取结果"""
+
     events: List[Dict] = field(default_factory=list)
     entities: List[Dict] = field(default_factory=list)
 
@@ -115,11 +117,12 @@ class SAGExtractor:
             logger.warning(f"[SAG] 提取失败: {e}")
             return ExtractionResult()
 
-# FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
+    # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
     async def _save_to_db(self, result: ExtractionResult, chunk_meta: Dict = None):
         """将提取结果写入数据库表（使用 MemoryStore 新方法）"""
         try:
             from src.db.memory_store import get_store
+
             store = get_store()
             meta = chunk_meta or {}
             chunk_id = meta.get("chunk_id", "")
@@ -171,13 +174,14 @@ class SAGExtractor:
         """从 ontology.py 动态读取实体类型"""
         try:
             from src.db.ontology import ENTITY_TYPES
+
             types = []
             for t, info in ENTITY_TYPES.items():
                 label = info.get("label", t)
                 desc = info.get("description", "")
                 types.append(f"- {t}: {label}（{desc}）" if desc else f"- {t}: {label}")
             return "\n".join(types)
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             return "- person: 人名\n- organization: 组织\n- product: 产品\n- location: 地点\n- time: 时间\n- subject: 主题\n- metric: 指标\n- material: 材料\n- device: 设备"
 
     def _resolve_pronouns(self, result: ExtractionResult) -> ExtractionResult:
@@ -244,6 +248,7 @@ class SAGExtractor:
         """调用LLM"""
         try:
             from src.infra.llm import call_ai
+
             return await call_ai(prompt)
         except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[SAG] LLM调用失败: {e}")

@@ -2,6 +2,7 @@
 orchestrator.py — 少阴·调度器
 Plan→Execute→Reflect 循环
 """
+
 import logging
 from typing import Dict
 
@@ -36,6 +37,7 @@ class Orchestrator:
 
     async def _execute(self, plan: Dict) -> Dict:
         from src.taiyang.retrieval import hybrid_search
+
         results = await hybrid_search(plan["query"], top_k=10)
         return {"answer": "", "sources": results, "results": results}
 

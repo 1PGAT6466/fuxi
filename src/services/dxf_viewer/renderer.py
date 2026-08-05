@@ -53,10 +53,7 @@ def _extract_layers(entities: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
     for e in entities:
         layer = e.get("layer", "0")
         layer_map[layer] = layer_map.get(layer, 0) + 1
-    return [
-        {"name": name, "entity_count": count}
-        for name, count in sorted(layer_map.items())
-    ]
+    return [{"name": name, "entity_count": count} for name, count in sorted(layer_map.items())]
 
 
 def _convert_entity(entity: Dict[str, Any]) -> Optional[Dict[str, Any]]:

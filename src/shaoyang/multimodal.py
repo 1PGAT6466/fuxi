@@ -1,6 +1,11 @@
 """P2.6 多模态转录 — A: 表格提取增强 + B: SiliconFlow 图片转录"""
-import os, base64, requests, logging
+
+import base64
+import logging
+import os
 from typing import Optional
+
+import requests
 
 logger = logging.getLogger(__name__)
 
@@ -19,32 +24,33 @@ ENHANCED_TABLE_PROMPT = """将以下 PDF 表格数据转换为结构化的 Markd
 
 Markdown 表格:"""
 
+
 def enhance_table_extraction(page_text: str, tables: list) -> str:
     """A: 增强表格提取 — 从 pdfplumber 表格数据生成 Markdown 表格"""
     enhanced = page_text or ""
-    
+
     for ti, table in enumerate(tables):
         if not table or len(table) < 2:
             continue
-        
+
         # 过滤纯空行
         table = [row for row in table if any(c for c in row if c and str(c).strip())]
         if len(table) < 2:
             continue
-        
+
         # 构建 Markdown 表格
         md_lines = []
         header = table[0]
         md_lines.append("| " + " | ".join(str(c) if c else "-" for c in header) + " |")
         md_lines.append("|" + "|".join("---" for _ in header) + "|")
-        
+
         for row in table[1:]:
             cells = [str(c).replace("\n", " ").strip() if c else "-" for c in row]
             md_lines.append("| " + " | ".join(cells) + " |")
-        
+
         table_md = f"\n\n### 📊 表格 {ti+1}\n\n" + "\n".join(md_lines) + "\n"
         enhanced += table_md
-    
+
     return enhanced
 
 
@@ -53,7 +59,9 @@ def enhance_table_extraction(page_text: str, tables: list) -> str:
 # ============================================
 
 # SiliconFlow 配置（复用已有 API Key，URL 从统一配置读取）
-from src.config import DEEPSEEK_BASE_URL as _DEEPSEEK_BASE_URL, SILICONFLOW_BASE_URL as SF_FULL_URL
+from src.config import DEEPSEEK_BASE_URL as _DEEPSEEK_BASE_URL
+from src.config import SILICONFLOW_BASE_URL as SF_FULL_URL
+
 DEEPSEEK_BASE = f"{_DEEPSEEK_BASE_URL}/v1"
 DEEPSEEK_KEY = os.environ.get("DEEPSEEK_API_KEY", "")
 
@@ -78,8 +86,8 @@ IMAGE_TRANSCRIPT_PROMPT = """你是一个专业的工程图纸/图表分析助�
 def encode_image_base64(image_path: str) -> Optional[str]:
     """将图片编码为 base64"""
     try:
-        with open(image_path, 'rb') as f:
-            return base64.b64encode(f.read()).decode('utf-8')
+        with open(image_path, "rb") as f:
+            return base64.b64encode(f.read()).decode("utf-8")
     except Exception as e:  # TODO: Narrow exception type
         logger.error(f"图片编码失败: {image_path} — {e}")
         return None
@@ -91,17 +99,22 @@ def transcribe_image(image_path: str, api_key: str = None) -> Optional[str]:
     if not key:
         logger.warning("SiliconFlow API Key 未配置，跳过图片转录")
         return None
-    
+
     b64 = encode_image_base64(image_path)
     if not b64:
         return None
-    
+
     # 根据文件类型确定 MIME
     ext = os.path.splitext(image_path)[1].lower()
-    mime_map = {'.jpg': 'image/jpeg', '.jpeg': 'image/jpeg', '.png': 'image/png', 
-                '.webp': 'image/webp', '.bmp': 'image/bmp'}
-    mime_type = mime_map.get(ext, 'image/png')
-    
+    mime_map = {
+        ".jpg": "image/jpeg",
+        ".jpeg": "image/jpeg",
+        ".png": "image/png",
+        ".webp": "image/webp",
+        ".bmp": "image/bmp",
+    }
+    mime_type = mime_map.get(ext, "image/png")
+
     payload = {
         "model": VISION_MODEL,
         "messages": [
@@ -110,13 +123,13 @@ def transcribe_image(image_path: str, api_key: str = None) -> Optional[str]:
                 "content": [
                     {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{b64}"}},
                     {"type": "text", "text": IMAGE_TRANSCRIPT_PROMPT},
-                ]
+                ],
             }
         ],
         "max_tokens": 500,
         "temperature": 0.1,
     }
-    
+
     try:
         r = requests.post(
             f"{DEEPSEEK_BASE}/chat/completions",
@@ -140,9 +153,9 @@ def transcribe_image_from_bytes(image_bytes: bytes, mime_type: str = "image/png"
     key = api_key or DEEPSEEK_KEY
     if not key:
         return None
-    
-    b64 = base64.b64encode(image_bytes).decode('utf-8')
-    
+
+    b64 = base64.b64encode(image_bytes).decode("utf-8")
+
     payload = {
         "model": VISION_MODEL,
         "messages": [
@@ -151,13 +164,13 @@ def transcribe_image_from_bytes(image_bytes: bytes, mime_type: str = "image/png"
                 "content": [
                     {"type": "image_url", "image_url": {"url": f"data:{mime_type};base64,{b64}"}},
                     {"type": "text", "text": IMAGE_TRANSCRIPT_PROMPT},
-                ]
+                ],
             }
         ],
         "max_tokens": 500,
         "temperature": 0.1,
     }
-    
+
     try:
         r = requests.post(
             f"{DEEPSEEK_BASE}/chat/completions",
@@ -178,13 +191,15 @@ def transcribe_image_from_bytes(image_bytes: bytes, mime_type: str = "image/png"
 # 工具函数：增强 PDF 解析（表格 + 图片）
 # ============================================
 
+
 def enhance_pdf_extraction(file_path: str, extract_images: bool = False, api_key: str = None) -> str:
     """增强版 PDF 提取：表格 Markdown 化 + 图片转录"""
     text = ""
-    
+
     # 先用 pdfplumber 提取文本和表格
     try:
         import pdfplumber
+
         with pdfplumber.open(file_path) as pdf:
             page_texts = []
             for i, page in enumerate(pdf.pages):
@@ -198,6 +213,7 @@ def enhance_pdf_extraction(file_path: str, extract_images: bool = False, api_key
         # 回退 PyMuPDF
         try:
             import fitz
+
             doc = fitz.open(file_path)
             page_texts = []
             for i in range(doc.page_count):
@@ -205,14 +221,15 @@ def enhance_pdf_extraction(file_path: str, extract_images: bool = False, api_key
                 page_texts.append(f"[Page {i+1}]\n{page.get_text()}")
             doc.close()
             text = "\n\n".join(page_texts)
-        except Exception:  # TODO: Narrow exception type
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             logger.warning(f"[multimodal] suppressed exception", exc_info=True)
             pass
-    
+
     # 图片提取 + 转录（可选，需要 API Key）
     if extract_images and api_key:
         try:
             import fitz
+
             doc = fitz.open(file_path)
             image_descriptions = []
             for i in range(doc.page_count):
@@ -226,13 +243,17 @@ def enhance_pdf_extraction(file_path: str, extract_images: bool = False, api_key
                         if len(image_bytes) > 50 * 1024:  # 跳过 >50KB 的大图
                             continue
                         desc = transcribe_image_from_bytes(
-                            image_bytes,
-                            f"image/{base_image.get('ext', 'png')}",
-                            api_key
+                            image_bytes, f"image/{base_image.get('ext', 'png')}", api_key
                         )
                         if desc:
                             image_descriptions.append(f"[图片 P{i+1}-{j+1}]: {desc}")
-                    except Exception:  # TODO: Narrow exception type
+                    except (
+                        OSError,
+                        ValueError,
+                        KeyError,
+                        ConnectionError,
+                        TimeoutError,
+                    ) as e:  # TODO: Narrow exception type
                         logger.warning(f"[multimodal] suppressed exception", exc_info=True)
                         pass
             doc.close()
@@ -240,7 +261,7 @@ def enhance_pdf_extraction(file_path: str, extract_images: bool = False, api_key
                 text += "\n\n### 📷 图片转录\n\n" + "\n\n".join(image_descriptions)
         except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"图片提取失败: {e}")
-    
+
     return text
 
 

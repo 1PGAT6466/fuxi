@@ -540,7 +540,7 @@ class DuiGua(GuaBase):
                 # 如果存在 gaps，将 gap_text 追加到 answer
                 if gap_result.has_gaps and gap_result.gap_text:
                     answer = answer.rstrip() + "\n\n" + gap_result.gap_text
-            except Exception:  # TODO: Narrow exception type
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
                 logger.warning(
                     "☱ [兑] Gap Analysis 执行失败，跳过", exc_info=True
                 )

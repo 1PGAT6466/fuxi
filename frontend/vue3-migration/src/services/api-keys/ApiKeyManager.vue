@@ -645,7 +645,8 @@ async function loadKeys(): Promise<void> {
   store.setError(null);
   try {
     const res = await apiKeysApi.getApiKeys();
-    store.setKeys(res.keys, res.total);
+    const list = Array.isArray(res) ? res : (res?.keys || res?.data || []);
+    store.setKeys(list, res?.total);
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : '加载 API Key 列表失败';
     store.setError(msg);
@@ -994,7 +995,8 @@ function formatRelativeTime(iso: string): string {
   return formatDate(iso);
 }
 
-function formatNumber(num: number): string {
+function formatNumber(num: number | undefined | null): string {
+  if (num == null || isNaN(num)) return '0';
   if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
   if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
   return num.toLocaleString();

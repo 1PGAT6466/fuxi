@@ -1,0 +1,1275 @@
+﻿"""
+smart_router.py 鈥?5 灞傞樁姊矾鐢辨鏋讹紙浼忕静 v2.1 Phase 0锛?
+
+璺敱灞傛锛?
+  L1: Keyword Router锛堝叧閿瘝璺敱锛?5ms锛?
+      棰勫畾涔夊叧閿瘝瀛楀吀 鈫?妯℃澘鍥炲锛屾鍒欏尮閰?+ 鍝堝笇鏌ユ壘
+  L2: Template Router锛堟ā鏉胯矾鐢憋紝<10ms锛?
+      鎰忓浘妯℃澘搴?鈫?妯℃澘鍖归厤 + 瀹炰綋鎻愬彇
+  L3: Cache Router锛堢紦瀛樿矾鐢憋紝<50ms锛?
+      涓夊眰缂撳瓨锛氬畬鍏ㄥ尮閰?md5) / 璇箟鐩镐技(embedding cosine>0.92) / 鎰忓浘璺緞鍖归厤
+      TTL锛歀1绮剧‘缂撳瓨 5min / L2璇箟缂撳瓨 10min
+      涓婁笅鏂囦竴鑷存€ф鏌?
+  L4: Small Model Router锛團lash 妯″瀷璺敱锛?-2s锛?
+      DeepSeek V4 Flash 鍋氭剰鍥惧垎绫伙紝杈撳嚭棰勯攣瀹氫负 JSON
+  L5: Full Model Router锛堝叏妯″瀷璺敱锛?-5s锛?
+      Mimo 鍏ㄥ弬鏁版ā鍨嬶紝鏈€缁堝厹搴?
+
+鍗囩骇鍒ゅ畾閫昏緫锛?
+  L1鈫扡2锛氬叧閿瘝涓嶅湪棰勫畾涔夊瓧鍏镐腑
+  L2鈫扡3锛氭棤鍖归厤妯℃澘 鎴?缃俊搴?< 0.85
+  L3鈫扡4锛氱紦瀛樻湭鍛戒腑 鎴?涓婁笅鏂囧彉鍖?鎴?TTL 杩囨湡
+  L4鈫扡5锛欶lash 杈撳嚭鏍煎紡寮傚父 鎴?缃俊搴︿綆(<0.7) 鎴?intent="reason"
+
+涓嶄緷璧?organs/ 鎴?Meridian锛屼粎渚濊禆 src/services/llm.py 鐨?_call_api銆?
+"""
+
+import asyncio
+import hashlib
+import json
+import logging
+import re
+import time
+from dataclasses import dataclass, field
+from typing import Any, Dict, List, Optional, Tuple
+
+logger = logging.getLogger(__name__)
+
+# ============================================================================
+# 鏁版嵁缁撴瀯
+# ============================================================================
+
+
+@dataclass
+class RoutingDecision:
+    """姣忎竴灞傝矾鐢辩殑杩斿洖缁撴瀯"""
+
+    level: int  # 1-5锛屽懡涓眰绾?
+    result: Any  # 璺敱缁撴灉锛氭ā鏉垮洖澶?/ 鎰忓浘鏍囩 / 缂撳瓨绛旀 / LLM 杈撳嚭绛?
+    confidence: float  # 0.0 - 1.0
+    should_upgrade: bool  # 鏄惁闇€瑕佸崌绾у埌涓嬩竴灞?
+    metadata: Dict[str, Any] = field(default_factory=dict)
+
+
+@dataclass
+class CacheEntry:
+    """缂撳瓨鏉＄洰"""
+
+    key: str
+    result: Any
+    confidence: float
+    created_at: float
+    ttl: float
+    context_hash: Optional[str] = None
+
+
+# ============================================================================
+# 鏂囨湰棰勫鐞?
+# ============================================================================
+
+
+def _normalize_text(text: str) -> str:
+    """鏂囨湰棰勫鐞嗭細鍘婚灏剧┖鏍笺€佺粺涓€鍏ㄨ鍗婅銆佸幓澶氫綑绌虹櫧"""
+    text = text.strip()
+    text = text.replace("\uff01", "!").replace("\uff1f", "?").replace("\uff0c", ",")
+    text = text.replace("\u3002", ".").replace("\uff02", '"').replace("\uff07", "'")
+    text = text.replace("\uff1a", ":").replace("\uff1b", ";")
+    text = re.sub(r"\s+", " ", text)
+    return text
+
+
+# ============================================================================
+# L1: Keyword Router锛堝叧閿瘝璺敱锛?5ms锛?
+# ============================================================================
+
+_KEYWORD_DICT: Dict[str, str] = {
+    "浣犲ソ": "浣犲ソ锛佹垜鏄紡缇诧紝鏈変粈涔堝彲浠ュ府浣犵殑锛?,
+    "鎮ㄥソ": "鎮ㄥソ锛侀渶瑕佹垜鍋氫粈涔堬紵",
+    "hi": "Hi there! 鏈変粈涔堝彲浠ュ府浣犵殑锛?,
+    "hello": "Hello! How can I assist you today?",
+    "鍡?: "鍡紒鎴戝湪鍛綖",
+    "鏃╀笂濂?: "鏃╀笂濂斤紒浠婂ぉ鏈変粈涔堣鍒掞紵",
+    "鏅氫笂濂?: "鏅氫笂濂斤紒杩樺湪宸ヤ綔鍚楋紵",
+    "鍗堝畨": "鍗堝畨锛佷紤鎭竴涓嬪啀缁х画鍚с€?,
+    "鍦ㄥ悧": "鎴戝湪鐨勶紝闅忔椂鍙互闂垜闂銆?,
+    "鍦ㄤ笉鍦?: "鍦ㄥ憿锛屾湁浠€涔堟兂闂殑锛?,
+    "鍐嶈": "鍐嶈锛侀殢鏃跺洖鏉ユ壘鎴戙€?,
+    "鎷滄嫓": "鎷滄嫓锝?,
+    "鏅氬畨": "鏅氬畨锛屽仛涓ソ姊︼紒",
+    "bye": "Goodbye! Take care.",
+    "鎷?: "鎷滄嫓锛屼笅娆¤锛?,
+    "璋㈣阿": "涓嶅姘旓紒鑳藉府鍒颁綘灏卞ソ銆?,
+    "鎰熻阿": "涓嶇敤璋紝杩欐槸鎴戣鍋氱殑銆?,
+    "thanks": "You're welcome!",
+    "thank you": "You're welcome! Happy to help.",
+    "澶氳阿": "瀹㈡皵鍟︼紝闅忔椂鎵炬垜銆?,
+    "濂界殑": "濂界殑锛屾垜璁颁笅浜嗐€?,
+    "OK": "OK锛屾敹鍒般€?,
+    "ok": "濂界殑锛屾槑鐧戒簡銆?,
+    "鍡棷": "鍡棷锛岀户缁鍚с€?,
+    "娌￠棶棰?: "閭ｅお濂戒簡锛屾湁浠€涔堝悗缁紵",
+    "涓嶅": "鍝︼紵鍝噷涓嶅锛熸垜閲嶆柊鏉ャ€?,
+    "绠椾簡": "娌″叧绯伙紝鎹釜璇濋鍚с€?,
+    "浣犳槸璋?: "鎴戞槸浼忕静锛屼竴涓?AI 鍔╂墜銆傚彲浠ュ府浣犳悳绱€佸垎鏋愩€佸啓浣溿€佺紪绋嬬瓑銆?,
+    "浣犲彨浠€涔?: "鎴戝彨浼忕静锛屾簮鑷腑鍥藉彜浠ｇ璇濅腑鐨勫垱涓栫銆?,
+    "浣犵殑鍚嶅瓧": "鎴戝彨浼忕静锛屾槸缁撳悎浜嗗涓ぇ妯″瀷鐨勬櫤鑳藉姪鎵嬨€?,
+    "浣犺兘鍋氫粈涔?: "鎴戝彲浠ユ悳绱俊鎭€佸垎鏋愭暟鎹€佸啓浠ｇ爜銆佺炕璇戙€佺敓鎴愭枃鏈€佸洖绛旈棶棰樷€︹€﹁瘯璇曠湅锛?,
+    "浣犳湁浠€涔堝姛鑳?: "鎼滅储銆佸啓浣溿€佺紪绋嬨€佺炕璇戙€佹暟鎹垎鏋愩€佺煡璇嗛棶绛旂瓑绛夛紝浣犳湁浠€涔堥渶姹傦紵",
+    "甯垜": "濂界殑锛屼綘鎯宠鎴戝仛浠€涔堬紵",
+    "甯繖": "娌￠棶棰橈紝浠€涔堜簨锛?,
+    "鎬庝箞鍔?: "璇磋鐪嬪叿浣撴儏鍐碉紝鎴戝府浣犲垎鏋愩€?,
+    "鏁戝懡": "鍒厡锛岃璇翠粈涔堥棶棰橈紵",
+}
+
+_KEYWORD_PATTERNS: List[Tuple[re.Pattern, str]] = [
+    (re.compile(r"^(浣犲ソ|鎮ㄥソ|hi|hello|鍡?\s*[锛?銆?]?\s*$"), "greeting"),
+    (re.compile(r"^(鍐嶈|鎷滄嫓|bye|鏅氬畨|鎷?\s*[锛?銆?]?\s*$"), "farewell"),
+    (re.compile(r"^(璋㈣阿|鎰熻阿|thanks|thank\s*you|澶氳阿)\s*[锛?銆?]?\s*$"), "thanks"),
+    (re.compile(r"^(濂界殑|OK|ok|鍡棷|娌￠棶棰榺鏀跺埌)\s*[锛?銆?]?\s*$"), "confirm"),
+    (re.compile(r"^(浣犳槸璋亅浣犲彨浠€涔坾浣犵殑鍚嶅瓧)"), "identity"),
+    (re.compile(r"^(浣犺兘鍋氫粈涔坾浣犳湁浠€涔堝姛鑳絴浣犱細浠€涔?"), "capability"),
+    (re.compile(r"^(甯垜|甯繖|鎬庝箞鍔瀨鏁戝懡)"), "help_request"),
+    (re.compile(r"^(鏃╀笂濂絴鏅氫笂濂絴鍗堝畨)"), "time_greeting"),
+]
+
+_PATTERN_REPLY_MAP: Dict[str, str] = {
+    "greeting": "浣犲ソ锛佹湁浠€涔堝彲浠ュ府浣犵殑锛?,
+    "farewell": "鍐嶈锛侀殢鏃跺洖鏉ユ壘鎴戙€?,
+    "thanks": "涓嶅姘旓紒鑳藉府鍒颁綘灏卞ソ銆?,
+    "confirm": "濂界殑锛屾敹鍒般€?,
+    "identity": "鎴戞槸浼忕静锛屼竴涓妯″瀷铻嶅悎鐨?AI 鍔╂墜锛屽彲浠ユ悳绱€佸垎鏋愩€佸啓浣溿€佺紪绋嬧€︹€﹁瘯璇曠湅锛?,
+    "capability": "鎴戣兘锛氭悳绱俊鎭€佸垎鏋愭暟鎹€佸啓浠ｇ爜銆佺炕璇戙€佺敓鏂囥€侀棶绛斻€佺煡璇嗙鐞嗙瓑绛夈€備綘鎯宠瘯璇曞摢涓紵",
+    "help_request": "娌￠棶棰橈紝璇疯鍏蜂綋涓€鐐癸紝鎴戞潵甯綘銆?,
+    "time_greeting": "浣犲ソ锛佺幇鍦ㄦ鏄ソ鏃跺厜锛屾湁浠€涔堝彲浠ュ府浣犵殑锛?,
+}
+
+
+async def _l1_keyword_route(user_input: str) -> RoutingDecision:
+    """L1: 鍏抽敭璇嶈矾鐢?鈥?鍝堝笇鏌ユ壘 + 姝ｅ垯鍖归厤"""
+    normalized = _normalize_text(user_input)
+    lower_input = normalized.lower()
+
+    # Step 1: 鍝堝笇鏌ユ壘
+    for key, reply in _KEYWORD_DICT.items():
+        if lower_input == _normalize_text(key).lower():
+            return RoutingDecision(
+                level=1,
+                result=reply,
+                confidence=1.0,
+                should_upgrade=False,
+                metadata={"type": "keyword_exact", "key": key},
+            )
+
+    # Step 2: 姝ｅ垯鍖归厤
+    for pattern, tag in _KEYWORD_PATTERNS:
+        if pattern.match(normalized):
+            reply = _PATTERN_REPLY_MAP.get(tag, "")
+            if reply:
+                return RoutingDecision(
+                    level=1,
+                    result=reply,
+                    confidence=0.95,
+                    should_upgrade=False,
+                    metadata={"type": "keyword_pattern", "tag": tag},
+                )
+
+    return RoutingDecision(
+        level=1,
+        result=None,
+        confidence=0.0,
+        should_upgrade=True,
+        metadata={"type": "keyword_miss"},
+    )
+
+
+# ============================================================================
+# L2: Template Router锛堟ā鏉胯矾鐢憋紝<10ms锛?
+# ============================================================================
+
+_TEMPLATE_LIBRARY: List[Tuple[re.Pattern, str, Dict[str, str], float]] = [
+    (
+        re.compile(r"鎼??:绱涓€涓媩涓€鎼??\s*(?:鍏充簬|鏈夊叧)?(?P<topic>.+?)鐨??P<aspect>.+)"),
+        "search",
+        {"topic": "鎼滅储涓婚", "aspect": "鎼滅储鏂归潰"},
+        0.90,
+    ),
+    (
+        re.compile(r"(?:甯垜?|缁欐垜|甯繖|鎴戞兂)?(?:鏌鎵緗鎼?(?:涓€涓媩涓€鏌??\s*(?P<query>.+)"),
+        "search",
+        {"query": "鎼滅储鏌ヨ"},
+        0.88,
+    ),
+    (re.compile(r"(?P<topic>.+?)(?:鏄瘄鐨?(?:浠€涔坾鍜嬫牱|鎬庝箞鏍穦濡備綍|鎬庝箞)"), "knowledge_qa", {"topic": "鐭ヨ瘑涓婚"}, 0.85),
+    (
+        re.compile(r"(?:鎶妡灏唡甯垜鎶妡甯垜)?(?P<text>.+?)缈昏瘧(?:鎴恷涓簗鍒??(?P<target_lang>.+)"),
+        "translate",
+        {"text": "寰呯炕璇戞枃鏈?, "target_lang": "鐩爣璇█"},
+        0.92,
+    ),
+    (
+        re.compile(r"(?P<text>.+?)(?:鐨??鑻辨枃(?:鎬庝箞[璇村啓]|鏄暐|鏄?浠€涔?"),
+        "translate",
+        {"text": "寰呯炕璇戞枃鏈?, "target_lang": "鑻辨枃"},
+        0.90,
+    ),
+    (
+        re.compile(
+            r"(?:甯垜?|缁欐垜)?鍐??:涓€[绡囦釜]|涓€涓??(?P<content_type>.+?)(?:鍏充簬|涓婚[鏄负]|鍐呭鏄?)?(?P<topic>.+)"
+        ),
+        "writing",
+        {"content_type": "鍐呭绫诲瀷", "topic": "鍐欎綔涓婚"},
+        0.88,
+    ),
+    (
+        re.compile(
+            r"(?:鐢熸垚|鍒涗綔|璧疯崏)(?:涓€[绡囦釜]|涓€涓??(?P<content_type>.+?)(?:鍏充簬|涓婚[鏄负]|鍐呭鏄?)?(?P<topic>.+)"
+        ),
+        "writing",
+        {"content_type": "鍐呭绫诲瀷", "topic": "鍐欎綔涓婚"},
+        0.88,
+    ),
+    (re.compile(r"(?:甯垜?)?鎬荤粨(?:涓€涓媩杩欐|杩欑瘒)?(?P<content>.+)"), "summarize", {"content": "寰呮€荤粨鍐呭"}, 0.90),
+    (re.compile(r"(?:甯垜?)?姒傛嫭(?:涓€涓媩杩欐|杩欑瘒)?(?P<content>.+)"), "summarize", {"content": "寰呮鎷唴瀹?}, 0.89),
+    (
+        re.compile(r"(?:甯垜?|璇??鍐??:涓€[娈典釜]|鐐??(?P<lang>.+?)(?:浠ｇ爜|绋嬪簭)(?:瀹炵幇|瀹屾垚)?(?P<task>.+)"),
+        "code_gen",
+        {"lang": "缂栫▼璇█", "task": "缂栫▼浠诲姟"},
+        0.88,
+    ),
+    (
+        re.compile(r"(?:甯垜?)?鐢??P<lang>.+?)瀹炵幇(?P<task>.+)"),
+        "code_gen",
+        {"lang": "缂栫▼璇█", "task": "缂栫▼浠诲姟"},
+        0.90,
+    ),
+    (
+        re.compile(r"(?:杩欐|杩欎釜)?(?:浠ｇ爜|绋嬪簭)(?:鏈?浠€涔??(?:闂|閿欒|bug|閿檤姣涚梾)(?P<code>.+)"),
+        "code_review",
+        {"code": "寰呭鏌ヤ唬鐮?},
+        0.87,
+    ),
+    (re.compile(r"(?:甯垜?)?鍒嗘瀽(?:涓€涓??(?P<target>.+)"), "analysis", {"target": "鍒嗘瀽鐩爣"}, 0.87),
+    (re.compile(r"(?P<target>.+?)鐨??:浼樼己鐐箌鍒╁紛|濂藉潖)"), "analysis", {"target": "鍒嗘瀽鐩爣"}, 0.85),
+    (re.compile(r"(?:瑙ｉ噴|璇存槑)(?:涓€涓??(?P<concept>.+)"), "explain", {"concept": "寰呰В閲婃蹇?}, 0.89),
+    (re.compile(r"(?:浠€涔堟槸|鍟ユ槸|浠€涔堝彨)(?P<concept>.+)"), "explain", {"concept": "寰呰В閲婃蹇?}, 0.90),
+    (re.compile(r"(?:鎺ㄨ崘|寤鸿)(?:涓€浜?|鍑犱釜?)?(?P<category>.+)"), "recommend", {"category": "鎺ㄨ崘绫诲埆"}, 0.86),
+    (re.compile(r"(?:鏈夋病鏈?|鏈変粈涔?(?:濂絴閫傚悎|鎺ㄨ崘)鐨??P<category>.+)"), "recommend", {"category": "鎺ㄨ崘绫诲埆"}, 0.85),
+    (
+        re.compile(r"(?P<a>.+?)鍜??P<b>.+?)(?:鐨??(?:鍖哄埆|涓嶅悓|鍝釜濂絴鎬庝箞閫墊瀵规瘮|姣旇緝)"),
+        "compare",
+        {"a": "姣旇緝瀵硅薄A", "b": "姣旇緝瀵硅薄B"},
+        0.88,
+    ),
+    (re.compile(r"(?:璁＄畻|绠?(?:涓€涓媩涓€绠??(?P<expression>.+)"), "calculate", {"expression": "璁＄畻琛ㄨ揪寮?}, 0.90),
+    (
+        re.compile(r"(?P<expression>.+?)(?:绛変簬|鏄灏憒绛変簬澶氬皯|寰楀灏?"),
+        "calculate",
+        {"expression": "璁＄畻琛ㄨ揪寮?},
+        0.85,
+    ),
+    (re.compile(r"(?:缁欐垜?|璁?(?:涓€涓?|涓?)(?:绗戣瘽|娈靛瓙)"), "joke", {}, 0.95),
+    (
+        re.compile(r"(?:璧穦鍙東甯垜鎯?(?:涓?|涓€涓?)(?:鍚嶅瓧|鍚嶇О)(?:缁檤涓??(?P<target>.+)"),
+        "naming",
+        {"target": "鍛藉悕鐩爣"},
+        0.88,
+    ),
+]
+
+_INTENT_DESCRIPTIONS: Dict[str, str] = {
+    "search": "鎼滅储淇℃伅",
+    "knowledge_qa": "鐭ヨ瘑闂瓟",
+    "translate": "缈昏瘧",
+    "writing": "鍐欎綔鐢熸垚",
+    "summarize": "鎬荤粨姒傛嫭",
+    "code_gen": "浠ｇ爜鐢熸垚",
+    "code_review": "浠ｇ爜瀹℃煡",
+    "analysis": "鍒嗘瀽璇勪及",
+    "explain": "瑙ｉ噴璇存槑",
+    "recommend": "鎺ㄨ崘寤鸿",
+    "compare": "瀵规瘮姣旇緝",
+    "calculate": "璁＄畻姹傚€?,
+    "joke": "璁茬瑧璇?,
+    "naming": "璧峰悕瀛?,
+}
+
+_PLAN_INTENTS = {
+    "search",
+    "knowledge_qa",
+    "code_gen",
+    "code_review",
+    "writing",
+    "analysis",
+    "recommend",
+    "compare",
+    "naming",
+}
+_REASON_INTENTS = {"explain", "calculate"}
+_EXECUTE_INTENTS = {"translate", "summarize", "joke"}
+
+
+async def _l2_template_route(user_input: str) -> RoutingDecision:
+    """L2: 妯℃澘璺敱 鈥?妯℃澘鍖归厤 + 瀹炰綋鎻愬彇"""
+    normalized = _normalize_text(user_input)
+
+    best_match: Optional[Tuple[str, Dict[str, str], float, str]] = None
+
+    for pattern, intent, slots, base_confidence in _TEMPLATE_LIBRARY:
+        m = pattern.search(normalized)
+        if m:
+            entities: Dict[str, str] = {}
+            for slot_name in slots:
+                value = m.groupdict().get(slot_name, "")
+                if value:
+                    entities[slot_name] = value.strip()
+
+            fill_rate = len(entities) / max(len(slots), 1) if slots else 1.0
+            confidence = base_confidence * (0.7 + 0.3 * fill_rate)
+
+            if best_match is None or confidence > best_match[2]:
+                best_match = (intent, entities, confidence, pattern.pattern)
+
+    if best_match is None:
+        return RoutingDecision(
+            level=2,
+            result=None,
+            confidence=0.0,
+            should_upgrade=True,
+            metadata={"type": "template_miss"},
+        )
+
+    intent, entities, confidence, matched_pattern = best_match
+
+    if confidence < 0.85:
+        return RoutingDecision(
+            level=2,
+            result={"intent": intent, "entities": entities},
+            confidence=confidence,
+            should_upgrade=True,
+            metadata={"type": "template_low_conf", "pattern": matched_pattern},
+        )
+
+    if intent in _PLAN_INTENTS:
+        meta_type = "plan"
+    elif intent in _REASON_INTENTS:
+        meta_type = "reason"
+    elif intent in _EXECUTE_INTENTS:
+        meta_type = "execute"
+    else:
+        meta_type = "unknown"
+
+    result = {
+        "intent": intent,
+        "intent_desc": _INTENT_DESCRIPTIONS.get(intent, intent),
+        "meta_type": meta_type,
+        "entities": entities,
+    }
+
+    return RoutingDecision(
+        level=2,
+        result=result,
+        confidence=confidence,
+        should_upgrade=False,
+        metadata={"type": "template_match", "pattern": matched_pattern},
+    )
+
+
+# ============================================================================
+# L3: Cache Router锛堢紦瀛樿矾鐢憋紝<50ms锛?
+# ============================================================================
+
+_L1_CACHE: Dict[str, CacheEntry] = {}
+_L2_CACHE: Dict[str, CacheEntry] = {}
+_L3_CACHE: Dict[str, CacheEntry] = {}
+
+# 淇濇姢涓夊眰缂撳瓨鐨勫紓姝ラ攣锛堜慨澶嶅苟鍙戝畨鍏ㄩ棶棰橈級
+_cache_lock: asyncio.Lock = asyncio.Lock()
+
+L1_CACHE_TTL = 300  # 5 鍒嗛挓
+L2_CACHE_TTL = 600  # 10 鍒嗛挓
+L3_CACHE_TTL = 1800  # 30 鍒嗛挓
+
+SEMANTIC_SIMILARITY_THRESHOLD = 0.92
+
+
+def _compute_md5(text: str) -> str:
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _compute_ngram_similarity(text_a: str, text_b: str, n: int = 3) -> float:
+    """鍩轰簬瀛楃 n-gram 鐨?Jaccard 鐩镐技搴︼紙杞婚噺绾ц涔夎繎浼硷級"""
+
+    def get_ngrams(s: str, n: int) -> set:
+        s = s.lower().strip()
+        if len(s) < n:
+            return {s}
+        return {s[i : i + n] for i in range(len(s) - n + 1)}
+
+    a_grams = get_ngrams(text_a, n)
+    b_grams = get_ngrams(text_b, n)
+    if not a_grams or not b_grams:
+        return 0.0
+    intersection = a_grams & b_grams
+    union = a_grams | b_grams
+    return len(intersection) / len(union) if union else 0.0
+
+
+def _compute_context_hash(context: Optional[List[Dict[str, str]]]) -> str:
+    """璁＄畻浼氳瘽涓婁笅鏂囩殑缁撴瀯鍖栧搱甯?""
+    if not context:
+        return "empty"
+    recent = context[-3:]
+    role_sequence = "|".join(msg.get("role", "?") for msg in recent)
+    snippet = "|".join(msg.get("content", "")[:20] for msg in recent)
+    raw = f"{role_sequence}|{snippet}"
+    return _compute_md5(raw)
+
+
+async def _l3_cache_route(
+    user_input: str,
+    l2_result: Optional[Dict[str, Any]] = None,
+    context: Optional[List[Dict[str, str]]] = None,
+) -> RoutingDecision:
+    """L3: 缂撳瓨璺敱 鈥?涓夊眰缂撳瓨鏌ユ壘
+
+    鎵€鏈夎鍐欐搷浣滃湪 _cache_lock 淇濇姢涓嬭繘琛岋紝纭繚骞跺彂瀹夊叏銆?
+    """
+    normalized = _normalize_text(user_input)
+    now = time.time()
+    current_ctx_hash = _compute_context_hash(context)
+
+    async with _cache_lock:
+        # ---- Tier 1: 绮剧‘鍖归厤锛圡D5锛?----
+        md5_key = _compute_md5(normalized)
+        if md5_key in _L1_CACHE:
+            entry = _L1_CACHE[md5_key]
+            if now - entry.created_at < entry.ttl:
+                return RoutingDecision(
+                    level=3,
+                    result=entry.result,
+                    confidence=entry.confidence,
+                    should_upgrade=False,
+                    metadata={"type": "cache_exact", "cache_tier": "L1", "age_s": round(now - entry.created_at, 1)},
+                )
+            else:
+                del _L1_CACHE[md5_key]
+
+        # ---- Tier 2: 璇箟鐩镐技锛坣gram Jaccard锛?----
+        best_sim = 0.0
+        best_entry: Optional[CacheEntry] = None
+
+        for cache_key, entry in list(_L2_CACHE.items()):
+            if now - entry.created_at >= entry.ttl:
+                del _L2_CACHE[cache_key]
+                continue
+            sim = _compute_ngram_similarity(normalized, cache_key)
+            if sim > best_sim:
+                best_sim = sim
+                best_entry = entry
+
+        if best_entry and best_sim >= SEMANTIC_SIMILARITY_THRESHOLD:
+            # 涓婁笅鏂囦竴鑷存€ф鏌?
+            if best_entry.context_hash and best_entry.context_hash != current_ctx_hash:
+                return RoutingDecision(
+                    level=3,
+                    result=None,
+                    confidence=0.0,
+                    should_upgrade=True,
+                    metadata={"type": "cache_context_mismatch", "cache_tier": "L2", "sim_score": round(best_sim, 4)},
+                )
+            return RoutingDecision(
+                level=3,
+                result=best_entry.result,
+                confidence=best_entry.confidence * best_sim,
+                should_upgrade=False,
+                metadata={
+                    "type": "cache_semantic",
+                    "cache_tier": "L2",
+                    "sim_score": round(best_sim, 4),
+                    "age_s": round(now - best_entry.created_at, 1),
+                },
+            )
+
+        # ---- Tier 3: 鎰忓浘璺緞鍖归厤 ----
+        if l2_result and "intent" in l2_result:
+            intent_path = l2_result["intent"]
+            entities = l2_result.get("entities", {})
+            if entities:
+                entity_path = "|".join(sorted(entities.keys()))
+                intent_path = f"{intent_path}:{entity_path}"
+
+            if intent_path in _L3_CACHE:
+                entry = _L3_CACHE[intent_path]
+                if now - entry.created_at < entry.ttl:
+                    return RoutingDecision(
+                        level=3,
+                        result=entry.result,
+                        confidence=entry.confidence,
+                        should_upgrade=False,
+                        metadata={"type": "cache_intent_path", "cache_tier": "L3", "intent_path": intent_path},
+                    )
+                else:
+                    del _L3_CACHE[intent_path]
+
+        return RoutingDecision(
+            level=3,
+            result=None,
+            confidence=0.0,
+            should_upgrade=True,
+            metadata={"type": "cache_miss", "best_sim_score": round(best_sim, 4)},
+        )
+
+
+# ---- 缂撳瓨鍐欏叆 ----
+
+
+async def _write_exact_cache(user_input: str, result: Any, confidence: float = 0.98):
+    async with _cache_lock:
+        key = _compute_md5(_normalize_text(user_input))
+        _L1_CACHE[key] = CacheEntry(
+            key=key,
+            result=result,
+            confidence=confidence,
+            created_at=time.time(),
+            ttl=L1_CACHE_TTL,
+        )
+
+
+async def _write_semantic_cache(
+    user_input: str, result: Any, context: Optional[List[Dict[str, str]]] = None, confidence: float = 0.92
+):
+    async with _cache_lock:
+        normalized = _normalize_text(user_input)
+        _L2_CACHE[normalized] = CacheEntry(
+            key=normalized,
+            result=result,
+            confidence=confidence,
+            created_at=time.time(),
+            ttl=L2_CACHE_TTL,
+            context_hash=_compute_context_hash(context),
+        )
+
+
+async def _write_intent_path_cache(intent_path: str, result: Any, confidence: float = 0.90):
+    async with _cache_lock:
+        _L3_CACHE[intent_path] = CacheEntry(
+            key=intent_path,
+            result=result,
+            confidence=confidence,
+            created_at=time.time(),
+            ttl=L3_CACHE_TTL,
+        )
+
+
+async def clear_cache():
+    """娓呯┖鎵€鏈夌紦瀛?""
+    async with _cache_lock:
+        _L1_CACHE.clear()
+        _L2_CACHE.clear()
+        _L3_CACHE.clear()
+    logger.info("All router caches cleared")
+
+
+def clear_cache_sync():
+    """鍚屾娓呯┖鎵€鏈夌紦瀛橈紙鐢ㄤ簬鍚屾浠ｇ爜璺緞锛?""
+    _L1_CACHE.clear()
+    _L2_CACHE.clear()
+    _L3_CACHE.clear()
+    logger.info("All router caches cleared (sync)")
+
+
+async def get_cache_stats() -> Dict[str, int]:
+    """鑾峰彇缂撳瓨缁熻"""
+    async with _cache_lock:
+        return {
+            "l1_exact": len(_L1_CACHE),
+            "l2_semantic": len(_L2_CACHE),
+            "l3_intent_path": len(_L3_CACHE),
+        }
+
+
+# ============================================================================
+# L4: Small Model Router锛團lash 妯″瀷璺敱锛?-2s锛?
+# ============================================================================
+
+_FLASH_INTENT_CLASSIFY_PROMPT = """浣犳槸涓€涓剰鍥惧垎绫诲櫒銆傚垎鏋愮敤鎴疯緭鍏ワ紝杈撳嚭涓ユ牸 JSON 鏍煎紡銆?
+
+## 鎰忓浘绫诲埆
+- search: 鎼滅储淇℃伅銆佹煡鎵捐祫鏂?
+- knowledge_qa: 鐭ヨ瘑闂瓟銆佽В閲婃蹇?
+- translate: 缈昏瘧鏂囨湰
+- writing: 鍐欎綔鐢熸垚锛堟枃绔犮€侀偖浠躲€佹姤鍛婄瓑锛?
+- summarize: 鎬荤粨姒傛嫭鏂囨湰
+- code_gen: 鐢熸垚浠ｇ爜
+- code_review: 瀹℃煡/淇浠ｇ爜
+- analysis: 鍒嗘瀽璇勪及
+- explain: 瑙ｉ噴璇存槑
+- recommend: 鎺ㄨ崘寤鸿
+- compare: 瀵规瘮姣旇緝
+- calculate: 璁＄畻姹傚€?
+- chat: 闂茶亰/闂€?
+- reason: 澶嶆潅鎺ㄧ悊锛堟暟瀛︺€侀€昏緫銆佸姝ユ帹鐞嗭級
+- plan: 瑙勫垝瀹夋帓
+- creative: 鍒涙剰鐢熸垚
+- other: 鍏朵粬
+
+## 杈撳嚭鏍煎紡锛堝繀椤讳弗鏍?JSON锛屼笉瑕佸叾浠栨枃瀛楋級
+{{"intent": "<鎰忓浘绫诲埆>", "confidence": <0.0-1.0>, "entities": {{<key>: "<value>"}}, "meta_type": "<plan|reason|execute|chat>"}}
+
+meta_type 瑙勫垯锛?
+- plan: 闇€瑕佸姝ユ墽琛岀殑浠诲姟 (search, knowledge_qa, code_gen, code_review, writing, analysis, recommend, compare)
+- reason: 闇€瑕侀€昏緫鎺ㄧ悊鐨勪换鍔?(explain, calculate, reason)
+- execute: 鐩存帴杞崲涓烘搷浣滅殑浠诲姟 (translate, summarize, creative)
+- chat: 绾璇?
+
+## 鐢ㄦ埛杈撳叆
+{user_input}
+
+## 浣犵殑 JSON 杈撳嚭锛堜粎杈撳嚭 JSON锛夛細"""
+
+
+async def _l4_small_model_route(
+    user_input: str,
+    l2_result: Optional[Dict[str, Any]] = None,
+) -> RoutingDecision:
+    """L4: 灏忔ā鍨嬭矾鐢?鈥?DeepSeek V4 Flash 鍋氭剰鍥惧垎绫?""
+    normalized = _normalize_text(user_input)
+
+    hint = ""
+    if l2_result and l2_result.get("intent"):
+        hint = f"\n\n鎻愮ず锛氱敤鎴疯緭鍏ュ彲鑳藉睘浜?{l2_result['intent']} 绫诲埆锛堟潵鑷ā鏉垮尮閰嶏級銆?
+
+    prompt = _FLASH_INTENT_CLASSIFY_PROMPT.format(user_input=normalized[:2000])
+    if hint:
+        prompt += hint
+
+    try:
+        from src.config import DEEPSEEK_API_KEY, DEEPSEEK_BASE_URL, DEEPSEEK_TIMEOUT
+        from src.services.llm import _call_api
+
+        if not DEEPSEEK_API_KEY:
+            return RoutingDecision(
+                level=4,
+                result=None,
+                confidence=0.0,
+                should_upgrade=True,
+                metadata={"type": "flash_no_key"},
+            )
+
+        flash_model = "deepseek-v4-flash"
+
+        raw_output = await _call_api(
+            base_url=DEEPSEEK_BASE_URL,
+            api_key=DEEPSEEK_API_KEY,
+            model=flash_model,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=300,
+            temperature=0.1,
+            timeout=max(DEEPSEEK_TIMEOUT, 10),
+        )
+
+        if not raw_output:
+            return RoutingDecision(
+                level=4,
+                result=None,
+                confidence=0.0,
+                should_upgrade=True,
+                metadata={"type": "flash_empty"},
+            )
+
+        raw_output = raw_output.strip()
+        raw_output = re.sub(r"^```(?:json)?\s*", "", raw_output)
+        raw_output = re.sub(r"\s*```$", "", raw_output)
+
+        try:
+            parsed = json.loads(raw_output)
+        except json.JSONDecodeError:
+            json_match = re.search(r'\{[^{}]*"intent"[^{}]*\}', raw_output)
+            if json_match:
+                try:
+                    parsed = json.loads(json_match.group(0))
+                except json.JSONDecodeError:
+                    return RoutingDecision(
+                        level=4,
+                        result=None,
+                        confidence=0.0,
+                        should_upgrade=True,
+                        metadata={"type": "flash_parse_error", "raw": raw_output[:200]},
+                    )
+            else:
+                return RoutingDecision(
+                    level=4,
+                    result=None,
+                    confidence=0.0,
+                    should_upgrade=True,
+                    metadata={"type": "flash_no_json", "raw": raw_output[:200]},
+                )
+
+        intent = parsed.get("intent", "other")
+        confidence = float(parsed.get("confidence", 0.5))
+        entities = parsed.get("entities", {})
+        meta_type = parsed.get("meta_type", "chat")
+
+        if confidence < 0.7:
+            return RoutingDecision(
+                level=4,
+                result=parsed,
+                confidence=confidence,
+                should_upgrade=True,
+                metadata={"type": "flash_low_conf"},
+            )
+
+        if intent == "reason":
+            return RoutingDecision(
+                level=4,
+                result=parsed,
+                confidence=confidence,
+                should_upgrade=True,
+                metadata={"type": "flash_reason_intent"},
+            )
+
+        result = {
+            "intent": intent,
+            "intent_desc": _INTENT_DESCRIPTIONS.get(intent, intent),
+            "meta_type": meta_type,
+            "confidence": confidence,
+            "entities": entities,
+            "source": "flash",
+        }
+
+        return RoutingDecision(
+            level=4,
+            result=result,
+            confidence=confidence,
+            should_upgrade=False,
+            metadata={"type": "flash_classified", "model": flash_model},
+        )
+
+    except Exception as e:  # TODO: Narrow exception type
+        return RoutingDecision(
+            level=4,
+            result=None,
+            confidence=0.0,
+            should_upgrade=True,
+            metadata={"type": "flash_exception", "error": str(e)},
+        )
+
+
+# ============================================================================
+# L5: Full Model Router锛堝叏妯″瀷璺敱锛?-5s锛?
+# ============================================================================
+
+_FULL_MODEL_ROUTE_PROMPT = """浣犳槸涓€涓櫤鑳借矾鐢卞垎鏋愬櫒銆傚垎鏋愪互涓嬬敤鎴疯緭鍏ワ紝鎻愪緵瀹屾暣鐨勬剰鍥剧悊瑙ｅ拰鎵ц璁″垝銆?
+
+## 鐢ㄦ埛杈撳叆
+{user_input}
+
+## 鍓嶅嚑灞傚垎鏋愭彁绀?
+鎰忓浘鎻愮ず: {intent_hint}
+瀹炰綋鎻愮ず: {entities_hint}
+
+## 杈撳嚭鏍煎紡锛堜弗鏍?JSON锛?
+{{
+  "intent": "<鎰忓浘绫诲埆>",
+  "intent_desc": "<浜虹被鍙鎻忚堪>",
+  "meta_type": "<plan|reason|execute|chat>",
+  "confidence": <0.0-1.0>,
+  "entities": {{<key>: "<value>"}},
+  "reasoning": "<绠€鐭帹鐞嗚繃绋?",
+  "route_decision": "<direct_answer|search|generate|multi_step>"
+}}
+
+璇蜂粎杈撳嚭 JSON锛?""
+
+
+async def _l5_full_model_route(
+    user_input: str,
+    l2_result: Optional[Dict[str, Any]] = None,
+    l4_result: Optional[Dict[str, Any]] = None,
+) -> RoutingDecision:
+    """L5: 鍏ㄦā鍨嬭矾鐢?鈥?浣跨敤 Mimo 鍏ㄥ弬鏁版ā鍨嬪仛鏈€缁堝厹搴?""
+    normalized = _normalize_text(user_input)
+
+    intent_hint = "鏈煡"
+    entities_hint = "鏃?
+    if l4_result and l4_result.get("intent"):
+        intent_hint = l4_result["intent"]
+        entities_hint = json.dumps(l4_result.get("entities", {}), ensure_ascii=False)
+    elif l2_result and l2_result.get("intent"):
+        intent_hint = l2_result["intent"]
+        entities_hint = json.dumps(l2_result.get("entities", {}), ensure_ascii=False)
+
+    prompt = _FULL_MODEL_ROUTE_PROMPT.format(
+        user_input=normalized[:3000],
+        intent_hint=intent_hint,
+        entities_hint=entities_hint,
+    )
+
+    try:
+        from src.services.llm import call_llm
+
+        raw_output = await call_llm(
+            prompt=prompt,
+            max_tokens=500,
+            temperature=0.2,
+        )
+
+        if not raw_output:
+            logger.warning("L5 full model returned empty, using fallback")
+            return RoutingDecision(
+                level=5,
+                result={
+                    "intent": "other",
+                    "intent_desc": "鍏朵粬",
+                    "meta_type": "chat",
+                    "confidence": 0.3,
+                    "entities": {},
+                    "reasoning": "鍏ㄦā鍨嬪厹搴曪紙API 杩斿洖绌猴級",
+                    "route_decision": "direct_answer",
+                },
+                confidence=0.3,
+                should_upgrade=False,
+                metadata={"type": "full_model_fallback_empty"},
+            )
+
+        raw_output = raw_output.strip()
+        raw_output = re.sub(r"^```(?:json)?\s*", "", raw_output)
+        raw_output = re.sub(r"\s*```$", "", raw_output)
+
+        try:
+            parsed = json.loads(raw_output)
+        except json.JSONDecodeError:
+            json_match = re.search(r'\{[^{}]*"intent"[^{}]*\}', raw_output)
+            if json_match:
+                try:
+                    parsed = json.loads(json_match.group(0))
+                except json.JSONDecodeError:
+                    parsed = {
+                        "intent": "other",
+                        "meta_type": "chat",
+                        "confidence": 0.3,
+                        "entities": {},
+                        "route_decision": "direct_answer",
+                    }
+            else:
+                parsed = {
+                    "intent": "other",
+                    "meta_type": "chat",
+                    "confidence": 0.3,
+                    "entities": {},
+                    "route_decision": "direct_answer",
+                }
+
+        intent = parsed.get("intent", "other")
+        confidence = float(parsed.get("confidence", 0.5))
+        entities = parsed.get("entities", {})
+
+        result = {
+            "intent": intent,
+            "intent_desc": parsed.get("intent_desc", _INTENT_DESCRIPTIONS.get(intent, intent)),
+            "meta_type": parsed.get("meta_type", "chat"),
+            "confidence": confidence,
+            "entities": entities,
+            "reasoning": parsed.get("reasoning", ""),
+            "route_decision": parsed.get("route_decision", "direct_answer"),
+            "source": "full_model",
+        }
+
+        return RoutingDecision(
+            level=5,
+            result=result,
+            confidence=confidence,
+            should_upgrade=False,
+            metadata={"type": "full_model_routed"},
+        )
+
+    except Exception as e:  # TODO: Narrow exception type
+        logger.error(f"L5 full model route exception: {e}")
+        return RoutingDecision(
+            level=5,
+            result={
+                "intent": "other",
+                "intent_desc": "鍏朵粬",
+                "meta_type": "chat",
+                "confidence": 0.1,
+                "entities": {},
+                "reasoning": f"鍏ㄦā鍨嬪紓甯稿厹搴? {e}",
+                "route_decision": "direct_answer",
+            },
+            confidence=0.1,
+            should_upgrade=False,
+            metadata={"type": "full_model_exception", "error": str(e)},
+        )
+
+
+# ============================================================================
+# 涓荤紪鎺掑櫒锛歳oute()
+# ============================================================================
+
+
+async def route(
+    user_input: str,
+    context: Optional[List[Dict[str, str]]] = None,
+) -> RoutingDecision:
+    """
+    5 灞傞樁姊矾鐢变富缂栨帓
+
+    鍙傛暟锛?
+        user_input: 鐢ㄦ埛杈撳叆鏂囨湰
+        context: 瀵硅瘽涓婁笅鏂?[{"role": "user"/"assistant", "content": "..."}]
+
+    杩斿洖锛?
+        RoutingDecision锛屽寘鍚懡涓眰绾с€佺粨鏋溿€佺疆淇″害銆乻hould_upgrade 鏍囪
+    """
+    if not user_input or not user_input.strip():
+        return RoutingDecision(
+            level=1,
+            result="浣犲ソ锛熸湁浠€涔堟垜鍙互甯繖鐨勫悧锛?,
+            confidence=1.0,
+            should_upgrade=False,
+            metadata={"type": "empty_input"},
+        )
+
+    logger.info(f"Routing: '{user_input[:80]}...'")
+    start_time = time.time()
+
+    # ---- L1: Keyword ----
+    l1 = await _l1_keyword_route(user_input)
+    if not l1.should_upgrade:
+        elapsed = (time.time() - start_time) * 1000
+        logger.info(f"L1 hit in {elapsed:.1f}ms: {l1.metadata.get('type')}")
+        l1.metadata["elapsed_ms"] = round(elapsed, 1)
+        await _trigger_shadow_if_enabled(user_input, context, l1)
+        return l1
+
+    # ---- L2: Template ----
+    l2 = await _l2_template_route(user_input)
+    if not l2.should_upgrade:
+        # 灏?L2 缁撴灉鍐欏叆缂撳瓨
+        if l2.confidence >= 0.88:
+            await _write_semantic_cache(user_input, l2.result, context, l2.confidence)
+            intent_path = l2.result.get("intent", "")
+            if intent_path:
+                await _write_intent_path_cache(intent_path, l2.result, l2.confidence)
+        elapsed = (time.time() - start_time) * 1000
+        logger.info(f"L2 hit in {elapsed:.1f}ms: intent={l2.result.get('intent')}")
+        l2.metadata["elapsed_ms"] = round(elapsed, 1)
+        await _trigger_shadow_if_enabled(user_input, context, l2)
+        return l2
+
+    # ---- L3: Cache ----
+    l3 = await _l3_cache_route(
+        user_input,
+        l2_result=l2.result if isinstance(l2.result, dict) else None,
+        context=context,
+    )
+    if not l3.should_upgrade:
+        elapsed = (time.time() - start_time) * 1000
+        logger.info(f"L3 hit in {elapsed:.1f}ms: {l3.metadata.get('type')}")
+        l3.metadata["elapsed_ms"] = round(elapsed, 1)
+        await _trigger_shadow_if_enabled(user_input, context, l3)
+        return l3
+
+    # ---- L4: Flash ----
+    l4 = await _l4_small_model_route(
+        user_input,
+        l2_result=l2.result if isinstance(l2.result, dict) else None,
+    )
+    if not l4.should_upgrade:
+        # 灏?Flash 缁撴灉鍐欏叆閫愬眰缂撳瓨
+        if l4.confidence >= 0.8:
+            await _write_exact_cache(user_input, l4.result, l4.confidence)
+            await _write_semantic_cache(user_input, l4.result, context, l4.confidence)
+            intent_path = l4.result.get("intent", "")
+            if intent_path:
+                await _write_intent_path_cache(intent_path, l4.result, l4.confidence)
+        elapsed = (time.time() - start_time) * 1000
+        logger.info(f"L4 hit in {elapsed:.1f}ms: intent={l4.result.get('intent')}")
+        l4.metadata["elapsed_ms"] = round(elapsed, 1)
+        await _trigger_shadow_if_enabled(user_input, context, l4)
+        return l4
+
+    # ---- L5: Full Model (final fallback) ----
+    l5 = await _l5_full_model_route(
+        user_input,
+        l2_result=l2.result if isinstance(l2.result, dict) else None,
+        l4_result=l4.result if isinstance(l4.result, dict) else None,
+    )
+    # L5 鎬绘槸 should_upgrade=False锛堟渶缁堝厹搴曪級
+    if l5.confidence >= 0.7:
+        await _write_exact_cache(user_input, l5.result, l5.confidence)
+        await _write_semantic_cache(user_input, l5.result, context, l5.confidence)
+        intent_path = l5.result.get("intent", "")
+        if intent_path:
+            await _write_intent_path_cache(intent_path, l5.result, l5.confidence)
+    elapsed = (time.time() - start_time) * 1000
+    logger.info(f"L5 final in {elapsed:.1f}ms: intent={l5.result.get('intent')}")
+    l5.metadata["elapsed_ms"] = round(elapsed, 1)
+    await _trigger_shadow_if_enabled(user_input, context, l5)
+    return l5
+
+
+# ============================================================================
+# 缁熶竴妗ユ帴锛歳oute_to_qian_intent()
+# ============================================================================
+
+# smart_router 鎰忓浘 鈫?qian 鎰忓浘鏄犲皠琛?
+_INTENT_TO_QIAN_INTENT: Dict[str, str] = {
+    "search": "SEARCH",
+    "knowledge_qa": "SEARCH",
+    "translate": "DECIDE",
+    "writing": "PRESENT",
+    "summarize": "PRESENT",
+    "code_gen": "DECIDE",
+    "code_review": "DECIDE",
+    "analysis": "DECIDE",
+    "explain": "DECIDE",
+    "recommend": "DECIDE",
+    "compare": "DECIDE",
+    "calculate": "DECIDE",
+    "joke": "PRESENT",
+    "naming": "DECIDE",
+    "chat": "PRESENT",
+    "reason": "DECIDE",
+    "plan": "DECIDE",
+    "creative": "PRESENT",
+    "other": "PRESENT",
+}
+
+
+async def route_to_qian_intent(
+    user_input: str,
+    context: Optional[List[Dict[str, str]]] = None,
+) -> Optional[Dict[str, Any]]:
+    """
+    缁熶竴妗ユ帴锛歴mart_router 缁撴灉 鈫?qian 鍏崷鎰忓浘
+
+    褰?smart_router L1-L5 楂樼疆淇″害鍛戒腑鏃讹紝鐩存帴鏄犲皠涓?qian 鎰忓浘锛?
+    璺宠繃涔惧崷 LLM 鍐崇瓥锛岄檷浣庡欢杩熷拰鎴愭湰銆?
+
+    Args:
+        user_input: 鐢ㄦ埛杈撳叆
+        context: 瀵硅瘽涓婁笅鏂?
+
+    Returns:
+        {
+            "intent": "SEARCH|DECIDE|PRESENT|...",
+            "confidence": float,
+            "reasoning": str,
+            "source": "smart_router_bridge",
+            "router_level": int,
+        }
+        鎴?None锛堟湭鍛戒腑 / 缃俊搴︿笉瓒筹紝搴旇蛋 qian 瀹屾暣寰幆锛?
+    """
+    decision = await route(user_input, context)
+
+    # 浠呴珮缃俊搴︾粨鏋滄墠妗ユ帴
+    if decision.should_upgrade or decision.confidence < 0.85:
+        return None
+
+    # 浠?result 涓彁鍙栨剰鍥?
+    intent = None
+    if isinstance(decision.result, dict):
+        intent = decision.result.get("intent", "")
+    elif isinstance(decision.result, str):
+        # L1 鍏抽敭璇嶇洿鎺ュ洖澶?鈫?璧?PRESENT
+        intent = "chat"
+
+    if not intent:
+        return None
+
+    qian_intent = _INTENT_TO_QIAN_INTENT.get(intent, "PRESENT")
+
+    return {
+        "intent": qian_intent,
+        "confidence": decision.confidence,
+        "reasoning": f"smart_router L{decision.level} 妗ユ帴: {intent}鈫抺qian_intent}",
+        "source": "smart_router_bridge",
+        "router_level": decision.level,
+        "original_intent": intent,
+    }
+
+
+# ============================================================================
+# 鍚屾鍖呰鍣細鏂逛究鍚屾浠ｇ爜璋冪敤
+# ============================================================================
+
+
+def route_sync(
+    user_input: str,
+    context: Optional[List[Dict[str, str]]] = None,
+) -> RoutingDecision:
+    """鍚屾鍖呰鍣紝鍐呴儴杩愯 asyncio event loop"""
+    try:
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            import nest_asyncio
+
+            nest_asyncio.apply()
+        return loop.run_until_complete(route(user_input, context))
+    except RuntimeError:
+        return asyncio.run(route(user_input, context))
+
+
+# ============================================================================
+# 褰卞瓙妯″紡瑙﹀彂鍣?
+# ============================================================================
+
+
+async def _trigger_shadow_if_enabled(
+    user_input: str,
+    context: Optional[List[Dict[str, str]]],
+    production_result: RoutingDecision,
+) -> None:
+    """濡傛灉褰卞瓙妯″紡宸插惎鐢紝寮傛瑙﹀彂褰卞瓙璇勪及锛堜笉闃诲涓绘祦绋嬶級"""
+    try:
+        import random
+
+        from src.config import SHADOW_ENABLED, SHADOW_MODEL, SHADOW_SAMPLE_RATE
+
+        if not SHADOW_ENABLED:
+            return
+
+        # 閲囨牱鐜囨帶鍒?
+        if SHADOW_SAMPLE_RATE < 1.0 and random.random() > SHADOW_SAMPLE_RATE:
+            return
+
+        # 寮傛瑙﹀彂锛屼笉绛夊緟缁撴灉
+        asyncio.create_task(
+            shadow_route(
+                user_input=user_input,
+                model_name=SHADOW_MODEL,
+                context=context,
+                production_result=production_result,
+            )
+        )
+    except Exception as exc:
+        logger.debug("[Shadow] 瑙﹀彂褰卞瓙妯″紡寮傚父: %s", exc)
+
+
+# ============================================================================
+# 褰卞瓙妯″紡锛氬紓姝ュ姣斿疄楠屾ā鍨嬶紝涓嶉樆濉炵敓浜ф祦閲?
+# ============================================================================
+
+_shadow_results: List[Dict[str, Any]] = []
+_shadow_max_results: int = 200
+
+
+async def shadow_route(
+    user_input: str,
+    model_name: str,
+    context: Optional[List[Dict[str, str]]] = None,
+    production_result: Optional[RoutingDecision] = None,
+) -> None:
+    """褰卞瓙妯″紡 鈥?鐢ㄥ疄楠屾ā鍨嬪紓姝ヨ瘎浼板悓涓€璇锋眰锛屼笉闃诲涓绘祦绋?
+
+    灏嗙敓浜фā鍨嬬殑璺敱缁撴灉涓庡疄楠屾ā鍨嬶紙濡?gemini-flash锛夌殑缁撴灉
+    杩涜鍚庡彴瀵规瘮锛屽啓鍏ュ奖瀛愭棩蹇椾緵 A/B 鍒嗘瀽銆?
+
+    Args:
+        user_input:        鐢ㄦ埛杈撳叆
+        model_name:        瀹為獙妯″瀷鍚嶏紙濡?"gemini-flash", "qwen-turbo"锛?
+        context:           瀵硅瘽涓婁笅鏂?
+        production_result: 鐢熶骇妯″瀷鐨勮矾鐢卞喅绛栵紙鍙€夛紝鐢ㄤ簬瀵规瘮锛?
+    """
+    try:
+        from src.config import MIMO_API_KEY, MIMO_BASE_URL
+        from src.services.llm import _call_api
+
+        if not MIMO_API_KEY:
+            return
+
+        prompt = (
+            f"鍒嗘瀽浠ヤ笅鐢ㄦ埛杈撳叆锛岃緭鍑?JSON:\n"
+            f'{{"intent": "<绫诲埆>", "confidence": <0.0-1.0>, "meta_type": "<chat|plan|reason|execute>"}}\n'
+            f"\n鐢ㄦ埛杈撳叆: {user_input[:2000]}"
+        )
+
+        raw = await _call_api(
+            base_url=MIMO_BASE_URL,
+            api_key=MIMO_API_KEY,
+            model=model_name,
+            messages=[{"role": "user", "content": prompt}],
+            max_tokens=200,
+            temperature=0.1,
+            timeout=10,
+        )
+
+        if not raw:
+            return
+
+        import json as _json
+
+        try:
+            clean = raw.strip()
+            clean = re.sub(r"^```(?:json)?\s*", "", clean)
+            clean = re.sub(r"\s*```$", "", clean)
+            parsed = _json.loads(clean)
+        except _json.JSONDecodeError:
+            return
+
+        shadow_entry = {
+            "timestamp": time.time(),
+            "model": model_name,
+            "intent": parsed.get("intent", "unknown"),
+            "confidence": parsed.get("confidence", 0),
+            "production_intent": (
+                production_result.result.get("intent", "")
+                if production_result and isinstance(production_result.result, dict)
+                else None
+            ),
+            "production_confidence": (production_result.confidence if production_result else None),
+        }
+
+        global _shadow_results
+        _shadow_results.append(shadow_entry)
+        if len(_shadow_results) > _shadow_max_results:
+            _shadow_results = _shadow_results[-_shadow_max_results:]
+
+        logger.debug(
+            "[Shadow] model=%s intent=%s conf=%.2f | prod=%s",
+            model_name,
+            shadow_entry["intent"],
+            shadow_entry["confidence"],
+            shadow_entry["production_intent"] or "N/A",
+        )
+
+    except Exception as exc:  # TODO: Narrow exception type
+        logger.debug("[Shadow] 褰卞瓙璇勪及寮傚父: %s", exc)
+
+
+def get_shadow_stats() -> Dict[str, Any]:
+    """鑾峰彇褰卞瓙妯″紡缁熻
+
+    Returns:
+        {
+            "total_evaluations": int,
+            "by_model": {model: count},
+            "agreement_rate": float,
+            "recent": [...]
+        }
+    """
+    if not _shadow_results:
+        return {"total_evaluations": 0, "by_model": {}, "agreement_rate": 1.0, "recent": []}
+
+    by_model: Dict[str, int] = {}
+    agreements = 0
+    for entry in _shadow_results:
+        model = entry.get("model", "unknown")
+        by_model[model] = by_model.get(model, 0) + 1
+        if entry.get("production_intent") == entry.get("intent"):
+            agreements += 1
+
+    return {
+        "total_evaluations": len(_shadow_results),
+        "by_model": by_model,
+        "agreement_rate": round(agreements / len(_shadow_results), 4),
+        "recent": _shadow_results[-10:],
+    }
+
+
+def clear_shadow_results() -> None:
+    """娓呯┖褰卞瓙缁撴灉缂撳瓨"""
+    global _shadow_results
+    _shadow_results = []
+    logger.info("褰卞瓙缁撴灉缂撳瓨宸叉竻绌?)

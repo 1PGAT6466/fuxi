@@ -25,13 +25,14 @@ from typing import List, Optional
 logger = logging.getLogger(__name__)
 
 # ===== 爆炸保护上限 =====
-MAX_NEW_ENTITIES_PER_HOP = 50   # 每跳最多 50 个新实体
-MAX_TOTAL_EVENTS = 500          # 总事件数硬上限
+MAX_NEW_ENTITIES_PER_HOP = 50  # 每跳最多 50 个新实体
+MAX_TOTAL_EVENTS = 500  # 总事件数硬上限
 
 
 # ============================================================================
 # 数据模型
 # ============================================================================
+
 
 @dataclass
 class FrontierEntity:
@@ -129,7 +130,8 @@ class SQLiteEntityFrontier:
         conn = self._get_conn()
         placeholders = ",".join("?" * len(seed_event_ids))
 
-        rows = conn.execute(f"""
+        rows = conn.execute(
+            f"""
             SELECT 
                 ee.entity_id,
                 e.name,
@@ -140,7 +142,9 @@ class SQLiteEntityFrontier:
             WHERE ee.event_id IN ({placeholders})
             GROUP BY ee.entity_id, e.name, e.type
             ORDER BY event_count DESC
-        """, seed_event_ids).fetchall()
+        """,
+            seed_event_ids,
+        ).fetchall()
 
         conn.close()
         return [
@@ -194,13 +198,15 @@ class SQLiteEntityFrontier:
         for r in rows:
             if r["event_id"] not in seen_events:
                 seen_events.add(r["event_id"])
-                results.append(HoppedEvent(
-                    event_id=r["event_id"],
-                    chunk_id=r["chunk_id"],
-                    content=r["content"],
-                    entities=json.loads(r["entities_json"] or "[]"),
-                    hop_depth=0,
-                ))
+                results.append(
+                    HoppedEvent(
+                        event_id=r["event_id"],
+                        chunk_id=r["chunk_id"],
+                        content=r["content"],
+                        entities=json.loads(r["entities_json"] or "[]"),
+                        hop_depth=0,
+                    )
+                )
                 if len(seen_events) >= MAX_TOTAL_EVENTS:
                     break
 
@@ -249,13 +255,15 @@ class SQLiteEntityFrontier:
                 for r in new_rows:
                     if r["event_id"] not in seen_events:
                         seen_events.add(r["event_id"])
-                        results.append(HoppedEvent(
-                            event_id=r["event_id"],
-                            chunk_id=r["chunk_id"],
-                            content=r["content"],
-                            entities=json.loads(r["entities_json"] or "[]"),
-                            hop_depth=depth,
-                        ))
+                        results.append(
+                            HoppedEvent(
+                                event_id=r["event_id"],
+                                chunk_id=r["chunk_id"],
+                                content=r["content"],
+                                entities=json.loads(r["entities_json"] or "[]"),
+                                hop_depth=depth,
+                            )
+                        )
                         added += 1
                         if len(seen_events) >= MAX_TOTAL_EVENTS:
                             break
@@ -278,7 +286,8 @@ class SQLiteEntityFrontier:
         conn = self._get_conn()
         placeholders = ",".join("?" * len(query_entity_ids))
 
-        rows = conn.execute(f"""
+        rows = conn.execute(
+            f"""
             WITH seed_events AS (
                 SELECT DISTINCT ee.event_id
                 FROM event_entities ee
@@ -308,7 +317,9 @@ class SQLiteEntityFrontier:
             JOIN entities ent ON ex.entity_id = ent.id
             ORDER BY ex.is_seed DESC
             LIMIT ?
-        """, query_entity_ids + [max_events, max_events]).fetchall()
+        """,
+            query_entity_ids + [max_events, max_events],
+        ).fetchall()
 
         conn.close()
         return [
@@ -328,6 +339,7 @@ class SQLiteEntityFrontier:
 # PostgreSQL 实现（生产环境）
 # ============================================================================
 
+
 class PGEntityFrontier:
     """PostgreSQL 后端的 Entity Frontier"""
 
@@ -340,46 +352,53 @@ class PGEntityFrontier:
         cur = self.pg.cursor()
         cur.execute("SELECT * FROM get_entity_frontier(%s)", (seed_event_ids,))
         rows = cur.fetchall()
-        return [
-            FrontierEntity(entity_id=r[0], name=r[1], type=r[2], event_count=r[3])
-            for r in rows
-        ]
+        return [FrontierEntity(entity_id=r[0], name=r[1], type=r[2], event_count=r[3]) for r in rows]
 
     def hop_entities(
-        self, entity_ids: List[str],
-        exclude_event_ids: Optional[List[str]] = None, hop_limit: int = 1,
+        self,
+        entity_ids: List[str],
+        exclude_event_ids: Optional[List[str]] = None,
+        hop_limit: int = 1,
     ) -> List[HoppedEvent]:
         if not entity_ids:
             return []
         cur = self.pg.cursor()
-        cur.execute("SELECT * FROM hop_entities(%s, %s, %s)",
-                    (entity_ids, exclude_event_ids or [], hop_limit))
+        cur.execute("SELECT * FROM hop_entities(%s, %s, %s)", (entity_ids, exclude_event_ids or [], hop_limit))
         rows = cur.fetchall()
         return [
             HoppedEvent(
-                event_id=r[0], chunk_id=r[1], content=r[2],
-                entities=json.loads(r[3] or "[]"), hop_depth=r[4],
-            ) for r in rows
+                event_id=r[0],
+                chunk_id=r[1],
+                content=r[2],
+                entities=json.loads(r[3] or "[]"),
+                hop_depth=r[4],
+            )
+            for r in rows
         ]
 
     def get_hyperedge(self, query_entity_ids: List[str], max_events: int = 100) -> List[HyperedgeNode]:
         if not query_entity_ids:
             return []
         cur = self.pg.cursor()
-        cur.execute("SELECT * FROM get_dynamic_hyperedge(%s, %s)",
-                    (query_entity_ids, max_events))
+        cur.execute("SELECT * FROM get_dynamic_hyperedge(%s, %s)", (query_entity_ids, max_events))
         rows = cur.fetchall()
         return [
             HyperedgeNode(
-                event_id=r[0], chunk_id=r[1], entity_id=r[3],
-                entity_name=r[4], entity_type=r[5], is_seed=r[6],
-            ) for r in rows
+                event_id=r[0],
+                chunk_id=r[1],
+                entity_id=r[3],
+                entity_name=r[4],
+                entity_type=r[5],
+                is_seed=r[6],
+            )
+            for r in rows
         ]
 
 
 # ============================================================================
 # 统一入口（自动选后端）
 # ============================================================================
+
 
 class EntityFrontier:
     """Entity Frontier 查询引擎。"""
@@ -400,8 +419,10 @@ class EntityFrontier:
         return self._sqlite.expand_seed(seed_event_ids) if self._sqlite else []
 
     def hop_entities(
-        self, entity_ids: List[str],
-        exclude_event_ids: Optional[List[str]] = None, hop_limit: int = 1,
+        self,
+        entity_ids: List[str],
+        exclude_event_ids: Optional[List[str]] = None,
+        hop_limit: int = 1,
     ) -> List[HoppedEvent]:
         if self._pg_frontier:
             try:

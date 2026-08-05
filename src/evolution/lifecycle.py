@@ -108,6 +108,7 @@ class EvolutionLifecycle:
 
 # ---- 便捷函数 ----
 
+
 async def record_lifecycle_event(event_type: str, data: Dict) -> None:
     """便捷函数：记录知识生命周期事件
 

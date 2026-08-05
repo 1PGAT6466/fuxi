@@ -8,15 +8,15 @@ evolver.py — 知识进化封装层（第九宫 · 中宫）
 """
 
 import logging
-from typing import Dict, List, Any
+from typing import Any, Dict, List
 
 # ---- 从 services 导入原有实现 ----
 from src.services.evolver import (
     discover_entities,
-    infer_relations,
     evolve_graph,
-    get_graph_stats,
     get_graph_nodes,
+    get_graph_stats,
+    infer_relations,
 )
 
 logger = logging.getLogger("evolution.evolver")
@@ -120,6 +120,7 @@ class EvolutionEvolver:
 
 
 # ---- 便捷函数 ----
+
 
 def evolve_knowledge_graph(
     new_entities: Dict[str, List[str]],

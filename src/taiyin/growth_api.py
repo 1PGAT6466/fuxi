@@ -3,12 +3,13 @@ growth_api.py — 成长面板 API
 /api/growth/overview → 成长指标（四象各自的指标+趋势+SAG统计）
 /api/symbols/status ← 四象状态（心跳+健康+基本指标）
 """
-import os
+
 import json
-import time
 import logging
-from typing import Dict, List
+import os
+import time
 from datetime import datetime
+from typing import Dict, List
 
 logger = logging.getLogger("taiyin.growth_api")
 
@@ -43,6 +44,7 @@ def get_growth_overview() -> Dict:
 def get_symbols_status() -> Dict:
     """获取四象状态"""
     from src.infra.meridian_monitor import get_monitor
+
     monitor = get_monitor()
 
     status = {
@@ -130,12 +132,14 @@ def _calculate_trend(records: List[Dict]) -> List[Dict]:
     trend = []
     for day in sorted(daily.keys()):
         d = daily[day]
-        trend.append({
-            "date": day,
-            "query_count": d["count"],
-            "avg_latency_ms": d["latency_sum"] / d["count"],
-            "avg_confidence": d["confidence_sum"] / d["count"],
-        })
+        trend.append(
+            {
+                "date": day,
+                "query_count": d["count"],
+                "avg_latency_ms": d["latency_sum"] / d["count"],
+                "avg_confidence": d["confidence_sum"] / d["count"],
+            }
+        )
 
     return trend[-7:]  # 只返回最近7天
 

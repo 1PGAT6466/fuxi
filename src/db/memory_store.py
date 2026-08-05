@@ -5,16 +5,22 @@ memory_store.py — Phase 0 重构：SQLite 游标 + LRU 缓存
 2. LRU 缓存热门查询结果，避免重复 SQL
 3. 保持所有公开 API 接口不变，对调用方透明
 """
-import sqlite3, json, os, logging
-from pathlib import Path
-from typing import List, Dict, Optional
-from collections import OrderedDict
+
+import json
+import logging
+import os
+import sqlite3
 import threading
+from collections import OrderedDict
+from pathlib import Path
+from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger(__name__)
 
 # 从 config 读取路径
 from src.config import DATA_DIR
+from src.db.transaction import transaction_context
+
 
 class MemoryStore:
     """v2.0: SQLite-backed store with LRU cache (no full memory load)"""
@@ -23,32 +29,40 @@ class MemoryStore:
         self._db_path = db_path or str(DATA_DIR / "chunks.db")
         # Auto-repair: if DB is malformed, recreate from backup
         from pathlib import Path
+
         db_file = Path(self._db_path)
         if db_file.exists():
             try:
                 import sqlite3 as _sq
+
                 _t = _sq.connect(self._db_path)
                 _t.execute("SELECT COUNT(*) FROM chunks")
                 _t.close()
-            except Exception:  # TODO: Narrow exception type
+            except (sqlite3.DatabaseError, sqlite3.OperationalError) as e:
+                # DatabaseError - 数据库损坏或格式错误
+                # OperationalError - 数据库连接失败
                 # DB corrupted, try to restore from .bak
-                bak = db_file.with_suffix('.db.bak')
+                bak = db_file.with_suffix(".db.bak")
                 if bak.exists():
                     try:
                         # Export from .bak to fresh DB
                         src = _sq.connect(str(bak))
                         rows = src.execute("SELECT * FROM chunks").fetchall()
-                        schema = src.execute("SELECT sql FROM sqlite_master WHERE type='table' AND name='chunks'").fetchone()[0]
+                        schema = src.execute(
+                            "SELECT sql FROM sqlite_master WHERE type='table' AND name='chunks'"
+                        ).fetchone()[0]
                         src.close()
-                        new_path = str(db_file) + '.new'
+                        new_path = str(db_file) + ".new"
                         dst = _sq.connect(new_path)
                         dst.execute(schema)
                         dst.executemany("INSERT INTO chunks VALUES (?,?,?,?,?,?,?,?,?)", rows)
                         dst.commit()
                         dst.close()
                         os.replace(new_path, self._db_path)
-                    except Exception:  # TODO: Narrow exception type
-                        logger.debug("[suppressed] os.replace(new_path, self._db_")
+                    except (sqlite3.DatabaseError, sqlite3.OperationalError, OSError) as e:
+                        # DatabaseError/OperationalError - 数据库备份恢复失败
+                        # OSError - 文件替换失败
+                        logger.debug(f"[MemoryStore] 数据库恢复失败: {e}")
                         pass
         self._db_conn = None
         self._ensure_db()
@@ -64,7 +78,7 @@ class MemoryStore:
         self._json_cache: OrderedDict[str, tuple] = OrderedDict()
         self._json_cache_max = 500
 
-    def _ensure_db(self):
+    def _ensure_db(self) -> Any:
         """确保数据库和表存在 — v1.50 R3: 添加写入锁保护"""
         self._db_conn = sqlite3.connect(self._db_path, check_same_thread=False, timeout=10)
         self._db_conn.row_factory = sqlite3.Row  # L-11: 启用按名称访问
@@ -165,7 +179,7 @@ class MemoryStore:
         # Migrate from JSON if needed
         self._maybe_migrate_json()
 
-    def _migrate_events_entities(self):
+    def _migrate_events_entities(self) -> Any:
         """Phase A: 检测旧 events/entities 表 schema 并迁移
 
         旧 schema 缺少 id, chunk_id, entity_type, status, embedding, timestamp 等列。
@@ -180,7 +194,7 @@ class MemoryStore:
                 return  # 无旧表，无需迁移
 
             # 安全修复 (CWE-89): 白名单验证表名（防止SQL注入）
-            ALLOWED_TABLES = {'events', 'entities'}
+            ALLOWED_TABLES = {"events", "entities"}
             for table_name in existing_names:
                 if table_name not in ALLOWED_TABLES:
                     logger.warning(f"[MemoryStore] 跳过未知表: {table_name}")
@@ -189,8 +203,8 @@ class MemoryStore:
                 col_names = [c[1] for c in cols]
 
                 # 检查是否需要迁移（缺少新字段）
-                if table_name == 'events':
-                    needed = {'id', 'chunk_id', 'embedding', 'status', 'timestamp'}
+                if table_name == "events":
+                    needed = {"id", "chunk_id", "embedding", "status", "timestamp"}
                     missing = needed - set(col_names)
                     if missing:
                         logger.info(f"[MemoryStore] 检测到旧 events 表 schema，缺少: {missing}，准备迁移...")
@@ -201,8 +215,17 @@ class MemoryStore:
                         self._db_conn.execute("DROP INDEX IF EXISTS idx_events_status")
                         self._db_conn.execute("DROP INDEX IF EXISTS idx_events_file_hash")
 
-                elif table_name == 'entities':
-                    needed = {'id', 'entity_type', 'aliases_json', 'chunk_ids_json', 'source', 'embedding', 'status', 'timestamp'}
+                elif table_name == "entities":
+                    needed = {
+                        "id",
+                        "entity_type",
+                        "aliases_json",
+                        "chunk_ids_json",
+                        "source",
+                        "embedding",
+                        "status",
+                        "timestamp",
+                    }
                     missing = needed - set(col_names)
                     if missing:
                         logger.info(f"[MemoryStore] 检测到旧 entities 表 schema，缺少: {missing}，准备迁移...")
@@ -213,25 +236,26 @@ class MemoryStore:
                         self._db_conn.execute("DROP INDEX IF EXISTS idx_entities_status")
 
             self._db_conn.commit()
-        except Exception as e:  # TODO: Narrow exception type
+        except (sqlite3.DatabaseError, sqlite3.OperationalError) as e:
+            # DatabaseError - 表操作失败
+            # OperationalError - 数据库连接问题
             logger.warning(f"[MemoryStore] 迁移 events/entities 表失败: {e}")
 
-    def _migrate_add_tenant_id(self):
+    def _migrate_add_tenant_id(self) -> Any:
         """v1.44 Phase 1: 为现有表添加 tenant_id 列（如果不存在）
         v1.50 R5: 添加表名白名单验证，防止 SQL 注入
         """
         # v1.50 R5: 白名单验证表名
-        ALLOWED_TABLES = {'chunks', 'events', 'entities'}
+        ALLOWED_TABLES = {"chunks", "events", "entities"}
         try:
-            tables = ['chunks', 'events', 'entities']
+            tables = ["chunks", "events", "entities"]
             for table_name in tables:
                 if table_name not in ALLOWED_TABLES:
                     logger.warning(f"[MemoryStore] 跳过未知表迁移: {table_name}")
                     continue
                 # 检查表是否存在
                 exists = self._db_conn.execute(
-                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?",
-                    (table_name,)
+                    "SELECT name FROM sqlite_master WHERE type='table' AND name=?", (table_name,)
                 ).fetchone()
                 if not exists:
                     continue
@@ -239,21 +263,20 @@ class MemoryStore:
                 # 检查 tenant_id 列是否存在
                 cols = self._db_conn.execute(f"PRAGMA table_info('{table_name}')").fetchall()
                 col_names = [c[1] for c in cols]
-                if 'tenant_id' not in col_names:
+                if "tenant_id" not in col_names:
                     logger.info(f"[MemoryStore] 为 {table_name} 表添加 tenant_id 列")
-                    self._db_conn.execute(
-                        f"ALTER TABLE {table_name} ADD COLUMN tenant_id TEXT DEFAULT 'default'"
-                    )
+                    self._db_conn.execute(f"ALTER TABLE {table_name} ADD COLUMN tenant_id TEXT DEFAULT 'default'")
                     # 创建索引
                     idx_name = f"idx_{table_name}_tenant"
-                    self._db_conn.execute(
-                        f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table_name}(tenant_id)"
-                    )
+                    self._db_conn.execute(f"CREATE INDEX IF NOT EXISTS {idx_name} ON {table_name}(tenant_id)")
             self._db_conn.commit()
-        except Exception as e:
+        except (sqlite3.DatabaseError, sqlite3.OperationalError, ValueError) as e:
+            # DatabaseError - ALTER TABLE 失败
+            # OperationalError - 数据库连接问题
+            # ValueError - 表名或列名无效
             logger.warning(f"[MemoryStore] tenant_id 迁移失败: {e}")
 
-    def _maybe_migrate_json(self):
+    def _maybe_migrate_json(self) -> Any:
         """从旧 JSON 文件迁移数据"""
         json_path = DATA_DIR / "chunks.json"
         if not json_path.exists():
@@ -267,32 +290,37 @@ class MemoryStore:
                 return
             rows = []
             for c in chunks:
-                rows.append((
-                    json.dumps(c, ensure_ascii=False),
-                    c.get("file_hash", ""),
-                    c.get("file_name", ""),
-                    c.get("category", ""),
-                    c.get("chunk_index", 0),
-                    "active",
-                    c.get("created_at", ""),
-                    "",
-                ))
+                rows.append(
+                    (
+                        json.dumps(c, ensure_ascii=False),
+                        c.get("file_hash", ""),
+                        c.get("file_name", ""),
+                        c.get("category", ""),
+                        c.get("chunk_index", 0),
+                        "active",
+                        c.get("created_at", ""),
+                        "",
+                    )
+                )
             with self._db_conn:
                 self._db_conn.executemany(
                     "INSERT INTO chunks (doc, file_hash, file_name, category, chunk_index, status, created_at, loader_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                    rows
+                    rows,
                 )
             self._db_conn.commit()
             logger.info(f"[MemoryStore] Migrated {len(rows)} chunks from JSON")
-        except Exception as e:  # TODO: Narrow exception type
+        except (json.JSONDecodeError, sqlite3.DatabaseError, OSError) as e:
+            # JSONDecodeError - 源 JSON 文件格式错误
+            # DatabaseError - SQLite 操作失败
+            # OSError - 文件读取失败
             logger.error(f"[MemoryStore] JSON migration failed: {e}")
 
     def _count_rows(self) -> int:
         return self._db_conn.execute("SELECT COUNT(*) FROM chunks").fetchone()[0]
 
-    def _check_connection(self):
+    def _check_connection(self) -> Any:
         """v1.50 R5: 检查连接健康状态，必要时重连
-        
+
         长生命周期连接可能因 WAL checkpoint、超时等原因失效，
         此方法在关键操作前调用，确保连接可用。
         """
@@ -302,7 +330,7 @@ class MemoryStore:
             logger.warning("[MemoryStore] 连接已失效，正在重连...")
             try:
                 self._db_conn.close()
-            except Exception:
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
                 pass
             self._ensure_db()
 
@@ -321,14 +349,14 @@ class MemoryStore:
                 return cache[key]
         return None
 
-    def _cache_put(self, cache: OrderedDict, key: str, value: list):
+    def _cache_put(self, cache: OrderedDict, key: str, value: list) -> Any:
         with self._lock:
             cache[key] = value
             cache.move_to_end(key)
             while len(cache) > self._cache_max:
                 cache.popitem(last=False)
 
-    def _invalidate_cache(self, key: str = None, file_hash: str = None):
+    def _invalidate_cache(self, key: str = None, file_hash: str = None) -> Any:
         """Invalidate cache entries"""
         with self._lock:
             if file_hash:
@@ -338,12 +366,21 @@ class MemoryStore:
 
     # ===== Public API (unchanged interface) =====
 
-    def hierarchical_search(self, query: str, category: str = "", file_type: str = "",
-                            date_from: str = "", date_to: str = "",
-                            summary_top_k: int = 5, chunk_top_k: int = 15) -> list:
+    def hierarchical_search(
+        self,
+        query: str,
+        category: str = "",
+        file_type: str = "",
+        date_from: str = "",
+        date_to: str = "",
+        summary_top_k: int = 5,
+        chunk_top_k: int = 15,
+    ) -> list:
         """Hierarchical search: SQLite-based keyword search with category filtering"""
-        import re, json as _json
-        terms = [t.strip() for t in re.split(r'[\s,，。、]+', query.lower()) if len(t.strip()) >= 1]
+        import json as _json
+        import re
+
+        terms = [t.strip() for t in re.split(r"[\s,，。、]+", query.lower()) if len(t.strip()) >= 1]
         if not terms:
             terms = [query.lower()]
         conditions = ["status = 'active'"]
@@ -375,13 +412,29 @@ class MemoryStore:
             logger.warning(f"[MemoryStore] hierarchical_search failed: {e}")
             return []
 
-
     def keyword_search(self, query: str, top_k: int = 20, tenant_id: str = "default") -> list:
         """Simple keyword search via SQLite LIKE on chunk text
         v1.44 R2: 多租户隔离 — 按 tenant_id 过滤
+        v1.44 R4: 返回 chunk_index — 用于 RRF 融合的唯一标识
+        FIX: 中文分词 — 长查询拆分为 2-gram 词汇
+        FIX: 壁厚设计查询优化 — 对所有中文字符都进行 2-gram 拆分
         """
         import re
-        terms = [t.strip() for t in re.split(r'[\s,，。、]+', query.lower()) if len(t.strip()) >= 1]
+
+        # 先按空格/标点拆分
+        raw_terms = [t.strip() for t in re.split(r"[\s,，。、]+", query.lower()) if len(t.strip()) >= 1]
+        terms = []
+        for t in raw_terms:
+            # 检查是否包含中文字符
+            if re.search(r'[\u4e00-\u9fff]', t):
+                # 中文字符：进行 2-gram 拆分
+                for i in range(len(t) - 1):
+                    terms.append(t[i : i + 2])
+                # 也保留原始 term
+                terms.append(t)
+            else:
+                # 非中文字符：保留原始 term
+                terms.append(t)
         if not terms:
             return []
         conditions = ["status = 'active'"]
@@ -403,11 +456,14 @@ class MemoryStore:
             for row_id, doc_json in rows:
                 c = json.loads(doc_json) if isinstance(doc_json, str) else doc_json
                 c["_db_id"] = row_id
+                # v1.44 R4: 确保 chunk_index 存在
+                if "chunk_index" not in c or c["chunk_index"] is None:
+                    c["chunk_index"] = 0
                 text = (c.get("text", "") or "").lower()
-                score = sum(1.0 for t in terms if t in text)
+                file_name = (c.get("file_name", "") or "").lower()
+                score = sum(1.0 for t in terms if t in text) + sum(0.5 for t in terms if t in file_name)
                 c["score"] = round(score, 2)
-                if score > 0:
-                    results.append(c)
+                results.append(c)
             results.sort(key=lambda x: x.get("score", 0), reverse=True)
             return results[:top_k]
         except Exception as e:  # TODO: Narrow exception type
@@ -422,39 +478,32 @@ class MemoryStore:
         if limit is not None:
             rows = self._db_conn.execute(
                 "SELECT id, doc FROM chunks WHERE status='active' AND tenant_id=? ORDER BY id LIMIT ? OFFSET ?",
-                (tenant_id, limit, offset)
+                (tenant_id, limit, offset),
             ).fetchall()
         else:
             rows = self._db_conn.execute(
-                "SELECT id, doc FROM chunks WHERE status='active' AND tenant_id=? ORDER BY id",
-                (tenant_id,)
+                "SELECT id, doc FROM chunks WHERE status='active' AND tenant_id=? ORDER BY id", (tenant_id,)
             ).fetchall()
         return [self._row_to_chunk(r) for r in rows]
 
     @property
     def total_chunks(self) -> int:
-        return self._db_conn.execute(
-            "SELECT COUNT(*) FROM chunks WHERE status='active'"
-        ).fetchone()[0]
+        return self._db_conn.execute("SELECT COUNT(*) FROM chunks WHERE status='active'").fetchone()[0]
 
     def total_chunks_by_tenant(self, tenant_id: str = "default") -> int:
         """v1.44 Phase 1: 按租户统计 chunk 总数"""
         return self._db_conn.execute(
-            "SELECT COUNT(*) FROM chunks WHERE status='active' AND tenant_id=?",
-            (tenant_id,)
+            "SELECT COUNT(*) FROM chunks WHERE status='active' AND tenant_id=?", (tenant_id,)
         ).fetchone()[0]
 
     @property
     def total_files(self) -> int:
-        return self._db_conn.execute(
-            "SELECT COUNT(DISTINCT file_hash) FROM chunks WHERE status='active'"
-        ).fetchone()[0]
+        return self._db_conn.execute("SELECT COUNT(DISTINCT file_hash) FROM chunks WHERE status='active'").fetchone()[0]
 
     def total_files_by_tenant(self, tenant_id: str = "default") -> int:
         """v1.44 Phase 1: 按租户统计文件总数"""
         return self._db_conn.execute(
-            "SELECT COUNT(DISTINCT file_hash) FROM chunks WHERE status='active' AND tenant_id=?",
-            (tenant_id,)
+            "SELECT COUNT(DISTINCT file_hash) FROM chunks WHERE status='active' AND tenant_id=?", (tenant_id,)
         ).fetchone()[0]
 
     def get_by_hash(self, file_hash: str) -> List[Dict]:
@@ -466,8 +515,7 @@ class MemoryStore:
         self._check_connection()
         # Try exact match first
         rows = self._db_conn.execute(
-            "SELECT id, doc FROM chunks WHERE file_hash=? AND status='active' ORDER BY chunk_index",
-            (file_hash,)
+            "SELECT id, doc FROM chunks WHERE file_hash=? AND status='active' ORDER BY chunk_index", (file_hash,)
         ).fetchall()
 
         # Try short hash prefix if no exact match
@@ -475,7 +523,7 @@ class MemoryStore:
             short = file_hash[:16]
             rows = self._db_conn.execute(
                 "SELECT id, doc FROM chunks WHERE file_hash LIKE ? AND status='active' ORDER BY chunk_index",
-                (short + '%',)
+                (short + "%",),
             ).fetchall()
 
         result = [self._row_to_chunk(r) for r in rows]
@@ -490,8 +538,7 @@ class MemoryStore:
 
         self._check_connection()
         rows = self._db_conn.execute(
-            "SELECT id, doc FROM chunks WHERE file_name=? AND status='active' ORDER BY chunk_index",
-            (file_name,)
+            "SELECT id, doc FROM chunks WHERE file_name=? AND status='active' ORDER BY chunk_index", (file_name,)
         ).fetchall()
 
         result = [self._row_to_chunk(r) for r in rows]
@@ -502,8 +549,7 @@ class MemoryStore:
         """删除指定 file_hash 的所有 chunk"""
         with self._db_conn:
             cur = self._db_conn.execute(
-                "UPDATE chunks SET status='deleted' WHERE file_hash=? AND status='active'",
-                (file_hash,)
+                "UPDATE chunks SET status='deleted' WHERE file_hash=? AND status='active'", (file_hash,)
             )
             deleted = cur.rowcount
         self._invalidate_cache(file_hash=file_hash)
@@ -514,8 +560,7 @@ class MemoryStore:
         """按文件名标记删除"""
         with self._db_conn:
             cur = self._db_conn.execute(
-                "UPDATE chunks SET status='deleted' WHERE file_name=? AND status='active'",
-                (file_name,)
+                "UPDATE chunks SET status='deleted' WHERE file_name=? AND status='active'", (file_name,)
             )
             invalidated = cur.rowcount
         self._invalidate_cache(key=file_name)
@@ -542,7 +587,7 @@ class MemoryStore:
                         chunk.get("created_at", ""),
                         chunk.get("loader_path", ""),
                         tenant_id,
-                    )
+                    ),
                 )
                 return cur.lastrowid
 
@@ -554,22 +599,24 @@ class MemoryStore:
         rows = []
         for c in chunks:
             tenant_id = c.get("tenant_id", "default")
-            rows.append((
-                json.dumps(c, ensure_ascii=False),
-                c.get("file_hash", ""),
-                c.get("file_name", ""),
-                c.get("category", ""),
-                c.get("chunk_index", 0),
-                "active",
-                c.get("created_at", ""),
-                c.get("loader_path", ""),
-                tenant_id,
-            ))
+            rows.append(
+                (
+                    json.dumps(c, ensure_ascii=False),
+                    c.get("file_hash", ""),
+                    c.get("file_name", ""),
+                    c.get("category", ""),
+                    c.get("chunk_index", 0),
+                    "active",
+                    c.get("created_at", ""),
+                    c.get("loader_path", ""),
+                    tenant_id,
+                )
+            )
         with self._write_lock:
             with self._db_conn:
                 self._db_conn.executemany(
                     "INSERT INTO chunks (doc, file_hash, file_name, category, chunk_index, status, created_at, loader_path, tenant_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    rows
+                    rows,
                 )
         return len(rows)
 
@@ -590,14 +637,17 @@ class MemoryStore:
             return self._files_cache
 
         if tenant_id:
-            rows = self._db_conn.execute("""
+            rows = self._db_conn.execute(
+                """
                 SELECT file_hash, file_name, category,
                        COUNT(*) as chunk_count,
                        MIN(created_at) as created_at
                 FROM chunks WHERE status='active' AND tenant_id=?
                 GROUP BY file_hash
                 ORDER BY created_at DESC
-            """, (tenant_id,)).fetchall()
+            """,
+                (tenant_id,),
+            ).fetchall()
         else:
             rows = self._db_conn.execute("""
                 SELECT file_hash, file_name, category,
@@ -610,13 +660,15 @@ class MemoryStore:
 
         result = []
         for r in rows:
-            result.append({
-                "file_hash": r[0],
-                "file_name": r[1],
-                "category": r[2],
-                "chunk_count": r[3],
-                "created_at": r[4],
-            })
+            result.append(
+                {
+                    "file_hash": r[0],
+                    "file_name": r[1],
+                    "category": r[2],
+                    "chunk_count": r[3],
+                    "created_at": r[4],
+                }
+            )
         self._files_cache = result
         return result
 
@@ -627,16 +679,21 @@ class MemoryStore:
         v1.44 Phase 1: 多租户 — 自动附加 tenant_id
         """
         import json as _json
+
         # 将 embedding (List[float]) 序列化为 BLOB
         embedding_blob = None
         if event_data.get("embedding"):
             import struct
+
             emb = event_data["embedding"]
             if isinstance(emb, list) and len(emb) > 0:
                 try:
-                    embedding_blob = struct.pack(f'{len(emb)}f', *emb)
-                except Exception:  # TODO: Narrow exception type
-                    embedding_blob = _json.dumps(emb).encode('utf-8')
+                    embedding_blob = struct.pack(f"{len(emb)}f", *emb)
+                except (struct.error, TypeError) as e:
+                    # struct.error - embedding 数据格式不支持 pack
+                    # TypeError - embedding 不是有效的浮点数列表
+                    logger.debug(f"[MemoryStore] embedding 序列化降级 JSON: {e}")
+                    embedding_blob = _json.dumps(emb).encode("utf-8")
 
         tenant_id = event_data.get("tenant_id", "default")
 
@@ -666,7 +723,7 @@ class MemoryStore:
                     embedding_blob,
                     event_data.get("status", "active"),
                     tenant_id,
-                )
+                ),
             )
             return cur.lastrowid
 
@@ -675,6 +732,7 @@ class MemoryStore:
         v1.44 Phase 1: 多租户 — 自动附加 tenant_id
         """
         import json as _json
+
         tenant_id = entity_data.get("tenant_id", "default")
         with self._db_conn:
             cur = self._db_conn.execute(
@@ -697,7 +755,7 @@ class MemoryStore:
                     entity_data.get("mentions", 1),
                     entity_data.get("status", "active"),
                     tenant_id,
-                )
+                ),
             )
             return cur.lastrowid
 
@@ -705,12 +763,9 @@ class MemoryStore:
         """按 chunk_id 查询 events"""
         try:
             rows = self._db_conn.execute(
-                "SELECT * FROM events WHERE chunk_id=? AND status='active'",
-                (chunk_id,)
+                "SELECT * FROM events WHERE chunk_id=? AND status='active'", (chunk_id,)
             ).fetchall()
-            cols = [desc[0] for desc in self._db_conn.execute(
-                "SELECT * FROM events LIMIT 0"
-            ).description]
+            cols = [desc[0] for desc in self._db_conn.execute("SELECT * FROM events LIMIT 0").description]
             return [dict(zip(cols, row)) for row in rows]
         except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[MemoryStore] get_events_by_chunk_id failed: {e}")
@@ -719,13 +774,8 @@ class MemoryStore:
     def get_entities_by_name(self, name: str) -> list:
         """按名称查询 entities"""
         try:
-            rows = self._db_conn.execute(
-                "SELECT * FROM entities WHERE name=? AND status='active'",
-                (name,)
-            ).fetchall()
-            cols = [desc[0] for desc in self._db_conn.execute(
-                "SELECT * FROM entities LIMIT 0"
-            ).description]
+            rows = self._db_conn.execute("SELECT * FROM entities WHERE name=? AND status='active'", (name,)).fetchall()
+            cols = [desc[0] for desc in self._db_conn.execute("SELECT * FROM entities LIMIT 0").description]
             return [dict(zip(cols, row)) for row in rows]
         except Exception as e:  # TODO: Narrow exception type
             logger.warning(f"[MemoryStore] get_entities_by_name failed: {e}")
@@ -734,19 +784,15 @@ class MemoryStore:
     def get_entity_count(self) -> int:
         """返回活跃 entity 总数"""
         try:
-            return self._db_conn.execute(
-                "SELECT COUNT(*) FROM entities WHERE status='active'"
-            ).fetchone()[0]
-        except Exception:  # TODO: Narrow exception type
+            return self._db_conn.execute("SELECT COUNT(*) FROM entities WHERE status='active'").fetchone()[0]
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             return 0
 
     def get_event_count(self) -> int:
         """返回活跃 event 总数"""
         try:
-            return self._db_conn.execute(
-                "SELECT COUNT(*) FROM events WHERE status='active'"
-            ).fetchone()[0]
-        except Exception:  # TODO: Narrow exception type
+            return self._db_conn.execute("SELECT COUNT(*) FROM events WHERE status='active'").fetchone()[0]
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             return 0
 
     def get_chunks_batch(self, chunk_ids: List[str]) -> Dict[str, dict]:
@@ -803,7 +849,7 @@ class MemoryStore:
 
         return result
 
-    def _json_cache_put(self, key: str, value: dict):
+    def _json_cache_put(self, key: str, value: dict) -> Any:
         """写入 JSON 解析缓存"""
         if len(self._json_cache) >= self._json_cache_max:
             self._json_cache.popitem(last=False)
@@ -815,18 +861,15 @@ class MemoryStore:
         v1.44 Phase 1: 多租户 — 按 tenant_id 过滤
         """
         try:
-            cols = [desc[0] for desc in self._db_conn.execute(
-                "SELECT * FROM events LIMIT 0"
-            ).description]
+            cols = [desc[0] for desc in self._db_conn.execute("SELECT * FROM events LIMIT 0").description]
             if limit is not None:
                 rows = self._db_conn.execute(
                     "SELECT * FROM events WHERE status='active' AND tenant_id=? ORDER BY id LIMIT ? OFFSET ?",
-                    (tenant_id, limit, offset)
+                    (tenant_id, limit, offset),
                 ).fetchall()
             else:
                 rows = self._db_conn.execute(
-                    "SELECT * FROM events WHERE status='active' AND tenant_id=? ORDER BY id",
-                    (tenant_id,)
+                    "SELECT * FROM events WHERE status='active' AND tenant_id=? ORDER BY id", (tenant_id,)
                 ).fetchall()
             return [dict(zip(cols, row)) for row in rows]
         except Exception as e:  # TODO: Narrow exception type
@@ -838,18 +881,15 @@ class MemoryStore:
         v1.44 Phase 1: 多租户 — 按 tenant_id 过滤
         """
         try:
-            cols = [desc[0] for desc in self._db_conn.execute(
-                "SELECT * FROM entities LIMIT 0"
-            ).description]
+            cols = [desc[0] for desc in self._db_conn.execute("SELECT * FROM entities LIMIT 0").description]
             if limit is not None:
                 rows = self._db_conn.execute(
                     "SELECT * FROM entities WHERE status='active' AND tenant_id=? ORDER BY id LIMIT ? OFFSET ?",
-                    (tenant_id, limit, offset)
+                    (tenant_id, limit, offset),
                 ).fetchall()
             else:
                 rows = self._db_conn.execute(
-                    "SELECT * FROM entities WHERE status='active' AND tenant_id=? ORDER BY id",
-                    (tenant_id,)
+                    "SELECT * FROM entities WHERE status='active' AND tenant_id=? ORDER BY id", (tenant_id,)
                 ).fetchall()
             return [dict(zip(cols, row)) for row in rows]
         except Exception as e:  # TODO: Narrow exception type
@@ -871,33 +911,36 @@ class MemoryStore:
             """)
             self._db_conn.execute(
                 "INSERT INTO qa_pairs (question, source_chunk_id, qa_index) VALUES (?, ?, ?)",
-                (question, source_chunk_id, qa_index)
+                (question, source_chunk_id, qa_index),
             )
             self._db_conn.commit()
-        except Exception as e:  # TODO: Narrow exception type
+        except (sqlite3.DatabaseError, sqlite3.OperationalError) as e:
+            # DatabaseError - 表操作失败
+            # OperationalError - 数据库连接问题
             logger.error(f"[MemoryStore] add_qa_pair failed: {e}")
 
     def search_qa_pairs(self, query: str, top_k: int = 3) -> list:
         """搜索 QA 对（简单 LIKE 匹配）"""
         try:
             rows = self._db_conn.execute(
-                "SELECT question, source_chunk_id FROM qa_pairs WHERE question LIKE ? LIMIT ?",
-                (f'%{query}%', top_k)
+                "SELECT question, source_chunk_id FROM qa_pairs WHERE question LIKE ? LIMIT ?", (f"%{query}%", top_k)
             ).fetchall()
             return [{"question": r[0], "source_chunk_id": r[1]} for r in rows]
-        except Exception as e:  # TODO: Narrow exception type
+        except (sqlite3.DatabaseError, sqlite3.OperationalError) as e:
+            # DatabaseError - 查询失败
+            # OperationalError - 数据库连接问题
             logger.warning(f"[MemoryStore] search_qa_pairs failed: {e}")
             return []
 
     # ===== Compatibility aliases =====
     @property
-    def _chunks(self):
+    def _chunks(self) -> Any:
         """Compatibility: return all chunks as list (USE SPARINGLY, loads all)"""
         logger.warning("[MemoryStore] _chunks property called - this loads all data! Use get_all(limit=) instead.")
         return self.get_all()
 
     @property
-    def _by_hash(self):
+    def _by_hash(self) -> Any:
         """Compatibility: return hash index (USE SPARINGLY)"""
         logger.warning("[MemoryStore] _by_hash property called - use get_by_hash() instead.")
         result = {}
@@ -911,7 +954,7 @@ class MemoryStore:
         return result
 
     @property
-    def _files(self):
+    def _files(self) -> Any:
         """Compatibility: return files dict"""
         result = {}
         for f in self.get_files_summary():
@@ -920,17 +963,17 @@ class MemoryStore:
 
     @property
     # DEPRECATED: 未使用，v1.50 标记待删除
-    def _inverted(self):
+    def _inverted(self) -> Any:
         """Compatibility: return empty dict (inverted index not needed for compat)"""
         return {}
 
     # DEPRECATED: 未使用，v1.50 标记待删除
     @property
-    def _loaded(self):
+    def _loaded(self) -> Any:
         """Compatibility: always True (no loading phase needed)"""
         return True
 
-    def _load(self):
+    def _load(self) -> Any:
         """Compatibility: no-op (data is in SQLite)"""
         pass
 
@@ -940,15 +983,16 @@ class MemoryStore:
             "total_chunks": self.total_chunks,
             "total_files": self.total_files,
         }
-# DEPRECATED: 未使用，v1.50 标记待删除
+
+    # DEPRECATED: 未使用，v1.50 标记待删除
 
     @property
-    def _db_conn_public(self):
+    def _db_conn_public(self) -> Any:
         # DEPRECATED: 未使用，v1.50 标记待删除
         """Compatibility alias"""
         return self._db_conn
 
-    def _save_to_db(self, row_id: int, c: dict):
+    def _save_to_db(self, row_id: int, c: dict) -> Any:
         """Update a chunk in DB"""
         with self._db_conn:
             self._db_conn.execute(
@@ -962,11 +1006,13 @@ class MemoryStore:
                     c.get("status", "active"),
                     c.get("loader_path", ""),
                     row_id,
-                )
+                ),
             )
+
 
 # Singleton
 _store: Optional[MemoryStore] = None
+
 
 def get_store() -> MemoryStore:
     global _store

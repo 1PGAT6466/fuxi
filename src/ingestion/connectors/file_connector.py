@@ -4,6 +4,7 @@ file_connector.py — 文件系统连接器
 支持从本地文件系统批量读取文件内容。
 支持格式：.txt, .md, .json, .csv, .yaml/.yml, .html, .pdf, .docx, .xlsx
 """
+
 import csv
 import json
 import logging
@@ -12,14 +13,14 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from .base import (
-    DataSource,
-    ConnectorConfig,
-    UnifiedDocument,
-    SourceType,
-    ConnectorStatus,
     ConnectionError,
+    ConnectorConfig,
+    ConnectorStatus,
+    DataSource,
     FetchError,
+    SourceType,
     TransformError,
+    UnifiedDocument,
 )
 
 logger = logging.getLogger(__name__)
@@ -54,10 +55,34 @@ class FileConnector(DataSource):
     """
 
     # 支持的文件格式及其处理方法
-    _TEXT_EXTENSIONS = {".txt", ".md", ".rst", ".log", ".py", ".js", ".ts",
-                        ".java", ".go", ".rs", ".cpp", ".c", ".h", ".css",
-                        ".html", ".htm", ".xml", ".yaml", ".yml", ".toml",
-                        ".ini", ".cfg", ".conf", ".sh", ".bat", ".sql"}
+    _TEXT_EXTENSIONS = {
+        ".txt",
+        ".md",
+        ".rst",
+        ".log",
+        ".py",
+        ".js",
+        ".ts",
+        ".java",
+        ".go",
+        ".rs",
+        ".cpp",
+        ".c",
+        ".h",
+        ".css",
+        ".html",
+        ".htm",
+        ".xml",
+        ".yaml",
+        ".yml",
+        ".toml",
+        ".ini",
+        ".cfg",
+        ".conf",
+        ".sh",
+        ".bat",
+        ".sql",
+    }
     _STRUCTURED_EXTENSIONS = {".json", ".csv"}
     _BINARY_EXTENSIONS = {".pdf", ".docx", ".xlsx", ".pptx", ".doc"}
 
@@ -86,21 +111,12 @@ class FileConnector(DataSource):
             self._root_path = Path(root).resolve()
 
             if not self._root_path.exists():
-                raise ConnectionError(
-                    self.name,
-                    f"路径不存在: {self._root_path}"
-                )
+                raise ConnectionError(self.name, f"路径不存在: {self._root_path}")
 
             if self._root_path.is_file():
-                logger.info(
-                    "[%s] 文件路径就绪: %s",
-                    self.name, self._root_path.name
-                )
+                logger.info("[%s] 文件路径就绪: %s", self.name, self._root_path.name)
             else:
-                logger.info(
-                    "[%s] 目录路径就绪: %s",
-                    self.name, str(self._root_path)
-                )
+                logger.info("[%s] 目录路径就绪: %s", self.name, str(self._root_path))
 
             self._set_status(ConnectorStatus.CONNECTED)
             return True
@@ -130,38 +146,26 @@ class FileConnector(DataSource):
         Raises:
             FetchError: 扫描失败时抛出
         """
-        root_path = Path(kwargs.get(
-            "root_path",
-            self.config.extra["root_path"]
-        )).resolve()
-        patterns = kwargs.get(
-            "patterns",
-            self.config.extra.get("patterns", ["*"])
-        )
-        recursive = kwargs.get(
-            "recursive",
-            self.config.extra.get("recursive", True)
-        )
-        max_files = kwargs.get(
-            "max_files",
-            self.config.extra.get("max_files", 10000)
-        )
+        root_path = Path(kwargs.get("root_path", self.config.extra["root_path"])).resolve()
+        patterns = kwargs.get("patterns", self.config.extra.get("patterns", ["*"]))
+        recursive = kwargs.get("recursive", self.config.extra.get("recursive", True))
+        max_files = kwargs.get("max_files", self.config.extra.get("max_files", 10000))
 
         try:
             files = []
-            max_size = self.config.extra.get(
-                "max_file_size_mb", 100
-            ) * 1024 * 1024
+            max_size = self.config.extra.get("max_file_size_mb", 100) * 1024 * 1024
 
             if root_path.is_file():
                 # 单文件模式
                 stat = root_path.stat()
-                files.append({
-                    "path": str(root_path),
-                    "name": root_path.name,
-                    "size": stat.st_size,
-                    "ext": root_path.suffix.lower(),
-                })
+                files.append(
+                    {
+                        "path": str(root_path),
+                        "name": root_path.name,
+                        "size": stat.st_size,
+                        "ext": root_path.suffix.lower(),
+                    }
+                )
             else:
                 # 目录模式
                 for pattern in patterns:
@@ -176,29 +180,29 @@ class FileConnector(DataSource):
                         if file_path.stat().st_size > max_size:
                             logger.warning(
                                 "[%s] 跳过超大文件: %s (%.1f MB)",
-                                self.name, file_path.name,
-                                file_path.stat().st_size / 1024 / 1024
+                                self.name,
+                                file_path.name,
+                                file_path.stat().st_size / 1024 / 1024,
                             )
                             continue
                         if len(files) >= max_files:
                             break
 
-                        files.append({
-                            "path": str(file_path),
-                            "name": file_path.name,
-                            "size": file_path.stat().st_size,
-                            "ext": file_path.suffix.lower(),
-                            "mtime": file_path.stat().st_mtime,
-                        })
+                        files.append(
+                            {
+                                "path": str(file_path),
+                                "name": file_path.name,
+                                "size": file_path.stat().st_size,
+                                "ext": file_path.suffix.lower(),
+                                "mtime": file_path.stat().st_mtime,
+                            }
+                        )
 
                     if len(files) >= max_files:
                         break
 
             self._files_found = len(files)
-            logger.info(
-                "[%s] 扫描完成: 找到 %d 个文件",
-                self.name, self._files_found
-            )
+            logger.info("[%s] 扫描完成: 找到 %d 个文件", self.name, self._files_found)
             return files
 
         except Exception as e:
@@ -239,16 +243,15 @@ class FileConnector(DataSource):
                 else:
                     self._files_failed += 1
             except Exception as e:
-                logger.warning(
-                    "[%s] 处理文件失败 %s: %s",
-                    self.name, file_info["name"], str(e)
-                )
+                logger.warning("[%s] 处理文件失败 %s: %s", self.name, file_info["name"], str(e))
                 self._files_failed += 1
 
         logger.info(
             "[%s] 转换完成: %d 成功, %d 失败 → %d 个文档",
-            self.name, self._files_processed,
-            self._files_failed, len(documents)
+            self.name,
+            self._files_processed,
+            self._files_failed,
+            len(documents),
         )
         return documents
 
@@ -276,10 +279,7 @@ class FileConnector(DataSource):
             try:
                 content = await self._read_text_file(file_path)
             except UnicodeDecodeError:
-                logger.warning(
-                    "[%s] 无法读取文件（非文本或编码不支持）: %s",
-                    self.name, file_path.name
-                )
+                logger.warning("[%s] 无法读取文件（非文本或编码不支持）: %s", self.name, file_path.name)
                 return None
 
         if not content or len(content.strip()) < 5:
@@ -350,12 +350,7 @@ class FileConnector(DataSource):
                     with open(path, "r", encoding=encoding, newline="") as f:
                         reader = csv.DictReader(f)
                         for row in reader:
-                            lines.append(
-                                " | ".join(
-                                    f"{k}: {v}"
-                                    for k, v in row.items()
-                                )
-                            )
+                            lines.append(" | ".join(f"{k}: {v}" for k, v in row.items()))
                     break
                 except (UnicodeDecodeError, csv.Error):
                     continue
@@ -368,6 +363,7 @@ class FileConnector(DataSource):
         """读取 PDF 文件文本"""
         try:
             import PyPDF2
+
             text_parts = []
             with open(path, "rb") as f:
                 reader = PyPDF2.PdfReader(f)
@@ -377,67 +373,48 @@ class FileConnector(DataSource):
                         text_parts.append(text)
             return "\n\n".join(text_parts)
         except ImportError:
-            logger.warning(
-                "[%s] 缺少 PyPDF2 依赖，跳过 PDF: %s",
-                self.name, path.name
-            )
+            logger.warning("[%s] 缺少 PyPDF2 依赖，跳过 PDF: %s", self.name, path.name)
             return ""
         except Exception as e:
-            logger.warning(
-                "[%s] PDF 读取失败 %s: %s",
-                self.name, path.name, str(e)
-            )
+            logger.warning("[%s] PDF 读取失败 %s: %s", self.name, path.name, str(e))
             return ""
 
     async def _read_docx_file(self, path: Path) -> str:
         """读取 DOCX 文件文本"""
         try:
             import docx
+
             doc = docx.Document(str(path))
             paragraphs = [p.text for p in doc.paragraphs if p.text.strip()]
             return "\n".join(paragraphs)
         except ImportError:
-            logger.warning(
-                "[%s] 缺少 python-docx 依赖，跳过 DOCX: %s",
-                self.name, path.name
-            )
+            logger.warning("[%s] 缺少 python-docx 依赖，跳过 DOCX: %s", self.name, path.name)
             return ""
         except Exception as e:
-            logger.warning(
-                "[%s] DOCX 读取失败 %s: %s",
-                self.name, path.name, str(e)
-            )
+            logger.warning("[%s] DOCX 读取失败 %s: %s", self.name, path.name, str(e))
             return ""
 
     async def _read_xlsx_file(self, path: Path) -> str:
         """读取 XLSX 文件文本"""
         try:
             import openpyxl
+
             wb = openpyxl.load_workbook(str(path), read_only=True, data_only=True)
             text_parts = []
             for sheet_name in wb.sheetnames:
                 ws = wb[sheet_name]
                 text_parts.append(f"=== Sheet: {sheet_name} ===")
                 for row in ws.iter_rows(values_only=True):
-                    row_text = "\t".join(
-                        str(cell) if cell is not None else ""
-                        for cell in row
-                    )
+                    row_text = "\t".join(str(cell) if cell is not None else "" for cell in row)
                     if row_text.strip():
                         text_parts.append(row_text)
             wb.close()
             return "\n".join(text_parts[:5000])
         except ImportError:
-            logger.warning(
-                "[%s] 缺少 openpyxl 依赖，跳过 XLSX: %s",
-                self.name, path.name
-            )
+            logger.warning("[%s] 缺少 openpyxl 依赖，跳过 XLSX: %s", self.name, path.name)
             return ""
         except Exception as e:
-            logger.warning(
-                "[%s] XLSX 读取失败 %s: %s",
-                self.name, path.name, str(e)
-            )
+            logger.warning("[%s] XLSX 读取失败 %s: %s", self.name, path.name, str(e))
             return ""
 
     async def disconnect(self) -> None:
@@ -448,11 +425,13 @@ class FileConnector(DataSource):
     @property
     def stats(self) -> Dict[str, Any]:
         base_stats = super().stats
-        base_stats.update({
-            "files_found": self._files_found,
-            "files_processed": self._files_processed,
-            "files_failed": self._files_failed,
-        })
+        base_stats.update(
+            {
+                "files_found": self._files_found,
+                "files_processed": self._files_processed,
+                "files_failed": self._files_failed,
+            }
+        )
         return base_stats
 
     async def __aenter__(self):

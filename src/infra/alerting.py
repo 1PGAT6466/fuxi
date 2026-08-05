@@ -2,10 +2,11 @@
 alerting.py — 监控告警
 关键指标监控 + 告警阈值
 """
+
 import logging
 import time
-from typing import Dict, List, Optional
 from dataclasses import dataclass, field
+from typing import Dict, List, Optional
 
 try:
     import aiohttp
@@ -18,6 +19,7 @@ logger = logging.getLogger("infra.alerting")
 @dataclass
 class Alert:
     """告警"""
+
     level: str  # critical / warning / info
     symbol: str
     metric: str
@@ -51,6 +53,7 @@ class AlertManager:
     def __init__(self):
         self._alerts: List[Alert] = []
         self._max_alerts = 1000
+
     # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def check_metrics(self, metrics: Dict) -> List[Alert]:
@@ -88,7 +91,7 @@ class AlertManager:
 
         # 限制告警数量
         if len(self._alerts) > self._max_alerts:
-            self._alerts = self._alerts[-self._max_alerts:]
+            self._alerts = self._alerts[-self._max_alerts :]
 
         return new_alerts
 
@@ -131,6 +134,7 @@ def get_alert_manager() -> AlertManager:
 # v2.1: Webhook 告警发送（兼容 test_infra_components.py）
 # ---------------------------------------------------------------------------
 
+
 def _build_dingtalk_body(title: str, content: str, level: str = "info") -> Dict:
     """构建钉钉机器人 Markdown 消息体"""
     level_emoji = {"critical": "🔴", "warning": "🟡", "info": "🔵"}
@@ -139,8 +143,8 @@ def _build_dingtalk_body(title: str, content: str, level: str = "info") -> Dict:
         "msgtype": "markdown",
         "markdown": {
             "title": f"{emoji} [{level.upper()}] {title}",
-            "text": f"## {emoji} {title}\n\n{content}\n\n---\n> 告警级别: {level.upper()}"
-        }
+            "text": f"## {emoji} {title}\n\n{content}\n\n---\n> 告警级别: {level.upper()}",
+        },
     }
 
 
@@ -151,14 +155,9 @@ def _build_feishu_body(title: str, content: str, level: str = "info") -> Dict:
     return {
         "msg_type": "interactive",
         "card": {
-            "header": {
-                "title": {"content": f"[{level.upper()}] {title}", "tag": "plain_text"},
-                "template": template
-            },
-            "elements": [
-                {"tag": "div", "text": {"tag": "plain_text", "content": content}}
-            ]
-        }
+            "header": {"title": {"content": f"[{level.upper()}] {title}", "tag": "plain_text"}, "template": template},
+            "elements": [{"tag": "div", "text": {"tag": "plain_text", "content": content}}],
+        },
     }
 
 
@@ -191,6 +190,7 @@ async def send_webhook(url: str, title: str, message: str, level: str = "info") 
 async def send_alert(title: str, message: str, level: str = "warning") -> bool:
     """发送告警到所有配置的 Webhook 地址"""
     import os
+
     urls = []
     dt_url = os.environ.get("DINGTALK_WEBHOOK_URL", "")
     fs_url = os.environ.get("FEISHU_WEBHOOK_URL", "")

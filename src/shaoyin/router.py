@@ -2,8 +2,9 @@
 router.py — 少阴·意图路由
 route_query
 """
-import re
+
 import logging
+import re
 from typing import Tuple
 
 logger = logging.getLogger("shaoyin.router")

@@ -86,11 +86,24 @@ const SymbolsView = () => import('@/views/admin/SymbolsView.vue');
 const GrowthView = () => import('@/views/admin/GrowthView.vue');
 const FeedbackView = () => import('@/views/admin/FeedbackView.vue');
 
+// 安全加固 — 知识审批与回滚
+const KnowledgeApprovalView = () => import('@/views/admin/KnowledgeApprovalView.vue');
+const KnowledgeRollbackView = () => import('@/views/admin/KnowledgeRollbackView.vue');
+
 // 管理
 const AdminView = () => import('@/views/Admin.vue');
 
 // Phase 5 — API Key 管理
 const ApiKeyManager = () => import('@/services/api-keys/ApiKeyManager.vue');
+
+// Phase 4 — 自运转中心
+const OpsDashboardView = () => import('@/views/ops/OpsDashboardView.vue');
+const PluginSourceView = () => import('@/views/ops/PluginSourceView.vue');
+const MonitoringView = () => import('@/views/ops/MonitoringView.vue');
+const TaskCenterView = () => import('@/views/ops/TaskCenterView.vue');
+const ReportCenterView = () => import('@/views/ops/ReportCenterView.vue');
+const ConfigCenterView = () => import('@/views/ops/ConfigCenterView.vue');
+const AutonomousView = () => import('@/views/ops/AutonomousView.vue');
 
 // Phase 6 — 开发者门户
 const DeveloperPortal = () => import('@/services/developer-portal/DeveloperPortal.vue');
@@ -244,8 +257,8 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'profile',
         name: 'Profile',
-        component: () => import('@/views/Placeholder.vue'),
-        meta: { title: '个人中心（建设中）' },
+        component: () => import('@/views/ProfileView.vue'),
+        meta: { title: '个人中心' },
       },
       {
         path: 'about',
@@ -256,8 +269,8 @@ const routes: RouteRecordRaw[] = [
       {
         path: 'settings',
         name: 'Settings',
-        component: () => import('@/views/Placeholder.vue'),
-        meta: { title: '设置（建设中）' },
+        component: () => import('@/views/SettingsView.vue'),
+        meta: { title: '设置' },
       },
 
       // ─── DXF 查看器 ───
@@ -303,6 +316,68 @@ const routes: RouteRecordRaw[] = [
         name: 'PersonalFavorites',
         component: () => import('@/services/favorites/FavoritesPanel.vue'),
         meta: { title: '收藏夹' },
+      },
+
+      // ─── 自运转中心 ───
+      {
+        path: 'ops/dashboard',
+        name: 'OpsDashboard',
+        component: OpsDashboardView,
+        meta: { requiresAdmin: true, title: '运维仪表板' },
+      },
+      {
+        path: 'ops/plugins',
+        name: 'OpsPlugins',
+        component: PluginSourceView,
+        meta: { requiresAdmin: true, title: '插件源管理' },
+      },
+      {
+        path: 'ops/plugin-manager',
+        name: 'PluginManager',
+        component: () => import('@/views/ops/PluginManagerView.vue'),
+        meta: { requiresAdmin: true, title: '插件管理中心' },
+      },
+      {
+        path: 'ops/plugin-function/:pluginName',
+        name: 'PluginFunction',
+        component: () => import('@/views/ops/PluginFunctionView.vue'),
+        meta: { requiresAdmin: true, title: '插件功能' },
+      },
+      {
+        path: 'ops/modules',
+        name: 'ModulesCenter',
+        component: () => import('@/views/ops/ModulesView.vue'),
+        meta: { requiresAdmin: true, title: '功能模块中心' },
+      },
+      {
+        path: 'ops/monitoring',
+        name: 'OpsMonitoring',
+        component: MonitoringView,
+        meta: { requiresAdmin: true, title: '监控中心' },
+      },
+      {
+        path: 'ops/tasks',
+        name: 'OpsTasks',
+        component: TaskCenterView,
+        meta: { requiresAdmin: true, title: '任务中心' },
+      },
+      {
+        path: 'ops/reports',
+        name: 'OpsReports',
+        component: ReportCenterView,
+        meta: { requiresAdmin: true, title: '报告中心' },
+      },
+      {
+        path: 'ops/config',
+        name: 'OpsConfig',
+        component: ConfigCenterView,
+        meta: { requiresAdmin: true, title: '配置中心' },
+      },
+      {
+        path: 'ops/autonomous',
+        name: 'OpsAutonomous',
+        component: AutonomousView,
+        meta: { requiresAdmin: true, title: '自主运行中心' },
       },
 
       // ─── 管理中心 ───
@@ -359,6 +434,18 @@ const routes: RouteRecordRaw[] = [
         name: 'AdminFeedback',
         component: FeedbackView,
         meta: { requiresAdmin: true, title: '用户反馈' },
+      },
+      {
+        path: 'admin/knowledge-approval',
+        name: 'AdminKnowledgeApproval',
+        component: KnowledgeApprovalView,
+        meta: { requiresAdmin: true, title: '知识审批' },
+      },
+      {
+        path: 'admin/knowledge-rollback',
+        name: 'AdminKnowledgeRollback',
+        component: KnowledgeRollbackView,
+        meta: { requiresAdmin: true, title: '知识回滚' },
       },
       {
         path: 'admin/api-keys',

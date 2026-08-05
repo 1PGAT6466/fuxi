@@ -209,7 +209,7 @@ async def log_feedback_unified(user_id: str, query: str, action: str,
     # 2. 写入反馈缓冲区（P1: 批量缓冲替代直接写入）
     try:
         _add_to_write_buffer(user_id, query, action, results, metadata, now)
-    except Exception:
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
         logger.warning("添加反馈到缓冲区失败", exc_info=True)
 
     # 3. 积累学习 buffer
@@ -269,7 +269,7 @@ async def _maybe_learn_batch():
         logger.info(f"[反馈闭环] 学习完成: {len(batch)} 条反馈")
     except ImportError:
         logger.debug("[反馈闭环] learner 模块不存在，跳过批量学习")
-    except Exception:  # TODO: Narrow exception type
+    except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.warning("[反馈闭环] 学习失败", exc_info=True)
         # 失败时放回 buffer（最多重试 MAX_RETRY 次）
         for item in batch:

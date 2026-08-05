@@ -32,7 +32,6 @@
       return paginated(items=[...], total=100, page=1, page_size=20)
 """
 
-
 import functools
 import logging
 from typing import Any, Dict, List, Optional
@@ -40,10 +39,42 @@ from typing import Any, Dict, List, Optional
 from fastapi import Request
 from fastapi.responses import JSONResponse
 
+
+# 强制 UTF-8 编码
+class UTF8JSONResponse(JSONResponse):
+    """强制 UTF-8 编码的 JSON 响应"""
+
+    def render(self, content: any) -> bytes:
+        import json
+        import math
+
+        # 处理 NaN 和 Inf 值
+        def handle_nan(obj):
+            if isinstance(obj, float) and (math.isnan(obj) or math.isinf(obj)):
+                return 0.0
+            elif isinstance(obj, dict):
+                return {k: handle_nan(v) for k, v in obj.items()}
+            elif isinstance(obj, list):
+                return [handle_nan(item) for item in obj]
+            return obj
+
+        # 处理内容中的 NaN 值
+        content = handle_nan(content)
+
+        return json.dumps(
+            content,
+            ensure_ascii=False,
+            allow_nan=False,
+            indent=None,
+            separators=(",", ":"),
+        ).encode("utf-8")
+
+
 logger = logging.getLogger("api.response")
 
 # v1.50 R5: 生产环境控制 — 隐藏内部错误详情
 import os as _os
+
 _IS_PRODUCTION = _os.getenv("FUXI_ENV", "production").lower() == "production"
 
 # —— 公共常量 ——
@@ -51,6 +82,7 @@ STATUS_SUCCESS = "success"
 STATUS_ERROR = "error"
 
 # —— 核心响应函数 ——
+
 
 def success(
     data: Any = None,
@@ -86,7 +118,7 @@ def success(
             if k not in ("status", "message", "data"):
                 body[k] = v
 
-    return JSONResponse(content=body, status_code=status_code)
+    return UTF8JSONResponse(content=body, status_code=status_code)
 
 
 def paginated(
@@ -188,7 +220,7 @@ def error(
             if k not in ("status", "message", "detail", "data"):
                 body[k] = v
 
-    return JSONResponse(content=body, status_code=status_code)
+    return UTF8JSONResponse(content=body, status_code=status_code)
 
 
 # —— 向后兼容装饰器 ——
@@ -197,6 +229,7 @@ def error(
 #   - 默认行为: 保持现有格式不变 (前端的 api-client.js 期待直接访问 d.answer / d.results 等顶层字段)
 #   - 调用方可通过 ?format=v2 参数或 X-API-Format: v2 请求头明确切换到新格式
 #   - 第二步迁移时再统一切到新格式
+
 
 def _client_wants_v2(request: Optional[Request]) -> bool:
     """检测客户端是否请求 v2 格式"""
@@ -232,6 +265,7 @@ def backward_compatible(
 
     如果函数返回 JSONResponse, 则原样返回。
     """
+
     def decorator(func):
         @functools.wraps(func)
         async def wrapper(*args, **kwargs):
@@ -249,7 +283,7 @@ def backward_compatible(
 
             try:
                 result = await func(*args, **kwargs)
-            except Exception:  # TODO: Narrow exception type
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
                 raise
 
             # 如果已经是 JSONResponse，直接返回
@@ -266,10 +300,12 @@ def backward_compatible(
             return success(result, message=wrap_message)
 
         return wrapper
+
     return decorator
 
 
 # —— 便捷别名 ——
+
 
 def ok(
     data: Any = None,

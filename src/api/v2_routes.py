@@ -1,11 +1,13 @@
 # 兼容层 - v2路由
+import logging
+
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
-import logging
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(tags=["v2"])
+
 
 @router.get("/api/v2/status")
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行

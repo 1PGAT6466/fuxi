@@ -2,11 +2,14 @@
 v2.1 — 用户偏好 API（真实持久化版）
 数据来源：data/user_preferences/ 目录下每个用户的 JSON 文件
 """
+
+import asyncio
+import json
+import logging
+import os
+
 from fastapi import APIRouter, Request
 from fastapi.responses import JSONResponse
-import logging
-import json
-import os
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +17,7 @@ router = APIRouter(prefix="/api/user", tags=["用户偏好"])
 
 # v1.50 R4: Use config DATA_DIR for consistent path resolution
 from src.config import DATA_DIR as _CFG_DATA_DIR
+
 _PREFS_DIR = os.path.join(str(_CFG_DATA_DIR), "user_preferences")
 
 
@@ -76,8 +80,7 @@ async def get_user_preferences(request: Request = None):
     """获取当前用户偏好 — 从持久化文件读取"""
     try:
         username = getattr(request.state, "user", "anonymous") if request else "anonymous"
-        import asyncio as _aio
-        prefs = await _aio.to_thread(_load_preferences, username)
+        prefs = await asyncio.to_thread(_load_preferences, username)
 
         # v1.50 R5: 统一返回格式 {status: "ok", data: {...}}
         return {"status": "ok", "data": {"preferences": prefs}}
@@ -104,10 +107,12 @@ async def update_user_preferences(request: Request):
             if key in allowed_keys:
                 current[key] = value
 
-        await _aio.to_thread(_save_preferences, username, current)
+        await asyncio.to_thread(_save_preferences, username, current)
         logger.info(f"[user_preferences] {username} 更新偏好: {list(body.keys())}")
 
-        return {"preferences": current, "ok": True, "message": "偏好已保存"}
+        from src.api.response import success
+
+        return success(data={"preferences": current}, message="偏好已保存")
     except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"update_user_preferences 失败: {e}")
         return JSONResponse(

@@ -2,10 +2,11 @@
 protocol.py — 象间通信协议
 定义象间通信的数据结构 + 信号类型
 """
-from dataclasses import dataclass, field
-from typing import Any, Dict
-from enum import Enum
+
 import time
+from dataclasses import dataclass, field
+from enum import Enum
+from typing import Any, Dict
 
 
 # 信号类型
@@ -49,6 +50,7 @@ SIGNAL_TIMEOUT = {
 @dataclass
 class Signal:
     """经络信号"""
+
     source: str
     target: str
     signal_type: str
@@ -60,6 +62,7 @@ class Signal:
     def __post_init__(self):
         if not self.signal_id:
             import uuid
+
             self.signal_id = str(uuid.uuid4())[:8]
         if not self.timestamp:
             self.timestamp = time.time()
@@ -68,9 +71,10 @@ class Signal:
 @dataclass
 class SymbolRequest:
     """象间请求"""
-    source: str          # 来源象 ID
-    target: str          # 目标象 ID
-    method: str          # 调用方法
+
+    source: str  # 来源象 ID
+    target: str  # 目标象 ID
+    method: str  # 调用方法
     params: Dict[str, Any] = None
     timeout_ms: int = 5000
     request_id: str = ""
@@ -83,6 +87,7 @@ class SymbolRequest:
 @dataclass
 class SymbolResponse:
     """象间响应"""
+
     success: bool
     data: Any = None
     error: str = ""

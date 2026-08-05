@@ -641,7 +641,7 @@ class Evaluation:
 
     # ──────── 持久化 ────────
 
-    async def _persist_and_trigger(self, result: EvaluationResult):
+    async def _persist_and_trigger(self, result: EvaluationResult) -> Any:
         """持久化评估结果并触发反馈闭环"""
         try:
             # 1. 写入评估结果
@@ -663,7 +663,7 @@ class Evaluation:
         except Exception as e:
             logger.warning(f"[Evaluation] 持久化失败: {e}", exc_info=True)
 
-    async def _save_evaluation(self, result: EvaluationResult):
+    async def _save_evaluation(self, result: EvaluationResult) -> Any:
         """保存评估结果到 JSONL 文件"""
         try:
             record = {
@@ -698,7 +698,7 @@ class Evaluation:
         except Exception as e:
             logger.warning(f"[Evaluation] 序列化评估结果失败: {e}", exc_info=True)
 
-    async def _flush_buffer(self):
+    async def _flush_buffer(self) -> Any:
         """批量刷新缓冲区到文件"""
         if not self._batch_buffer:
             return
@@ -707,7 +707,7 @@ class Evaluation:
         self._batch_buffer.clear()
 
         try:
-            def _write():
+            def _write() -> Any:
                 with open(EVAL_DB_PATH, "a", encoding="utf-8") as f:
                     for record in buf:
                         f.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -719,17 +719,17 @@ class Evaluation:
             # 失败时放回缓冲区
             self._batch_buffer = buf + self._batch_buffer
 
-    async def _flush_index(self):
+    async def _flush_index(self) -> Any:
         """保存评估索引"""
         try:
-            def _write_index():
+            def _write_index() -> Any:
                 with open(EVAL_INDEX_PATH, "w", encoding="utf-8") as f:
                     json.dump(self._eval_index, f, ensure_ascii=False)
             await asyncio.to_thread(_write_index)
         except Exception as e:
             logger.warning(f"[Evaluation] 索引写入失败: {e}", exc_info=True)
 
-    async def _trigger_feedback_loop(self, result: EvaluationResult):
+    async def _trigger_feedback_loop(self, result: EvaluationResult) -> Any:
         """
         评估未通过时触发反馈闭环：
         1. 将评估结果写入 feedback_store
@@ -763,7 +763,7 @@ class Evaluation:
         except Exception as e:
             logger.warning(f"[Evaluation] 反馈闭环触发失败: {e}", exc_info=True)
 
-    async def _log_hallucination_alert(self, result: EvaluationResult):
+    async def _log_hallucination_alert(self, result: EvaluationResult) -> Any:
         """记录幻觉告警到高优先级日志"""
         alert = {
             "type": "hallucination_alert",
@@ -779,7 +779,7 @@ class Evaluation:
         # 同时写入告警文件
         try:
             alert_file = EVAL_DIR / "hallucination_alerts.jsonl"
-            def _write_alert():
+            def _write_alert() -> Any:
                 with open(alert_file, "a", encoding="utf-8") as f:
                     f.write(json.dumps(alert, ensure_ascii=False) + "\n")
             await asyncio.to_thread(_write_alert)
@@ -1009,12 +1009,12 @@ class Evaluation:
 
         return recs
 
-    async def _save_report(self, report: Dict):
+    async def _save_report(self, report: Dict) -> Any:
         """保存评估报告到文件"""
         try:
             date_str = datetime.fromtimestamp(report["timestamp"]).strftime("%Y%m%d_%H%M%S")
             report_file = EVAL_REPORTS_DIR / f"quality_report_{date_str}.json"
-            def _write_report():
+            def _write_report() -> Any:
                 with open(report_file, "w", encoding="utf-8") as f:
                     json.dump(report, f, ensure_ascii=False, indent=2)
             await asyncio.to_thread(_write_report)
@@ -1037,7 +1037,7 @@ class Evaluation:
 
         records = []
         try:
-            def _read():
+            def _read() -> Any:
                 result = []
                 with open(EVAL_DB_PATH, "r", encoding="utf-8") as f:
                     for line in f:
@@ -1058,12 +1058,12 @@ class Evaluation:
 
         return records
 
-    def _load_index(self):
+    def _load_index(self) -> Any:
         """加载评估索引"""
         if EVAL_INDEX_PATH.exists():
             try:
                 self._eval_index = json.loads(EVAL_INDEX_PATH.read_text(encoding="utf-8"))
-            except Exception:
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
                 self._eval_index = {}
 
     # ──────── 查询接口 ────────
@@ -1183,13 +1183,13 @@ class Evaluation:
             return round(sorted_data[f] + c * (sorted_data[f + 1] - sorted_data[f]), 4)
         return round(sorted_data[f], 4)
 
-    async def flush(self):
+    async def flush(self) -> Any:
         """强制刷新所有缓冲区（graceful shutdown 时调用）"""
         await self._flush_buffer()
         await self._flush_index()
         logger.info("[Evaluation] 已刷新所有缓冲数据")
 
-    async def clear_dedup_cache(self):
+    async def clear_dedup_cache(self) -> Any:
         """清空去重缓存"""
         self._dedup_cache.clear()
         self._last_dedup_cleanup = time.time()

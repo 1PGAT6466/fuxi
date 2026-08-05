@@ -2,9 +2,10 @@
 symbol_base.py — 四象基类
 不继承 OrganBase，避免八卦/五行/天干元数据
 """
+
 import logging
 import time
-from typing import Dict, Any
+from typing import Any, Dict
 
 logger = logging.getLogger("symbol_base")
 
@@ -22,9 +23,13 @@ class SymbolBase:
         self._last_activity = time.time()
         self._metrics: Dict[str, Any] = {}
 
-        # 注册到经络（Meridian.register_symbol 接受 symbol_id 和 instance 两个参数）
-        meridian.register_symbol(symbol_id, self)
-        logger.info(f"[{symbol_id}] {emoji} {name} 已注册")
+        # 注册到经络（IntentBus.register_symbol 接受 symbol_id, name, handler 三个参数）
+        if meridian is not None:
+            meridian.register_symbol(symbol_id, name, self)
+            logger.info(f"[{symbol_id}] {emoji} {name} 已注册")
+        else:
+            logger.info(f"[{symbol_id}] {emoji} {name} 初始化（无经络模式）")
+
     # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def heartbeat(self):
@@ -50,8 +55,9 @@ class SymbolBase:
         """设置状态（idle/processing/error）"""
         self._status = status
         self._last_activity = time.time()
+
     # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
-# DEPRECATED: 未使用，v1.50 标记待删除
+    # DEPRECATED: 未使用，v1.50 标记待删除
 
     async def _handle_growth_rollback(self, signal):
         """处理成长引擎的回滚信号"""

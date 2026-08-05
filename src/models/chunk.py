@@ -2,9 +2,10 @@
 chunk.py — 全系统唯一的 Chunk 数据模型
 基于周天大阵方案 + 实际代码字段补全
 """
+
 from dataclasses import dataclass, field
-from typing import List, Optional, Dict, Any
 from enum import Enum
+from typing import Any, Dict, List, Optional
 
 
 class ChunkType(Enum):

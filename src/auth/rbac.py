@@ -1,336 +1,238 @@
 """
-rbac.py — 伏羲 v1.44 Phase 1: 基于 Casbin 的 RBAC 权限系统
-=============================================================
+伏羲 v1.44 — RBAC 权限管理模块
 
 角色定义：
-  - admin:  系统管理员，拥有全部权限
-  - user:   普通用户，可读写文档
-  - viewer: 只读用户，仅可查看
+- admin: 管理员，拥有所有权限
+- user: 普通用户，拥有读写权限
+- guest: 访客，只有读权限
 
-权限定义：
-  - read:   读取文档/搜索
-  - write:  创建/修改文档
-  - delete: 删除文档
-  - admin:  管理端点（用户管理、团队管理、系统配置）
+使用示例：
+    from src.auth.rbac import require_role, get_rbac
 
-Casbin RBAC 模型（基于角色继承）：
-  admin  → read, write, delete, admin
-  user   → read, write
-  viewer → read
+    @router.get("/api/admin/users")
+    @require_role("admin")
+    async def admin_users(request: Request):
+        pass
+
+    @router.get("/api/users/me")
+    @require_role("user")
+    async def get_me(request: Request):
+        pass
 """
 
 import logging
-from typing import Optional, List, Set
+from enum import Enum
 from functools import wraps
+from typing import List, Optional, Set
 
-import casbin
+from fastapi import HTTPException, Request
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("auth.rbac")
 
-# ============================================================================
-# 角色与权限定义
-# ============================================================================
 
-# 默认角色列表
-ROLES = ("admin", "user", "viewer")
+class Role(str, Enum):
+    """用户角色枚举"""
 
-# 默认权限列表
-PERMISSIONS = ("read", "write", "delete", "admin")
+    ADMIN = "admin"
+    USER = "user"
+    GUEST = "guest"
 
-# 角色-权限映射（Casbin policy 格式）
-_ROLE_POLICIES = [
-    # role, permission
-    ("admin", "read"),
-    ("admin", "write"),
-    ("admin", "delete"),
-    ("admin", "admin"),
-    ("user", "read"),
-    ("user", "write"),
-    ("viewer", "read"),
-]
 
-# Casbin RBAC 模型字符串
-_MODEL_TEXT = """
-[request_definition]
-r = sub, obj, act
-
-[policy_definition]
-p = sub, obj, act
-
-[role_definition]
-g = _, _
-
-[policy_effect]
-e = some(where (p.eft == allow))
-
-[matchers]
-m = g(r.sub, p.sub) && r.obj == p.obj && r.act == p.act
-"""
-
-# ============================================================================
-# RBAC 管理器
-# ============================================================================
+# 角色权限映射
+ROLE_PERMISSIONS: dict[Role, Set[str]] = {
+    Role.ADMIN: {
+        # 管理员拥有所有权限
+        "*"
+    },
+    Role.USER: {
+        # 普通用户权限
+        "read",
+        "write",
+        "delete_own",
+        "upload",
+        "chat",
+        "search",
+        "favorites",
+        "history",
+        "preferences",
+    },
+    Role.GUEST: {
+        # 访客权限
+        "read",
+        "search",
+    },
+}
 
 
 class RBAC:
-    """基于 Casbin 的 RBAC 权限管理器
-
-    单例模式，通过 get_rbac() 获取全局实例。
-    """
+    """RBAC 权限管理器"""
 
     def __init__(self):
-        self._model = casbin.Model()
-        self._model.load_model_from_text(_MODEL_TEXT)
-        self._enforcer = casbin.Enforcer(self._model)
-        self._user_roles: dict = {}  # username → set of roles
-        self._load_policies()
-        logger.info("[RBAC] Casbin RBAC 已初始化，角色: %s", ", ".join(ROLES))
+        self._role_permissions = ROLE_PERMISSIONS
 
-    def _load_policies(self):
-        """加载默认角色-权限策略"""
-        for role, perm in _ROLE_POLICIES:
-            self._enforcer.add_policy(role, "api", perm)
-        logger.debug("[RBAC] 已加载 %d 条默认策略", len(_ROLE_POLICIES))
-
-    def assign_role(self, username: str, role: str) -> bool:
-        """为用户分配角色
-
-        Args:
-            username: 用户名
-            role:     角色名（必须在 ROLES 中）
-
-        Returns:
-            是否成功
-        """
-        if role not in ROLES:
-            logger.warning("[RBAC] 无效角色: %s", role)
+    def has_permission(self, role: str, permission: str) -> bool:
+        """检查角色是否拥有指定权限"""
+        try:
+            role_enum = Role(role)
+        except ValueError:
+            logger.warning(f"未知角色: {role}")
             return False
 
-        if username not in self._user_roles:
-            self._user_roles[username] = set()
+        permissions = self._role_permissions.get(role_enum, set())
 
-        if role in self._user_roles[username]:
-            return True  # 幂等
+        # 管理员拥有所有权限
+        if "*" in permissions:
+            return True
 
-        self._user_roles[username].add(role)
-        self._enforcer.add_role_for_user(username, role)
-        logger.info("[RBAC] 用户 %s 分配角色: %s", username, role)
-        return True
+        return permission in permissions
 
-    def revoke_role(self, username: str, role: str) -> bool:
-        """撤销用户角色
+    def has_any_permission(self, role: str, permissions: List[str]) -> bool:
+        """检查角色是否拥有任意一个权限"""
+        return any(self.has_permission(role, p) for p in permissions)
 
-        Args:
-            username: 用户名
-            role:     角色名
+    def has_all_permissions(self, role: str, permissions: List[str]) -> bool:
+        """检查角色是否拥有所有权限"""
+        return all(self.has_permission(role, p) for p in permissions)
 
-        Returns:
-            是否成功
-        """
-        if username not in self._user_roles or role not in self._user_roles[username]:
-            return False
-
-        self._user_roles[username].discard(role)
-        self._enforcer.delete_role_for_user(username, role)
-        logger.info("[RBAC] 用户 %s 撤销角色: %s", username, role)
-        return True
-
-    def get_user_roles(self, username: str) -> List[str]:
-        """获取用户的所有角色
-
-        Args:
-            username: 用户名
-
-        Returns:
-            角色列表
-        """
-        # 优先从内存缓存返回
-        if username in self._user_roles:
-            return list(self._user_roles[username])
-
-        # 兜底：从 users.json 读取
-        return self._load_roles_from_db(username)
-
-    def _load_roles_from_db(self, username: str) -> List[str]:
-        """从 users.json 加载用户角色（兜底机制）
-
-        读取 users.json 中的 role 字段，转换为 RBAC 角色。
-        旧格式：{"role": "admin"} → 映射到 RBAC 角色 "admin"
-        新格式：{"roles": ["admin", "user"]} → 直接使用
-        """
+    def get_roles_for_token(self, username: str) -> List[str]:
+        """获取用户的 JWT token 角色列表"""
+        # 从 users.json 获取用户角色
         try:
             import json
             from pathlib import Path
+
             from src.config import DATA_DIR
+
             users_file = Path(DATA_DIR) / "users.json"
-            if not users_file.exists():
-                return ["viewer"]  # 默认只读
-
-            users = json.loads(users_file.read_text(encoding="utf-8"))
-            user = users.get(username, {})
-
-            # 新格式：roles 字段
-            if "roles" in user and isinstance(user["roles"], list):
-                roles = [r for r in user["roles"] if r in ROLES]
-                if roles:
-                    self._user_roles[username] = set(roles)
-                    for r in roles:
-                        self._enforcer.add_role_for_user(username, r)
-                    return roles
-
-            # 旧格式：单个 role 字段 → 映射
-            legacy_role = user.get("role", "user")
-            mapped = self._map_legacy_role(legacy_role)
-            self._user_roles[username] = {mapped}
-            self._enforcer.add_role_for_user(username, mapped)
-            return [mapped]
-
+            if users_file.exists():
+                users = json.loads(users_file.read_text(encoding="utf-8"))
+                # users.json 是字典格式，键是用户名
+                user = users.get(username)
+                if user:
+                    role = user.get("role", "user")
+                    return [role]
         except Exception as e:
-            logger.warning("[RBAC] 加载用户角色失败: %s，返回默认 viewer", e)
-            return ["viewer"]
+            logger.warning(f"获取用户角色失败: {e}")
 
-    @staticmethod
-    def _map_legacy_role(role: str) -> str:
-        """将旧版单角色映射到 RBAC 角色"""
-        mapping = {"admin": "admin", "user": "user", "viewer": "viewer"}
-        return mapping.get(role, "user")
-
-    def check_permission(self, username: str, permission: str) -> bool:
-        """检查用户是否拥有指定权限
-
-        Args:
-            username:   用户名
-            permission: 权限名（read/write/delete/admin）
-
-        Returns:
-            是否允许
-        """
-        if permission not in PERMISSIONS:
-            logger.warning("[RBAC] 检查无效权限: %s", permission)
-            return False
-
-        # 先确保角色已加载
-        if username not in self._user_roles:
-            self._load_roles_from_db(username)
-
-        return self._enforcer.enforce(username, "api", permission)
-
-    def has_role(self, username: str, role: str) -> bool:
-        """检查用户是否拥有指定角色
-
-        Args:
-            username: 用户名
-            role:     角色名
-
-        Returns:
-            是否拥有该角色
-        """
-        if username not in self._user_roles:
-            self._load_roles_from_db(username)
-        return role in self._user_roles.get(username, set())
-
-    def get_roles_for_token(self, username: str) -> List[str]:
-        """获取用户角色列表，用于 JWT token 签发
-
-        Args:
-            username: 用户名
-
-        Returns:
-            角色列表（至少包含一个角色）
-        """
-        roles = self.get_user_roles(username)
-        return roles if roles else ["viewer"]
-
-    def reload_user(self, username: str):
-        """重新加载用户角色（用户角色变更后调用）
-
-        Args:
-            username: 用户名
-        """
-        if username in self._user_roles:
-            old_roles = self._user_roles[username]
-            for r in old_roles:
-                self._enforcer.delete_role_for_user(username, r)
-            del self._user_roles[username]
-        self._load_roles_from_db(username)
-        logger.info("[RBAC] 已重新加载用户 %s 的角色", username)
+        # 默认返回 user 角色
+        return ["user"]
 
 
-# ============================================================================
-# 全局单例
-# ============================================================================
-
-_rbac_instance: Optional[RBAC] = None
+# 全局 RBAC 实例
+_rbac: Optional[RBAC] = None
 
 
 def get_rbac() -> RBAC:
-    """获取全局 RBAC 实例（单例）"""
-    global _rbac_instance
-    if _rbac_instance is None:
-        _rbac_instance = RBAC()
-    return _rbac_instance
+    """获取 RBAC 单例"""
+    global _rbac
+    if _rbac is None:
+        _rbac = RBAC()
+    return _rbac
 
 
-def reset_rbac():
-    """重置全局 RBAC 实例（仅用于测试）"""
-    global _rbac_instance
-    _rbac_instance = None
-
-
-# ============================================================================
-# FastAPI 依赖注入 & 装饰器
-# ============================================================================
-
-from fastapi import Request, HTTPException
-
-
-def require_role(role: str):
-    """FastAPI 依赖工厂：要求用户拥有指定角色
+def require_role(required_role: str):
+    """
+    角色检查装饰器
 
     用法：
-        @router.get("/api/admin/users", dependencies=[Depends(require_role("admin"))])
+        @router.get("/api/admin/users")
+        @require_role("admin")
         async def admin_users(request: Request):
-            ...
-
-    Args:
-        role: 要求的角色名
-
-    Returns:
-        FastAPI 依赖函数
+            pass
     """
-    def _check_role(request: Request):
-        username = getattr(request.state, "user", None)
-        if not username:
-            raise HTTPException(401, "未登录")
 
-        rbac = get_rbac()
-        if not rbac.has_role(username, role):
-            raise HTTPException(403, f"需要 {role} 角色权限")
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            # 从参数中提取 Request 对象
+            request = None
+            for arg in args:
+                if isinstance(arg, Request):
+                    request = arg
+                    break
+            if request is None:
+                for v in kwargs.values():
+                    if isinstance(v, Request):
+                        request = v
+                        break
 
-    return _check_role
+            if request is None:
+                logger.error("require_role: 无法找到 Request 对象")
+                raise HTTPException(status_code=500, detail="服务器内部错误")
+
+            # 获取用户角色
+            user_role = getattr(request.state, "role", "guest")
+
+            # 检查权限
+            rbac = get_rbac()
+            if not rbac.has_permission(user_role, "*") and user_role != required_role:
+                # 检查角色层级
+                role_hierarchy = {"admin": 3, "user": 2, "guest": 1}
+                user_level = role_hierarchy.get(user_role, 0)
+                required_level = role_hierarchy.get(required_role, 0)
+
+                if user_level < required_level:
+                    logger.warning(f"权限不足: 用户角色 {user_role} 需要 {required_role}")
+                    raise HTTPException(status_code=403, detail="权限不足")
+
+            return await func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
 
 
 def require_permission(permission: str):
-    """FastAPI 依赖工厂：要求用户拥有指定权限
+    """
+    权限检查装饰器
 
     用法：
-        @router.post("/api/documents", dependencies=[Depends(require_permission("write"))])
-        async def create_document(request: Request):
-            ...
-
-    Args:
-        permission: 要求的权限名
-
-    Returns:
-        FastAPI 依赖函数
+        @router.post("/api/upload")
+        @require_permission("upload")
+        async def upload_file(request: Request):
+            pass
     """
-    def _check_permission(request: Request):
-        username = getattr(request.state, "user", None)
-        if not username:
-            raise HTTPException(401, "未登录")
 
-        rbac = get_rbac()
-        if not rbac.check_permission(username, permission):
-            raise HTTPException(403, f"需要 {permission} 权限")
+    def decorator(func):
+        @wraps(func)
+        async def wrapper(*args, **kwargs):
+            # 从参数中提取 Request 对象
+            request = None
+            for arg in args:
+                if isinstance(arg, Request):
+                    request = arg
+                    break
+            if request is None:
+                for v in kwargs.values():
+                    if isinstance(v, Request):
+                        request = v
+                        break
 
-    return _check_permission
+            if request is None:
+                logger.error("require_permission: 无法找到 Request 对象")
+                raise HTTPException(status_code=500, detail="服务器内部错误")
+
+            # 获取用户角色
+            user_role = getattr(request.state, "role", "guest")
+
+            # 检查权限
+            rbac = get_rbac()
+            if not rbac.has_permission(user_role, permission):
+                logger.warning(f"权限不足: 用户角色 {user_role} 需要权限 {permission}")
+                raise HTTPException(status_code=403, detail="权限不足")
+
+            return await func(*args, **kwargs)
+
+        return wrapper
+
+    return decorator
+
+
+def get_current_user_role(request: Request) -> str:
+    """获取当前用户角色"""
+    return getattr(request.state, "role", "guest")
+
+
+def get_current_username(request: Request) -> str:
+    """获取当前用户名"""
+    return getattr(request.state, "user", "anonymous")

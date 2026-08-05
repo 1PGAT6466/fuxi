@@ -2,10 +2,12 @@
 v2.1 — 统一搜索 API（伏羲令，真实跨服务聚合）
 数据来源：搜索 + Wiki + 知识图谱 + 文件索引 聚合查询
 """
-from fastapi import APIRouter, Request, Query
-from fastapi.responses import JSONResponse
+
 import logging
 import time
+
+from fastapi import APIRouter, Query, Request
+from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
@@ -62,30 +64,37 @@ async def unified_search(
     try:
         # v1.44 R2: 从 request.state 获取租户 ID
         tenant_id = getattr(request.state, "tenant_id", "default") if request else "default"
-        
+
         matches = []
         searched_sources = []
 
         if not q or not q.strip():
             return _build_response(
-                request, q, [], 0, time.time() - t0,
+                request,
+                q,
+                [],
+                0,
+                time.time() - t0,
                 hint="请输入搜索关键词",
             )
 
         # 1. 知识库搜索
         try:
             from src.taiyang.retrieval import hybrid_search
+
             kb_results = await hybrid_search(q, top_k=5, tenant_id=tenant_id)
             searched_sources.append("knowledge_base")
             for r in kb_results:
-                matches.append({
-                    "source": "knowledge_base",
-                    "title": r.get("title", r.get("source", "")),
-                    "text": r.get("text", r.get("snippet", ""))[:200],
-                    "score": r.get("score", r.get("distance", 0)),
-                    "file_name": r.get("file_name", ""),
-                    "chunk_id": r.get("chunk_id", r.get("id", "")),
-                })
+                matches.append(
+                    {
+                        "source": "knowledge_base",
+                        "title": r.get("title", r.get("source", "")),
+                        "text": r.get("text", r.get("snippet", ""))[:200],
+                        "score": r.get("score", r.get("distance", 0)),
+                        "file_name": r.get("file_name", ""),
+                        "chunk_id": r.get("chunk_id", r.get("id", "")),
+                    }
+                )
         except ImportError:
             searched_sources.append("knowledge_base (unavailable)")
         except Exception as e:  # TODO: Narrow exception type
@@ -95,17 +104,20 @@ async def unified_search(
         # 2. Wiki 搜索
         try:
             from src.taiyang.wiki import get_wiki_engine
+
             wiki_engine = get_wiki_engine()
             wiki_pages = wiki_engine.search_content(q, limit=5)
             searched_sources.append("wiki")
             for p in wiki_pages:
-                matches.append({
-                    "source": "wiki",
-                    "title": p.get("title", ""),
-                    "text": (p.get("summary", "") or p.get("content", ""))[:200],
-                    "page_id": p.get("id", ""),
-                    "score": 1.0,
-                })
+                matches.append(
+                    {
+                        "source": "wiki",
+                        "title": p.get("title", ""),
+                        "text": (p.get("summary", "") or p.get("content", ""))[:200],
+                        "page_id": p.get("id", ""),
+                        "score": 1.0,
+                    }
+                )
         except ImportError:
             searched_sources.append("wiki (unavailable)")
         except Exception as e:  # TODO: Narrow exception type
@@ -115,16 +127,19 @@ async def unified_search(
         # 3. 知识图谱搜索
         try:
             from src.taiyang.graph import query_graph
+
             graph_results = query_graph(entity=q, limit=5, tenant_id=tenant_id)
             searched_sources.append("knowledge_graph")
             for g in graph_results:
-                matches.append({
-                    "source": "knowledge_graph",
-                    "title": g.get("name", g.get("entity", "")),
-                    "text": g.get("description", g.get("relation", ""))[:200],
-                    "entity": g.get("name", g.get("entity", "")),
-                    "score": g.get("score", g.get("confidence", 0.5)),
-                })
+                matches.append(
+                    {
+                        "source": "knowledge_graph",
+                        "title": g.get("name", g.get("entity", "")),
+                        "text": g.get("description", g.get("relation", ""))[:200],
+                        "entity": g.get("name", g.get("entity", "")),
+                        "score": g.get("score", g.get("confidence", 0.5)),
+                    }
+                )
         except ImportError:
             searched_sources.append("knowledge_graph (unavailable)")
         except Exception as e:  # TODO: Narrow exception type
@@ -152,8 +167,7 @@ async def unified_search(
         )
 
 
-def _build_response(request, q: str, matches: list, took_ms: float,
-                    hint: str = None, sources: list = None) -> dict:
+def _build_response(request, q: str, matches: list, took_ms: float, hint: str = None, sources: list = None) -> dict:
     """构建统一响应"""
     data = {
         "query": q,
@@ -172,10 +186,10 @@ def _build_response(request, q: str, matches: list, took_ms: float,
         data["seed_note"] = f"其中 {seed_count} 条结果为示例数据（种子向量）"
 
     _wants_v2 = request and (
-        request.query_params.get("format") == "v2"
-        or request.headers.get("X-API-Format", "").lower() == "v2"
+        request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
     )
     if _wants_v2:
         from src.api.response import success
+
         return success(data=data, message="统一搜索")
     return data

@@ -4,12 +4,13 @@
 -->
 <template>
   <el-drawer
-    v-model="visible"
+    :model-value="visible"
     title="通知设置"
     direction="rtl"
     size="380px"
     :close-on-click-modal="true"
     @closed="$emit('close')"
+    @update:model-value="$emit('close')"
   >
     <div class="notif-settings">
       <!-- ═══ 推送订阅 ═══ -->

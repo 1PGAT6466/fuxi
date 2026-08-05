@@ -2,6 +2,7 @@
 timeout.py — 超时处理
 异步超时 + 降级
 """
+
 import asyncio
 import logging
 from typing import Any, Callable
@@ -22,6 +23,8 @@ async def with_timeout(
     except asyncio.TimeoutError:
         logger.warning(f"[Timeout] {timeout_message} ({timeout_seconds}s)")
         return fallback
+
+
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
 

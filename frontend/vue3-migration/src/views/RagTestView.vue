@@ -1,4 +1,4 @@
-﻿<template>
+<template>
   <!--
     伏羲 v2.2 — RAG 检索测试台（SAG Event 粒度改造）
     独立于对话的检索测试工具，支持参数调节、Event 粒度切换、结果对比、原文对照

@@ -155,7 +155,36 @@
             </div>
           </el-collapse-item>
 
-          <!-- Group 5: 👤 个人 -->
+          <!-- Group 5: 🖥️ 自运转中心（仅 admin 可见） -->
+          <el-collapse-item
+            v-if="!collapsed && isAdmin"
+            key="ops"
+            title="🖥️ 自运转中心"
+            name="ops"
+          >
+            <div class="menu-sub-items">
+              <div
+                v-for="item in opsItems"
+                :key="item.route"
+                class="menu-item"
+                :class="{
+                  'menu-item--active': isActive(item.route),
+                  'menu-item--disabled': item.disabled,
+                }"
+                role="menuitem"
+                @click="handleMenuClick(item)"
+              >
+                <div class="menu-item-icon" :style="{ color: item.iconColor }">
+                  <el-icon :size="18">
+                    <component :is="item.icon" />
+                  </el-icon>
+                </div>
+                <span class="menu-item-label">{{ item.label }}</span>
+              </div>
+            </div>
+          </el-collapse-item>
+
+          <!-- Group 6: 👤 个人 -->
           <el-collapse-item
             v-if="!collapsed"
             key="personal"
@@ -229,6 +258,15 @@ import {
   Switch,
   Guide,
   Timer,
+  Shop,
+  Key,
+  Platform,
+  Lightning,
+  Connection,
+  Warning,
+  List,
+  PieChart,
+  Tools,
 } from '@element-plus/icons-vue';
 import { h } from 'vue';
 
@@ -331,6 +369,18 @@ const workspaceItems = computed<MenuItem[]>(() => [
     route: '/workspace/worldtree',
     icon: Guide,
     iconColor: '#5b8c5a',
+  },
+  {
+    label: '服务市场',
+    route: '/workspace/service-market',
+    icon: Shop,
+    iconColor: '#FF6700',
+  },
+  {
+    label: '工作流引擎',
+    route: '/workspace/workflow-engine',
+    icon: Lightning,
+    iconColor: '#d4a574',
   },
 ]);
 
@@ -441,6 +491,64 @@ const adminItems = computed<MenuItem[]>(() => [
     icon: ChatDotRound,
     iconColor: '#4a7c59',
   },
+  {
+    label: 'API密钥',
+    route: '/admin/api-keys',
+    icon: Key,
+    iconColor: '#c44b3c',
+  },
+  {
+    label: '开发者门户',
+    route: '/admin/developer-portal',
+    icon: Platform,
+    iconColor: '#3a6b8c',
+  },
+]);
+
+// 🖥️ 自运转中心（仅 admin 可见）
+const opsItems = computed<MenuItem[]>(() => [
+  {
+    label: '运维仪表板',
+    route: '/ops/dashboard',
+    icon: Monitor,
+    iconColor: '#00d4aa',
+  },
+  {
+    label: '插件源管理',
+    route: '/ops/plugins',
+    icon: Connection,
+    iconColor: '#58a6ff',
+  },
+  {
+    label: '监控中心',
+    route: '/ops/monitoring',
+    icon: DataAnalysis,
+    iconColor: '#f0a030',
+  },
+  {
+    label: '任务中心',
+    route: '/ops/tasks',
+    icon: List,
+    iconColor: '#c9a84c',
+  },
+  {
+    label: '报告中心',
+    route: '/ops/reports',
+    icon: PieChart,
+    iconColor: '#c44b3c',
+  },
+  {
+    label: '配置中心',
+    route: '/ops/config',
+    icon: Tools,
+    iconColor: '#8b949e',
+  },
+  {
+    label: '自主运行',
+    route: '/ops/autonomous',
+    icon: Monitor,
+    iconColor: '#7c3aed',
+  },
 ]);
 
 // 👤 个人
@@ -456,7 +564,6 @@ const personalItems = computed<MenuItem[]>(() => [
     route: '/personal/favorites',
     icon: FolderOpened,
     iconColor: '#c9a84c',
-    construction: true,
   },
   {
     label: '历史',
@@ -469,7 +576,6 @@ const personalItems = computed<MenuItem[]>(() => [
     route: '/settings',
     icon: Setting,
     iconColor: '#a68a6b',
-    construction: true,
   },
 ]);
 

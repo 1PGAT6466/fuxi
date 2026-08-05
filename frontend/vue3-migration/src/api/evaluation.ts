@@ -30,16 +30,31 @@ export function createEvaluation(data: Record<string, unknown>) {
   return apiClient.post('/api/evaluation', data);
 }
 
+/** 创建评测数据集 → /api/evaluation/datasets */
+export function createEvaluationDataset(data: Record<string, unknown>) {
+  return apiClient.post('/api/evaluation/datasets', data);
+}
+
 // ============================
-// 评测任务管理（后端暂无）
+// 评测任务管理
 // ============================
 
-/** 获取评测任务列表 */
+/** 获取评测任务列表 → /api/evaluation/tasks */
 export function getEvaluationTasks() {
   return apiClient.get('/api/evaluation/tasks');
 }
 
-/** 获取评测结果 */
+/** 创建评测任务 → /api/evaluation/tasks */
+export function createEvaluationTask(data: Record<string, unknown>) {
+  return apiClient.post('/api/evaluation/tasks', data);
+}
+
+/** 执行评测任务 → /api/evaluation/tasks/:id/run */
+export function runEvaluationTask(taskId: string) {
+  return apiClient.post(`/api/evaluation/tasks/${taskId}/run`);
+}
+
+/** 获取评测结果 → /api/evaluation/results */
 export function getEvaluationResults() {
   return apiClient.get('/api/evaluation/results');
 }
@@ -62,3 +77,18 @@ export function getEvalReport() {
 export function getEvalHistory() {
   return apiClient.get('/api/eval/history');
 }
+
+// 默认导出（供 EvaluationView.vue 使用）
+export default {
+  getEvaluationOverview,
+  createEvaluation,
+  createEvaluationDataset,
+  getEvaluationDatasets,
+  getEvaluationTasks,
+  createEvaluationTask,
+  runEvaluationTask,
+  getEvaluationResults,
+  runEvaluation,
+  getEvalReport,
+  getEvalHistory,
+};

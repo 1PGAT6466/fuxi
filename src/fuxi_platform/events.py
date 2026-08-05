@@ -2,6 +2,7 @@
 events.py — 事件总线
 服务间通信机制
 """
+
 import asyncio
 import logging
 import time

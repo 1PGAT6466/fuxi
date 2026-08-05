@@ -2,6 +2,7 @@
 extraction_growth.py — 少阳成长
 提取质量监控
 """
+
 import logging
 from typing import Dict
 
@@ -26,7 +27,7 @@ class ExtractionGrowth:
             symbol="shaoyang",
             metric="extraction_success",
             value=1.0 if success else 0.0,
-            context={"entities_count": entities_count}
+            context={"entities_count": entities_count},
         )
 
     def get_stats(self) -> Dict:

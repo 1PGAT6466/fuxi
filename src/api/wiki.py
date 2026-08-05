@@ -1,24 +1,26 @@
 # v1.50 P0 修复 — Wiki路由，从 WikiEngine 实际查询数据
 # v1.44 Phase 1 Fix: 新增 POST/PUT/DELETE 端点
 # v1.50 R3 Blue Fix: 添加 XSS 输入过滤 + 越权所有权检查
-from fastapi import APIRouter, Query, Request, HTTPException
-from fastapi.responses import JSONResponse
-from pydantic import BaseModel, field_validator
-import logging
 import html
+import logging
 import re
 
+from fastapi import APIRouter, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
+from pydantic import BaseModel, field_validator
+
 logger = logging.getLogger(__name__)
+
 
 # ── v1.50 R3 Blue: XSS 输入过滤 ──
 def _sanitize_html(text: str) -> str:
     """对用户输入进行 HTML 实体编码，防止存储型 XSS。
-    
+
     策略：
     1. 先对 HTML 特殊字符进行实体编码（< > & " '）
     2. 移除潜在的 event handler 属性（onerror/onload 等）
     3. 移除 javascript: 协议链接
-    
+
     注意：
     - Markdown 内容中的代码块使用 ``` 或 ` 包裹，这些符号不会被编码
     - 用户提交的原始 HTML 标签会被转义为无害的文本
@@ -28,32 +30,32 @@ def _sanitize_html(text: str) -> str:
     # 1. HTML 实体编码
     sanitized = html.escape(text, quote=True)
     # 2. 移除潜在的事件处理器属性（防御深层注入）
-    sanitized = re.sub(r'\bon\w+\s*=', ' data-blocked=', sanitized, flags=re.IGNORECASE)
+    sanitized = re.sub(r"\bon\w+\s*=", " data-blocked=", sanitized, flags=re.IGNORECASE)
     # 3. 移除 javascript: 协议
-    sanitized = re.sub(r'javascript\s*:', 'blocked:', sanitized, flags=re.IGNORECASE)
+    sanitized = re.sub(r"javascript\s*:", "blocked:", sanitized, flags=re.IGNORECASE)
     return sanitized
 
 
 def _get_current_user(request: Request) -> str:
     """从请求中获取当前用户名"""
-    return getattr(request.state, 'user', 'anonymous')
+    return getattr(request.state, "user", "anonymous")
 
 
 def _get_current_role(request: Request) -> str:
     """从请求中获取当前用户角色"""
-    return getattr(request.state, 'role', 'user')
+    return getattr(request.state, "role", "user")
 
 
 def _check_wiki_ownership(page_id: str, request: Request) -> bool:
     """检查当前用户是否有权限操作指定的 Wiki 页面。
-    
+
     规则：
     - admin 角色：可以操作任意页面
     - 普通用户：只能操作自己创建的页面
     - 页面不存在时：允许创建操作通过（由调用方处理）
     """
     role = _get_current_role(request)
-    if role == 'admin':
+    if role == "admin":
         return True
     # 普通用户需要检查所有权
     engine = _get_wiki_engine()
@@ -62,12 +64,13 @@ def _check_wiki_ownership(page_id: str, request: Request) -> bool:
         # 页面不存在，放行（后续操作会返回 404）
         return True
     current_user = _get_current_user(request)
-    owner = page.get('author', page.get('created_by', ''))
+    owner = page.get("author", page.get("created_by", ""))
     if not owner:
         # 旧数据没有 author 字段，拒绝非 admin 操作
         logger.warning(f"[Wiki] 页面 {page_id} 无作者信息，拒绝用户 {current_user} 的操作")
         return False
     return owner == current_user
+
 
 router = APIRouter(tags=["Wiki"])
 
@@ -75,6 +78,7 @@ router = APIRouter(tags=["Wiki"])
 def _get_wiki_engine():
     """延迟加载 WikiEngine 单例"""
     from src.taiyang.wiki import get_wiki_engine
+
     return get_wiki_engine()
 
 
@@ -91,14 +95,20 @@ async def wiki_home(request: Request = None):
         categories = list(set(p.get("category", "") for p in pages if p.get("category")))
 
         # 向后兼容格式
-        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        _wants_v2 = request and (
+            request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
+        )
         if _wants_v2:
             from src.api.response import success
-            return success(data={
-                "pages": pages,
-                "total": len(pages),
-                "categories": categories,
-            }, message="获取 Wiki 目录成功")
+
+            return success(
+                data={
+                    "pages": pages,
+                    "total": len(pages),
+                    "categories": categories,
+                },
+                message="获取 Wiki 目录成功",
+            )
         return {
             "ok": True,
             "title": "伏羲 Wiki",
@@ -120,11 +130,10 @@ async def wiki_pages(request: Request = None, category: str = "", limit: int = 5
         engine = _get_wiki_engine()
         pages = engine.list_pages(category=category, limit=limit)
 
-        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
-        if _wants_v2:
-            from src.api.response import success
-            return success(data={"pages": pages, "total": len(pages)}, message="获取 Wiki 页面列表成功")
-        return {"pages": pages, "total": len(pages)}
+        # 统一返回格式：默认返回 {success, data, message}
+        from src.api.response import success
+
+        return success(data={"pages": pages, "total": len(pages)}, message="获取 Wiki 页面列表成功")
     except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"wiki_pages 失败: {e}")
         return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
@@ -134,6 +143,11 @@ async def wiki_pages(request: Request = None, category: str = "", limit: int = 5
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def wiki_search(q: str = Query(""), request: Request = None):
     """Wiki搜索 — 全文搜索标题+内容+标签"""
+    # 检查 feature flag
+    from src.services.feature_flags import is_enabled
+
+    if not is_enabled("wiki_search"):
+        return {"pages": [], "total": 0, "message": "Wiki search is disabled"}
     try:
         engine = _get_wiki_engine()
         if not q.strip():
@@ -145,9 +159,12 @@ async def wiki_search(q: str = Query(""), request: Request = None):
                 # fallback 标题搜索
                 pages = engine.search_by_title(q, limit=20)
 
-        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        _wants_v2 = request and (
+            request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
+        )
         if _wants_v2:
             from src.api.response import success
+
             return success(data={"pages": pages, "total": len(pages)}, message="Wiki 搜索完成")
         return {"pages": pages, "total": len(pages)}
     except Exception as e:  # TODO: Narrow exception type
@@ -163,15 +180,20 @@ async def wiki_page(page_id: str, request: Request = None):
         engine = _get_wiki_engine()
         page = engine.get_page(page_id)
         if not page:
-            return JSONResponse(status_code=404, content={"error": "页面未找到", "detail": f"Wiki 页面 {page_id} 不存在"})
+            return JSONResponse(
+                status_code=404, content={"error": "页面未找到", "detail": f"Wiki 页面 {page_id} 不存在"}
+            )
 
         # 同时获取关联页面
         linked = engine.get_linked_pages(page_id)
         page["linked_pages"] = linked
 
-        _wants_v2 = request and (request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2")
+        _wants_v2 = request and (
+            request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
+        )
         if _wants_v2:
             from src.api.response import success
+
             return success(data=page, message="获取 Wiki 页面成功")
         return page
     except Exception as e:  # TODO: Narrow exception type
@@ -180,6 +202,7 @@ async def wiki_page(page_id: str, request: Request = None):
 
 
 # ============ v1.44 Phase 1 Fix: Wiki 写操作端点 ============
+
 
 # ── 路径别名: /api/wiki/{id} → /api/wiki/page/{page_id} ──
 @router.get("/api/wiki/{page_id:path}")
@@ -202,6 +225,7 @@ async def wiki_get_by_id(page_id: str, request: Request = None):
 # v1.50 R2 Blue: Wiki 内容大小限制 — 防止超大内容 DoS
 MAX_WIKI_CONTENT_LENGTH = 1 * 1024 * 1024  # 1MB
 MAX_WIKI_TITLE_LENGTH = 200  # 标题最大字符数
+
 
 class WikiCreateRequest(BaseModel):
     title: str
@@ -239,10 +263,10 @@ async def wiki_create(body: WikiCreateRequest, request: Request = None):
         sanitized_content = _sanitize_html(body.content)
         sanitized_summary = _sanitize_html(body.summary) if body.summary else ""
         sanitized_tags = [_sanitize_html(t) for t in body.tags] if body.tags else []
-        
+
         # v1.50 R3 Blue: 记录当前用户为页面作者
         author = _get_current_user(request) if request else "anonymous"
-        
+
         page_id = engine.create_page(
             title=sanitized_title,
             content=sanitized_content,
@@ -255,11 +279,11 @@ async def wiki_create(body: WikiCreateRequest, request: Request = None):
         page = engine.get_page(page_id)
 
         _wants_v2 = request and (
-            request.query_params.get("format") == "v2"
-            or request.headers.get("X-API-Format", "").lower() == "v2"
+            request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
         )
         if _wants_v2:
             from src.api.response import success
+
             return success(data=page, message="Wiki 页面创建成功")
         return {"ok": True, "page": page, "message": "Wiki 页面创建成功"}
     except Exception as e:  # TODO: Narrow exception type
@@ -274,24 +298,23 @@ async def wiki_update(page_id: str, request: Request):
         # v1.50 R3 Blue: 越权检查 — 验证所有权
         if not _check_wiki_ownership(page_id, request):
             return JSONResponse(
-                status_code=403,
-                content={"error": "权限不足", "detail": "您只能编辑自己创建的 Wiki 页面"}
+                status_code=403, content={"error": "权限不足", "detail": "您只能编辑自己创建的 Wiki 页面"}
             )
-        
+
         body = await request.json()
         engine = _get_wiki_engine()
-        
+
         # v1.50 R2 Blue: Wiki 更新内容大小限制
         raw_content = body.get("content")
         if raw_content and len(raw_content.encode("utf-8")) > MAX_WIKI_CONTENT_LENGTH:
             return JSONResponse(
                 status_code=400,
-                content={"error": "内容过大", "detail": f"内容大小不能超过{MAX_WIKI_CONTENT_LENGTH // 1024 // 1024}MB"}
+                content={"error": "内容过大", "detail": f"内容大小不能超过{MAX_WIKI_CONTENT_LENGTH // 1024 // 1024}MB"},
             )
-        
+
         # v1.50 R4: 乐观锁 — 检查客户端传来的版本号
         client_version = body.get("version")
-        
+
         # v1.50 R3 Blue: 对用户输入进行 XSS 过滤
         sanitized_content = _sanitize_html(raw_content) if raw_content else None
         raw_summary = body.get("summary")
@@ -310,8 +333,7 @@ async def wiki_update(page_id: str, request: Request):
             page = engine.get_page(page_id)
             if not page:
                 return JSONResponse(
-                    status_code=404,
-                    content={"error": "页面未找到", "detail": f"Wiki 页面 {page_id} 不存在"}
+                    status_code=404, content={"error": "页面未找到", "detail": f"Wiki 页面 {page_id} 不存在"}
                 )
             # 页面存在但版本不匹配 — 并发冲突
             return JSONResponse(
@@ -319,15 +341,18 @@ async def wiki_update(page_id: str, request: Request):
                 content={
                     "error": "编辑冲突",
                     "detail": "页面已被其他人修改，请刷新后重试",
-                    "current_version": page.get("version", 1)
-                }
+                    "current_version": page.get("version", 1),
+                },
             )
 
         page = engine.get_page(page_id)
 
-        _wants_v2 = request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
+        _wants_v2 = (
+            request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
+        )
         if _wants_v2:
             from src.api.response import success
+
             return success(data=page, message="Wiki 页面更新成功")
         return {"ok": True, "page": page, "message": "Wiki 页面更新成功"}
     except Exception as e:  # TODO: Narrow exception type
@@ -343,25 +368,23 @@ async def wiki_delete(page_id: str, request: Request = None):
         # v1.50 R3 Blue: 越权检查 — 验证所有权
         if not _check_wiki_ownership(page_id, request):
             return JSONResponse(
-                status_code=403,
-                content={"error": "权限不足", "detail": "您只能删除自己创建的 Wiki 页面"}
+                status_code=403, content={"error": "权限不足", "detail": "您只能删除自己创建的 Wiki 页面"}
             )
-        
+
         engine = _get_wiki_engine()
         deleted = engine.delete_page(page_id)
 
         if not deleted:
             return JSONResponse(
-                status_code=404,
-                content={"error": "页面未找到", "detail": f"Wiki 页面 {page_id} 不存在"}
+                status_code=404, content={"error": "页面未找到", "detail": f"Wiki 页面 {page_id} 不存在"}
             )
 
         _wants_v2 = request and (
-            request.query_params.get("format") == "v2"
-            or request.headers.get("X-API-Format", "").lower() == "v2"
+            request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
         )
         if _wants_v2:
             from src.api.response import success
+
             return success(data=None, message=f"Wiki 页面 {page_id} 已删除")
         return {"ok": True, "message": f"Wiki 页面 {page_id} 已删除"}
     except Exception as e:  # TODO: Narrow exception type

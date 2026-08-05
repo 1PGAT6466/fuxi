@@ -70,9 +70,12 @@ export const useFileStore = defineStore('files', () => {
     }
   }
 
-  async function uploadFile(file: File): Promise<void> {
+  async function uploadFile(file: File, relativePath?: string): Promise<void> {
     const formData = new FormData();
     formData.append('file', file);
+    if (relativePath) {
+      formData.append('relative_path', relativePath);
+    }
 
     await apiUploadFile(formData);
   }

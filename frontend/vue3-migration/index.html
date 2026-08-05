@@ -2,13 +2,18 @@
 <html lang="zh-CN">
 <head>
   <meta charset="UTF-8">
-  <link rel="icon" type="image/x-icon" href="/favicon.ico">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>☯</text></svg>">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <!-- MiSans + Inter 字体 -->
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
   <title>伏羲 · 企业知识认知体系</title>
+  <meta name="description" content="伏羲是企业级知识认知体系平台，基于 RAG 技术实现智能问答、知识图谱、多模态检索，支持文档管理、自动化运维和自进化学习。">
+  <meta name="robots" content="noindex, nofollow">
+  <meta property="og:title" content="伏羲 · 企业知识认知体系">
+  <meta property="og:description" content="基于 RAG 技术的企业级知识认知体系，智能问答、知识图谱、多模态检索。">
+  <meta property="og:type" content="website">
   <!-- CSP 策略（安全加固 v1.44）
        - 已移除 script-src 'unsafe-eval'：禁止 eval() / new Function()
        - style-src 仍保留 'unsafe-inline'：Element Plus 运行时通过 CSSOM 注入组件样式，
@@ -17,10 +22,10 @@
   <meta http-equiv="Content-Security-Policy" content="
     default-src 'self';
     script-src 'self';
-    style-src 'self' 'unsafe-inline';
+    style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
     img-src 'self' data: https:;
-    font-src 'self' data: https:;
-    connect-src 'self' http://localhost:* ws://localhost:* https:;
+    font-src 'self' data: https://fonts.googleapis.com https://fonts.gstatic.com;
+    connect-src 'self' http://localhost:* ws://localhost:* http://172.25.30.10:* https:;
   ">
 </head>
 <body>

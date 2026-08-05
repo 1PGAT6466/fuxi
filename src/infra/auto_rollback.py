@@ -2,8 +2,9 @@
 auto_rollback.py — 自动回滚机制
 部署后5分钟级检测，异常时自动关闭新Flag
 """
-import time
+
 import logging
+import time
 from typing import Dict, List, Optional
 
 logger = logging.getLogger("infra.auto_rollback")
@@ -21,6 +22,7 @@ class AutoRollback:
     def __init__(self):
         self._check_history: List[Dict] = []
         self._last_check_time = 0
+
     # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 
     async def check_and_rollback(self, metrics: Dict) -> Dict:

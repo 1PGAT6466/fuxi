@@ -18,6 +18,7 @@ def get_router() -> APIRouter:
     global _router
     if _router is None:
         from src.services.data_analytics.routes import router
+
         _router = router
     return _router
 

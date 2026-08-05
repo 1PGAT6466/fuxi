@@ -4,6 +4,7 @@ web_connector.py — 网页爬取连接器
 支持从指定 URL/域名爬取网页内容，提取文本并转换为统一文档格式。
 实现特性：robots.txt 合规检查、速率限制、HTML 清洗、同源策略。
 """
+
 import asyncio
 import logging
 import re
@@ -15,14 +16,14 @@ import aiohttp
 from bs4 import BeautifulSoup
 
 from .base import (
-    DataSource,
-    ConnectorConfig,
-    UnifiedDocument,
-    SourceType,
-    ConnectorStatus,
     ConnectionError,
+    ConnectorConfig,
+    ConnectorStatus,
+    DataSource,
     FetchError,
+    SourceType,
     TransformError,
+    UnifiedDocument,
 )
 
 logger = logging.getLogger(__name__)
@@ -62,16 +63,36 @@ class WebConnector(DataSource):
 
     # 需要去除的 HTML 标签
     _REMOVE_TAGS = {
-        "script", "style", "nav", "footer", "header",
-        "aside", "noscript", "iframe", "form",
-        "button", "input", "select", "textarea",
+        "script",
+        "style",
+        "nav",
+        "footer",
+        "header",
+        "aside",
+        "noscript",
+        "iframe",
+        "form",
+        "button",
+        "input",
+        "select",
+        "textarea",
     }
 
     # 需要去除的 CSS class/id 关键词
     _REMOVE_CLASS_PATTERNS = [
-        r"nav", r"menu", r"sidebar", r"footer", r"header",
-        r"advertisement", r"ad-", r"banner", r"popup",
-        r"cookie", r"social", r"comment", r"related",
+        r"nav",
+        r"menu",
+        r"sidebar",
+        r"footer",
+        r"header",
+        r"advertisement",
+        r"ad-",
+        r"banner",
+        r"popup",
+        r"cookie",
+        r"social",
+        r"comment",
+        r"related",
     ]
 
     def __init__(self, config: ConnectorConfig):
@@ -110,12 +131,8 @@ class WebConnector(DataSource):
                     self._allowed_domains.add(domain)
 
             # 爬取参数
-            self._crawl_delay = self.config.extra.get(
-                "crawl_delay", 1.0
-            )
-            self._robots_allowed = self.config.extra.get(
-                "follow_robots_txt", True
-            )
+            self._crawl_delay = self.config.extra.get("crawl_delay", 1.0)
+            self._robots_allowed = self.config.extra.get("follow_robots_txt", True)
 
             # 检查 robots.txt
             if self._robots_allowed and self._allowed_domains:
@@ -123,10 +140,7 @@ class WebConnector(DataSource):
                     try:
                         await self._check_robots_txt(domain)
                     except Exception as e:
-                        logger.warning(
-                            "[%s] robots.txt 检查失败 (%s): %s",
-                            self.name, domain, str(e)
-                        )
+                        logger.warning("[%s] robots.txt 检查失败 (%s): %s", self.name, domain, str(e))
 
             # 创建 aiohttp 会话
             headers = {
@@ -152,8 +166,7 @@ class WebConnector(DataSource):
 
             self._set_status(ConnectorStatus.CONNECTED)
             logger.info(
-                "[%s] 网页爬虫就绪 (起始 URL: %d 个, 延迟: %.1fs)",
-                self.name, len(start_urls), self._crawl_delay
+                "[%s] 网页爬虫就绪 (起始 URL: %d 个, 延迟: %.1fs)", self.name, len(start_urls), self._crawl_delay
             )
             return True
 
@@ -167,22 +180,13 @@ class WebConnector(DataSource):
         """检查并解析 robots.txt"""
         robots_url = f"http://{domain}/robots.txt"
         try:
-            async with self._session.get(
-                robots_url,
-                timeout=aiohttp.ClientTimeout(total=10)
-            ) as resp:
+            async with self._session.get(robots_url, timeout=aiohttp.ClientTimeout(total=10)) as resp:
                 if resp.status == 200:
                     content = await resp.text()
                     await self._parse_robots_txt(content)
-                    logger.info(
-                        "[%s] robots.txt 已加载 (%s)",
-                        self.name, domain
-                    )
-        except Exception:
-            logger.debug(
-                "[%s] 无法获取 robots.txt (%s)，允许所有路径",
-                self.name, domain
-            )
+                    logger.info("[%s] robots.txt 已加载 (%s)", self.name, domain)
+        except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
+            logger.debug("[%s] 无法获取 robots.txt (%s)，允许所有路径", self.name, domain)
 
     async def _parse_robots_txt(self, content: str) -> None:
         """解析 robots.txt 内容"""
@@ -192,11 +196,7 @@ class WebConnector(DataSource):
 
             if line.startswith("user-agent:"):
                 agent = line.split(":", 1)[1].strip()
-                user_agent_match = (
-                    agent == "*"
-                    or "fuxi" in agent
-                    or "bot" in agent
-                )
+                user_agent_match = agent == "*" or "fuxi" in agent or "bot" in agent
                 continue
 
             if user_agent_match and line.startswith("disallow:"):
@@ -231,21 +231,12 @@ class WebConnector(DataSource):
         if not self._session or not self.is_connected:
             raise FetchError(self.name, "网页爬虫未连接，请先调用 connect()")
 
-        start_urls = kwargs.get(
-            "urls",
-            self.config.extra.get("start_urls", [])
-        )
+        start_urls = kwargs.get("urls", self.config.extra.get("start_urls", []))
         if isinstance(start_urls, str):
             start_urls = [start_urls]
 
-        max_pages = kwargs.get(
-            "max_pages",
-            self.config.extra.get("max_pages", 100)
-        )
-        max_depth = kwargs.get(
-            "max_depth",
-            self.config.extra.get("max_depth", 3)
-        )
+        max_pages = kwargs.get("max_pages", self.config.extra.get("max_pages", 100))
+        max_depth = kwargs.get("max_depth", self.config.extra.get("max_depth", 3))
         same_domain = self.config.extra.get("same_domain_only", True)
 
         try:
@@ -255,9 +246,7 @@ class WebConnector(DataSource):
             self._pages_failed = 0
 
             # BFS 爬取
-            url_queue: List[tuple] = [
-                (url, 0) for url in start_urls
-            ]
+            url_queue: List[tuple] = [(url, 0) for url in start_urls]
 
             while url_queue and self._pages_crawled < max_pages:
                 url, depth = url_queue.pop(0)
@@ -281,19 +270,14 @@ class WebConnector(DataSource):
 
                     # 提取页面中的链接加入队列
                     if depth < max_depth:
-                        links = await self._extract_links(
-                            result["html"], url, same_domain
-                        )
+                        links = await self._extract_links(result["html"], url, same_domain)
                         for link in links:
                             if link not in self._visited_urls:
                                 url_queue.append((link, depth + 1))
                 else:
                     self._pages_failed += 1
 
-            logger.info(
-                "[%s] 爬取完成: %d 成功, %d 失败",
-                self.name, self._pages_crawled, self._pages_failed
-            )
+            logger.info("[%s] 爬取完成: %d 成功, %d 失败", self.name, self._pages_crawled, self._pages_failed)
             return results
 
         except Exception as e:
@@ -304,18 +288,12 @@ class WebConnector(DataSource):
         try:
             async with self._session.get(url) as resp:
                 if resp.status != 200:
-                    logger.debug(
-                        "[%s] HTTP %d: %s",
-                        self.name, resp.status, url
-                    )
+                    logger.debug("[%s] HTTP %d: %s", self.name, resp.status, url)
                     return None
 
                 content_type = resp.headers.get("Content-Type", "")
                 if "text/html" not in content_type.lower():
-                    logger.debug(
-                        "[%s] 跳过非 HTML: %s (%s)",
-                        self.name, url, content_type
-                    )
+                    logger.debug("[%s] 跳过非 HTML: %s (%s)", self.name, url, content_type)
                     return None
 
                 html = await resp.text()
@@ -364,20 +342,14 @@ class WebConnector(DataSource):
         # 根据 class/id 去除广告、导航等
         for pattern in self._REMOVE_CLASS_PATTERNS:
             regex = re.compile(pattern, re.IGNORECASE)
-            for tag in soup.find_all(
-                class_=regex
-            ):
+            for tag in soup.find_all(class_=regex):
                 tag.decompose()
-            for tag in soup.find_all(
-                id=regex
-            ):
+            for tag in soup.find_all(id=regex):
                 tag.decompose()
 
         # 去除空标签
         for tag in soup.find_all():
-            if not tag.get_text(strip=True) and tag.name not in (
-                "br", "hr", "img", "input", "meta", "link"
-            ):
+            if not tag.get_text(strip=True) and tag.name not in ("br", "hr", "img", "input", "meta", "link"):
                 tag.decompose()
 
     def _extract_text(self, soup: BeautifulSoup) -> str:
@@ -405,9 +377,7 @@ class WebConnector(DataSource):
 
         return text.strip()
 
-    async def _extract_links(
-        self, html: str, base_url: str, same_domain: bool
-    ) -> List[str]:
+    async def _extract_links(self, html: str, base_url: str, same_domain: bool) -> List[str]:
         """从 HTML 中提取链接"""
         soup = BeautifulSoup(html, "html.parser")
         links = []
@@ -451,10 +421,7 @@ class WebConnector(DataSource):
             path = parsed.path or "/"
             for disallowed in self._disallowed_paths:
                 if path.startswith(disallowed):
-                    logger.debug(
-                        "[%s] robots.txt 禁止: %s",
-                        self.name, url
-                    )
+                    logger.debug("[%s] robots.txt 禁止: %s", self.name, url)
                     return False
 
         return True
@@ -482,10 +449,7 @@ class WebConnector(DataSource):
                 text = page.get("text", "")
 
                 if not text or len(text.strip()) < 50:
-                    logger.debug(
-                        "[%s] 页面内容过短，跳过: %s",
-                        self.name, page.get("url", "")
-                    )
+                    logger.debug("[%s] 页面内容过短，跳过: %s", self.name, page.get("url", ""))
                     continue
 
                 doc = UnifiedDocument(
@@ -503,10 +467,7 @@ class WebConnector(DataSource):
                 )
                 documents.append(doc)
 
-            logger.info(
-                "[%s] 转换完成: %d 页 → %d 个文档",
-                self.name, len(raw_data), len(documents)
-            )
+            logger.info("[%s] 转换完成: %d 页 → %d 个文档", self.name, len(raw_data), len(documents))
             return documents
 
         except Exception as e:
@@ -528,11 +489,13 @@ class WebConnector(DataSource):
     @property
     def stats(self) -> Dict[str, Any]:
         base_stats = super().stats
-        base_stats.update({
-            "pages_crawled": self._pages_crawled,
-            "pages_failed": self._pages_failed,
-            "visited_urls": len(self._visited_urls),
-        })
+        base_stats.update(
+            {
+                "pages_crawled": self._pages_crawled,
+                "pages_failed": self._pages_failed,
+                "visited_urls": len(self._visited_urls),
+            }
+        )
         return base_stats
 
     async def __aenter__(self):

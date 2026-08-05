@@ -8,15 +8,16 @@ services/error_handler.py — 统一异常体系
 """
 
 import logging
-from fastapi import Request
+
+from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
-from fastapi import HTTPException
 
 logger = logging.getLogger(__name__)
 
 
 class KbError(Exception):
     """知识库异常基类"""
+
     code: str = "KB_ERROR"
     status: int = 500
     message: str = "知识库服务内部错误"

@@ -94,6 +94,15 @@ export const useServiceMarketStore = defineStore('service-market', () => {
 
   /** 加载服务列表 */
   async function fetchServices(): Promise<void> {
+    // 离线模式检查：跳过所有市场 API 请求
+    const isOffline = localStorage.getItem('fuxi_offline_mode') === 'true' || !navigator.onLine;
+    if (isOffline) {
+      services.value = [];
+      total.value = 0;
+      loading.value = false;
+      return;
+    }
+
     loading.value = true;
     error.value = null;
     try {
@@ -105,9 +114,16 @@ export const useServiceMarketStore = defineStore('service-market', () => {
         page: page.value,
         pageSize: pageSize.value,
       });
-      services.value = res.items;
-      total.value = res.total;
+      services.value = res.items ?? [];
+      total.value = res.total ?? 0;
+      // 如果后端返回空列表，清空错误（后端正常运行但无数据）
+      if (res.items && res.items.length === 0) {
+        error.value = null;
+      }
     } catch (e) {
+      // API 调用完全失败时，清空列表并显示错误
+      services.value = [];
+      total.value = 0;
       const msg = e instanceof Error ? e.message : '加载服务列表失败';
       error.value = msg;
       logger.error('fetchServices 失败:', msg);
@@ -120,6 +136,13 @@ export const useServiceMarketStore = defineStore('service-market', () => {
 
   /** 加载已安装服务 */
   async function fetchInstalledServices(): Promise<void> {
+    // 离线模式检查：跳过所有市场 API 请求
+    const isOffline = localStorage.getItem('fuxi_offline_mode') === 'true' || !navigator.onLine;
+    if (isOffline) {
+      installedServices.value = [];
+      return;
+    }
+
     try {
       installedServices.value = await marketApi.getInstalledServices();
     } catch (e) {
@@ -131,6 +154,14 @@ export const useServiceMarketStore = defineStore('service-market', () => {
 
   /** 加载服务详情 */
   async function fetchServiceDetail(id: string): Promise<void> {
+    // 离线模式检查：跳过所有市场 API 请求
+    const isOffline = localStorage.getItem('fuxi_offline_mode') === 'true' || !navigator.onLine;
+    if (isOffline) {
+      currentService.value = null;
+      error.value = '当前处于离线模式，无法加载服务详情';
+      return;
+    }
+
     detailLoading.value = true;
     try {
       currentService.value = await marketApi.getMarketServiceById(id);
@@ -147,9 +178,17 @@ export const useServiceMarketStore = defineStore('service-market', () => {
 
   /** 安装服务 */
   async function installService(serviceId: string, version?: string): Promise<boolean> {
+    // 离线模式检查：不允许安装操作
+    const isOffline = localStorage.getItem('fuxi_offline_mode') === 'true' || !navigator.onLine;
+    if (isOffline) {
+      installStatusMap.value[serviceId] = 'error';
+      error.value = '离线模式下无法安装服务';
+      return false;
+    }
+
     installStatusMap.value[serviceId] = 'installing';
     try {
-      const res = await marketApi.installService({ serviceId, version });
+      const res = await marketApi.installService({ service_id: serviceId, version });
       if (res.success) {
         installStatusMap.value[serviceId] = 'installed';
         // 刷新已安装列表
@@ -170,9 +209,17 @@ export const useServiceMarketStore = defineStore('service-market', () => {
 
   /** 卸载服务 */
   async function uninstallService(serviceId: string): Promise<boolean> {
+    // 离线模式检查：不允许卸载操作
+    const isOffline = localStorage.getItem('fuxi_offline_mode') === 'true' || !navigator.onLine;
+    if (isOffline) {
+      installStatusMap.value[serviceId] = 'error';
+      error.value = '离线模式下无法卸载服务';
+      return false;
+    }
+
     installStatusMap.value[serviceId] = 'installing';
     try {
-      const res = await marketApi.uninstallService({ serviceId });
+      const res = await marketApi.uninstallService({ service_id: serviceId });
       if (res.success) {
         installStatusMap.value[serviceId] = 'not-installed';
         await fetchInstalledServices();

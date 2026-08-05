@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import List, Optional
 
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, JSONResponse
 
 logger = logging.getLogger("services.doc-tools.routes")
 
@@ -32,7 +32,15 @@ SUPPORTED_CONVERT_FORMATS = {
 }
 
 SUPPORTED_IMAGE_FORMATS = {
-    ".jpg", ".jpeg", ".png", ".gif", ".bmp", ".tiff", ".tif", ".webp", ".ico",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".gif",
+    ".bmp",
+    ".tiff",
+    ".tif",
+    ".webp",
+    ".ico",
 }
 
 
@@ -56,8 +64,9 @@ def _cleanup_temp(*paths: Path) -> None:
 
 # ============ 健康检查 ============
 
+
 @router.get("/health")
-def health_check():
+def health_check() -> JSONResponse:
     """服务健康检查"""
     _ensure_temp_dir()
     return {
@@ -81,6 +90,7 @@ def _check_import(module_name: str) -> bool:
 
 
 # ============ 文件格式转换 ============
+
 
 @router.post("/convert")
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
@@ -163,6 +173,7 @@ def _do_convert(input_path: Path, output_path: Path, source_fmt: str, target_fmt
 
 # ============ PDF 操作 ============
 
+
 @router.post("/merge")
 async def merge_pdfs(files: List[UploadFile] = File(...)):
     """
@@ -173,7 +184,7 @@ async def merge_pdfs(files: List[UploadFile] = File(...)):
         raise HTTPException(400, "请至少上传 2 个 PDF 文件进行合并")
 
     try:
-        from pypdf import PdfWriter, PdfReader
+        from pypdf import PdfReader, PdfWriter
     except ImportError:
         raise HTTPException(503, "pypdf 未安装 — PDF 合并功能不可用")
 
@@ -199,9 +210,11 @@ async def merge_pdfs(files: List[UploadFile] = File(...)):
                 merger.add_page(page)
 
         output_path = temp_dir / f"merged_{os.urandom(8).hex()}.pdf"
+
         def _write_pdf():
             with open(str(output_path), "wb") as out_f:
                 merger.write(out_f)
+
         await asyncio.to_thread(_write_pdf)
 
         return FileResponse(
@@ -231,7 +244,7 @@ async def split_pdf(
     拆分 PDF 的指定页码范围
     """
     try:
-        from pypdf import PdfWriter, PdfReader
+        from pypdf import PdfReader, PdfWriter
     except ImportError:
         raise HTTPException(503, "pypdf 未安装 — PDF 拆分功能不可用")
 
@@ -267,9 +280,11 @@ async def split_pdf(
             writer.add_page(reader.pages[page_num])
 
         output_path = temp_dir / f"split_out_{os.urandom(8).hex()}.pdf"
+
         def _write_pdf():
             with open(str(output_path), "wb") as out_f:
                 writer.write(out_f)
+
         await asyncio.to_thread(_write_pdf)
 
         return FileResponse(
@@ -289,6 +304,7 @@ async def split_pdf(
 
 
 # ============ 文件压缩 ============
+
 
 @router.post("/compress")
 async def compress_file(file: UploadFile = File(...)):
@@ -371,7 +387,7 @@ def _compress_image_file(input_path: Path, ext: str) -> Path:
 def _compress_pdf_file(input_path: Path) -> Path:
     """压缩 PDF 文件"""
     try:
-        from pypdf import PdfWriter, PdfReader
+        from pypdf import PdfReader, PdfWriter
     except ImportError:
         raise HTTPException(503, "pypdf 未安装 — PDF 压缩功能不可用")
 
@@ -388,7 +404,9 @@ def _compress_pdf_file(input_path: Path) -> Path:
     def _write_pdf():
         with open(str(output_path), "wb") as out_f:
             writer.write(out_f)
+
     import asyncio
+
     asyncio.get_event_loop().run_in_executor(None, _write_pdf) if not asyncio.get_event_loop().is_running() else None
     # Note: this is a sync helper, will be called from async context via to_thread
     _write_pdf()
@@ -397,6 +415,7 @@ def _compress_pdf_file(input_path: Path) -> Path:
 
 
 # ============ 图片信息 ============
+
 
 @router.post("/image-info")
 async def image_info(file: UploadFile = File(...)):
@@ -439,6 +458,7 @@ async def image_info(file: UploadFile = File(...)):
         if hasattr(img, "_getexif") and img._getexif():
             for tag_id, value in img._getexif().items():
                 from PIL.ExifTags import TAGS
+
                 tag_name = TAGS.get(tag_id, tag_id)
                 if isinstance(value, bytes):
                     value = value.hex()
@@ -460,6 +480,7 @@ async def image_info(file: UploadFile = File(...)):
 
 
 # ============ 图片压缩 ============
+
 
 @router.post("/compress-image")
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
@@ -559,6 +580,7 @@ async def compress_image(
 
 # ============ 文本提取 ============
 
+
 @router.post("/text-extract")
 async def text_extract(file: UploadFile = File(...)):
     """
@@ -613,6 +635,7 @@ async def text_extract(file: UploadFile = File(...)):
 
 # ============ 辅助函数 ============
 
+
 def _extract_text_from_pdf(pdf_path: Path) -> str:
     """从 PDF 提取纯文本"""
     try:
@@ -648,8 +671,8 @@ def _write_text_to_pdf(text: str, output_path: Path) -> None:
     # 使用 pypdf 创建简单 PDF（文本逐行写入）
     # 对于纯文本 → PDF，使用 reportlab 更合适，但这里保持依赖轻量
     try:
-        from reportlab.pdfgen import canvas
         from reportlab.lib.pagesizes import A4
+        from reportlab.pdfgen import canvas
 
         c = canvas.Canvas(str(output_path), pagesize=A4)
         width, height = A4

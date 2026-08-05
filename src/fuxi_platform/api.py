@@ -2,11 +2,13 @@
 api.py — 平台 API 路由
 注册平台级端点
 """
+
 import logging
+
 from fastapi import FastAPI
 
-from .registry import get_registry
 from .gateway import get_gateway
+from .registry import get_registry
 
 logger = logging.getLogger("platform.api")
 

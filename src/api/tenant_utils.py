@@ -7,24 +7,24 @@
 v1.44 R2: 多租户隔离 — 从 JWT 提取 tenant_id，过滤搜索结果
 """
 
-from typing import List, Dict, Any
+from typing import Any, Dict, List
 
 
 def filter_results_by_tenant(results: List[Dict[str, Any]], tenant_id: str) -> List[Dict[str, Any]]:
     """多租户隔离：按 tenant_id 过滤结果
-    
+
     规则：
       - 如果结果 metadata 中有 tenant_id 字段，必须匹配
       - 如果结果 metadata 中无 tenant_id 字段，视为默认租户数据
       - 非默认租户不能访问其他租户的数据
-    
+
     Args:
         results: 待过滤的结果列表，每项应包含 'metadata' 字段
         tenant_id: 当前请求的租户 ID（从 JWT 提取）
-    
+
     Returns:
         过滤后的结果列表
-    
+
     Example:
         >>> results = [{"metadata": {"tenant_id": "t1"}}, {"metadata": {}}]
         >>> filter_results_by_tenant(results, "t1")
@@ -33,7 +33,7 @@ def filter_results_by_tenant(results: List[Dict[str, Any]], tenant_id: str) -> L
     if tenant_id == "default":
         # 默认租户可以看自己的数据 + 无租户标记的遗留数据
         return results
-    
+
     # 非默认租户：只看自己租户的数据
     filtered = []
     for r in results:

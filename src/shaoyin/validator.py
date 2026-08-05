@@ -2,8 +2,9 @@
 validator.py — 少阴·校验模块
 合并 yin_agent + judge 的校验逻辑
 """
-import re
+
 import logging
+import re
 from typing import Dict, List
 
 logger = logging.getLogger("shaoyin.validator")
@@ -32,13 +33,13 @@ class YinAgent:
             score -= 15
 
         # 3. 数字一致性检查（过滤材料名中的数字）
-        numbers_in_answer = set(re.findall(r'\d+\.?\d*', answer))
+        numbers_in_answer = set(re.findall(r"\d+\.?\d*", answer))
         if numbers_in_answer and sources:
             source_text = " ".join(s.get("text", "") for s in sources[:5])
-            numbers_in_source = set(re.findall(r'\d+\.?\d*', source_text))
+            numbers_in_source = set(re.findall(r"\d+\.?\d*", source_text))
             material_numbers = set()
-            for match in re.findall(r'[A-Za-z]{2,}\d+', answer):
-                material_numbers.update(re.findall(r'\d+\.?\d*', match))
+            for match in re.findall(r"[A-Za-z]{2,}\d+", answer):
+                material_numbers.update(re.findall(r"\d+\.?\d*", match))
             phantom_numbers = numbers_in_answer - numbers_in_source - material_numbers
             if len(phantom_numbers) > 3:
                 issues.append(f"答案包含 {len(phantom_numbers)} 个来源中未出现的数字")
@@ -52,7 +53,7 @@ class YinAgent:
                 score -= 10
 
         # 5. 答非所问检测
-        query_keywords = set(re.findall(r'[\u4e00-\u9fff]{2,}', query))
+        query_keywords = set(re.findall(r"[\u4e00-\u9fff]{2,}", query))
         if query_keywords and len(answer) > 50:
             answer_text = answer[:500]
             overlap = sum(1 for kw in query_keywords if kw in answer_text)
@@ -61,7 +62,7 @@ class YinAgent:
                 score -= 20
 
         # 6. 安全性检查
-        sensitive_patterns = [r'密码\s*[:：]\s*\S+', r'key\s*[:：]\s*\S+', r'token\s*[:：]\s*\S+']
+        sensitive_patterns = [r"密码\s*[:：]\s*\S+", r"key\s*[:：]\s*\S+", r"token\s*[:：]\s*\S+"]
         for pat in sensitive_patterns:
             if re.search(pat, answer, re.IGNORECASE):
                 issues.append("答案可能泄露敏感信息")

@@ -2,7 +2,12 @@
 audit.py — 审计日志服务 (v1.50)
 SQLite audit_log 表，记录 who/what/when/result
 """
-import sqlite3, time, os, json, logging
+
+import json
+import logging
+import os
+import sqlite3
+import time
 from pathlib import Path
 from typing import Dict
 
@@ -51,7 +56,17 @@ def log_audit(
         conn = _get_conn()
         conn.execute(
             "INSERT INTO audit_log (timestamp, user_id, action, query, result_summary, duration_ms, status, metadata, ip) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            (time.time(), user_id, action, query[:2000], result_summary[:500], duration_ms, status, json.dumps(metadata or {}, ensure_ascii=False), ip)
+            (
+                time.time(),
+                user_id,
+                action,
+                query[:2000],
+                result_summary[:500],
+                duration_ms,
+                status,
+                json.dumps(metadata or {}, ensure_ascii=False),
+                ip,
+            ),
         )
         conn.commit()
     except (sqlite3.Error, OSError) as e:
@@ -60,7 +75,7 @@ def log_audit(
         if conn:
             try:
                 conn.close()
-            except Exception:
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:
                 pass
 
 
@@ -70,8 +85,7 @@ def get_audit_stats(hours: int = 24) -> Dict:
         conn = _get_conn()
         since = time.time() - hours * 3600
         rows = conn.execute(
-            "SELECT action, COUNT(*), AVG(duration_ms) FROM audit_log WHERE timestamp > ? GROUP BY action",
-            (since,)
+            "SELECT action, COUNT(*), AVG(duration_ms) FROM audit_log WHERE timestamp > ? GROUP BY action", (since,)
         ).fetchall()
         conn.close()
         return {r[0]: {"count": r[1], "avg_ms": round(r[2] or 0)} for r in rows}
@@ -86,11 +100,19 @@ def get_recent_audits(limit: int = 50) -> list:
         conn = _get_conn()
         rows = conn.execute(
             "SELECT timestamp, user_id, action, query, result_summary, duration_ms, status FROM audit_log ORDER BY id DESC LIMIT ?",
-            (limit,)
+            (limit,),
         ).fetchall()
         conn.close()
         return [
-            {"timestamp": r[0], "user_id": r[1], "action": r[2], "query": r[3][:100], "result": r[4][:100], "duration_ms": r[5], "status": r[6]}
+            {
+                "timestamp": r[0],
+                "user_id": r[1],
+                "action": r[2],
+                "query": r[3][:100],
+                "result": r[4][:100],
+                "duration_ms": r[5],
+                "status": r[6],
+            }
             for r in rows
         ]
     except Exception as e:  # TODO: Narrow exception type

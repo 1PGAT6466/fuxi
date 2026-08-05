@@ -8,12 +8,11 @@ import logging
 import shutil
 from pathlib import Path
 
-from fastapi import APIRouter, HTTPException, UploadFile, File
+from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
-
-from src.services.dxf_viewer.parser import extract_dxf, EZDXF_AVAILABLE
-from src.services.dxf_viewer.renderer import generate_render_data
 from src.services.dxf_viewer.dedup import check_duplicate, register_hash
+from src.services.dxf_viewer.parser import EZDXF_AVAILABLE, extract_dxf
+from src.services.dxf_viewer.renderer import generate_render_data
 
 logger = logging.getLogger("services.dxf-viewer.api")
 
@@ -42,9 +41,7 @@ def _load_file_index() -> dict:
 
 def _save_file_index(index: dict) -> None:
     INDEX_FILE.parent.mkdir(parents=True, exist_ok=True)
-    INDEX_FILE.write_text(
-        json.dumps(index, indent=2, ensure_ascii=False), encoding="utf-8"
-    )
+    INDEX_FILE.write_text(json.dumps(index, indent=2, ensure_ascii=False), encoding="utf-8")
 
 
 @router.get("/health")
@@ -69,15 +66,11 @@ async def upload_dxf(file: UploadFile = File(...)):
 
     suffix = Path(file.filename).suffix.lower()
     if suffix not in (".dxf", ".dwg"):
-        raise HTTPException(
-            400, f"Unsupported file type: {suffix}. Supported: .dxf, .dwg"
-        )
+        raise HTTPException(400, f"Unsupported file type: {suffix}. Supported: .dxf, .dwg")
 
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(
-            413, f"File too large. Max size: {MAX_FILE_SIZE // (1024*1024)}MB"
-        )
+        raise HTTPException(413, f"File too large. Max size: {MAX_FILE_SIZE // (1024*1024)}MB")
 
     temp_path = FILES_DIR / f"temp_{file.filename}"
     try:
@@ -104,9 +97,7 @@ async def upload_dxf(file: UploadFile = File(...)):
         render_data = generate_render_data(parsed)
 
         render_path = final_dir / "render.json"
-        render_path.write_text(
-            json.dumps(render_data, ensure_ascii=False), encoding="utf-8"
-        )
+        render_path.write_text(json.dumps(render_data, ensure_ascii=False), encoding="utf-8")
 
         meta_path = final_dir / "metadata.json"
         meta_path.write_text(

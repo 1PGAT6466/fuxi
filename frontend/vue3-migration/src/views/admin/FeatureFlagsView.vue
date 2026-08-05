@@ -24,14 +24,16 @@
     <!-- 开关表格 -->
     <div class="table-wrapper">
       <el-table
-        :data="filteredFlags"
+        :data="Array.isArray(filteredFlags) ? filteredFlags : []"
         style="width: 100%"
         size="small"
         :default-sort="{ prop: 'updated_at', order: 'descending' }"
       >
-        <el-table-column prop="key" label="开关 Key" min-width="160">
+        <el-table-column label="开关 Key" min-width="160">
           <template #default="{ row }">
-            <code class="flag-key">{{ row.key }}</code>
+            <el-tooltip :content="row.key" placement="top" :disabled="getKeyLabel(row.key) === row.key">
+              <code class="flag-key">{{ getKeyLabel(row.key) }}</code>
+            </el-tooltip>
           </template>
         </el-table-column>
 
@@ -127,6 +129,55 @@ const editForm = ref<FeatureFlag>({
   important: false,
   updated_at: '',
 });
+
+// ─── Key 到中文名称的映射（与后端 feature_flags.py DEFAULT_FLAGS 对齐）───
+const KEY_LABELS: Record<string, string> = {
+  // 核心 Flag
+  'shaoyang_sag_extract': 'SAG 事件实体提取',
+  'taiyang_multi_hop': '多跳检索',
+  'taiyang_seed_score': 'Seed Score 融合',
+  // Phase B — 伏羲检索架构
+  'taiyang_sag_pipeline': 'SAG 三阶段管线',
+  'taiyang_path_a': 'Path A 实体引导召回',
+  'taiyang_event_search': 'Event 粒度检索',
+  'taiyang_sql_multi_hop': 'SQL JOIN 多跳扩展',
+  // 增强 Flag
+  'enhanced_pipeline': '增强版管线',
+  // 基础 Flag
+  'graphrag_multi_hop': 'GraphRAG 多跳遍历',
+  'query_planner': '查询规划器',
+  'table_structured_search': '表格结构化检索',
+  'multimodal_rag': '多模态 RAG',
+  'sentence_level_compress': '句子级压缩',
+  'knowledge_lifecycle': '知识生命周期',
+  'siliconflow_rerank': 'SiliconFlow 重排序',
+  'self_rag_check': '自检索检查',
+  'crag_rewrite': 'CRAG 重写',
+  'query_rewrite': '查询重写',
+  'hyde': 'HyDE 假设文档',
+  'wiki_search': 'Wiki 搜索',
+  'table_view': '表格视图',
+  'session_memory': '会话记忆',
+  // Dream Cycle
+  'enable_dream_cycle_notifications': 'Dream Cycle 通知',
+  'enable_gap_llm': 'Gap Scan LLM 增强',
+  // 前端 mock key 映射
+  'ai-tools-enabled': 'AI 工具集',
+  'dxf-viewer-enabled': 'DXF 工程浏览器',
+  'chat_v2': 'AI 对话 v2',
+  'search_semantic': '语义搜索',
+  'auto_index': '自动索引',
+  'wiki_public': '公开 Wiki',
+  'eval_auto': '自动评测',
+  'rate_limit': '速率限制',
+  'analytics-enabled': '数据分析',
+  'advanced_cache': '高级缓存',
+};
+
+/** 获取 Key 对应的中文显示名称 */
+function getKeyLabel(key: string): string {
+  return KEY_LABELS[key] || key;
+}
 
 // ─── Computed ───
 const filteredFlags = computed(() => {
@@ -230,7 +281,65 @@ const mockFlags: FeatureFlag[] = [
 async function fetchFlags(): Promise<void> {
   loading.value = true;
   try {
-    flags.value = (await apiClient.get('/api/feature-flags')) as FeatureFlag[];
+    const resp = await apiClient.get('/api/feature-flags') as Record<string, unknown>;
+    // 后端返回 {status, data: {flags: {key: bool}, defaults: {...}}}
+    const data = resp?.data || resp;
+    const rawFlags = (data as Record<string, unknown>)?.flags || data;
+    if (rawFlags && typeof rawFlags === 'object') {
+      const nameMap: Record<string, string> = {
+        shaoyang_sag_extract: '少阳·SAG 精准抽取',
+        taiyang_multi_hop: '太阳·多跳推理',
+        taiyang_seed_score: '太阳·种子评分',
+        taiyang_sag_pipeline: '太阳·SAG 全链路',
+        taiyang_path_a: '太阳·路径 A',
+        taiyang_event_search: '太阳·事件检索',
+        taiyang_sql_multi_hop: '太阳·SQL 多跳',
+        enhanced_pipeline: '增强版管线',
+        graphrag_multi_hop: 'GraphRAG 多跳遍历',
+        query_planner: '查询规划器',
+        table_structured_search: '表格结构化检索',
+        multimodal_rag: '多模态 RAG',
+        sentence_level_compression: '句子级压缩',
+        knowledge_lifecycle: '知识生命周期',
+        ai_tools_enabled: 'AI 工具集',
+        dxf_viewer_enabled: 'DXF 图纸查看器',
+        new_chat_engine: '新版对话引擎',
+        vector_search_enabled: '向量语义搜索',
+        auto_index_enabled: '自动向量化索引',
+        wiki_edit_enabled: 'Wiki 全员编辑',
+        daily_eval_enabled: '每日质量评测',
+        rate_limit_enabled: 'API 速率限制',
+        analytics_enabled: '数据分析服务',
+        redis_cache_enabled: 'Redis 多级缓存',
+      };
+      const descMap: Record<string, string> = {
+        shaoyang_sag_extract: '精准抽取知识三元组，提升检索准确率',
+        taiyang_multi_hop: '支持多跳推理，回答复杂关联问题',
+        taiyang_seed_score: '基于种子评分优化检索排序',
+        taiyang_sag_pipeline: 'SAG 全链路检索增强生成',
+        enhanced_pipeline: '增强版文档处理管线',
+        graphrag_multi_hop: '知识图谱多跳遍历检索',
+        query_planner: '智能查询拆解与规划',
+        table_structured_search: 'PDF 表格结构化解析与检索',
+        multimodal_rag: '支持图片、音频等多模态内容',
+        sentence_level_compression: '句子级精准压缩，减少噪声',
+        knowledge_lifecycle: '知识过期检测与自动更新',
+        new_chat_engine: '新版对话引擎，支持多轮上下文记忆',
+        vector_search_enabled: '启用向量语义搜索，结果更精准',
+        auto_index_enabled: '上传文档后自动触发向量化索引',
+        rate_limit_enabled: '启用 API 请求速率限制，防止滥用',
+      };
+      flags.value = Object.entries(rawFlags as Record<string, boolean>).map(([key, enabled]) => ({
+        key,
+        name: nameMap[key] || key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()),
+        description: descMap[key] || '',
+        enabled: Boolean(enabled),
+        important: false,
+        updated_at: '',
+      }));
+    } else {
+      flags.value = mockFlags;
+    }
   } catch {
     console.warn('[FeatureFlags] API 不可用，使用 mock 数据');
     flags.value = mockFlags;

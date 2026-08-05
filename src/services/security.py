@@ -1,7 +1,29 @@
-# PLACEHOLDER: 该服务模块预留扩展，当前无实际逻辑
-# v1.50: 已迁移至 src.taiyin.security，此文件仅为向后兼容层
-# 新代码请直接使用 src.taiyin.security 或 from src.services import ...
 """
-services/security.py — 兼容层（保留：被 pipeline/unified.py 引用）
-v1.50 HIGH 修复：将 import * 改为显式导入。
+services/security.py — 安全模块兼容层（v1.50）
+重定向到 src.taiyin.security，提供 Rate Limiting、审计日志、输入净化。
 """
+
+import logging
+from typing import Optional
+
+logger = logging.getLogger(__name__)
+
+# ============================================================
+# 从实际实现重导出所有公共 API
+# ============================================================
+from src.taiyin.security import (  # noqa: F401
+    RateLimiter,
+    check_rate_limit,
+    audit_log_entry,
+    sanitize_xss,
+    sanitize_user_input,
+)
+
+# 兼容别名（保持旧代码可运行）
+__all__ = [
+    "RateLimiter",
+    "check_rate_limit",
+    "audit_log_entry",
+    "sanitize_xss",
+    "sanitize_user_input",
+]

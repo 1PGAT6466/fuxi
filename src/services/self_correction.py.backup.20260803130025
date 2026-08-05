@@ -1,0 +1,388 @@
+"""
+self_correction.py — 自校正引擎（v2.0 新增）
+
+基于 self-improving-agent 的自校正机制：
+1. 错误检测 — 捕获对话/检索/生成中的错误
+2. 根因分析 — 判断是技能指导错误、执行错误还是环境变化
+3. 修正执行 — 更新模式库、调整参数、触发重新学习
+4. 验证修复 — 确认修正效果
+
+触发条件：
+- 用户明确指出回答错误（"不对"、"错了"、"不是这个"）
+- 检索结果与查询不相关（相似度 < 阈值）
+- LLM 回答"我不知道"或"知识库中未找到"
+- 反馈连续 dislike（同查询 ≥ 3 次）
+"""
+
+import json
+import logging
+import time
+from pathlib import Path
+from typing import Dict, List, Optional
+
+from src.config import DATA_DIR
+
+logger = logging.getLogger(__name__)
+
+CORRECTION_DIR = Path(DATA_DIR) / "corrections"
+CORRECTION_DIR.mkdir(parents=True, exist_ok=True)
+
+# 错误模式识别
+ERROR_PATTERNS = {
+    "user_correction": {
+        "keywords": ["不对", "错了", "不是", "错了", "纠正", "改正", "actually", "wrong"],
+        "weight": 1.0,
+    },
+    "knowledge_gap": {
+        "keywords": ["未找到", "不知道", "没有相关信息", "无法回答"],
+        "weight": 0.8,
+    },
+    "irrelevant_result": {
+        "keywords": ["不相关", "不匹配", "跑题", "答非所问"],
+        "weight": 0.9,
+    },
+    "repeated_dislike": {
+        "threshold": 3,  # 同查询 dislike ≥ 3 次
+        "weight": 0.95,
+    },
+}
+
+
+def detect_error(
+    query: str,
+    answer: str,
+    user_feedback: Optional[str] = None,
+    dislike_count: int = 0,
+) -> Optional[Dict]:
+    """检测回答是否存在错误
+
+    Returns:
+        None if no error detected, or error info dict
+    """
+    # 1. 用户明确指出错误
+    if user_feedback:
+        fb_lower = user_feedback.lower()
+        for pattern_name, config in ERROR_PATTERNS.items():
+            if pattern_name == "repeated_dislike":
+                continue
+            for kw in config["keywords"]:
+                if kw in fb_lower:
+                    return {
+                        "type": pattern_name,
+                        "confidence": config["weight"],
+                        "evidence": user_feedback[:200],
+                        "query": query[:200],
+                        "answer": answer[:200],
+                    }
+
+    # 2. 回答中包含"不知道"模式
+    answer_lower = answer.lower()
+    uncertainty_markers = ["未找到", "不知道", "无法确定", "没有相关信息", "抱歉", "我不确定"]
+    for marker in uncertainty_markers:
+        if marker in answer_lower:
+            return {
+                "type": "knowledge_gap",
+                "confidence": 0.7,
+                "evidence": marker,
+                "query": query[:200],
+                "answer": answer[:200],
+            }
+
+    # 3. 连续 dislike
+    if dislike_count >= ERROR_PATTERNS["repeated_dislike"]["threshold"]:
+        return {
+            "type": "repeated_dislike",
+            "confidence": ERROR_PATTERNS["repeated_dislike"]["weight"],
+            "evidence": f"dislike_count={dislike_count}",
+            "query": query[:200],
+            "answer": answer[:200],
+        }
+
+    return None
+
+
+def analyze_root_cause(error: Dict) -> Dict:
+    """分析错误根因
+
+    Returns:
+        root_cause analysis with recommended action
+    """
+    error_type = error.get("type", "unknown")
+
+    if error_type == "user_correction":
+        return {
+            "cause": "answer_incorrect",
+            "description": "回答内容与事实不符",
+            "action": "update_knowledge",
+            "priority": "high",
+        }
+    elif error_type == "knowledge_gap":
+        return {
+            "cause": "missing_knowledge",
+            "description": "知识库中缺少相关信息",
+            "action": "trigger_ingestion",
+            "priority": "medium",
+        }
+    elif error_type == "irrelevant_result":
+        return {
+            "cause": "retrieval_mismatch",
+            "description": "检索结果与查询不匹配",
+            "action": "adjust_retrieval",
+            "priority": "high",
+        }
+    elif error_type == "repeated_dislike":
+        return {
+            "cause": "systematic_failure",
+            "description": "同类查询反复失败，存在系统性问题",
+            "action": "pattern_review",
+            "priority": "critical",
+        }
+    else:
+        return {
+            "cause": "unknown",
+            "description": "未知错误类型",
+            "action": "manual_review",
+            "priority": "low",
+        }
+
+
+def record_correction(
+    query: str,
+    error: Dict,
+    root_cause: Dict,
+    correction_applied: str,
+    correction_type: str = "auto",
+) -> Dict:
+    """记录一次自校正事件
+
+    Args:
+        query: 原始查询
+        error: 错误信息
+        root_cause: 根因分析
+        correction_applied: 应用的修正内容
+        correction_type: 修正类型（auto/manual/suggested）
+
+    Returns:
+        校正记录
+    """
+    record = {
+        "id": f"corr-{time.strftime('%Y%m%d-%H%M%S')}",
+        "timestamp": time.time(),
+        "time_str": time.strftime("%Y-%m-%d %H:%M:%S"),
+        "query": query[:200],
+        "error": error,
+        "root_cause": root_cause,
+        "correction_applied": correction_applied,
+        "correction_type": correction_type,
+        "verified": False,
+        "verification_result": None,
+    }
+
+    # 写入日志
+    corr_file = CORRECTION_DIR / f"{time.strftime('%Y-%m-%d')}.jsonl"
+    with open(corr_file, "a", encoding="utf-8") as f:
+        f.write(json.dumps(record, ensure_ascii=False) + "\n")
+
+    # 同步写入进化日志
+    try:
+        from src.services.pattern_store import _log_evolution
+
+        _log_evolution(
+            "self_correction",
+            record["id"],
+            {
+                "error_type": error.get("type"),
+                "root_cause": root_cause.get("cause"),
+                "correction_type": correction_type,
+            },
+        )
+    except ImportError:
+        pass
+
+    logger.info(f"[SelfCorrection] 校正记录: {record['id']} ({error.get('type')})")
+    return record
+
+
+def get_recent_corrections(days: int = 7) -> List[Dict]:
+    """获取最近的校正记录"""
+    corrections = []
+    for i in range(days):
+        date_str = time.strftime("%Y-%m-%d", time.localtime(time.time() - i * 86400))
+        corr_file = CORRECTION_DIR / f"{date_str}.jsonl"
+        if corr_file.exists():
+            for line in corr_file.read_text(encoding="utf-8").strip().split("\n"):
+                if line.strip():
+                    try:
+                        corrections.append(json.loads(line))
+                    except json.JSONDecodeError:
+                        continue
+    return corrections
+
+
+def get_correction_stats() -> Dict:
+    """获取校正统计"""
+    corrections = get_recent_corrections(30)
+    by_type = {}
+    by_cause = {}
+    verified = 0
+    total = len(corrections)
+
+    for c in corrections:
+        etype = c.get("error", {}).get("type", "unknown")
+        cause = c.get("root_cause", {}).get("cause", "unknown")
+        by_type[etype] = by_type.get(etype, 0) + 1
+        by_cause[cause] = by_cause.get(cause, 0) + 1
+        if c.get("verified"):
+            verified += 1
+
+    return {
+        "total_corrections": total,
+        "verified": verified,
+        "by_error_type": by_type,
+        "by_root_cause": by_cause,
+        "verification_rate": round(verified / total, 3) if total > 0 else 0,
+    }
+
+
+# ============================================================================
+# v1.50 安全修复: 自校正主入口 (集成 SafetyCritic 幻觉检测)
+# ============================================================================
+
+
+async def correct(
+    query: str,
+    answer: str,
+    context: str = "",
+    user_feedback: Optional[str] = None,
+    dislike_count: int = 0,
+) -> Dict:
+    """自校正主入口 — 检测错误、分析根因、触发修正
+
+    v1.50 安全修复: 集成 SafetyCritic 幻觉检测
+    - 在错误检测后、根因分析前，调用 SafetyCritic 检测幻觉
+    - 如果 SafetyCritic 不可用，静默降级（ImportError）
+
+    Args:
+        query:          用户原始查询
+        answer:         模型生成的回答
+        context:        检索上下文（用于幻觉检测）
+        user_feedback:  用户反馈文本
+        dislike_count:  同查询 dislike 计数
+
+    Returns:
+        {
+            "has_error": bool,
+            "error": dict | None,
+            "root_cause": dict | None,
+            "hallucination_report": dict | None,  # v1.50 新增
+            "correction_record": dict | None,
+        }
+    """
+    result = {
+        "has_error": False,
+        "error": None,
+        "root_cause": None,
+        "hallucination_report": None,
+        "correction_record": None,
+    }
+
+    # 1. 基础错误检测
+    error = detect_error(query, answer, user_feedback, dislike_count)
+    if not error:
+        # 即使基础检测未发现错误，也尝试 SafetyCritic 幻觉检测
+        if context:
+            try:
+                from src.services.safety_critic import get_safety_critic
+
+                critic = get_safety_critic()
+                report = await critic.detect_hallucination(
+                    query=query,
+                    response=answer,
+                    context=context,
+                    use_llm=True,
+                    threshold=0.3,
+                )
+                if report.has_hallucination:
+                    # SafetyCritic 发现幻觉 → 升级为错误
+                    error = {
+                        "type": "hallucination_detected",
+                        "confidence": report.overall_score,
+                        "evidence": f"幻觉得分: {report.overall_score:.3f}, " f"spans={len(report.spans)}",
+                        "query": query[:200],
+                        "answer": answer[:200],
+                        "dimensions": {
+                            "fabrication": report.fabrication_score,
+                            "fact_distortion": report.fact_distortion_score,
+                            "logic_contradiction": report.logic_contradiction_score,
+                        },
+                    }
+                    result["hallucination_report"] = {
+                        "report_id": report.report_id,
+                        "overall_score": report.overall_score,
+                        "has_hallucination": True,
+                        "spans_count": len(report.spans),
+                        "spans": [
+                            {"type": s.get("type"), "text": s.get("text", "")[:80], "reason": s.get("reason", "")}
+                            for s in report.spans[:5]
+                        ],
+                        "recommendations": report.recommendations,
+                        "flags": report.flags,
+                        "detection_method": report.detection_method,
+                        "latency_ms": report.latency_ms,
+                    }
+                    logger.warning(
+                        f"[SelfCorrection] SafetyCritic 发现幻觉: "
+                        f"score={report.overall_score:.3f}, "
+                        f"spans={len(report.spans)}, "
+                        f"query={query[:80]}"
+                    )
+            except ImportError:
+                logger.debug("[SelfCorrection] SafetyCritic 不可用，跳过幻觉检测")
+            except Exception as e:
+                logger.warning(f"[SelfCorrection] SafetyCritic 检测异常: {e}")
+
+        if not error:
+            return result
+
+    # 2. 根因分析
+    result["has_error"] = True
+    result["error"] = error
+    root_cause = analyze_root_cause(error)
+    result["root_cause"] = root_cause
+
+    # 3. 记录校正事件
+    correction_applied = _auto_correct(error, root_cause)
+    record = record_correction(
+        query=query,
+        error=error,
+        root_cause=root_cause,
+        correction_applied=correction_applied,
+        correction_type="auto" if error.get("type") != "hallucination_detected" else "safety_critic",
+    )
+    result["correction_record"] = record
+
+    logger.info(
+        f"[SelfCorrection] 校正完成: {record['id']}, "
+        f"error_type={error.get('type')}, cause={root_cause.get('cause')}"
+    )
+    return result
+
+
+def _auto_correct(error: Dict, root_cause: Dict) -> str:
+    """自动修正策略（基于根因分析）
+
+    Returns:
+        修正动作描述
+    """
+    action = root_cause.get("action", "manual_review")
+
+    if action == "update_knowledge":
+        return "已标记待更新知识条目，下次 Dream Cycle 将处理"
+    elif action == "trigger_ingestion":
+        return "已标记知识盲区，建议补充相关文档"
+    elif action == "adjust_retrieval":
+        return "已记录检索失败案例，下次索引更新将优化"
+    elif action == "pattern_review":
+        return "已触发模式审查流程，等待人工确认"
+    else:
+        return "已记录待人工审查"

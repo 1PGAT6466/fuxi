@@ -1,0 +1,22 @@
+﻿{
+    "description":  "这是一个示例插件，用于演示插件系统功能",
+    "type":  "service",
+    "entry_point":  "main.py",
+    "version":  "1.0.0",
+    "display_name":  "示例插件",
+    "events":  [
+                   {
+                       "type":  "plugin_installed",
+                       "handler":  "on_installed"
+                   }
+               ],
+    "name":  "example-plugin",
+    "author":  "帝八",
+    "routes":  [
+                   {
+                       "path":  "/api/plugins/example/hello",
+                       "handler":  "hello_handler",
+                       "method":  "GET"
+                   }
+               ]
+}

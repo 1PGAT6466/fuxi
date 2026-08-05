@@ -20,6 +20,7 @@ def get_router() -> APIRouter:
     global _router
     if _router is None:
         from src.services.ai_tools.routes import router
+
         _router = router
     return _router
 
@@ -34,6 +35,7 @@ def start_service() -> None:
     try:
         # 检查 LLM 环境变量
         import os
+
         api_key = os.getenv("MIMO_API_KEY") or os.getenv("SILICONFLOW_API_KEY")
         base_url = os.getenv("MIMO_BASE_URL") or os.getenv("SILICONFLOW_BASE_URL")
         if api_key:

@@ -2,12 +2,14 @@
 files_alias.py - /api/files 路由别名
 将 documents 和 upload 端点映射到 /api/files 前缀
 """
+
 import asyncio
-from fastapi import APIRouter, HTTPException, Request
-from pathlib import Path
-import os
 import hashlib
 import logging
+import os
+from pathlib import Path
+
+from fastapi import APIRouter, HTTPException, Request
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +24,7 @@ UPLOAD_DIR = Path(CONFIG_UPLOAD_DIR)
 async def files_list(request: Request, page: int = 1, page_size: int = 50):
     """文件列表 - 别名 /api/documents"""
     from src.api.documents import documents
+
     return await documents(request=request, page=page, page_size=page_size)
 
 
@@ -29,11 +32,13 @@ async def files_list(request: Request, page: int = 1, page_size: int = 50):
 async def files_upload(request: Request):
     """文件上传 - 别名 /api/upload"""
     from src.api.documents import upload
+
     form = await request.form()
     file = form.get("file")
     if file is None:
         raise HTTPException(400, "缺少 file 字段")
-    return await upload(file=file, request=request)
+    relative_path = form.get("relative_path")
+    return await upload(file=file, relative_path=relative_path, request=request)
 
 
 @router.delete("/api/files/{file_id}")

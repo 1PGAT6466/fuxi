@@ -1,6 +1,6 @@
 <!--
-  伏羲 v2.1 — 拖拽上传区
-  支持拖拽/点击上传，进度显示，多文件支持
+  伏羲 v2.2 — 拖拽上传区
+  支持拖拽/点击上传，文件夹上传，进度显示，多文件支持
 -->
 <template>
   <div class="upload-zone">
@@ -11,7 +11,7 @@
       multiple
       :auto-upload="false"
       :file-list="fileList"
-      :limit="20"
+      :limit="100"
       :on-change="handleChange"
       :on-exceed="handleExceed"
       action="#"
@@ -20,8 +20,15 @@
         <el-icon class="upload-icon" :size="40"><UploadFilled /></el-icon>
         <div class="upload-text">将文件拖拽到此处，或 <em>点击上传</em></div>
         <div class="upload-hint">支持 PDF、DOCX、XLSX、TXT、Markdown、CSV 等格式</div>
+        <div class="upload-actions">
+          <el-button size="small" type="primary" @click.stop="selectFolder">
+            <el-icon><FolderOpened /></el-icon>
+            选择文件夹
+          </el-button>
+        </div>
       </div>
     </el-upload>
+    <input ref="folderInputRef" type="file" webkitdirectory directory multiple style="display: none" @change="handleFolderSelect" />
 
     <!-- 上传进度 -->
     <div v-if="fileList.length > 0" class="upload-progress">
@@ -59,7 +66,7 @@
 <script setup lang="ts">
 import { ref } from 'vue';
 import { ElMessage } from 'element-plus';
-import { UploadFilled, Document, Close } from '@element-plus/icons-vue';
+import { UploadFilled, Document, Close, FolderOpened } from '@element-plus/icons-vue';
 import { formatSize } from '@/utils/helpers';
 import { useFileStore } from '@/stores/files';
 import type { UploadFile, UploadInstance } from 'element-plus';
@@ -70,7 +77,9 @@ const emit = defineEmits<{
 
 const fileStore = useFileStore();
 const uploadRef = ref<UploadInstance>();
+const folderInputRef = ref<HTMLInputElement>();
 const fileList = ref<UploadFile[]>([]);
+const isFolderUpload = ref(false);
 const uploading = ref(false);
 const uploadProgress = ref<number[]>([]);
 const uploadErrors = ref<boolean[]>([]);
@@ -79,6 +88,43 @@ function handleChange(_file: UploadFile, files: UploadFile[]): void {
   fileList.value = files;
   uploadProgress.value = [];
   uploadErrors.value = [];
+}
+
+function selectFolder(): void {
+  folderInputRef.value?.click();
+}
+
+function handleFolderSelect(event: Event): void {
+  const input = event.target as HTMLInputElement;
+  const files = input.files;
+  if (!files || files.length === 0) return;
+
+  isFolderUpload.value = true;
+  const newFiles: UploadFile[] = [];
+
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    // Skip hidden files and system files
+    if (file.name.startsWith('.') || file.name === 'Thumbs.db' || file.name === 'desktop.ini') continue;
+
+    // Get relative path from webkitRelativePath
+    const relativePath = (file as any).webkitRelativePath || file.name;
+
+    newFiles.push({
+      name: relativePath,
+      raw: file,
+      size: file.size,
+      uid: Date.now() + i,
+      status: 'ready'
+    } as UploadFile);
+  }
+
+  fileList.value = [...fileList.value, ...newFiles];
+  uploadProgress.value = [];
+  uploadErrors.value = [];
+
+  ElMessage.success(`已选择文件夹，共 ${newFiles.length} 个文件`);
+  input.value = ''; // Reset input
 }
 
 function handleExceed(): void {
@@ -111,7 +157,11 @@ async function startUpload(): Promise<void> {
   for (let i = 0; i < fileList.value.length; i++) {
     try {
       uploadProgress.value[i] = 0;
-      await fileStore.uploadFile(fileList.value[i].raw as File);
+
+      const file = fileList.value[i];
+      const relativePath = isFolderUpload.value ? file.name : undefined;
+
+      await fileStore.uploadFile(file.raw as File, relativePath);
       uploadProgress.value[i] = 100;
       successCount++;
     } catch {
@@ -122,6 +172,7 @@ async function startUpload(): Promise<void> {
   }
 
   uploading.value = false;
+  isFolderUpload.value = false;
 
   if (successCount > 0) {
     ElMessage.success(
@@ -194,6 +245,10 @@ async function startUpload(): Promise<void> {
 .upload-hint {
   font-size: 12px;
   color: var(--fuxi-text-tertiary);
+}
+
+.upload-actions {
+  margin-top: 12px;
 }
 
 /* ───── 进度区 ───── */

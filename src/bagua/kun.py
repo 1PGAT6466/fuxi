@@ -38,14 +38,11 @@ Phase 1 器官迁移：
 """
 
 
-import hashlib
-import json
-import logging
-import os
-import re
 import sqlite3
-import time
-from typing import Any, Dict, List, Optional, Tuple
+from src.bagua._common import (
+    hashlib, json, logging, os, re, time,
+    Any, Dict, List, Optional, Tuple,
+)
 
 from src.bagua.base_gua import (
     GuaBase,

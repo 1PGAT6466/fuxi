@@ -1,7 +1,9 @@
 """
 kg_extractor.py — Phase 5.3: 知识图谱 LLM 抽取 + 实体消歧 + 增量更新
 """
-import json, logging
+
+import json
+import logging
 from typing import Dict, List
 
 logger = logging.getLogger(__name__)
@@ -26,7 +28,8 @@ RELATION_PROMPT = """从以下工业文档中抽取实体间关系。只输出 J
 
 async def extract_entities_llm(text: str, file_name: str) -> List[Dict]:
     """LLM 抽取实体"""
-    from src.services.llm import call_llm
+    from src.infra import call_llm
+
     prompt = ENTITY_PROMPT.format(file_name=file_name, text=text[:3000])
     result = await call_llm(prompt, max_tokens=2000)
     if result:
@@ -42,7 +45,8 @@ async def extract_entities_llm(text: str, file_name: str) -> List[Dict]:
 
 async def extract_relations_llm(text: str, entities: List[Dict]) -> List[Dict]:
     """LLM 抽取关系"""
-    from src.services.llm import call_llm
+    from src.infra import call_llm
+
     entity_names = [e["name"] for e in entities[:15]]
     prompt = RELATION_PROMPT.format(entities=json.dumps(entity_names, ensure_ascii=False), text=text[:3000])
     result = await call_llm(prompt, max_tokens=1500)
@@ -59,11 +63,11 @@ async def extract_relations_llm(text: str, entities: List[Dict]) -> List[Dict]:
 
 class EntityResolver:
     """实体消歧"""
-    
+
     def __init__(self):
         self._alias_map: Dict[str, str] = {}
         self._entities: Dict[str, dict] = {}
-    
+
     def resolve(self, name: str, entity_type: str = "") -> str:
         """实体消歧：返回统一名称"""
         name_lower = name.lower().strip()
@@ -82,16 +86,17 @@ class EntityResolver:
         self._entities[name] = {"type": entity_type}
         self._alias_map[name_lower] = name
         return name
-    
+
     def get_entity(self, name: str) -> dict:
         name = self.resolve(name)
         return self._entities.get(name, {})
-    
+
     def get_stats(self) -> dict:
         return {"entities": len(self._entities), "aliases": len(self._alias_map)}
 
 
 _resolver = None
+
 
 def get_entity_resolver() -> EntityResolver:
     global _resolver

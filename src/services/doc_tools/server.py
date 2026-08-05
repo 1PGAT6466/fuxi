@@ -22,6 +22,7 @@ def get_router() -> APIRouter:
     global _router
     if _router is None:
         from src.services.doc_tools.routes import router
+
         _router = router
     return _router
 
@@ -38,12 +39,14 @@ def start_service() -> None:
         # 检查依赖
         try:
             import pypdf
+
             logger.info(f"pypdf {pypdf.__version__} 可用")
         except ImportError:
             logger.warning("pypdf 未安装 — PDF 功能将受限")
 
         try:
             from PIL import Image
+
             logger.info(f"Pillow {Image.__version__} 可用")
         except ImportError:
             logger.warning("Pillow 未安装 — 图片功能将受限")
@@ -68,6 +71,7 @@ def stop_service() -> None:
 
     # 清理临时目录
     import shutil
+
     if TEMP_DIR.exists():
         try:
             shutil.rmtree(str(TEMP_DIR))

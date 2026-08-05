@@ -2,7 +2,9 @@
 judge_v2.py — LLM-as-Judge 答案质量评分 (v1.50)
 用 MiMo 2.5 Pro 自动评估答案质量
 """
-import json, logging
+
+import json
+import logging
 from typing import Dict
 
 logger = logging.getLogger(__name__)
@@ -29,7 +31,8 @@ async def judge_answer(query: str, context: str, answer: str) -> Dict:
     返回: {"relevance": int, "faithfulness": int, "completeness": int, "citation_accuracy": int, "overall": int, "reason": str}
     """
     try:
-        from src.services.llm import call_llm_fast
+        from src.infra import call_llm_fast
+
         prompt = JUDGE_PROMPT.format(
             query=query[:500],
             context=context[:2000],
@@ -38,7 +41,7 @@ async def judge_answer(query: str, context: str, answer: str) -> Dict:
         result = await call_llm_fast(prompt, max_tokens=200, temperature=0.1)
         if not result:
             return {"overall": 0, "reason": "Judge 调用失败"}
-        
+
         # 解析 JSON
         try:
             # 尝试直接解析
@@ -47,7 +50,8 @@ async def judge_answer(query: str, context: str, answer: str) -> Dict:
         except json.JSONDecodeError:
             # 尝试提取 JSON
             import re
-            match = re.search(r'\{[^}]+\}', result)
+
+            match = re.search(r"\{[^}]+\}", result)
             if match:
                 try:
                     return json.loads(match.group())

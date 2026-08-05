@@ -29,38 +29,48 @@ Usage::
 """
 
 import logging
+
 logger = logging.getLogger(__name__)
 
+from src.evolution.dream_cycle import DreamCycle
+from src.evolution.engine import (
+    EvolutionCycleResult,
+    EvolutionEngine,
+    EvolutionStepResult,
+    get_evolution_engine,
+    get_evolution_health,
+    run_evolution_cycle,
+    run_scheduled_evolution_check,
+)
 from src.evolution.evolution_gua import EvolutionGua
+from src.evolution.evolver import (
+    EvolutionEvolver,
+    discover_entities_from_text,
+    evolve_knowledge_graph,
+    get_knowledge_graph_nodes,
+    get_knowledge_graph_stats,
+)
 from src.evolution.feedback_loop import (
     FeedbackLoop,
-    record_feedback,
-    has_feedback_loop,
-    get_feedback_loop_stats,
     clear_feedback_dedup_cache,
+    get_feedback_loop_stats,
+    has_feedback_loop,
+    record_feedback,
 )
 from src.evolution.learner import (
     EvolutionLearner,
-    learn_from_feedback,
     extract_new_terms,
-    get_personalized_boost,
     get_learner_stats,
-)
-from src.evolution.evolver import (
-    EvolutionEvolver,
-    evolve_knowledge_graph,
-    discover_entities_from_text,
-    get_knowledge_graph_stats,
-    get_knowledge_graph_nodes,
+    get_personalized_boost,
+    learn_from_feedback,
 )
 from src.evolution.lifecycle import (
     EvolutionLifecycle,
-    record_lifecycle_event,
     check_lifecycle_triggers,
-    get_lifecycle_candidates,
     classify_lifecycle_confidence,
+    get_lifecycle_candidates,
+    record_lifecycle_event,
 )
-from src.evolution.dream_cycle import DreamCycle
 
 __all__ = [
     # 核心
@@ -89,6 +99,14 @@ __all__ = [
     "check_lifecycle_triggers",
     "get_lifecycle_candidates",
     "classify_lifecycle_confidence",
+    # v1.50 Phase C: 进化引擎
+    "EvolutionEngine",
+    "EvolutionStepResult",
+    "EvolutionCycleResult",
+    "get_evolution_engine",
+    "run_evolution_cycle",
+    "run_scheduled_evolution_check",
+    "get_evolution_health",
     # v1.50 Phase C: Dream Cycle
     "DreamCycle",
 ]

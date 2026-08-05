@@ -1,7 +1,8 @@
-"""
+﻿"""
 server.py — 太阴·显化 对外接口中枢
 合并皮肤(屏障)+三焦(通道)的能力
 """
+
 import logging
 import time
 from typing import Dict
@@ -20,14 +21,15 @@ class TaiyinServer(SymbolBase):
             symbol_id="taiyin",
             name="太阴·显化",
             emoji="🌑",
-            description="对外接口中枢：一个入口，一个出口"
+            description="对外接口中枢：一个入口，一个出口",
         )
         self._request_count = 0
         self._error_count = 0
 
     async def handle_query(self, query: str, history: list = None, trace_id: str = None) -> Dict:
         """处理用户查询 — 路由到少阴"""
-        from src.infra.logging import get_trace_id
+        from src.infra.fuxi_logging import get_trace_id
+
         if not trace_id:
             trace_id = get_trace_id()
 
@@ -55,10 +57,14 @@ class TaiyinServer(SymbolBase):
             # 记录成长数据
             try:
                 from src.growth.growth_recorder import GrowthRecordPoints
+
                 recorder = GrowthRecordPoints()
                 await recorder.record_taiyin_request(
-                    trace_id=trace_id, endpoint="/api/chat",
-                    method="POST", status_code=200, duration_ms=duration,
+                    trace_id=trace_id,
+                    endpoint="/api/chat",
+                    method="POST",
+                    status_code=200,
+                    duration_ms=duration,
                 )
             except Exception as e:  # TODO: Narrow exception type
                 logger.warning("Exception 失败: %s", e, exc_info=True)
@@ -74,11 +80,15 @@ class TaiyinServer(SymbolBase):
             # 记录错误
             try:
                 from src.growth.growth_recorder import GrowthRecordPoints
+
                 recorder = GrowthRecordPoints()
                 duration = (time.time() - start_time) * 1000
                 await recorder.record_taiyin_request(
-                    trace_id=trace_id or "", endpoint="/api/chat",
-                    method="POST", status_code=500, duration_ms=duration,
+                    trace_id=trace_id or "",
+                    endpoint="/api/chat",
+                    method="POST",
+                    status_code=500,
+                    duration_ms=duration,
                 )
             except Exception as e:  # TODO: Narrow exception type
                 logger.warning("Exception 失败: %s", e, exc_info=True)
@@ -92,7 +102,8 @@ class TaiyinServer(SymbolBase):
 
     async def handle_search(self, query: str, top_k: int = 10, trace_id: str = None) -> Dict:
         """处理搜索请求 — 路由到太阳"""
-        from src.infra.logging import get_trace_id
+        from src.infra.fuxi_logging import get_trace_id
+
         if not trace_id:
             trace_id = get_trace_id()
 
@@ -111,6 +122,7 @@ class TaiyinServer(SymbolBase):
                 results = await taiyang.refine(query, top_k=top_k, trace_id=trace_id)
             else:
                 from src.taiyang.retrieval import hybrid_search
+
                 results = await hybrid_search(query, top_k=top_k)
 
             duration = (time.time() - start_time) * 1000
@@ -118,10 +130,14 @@ class TaiyinServer(SymbolBase):
             # 记录成长数据
             try:
                 from src.growth.growth_recorder import GrowthRecordPoints
+
                 recorder = GrowthRecordPoints()
                 await recorder.record_taiyin_request(
-                    trace_id=trace_id, endpoint="/api/search",
-                    method="GET", status_code=200, duration_ms=duration,
+                    trace_id=trace_id,
+                    endpoint="/api/search",
+                    method="GET",
+                    status_code=200,
+                    duration_ms=duration,
                 )
             except Exception as e:  # TODO: Narrow exception type
                 logger.warning("Exception 失败: %s", e, exc_info=True)
@@ -140,11 +156,15 @@ class TaiyinServer(SymbolBase):
             # 记录错误
             try:
                 from src.growth.growth_recorder import GrowthRecordPoints
+
                 recorder = GrowthRecordPoints()
                 duration = (time.time() - start_time) * 1000
                 await recorder.record_taiyin_request(
-                    trace_id=trace_id or "", endpoint="/api/search",
-                    method="GET", status_code=500, duration_ms=duration,
+                    trace_id=trace_id or "",
+                    endpoint="/api/search",
+                    method="GET",
+                    status_code=500,
+                    duration_ms=duration,
                 )
             except Exception as e:  # TODO: Narrow exception type
                 logger.warning("Exception 失败: %s", e, exc_info=True)
@@ -153,7 +173,8 @@ class TaiyinServer(SymbolBase):
 
     async def handle_ingest(self, file_path: str, source: str = "upload", trace_id: str = None) -> Dict:
         """处理入库请求 — 路由到少阳"""
-        from src.infra.logging import get_trace_id
+        from src.infra.fuxi_logging import get_trace_id
+
         if not trace_id:
             trace_id = get_trace_id()
 
@@ -169,6 +190,7 @@ class TaiyinServer(SymbolBase):
                 result = await shaoyang.digest(file_path, source=source)
             else:
                 from src.shaoyang.pipeline import ShaoyangPipeline
+
                 pipeline = ShaoyangPipeline(self.meridian)
                 result = await pipeline.digest(file_path, source=source)
 
@@ -191,8 +213,8 @@ class TaiyinServer(SymbolBase):
     async def _fallback_query(self, query: str, trace_id: str) -> Dict:
         """降级查询（少阴不可用时）"""
         try:
-            from src.taiyang.retrieval import hybrid_search
             from src.infra.llm import call_llm
+            from src.taiyang.retrieval import hybrid_search
 
             results = await hybrid_search(query, top_k=5)
             context = "\n".join([r.get("text", "")[:200] for r in results[:3]])

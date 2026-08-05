@@ -17,27 +17,29 @@ reindex_events.py — Phase A 全量回灌脚本
   --delay D    两个 chunk 之间的延迟（秒，默认 1.0，用于 LLM 速率限制）
   --db PATH    SQLite 数据库路径（默认 data/chunks.db）
 """
-import sys
-import os
-import asyncio
+
 import argparse
+import asyncio
 import logging
+import os
 import struct
+import sys
 from pathlib import Path
 
 # Ensure repo root is on path
 repo_root = Path(__file__).resolve().parent.parent.parent
 sys.path.insert(0, str(repo_root))
 import secrets as _secrets
-os.environ.setdefault('FUXI_JWT_SECRET', os.environ.get('FUXI_JWT_SECRET') or _secrets.token_hex(32))
+
+os.environ.setdefault("FUXI_JWT_SECRET", os.environ.get("FUXI_JWT_SECRET") or _secrets.token_hex(32))
 
 from src.db.memory_store import MemoryStore, get_store
 from src.shaoyang.extractor import SAGExtractor
 
 logging.basicConfig(
     level=logging.INFO,
-    format='%(asctime)s [%(name)s] %(levelname)s: %(message)s',
-    datefmt='%H:%M:%S',
+    format="%(asctime)s [%(name)s] %(levelname)s: %(message)s",
+    datefmt="%H:%M:%S",
 )
 logger = logging.getLogger("reindex_events")
 
@@ -46,14 +48,12 @@ async def vectorize_event(store: MemoryStore, row_id: int, event_id: str, conten
     """为单个事件生成 embedding 并存入 BLOB"""
     try:
         from src.db.vector_store import embed_texts
+
         embeddings = await embed_texts([content])
         if embeddings and embeddings[0]:
             emb = embeddings[0]
-            blob = struct.pack(f'{len(emb)}f', *emb)
-            store._db_conn.execute(
-                "UPDATE events SET embedding=? WHERE id=?",
-                (blob, row_id)
-            )
+            blob = struct.pack(f"{len(emb)}f", *emb)
+            store._db_conn.execute("UPDATE events SET embedding=? WHERE id=?", (blob, row_id))
             store._db_conn.commit()
             return True
     except Exception as e:  # TODO: Narrow exception type
@@ -95,8 +95,8 @@ async def reindex(args) -> None:
             continue
 
         progress = f"[{i+1}/{len(chunks)}]"
-        chunk_preview = chunk_text[:50].replace('\n', ' ')
-        logger.info(f"  {progress} chunk={chunk_id[:30]}... text=\"{chunk_preview}...\"")
+        chunk_preview = chunk_text[:50].replace("\n", " ")
+        logger.info(f'  {progress} chunk={chunk_id[:30]}... text="{chunk_preview}..."')
 
         if args.dry_run:
             logger.info(f"  {progress} [DRY RUN] 跳过实际调用")
@@ -110,7 +110,7 @@ async def reindex(args) -> None:
                     "file_hash": file_hash,
                     "file_name": file_name,
                     "category": chunk.get("category", ""),
-                }
+                },
             )
 
             chunk_events = len(extraction.events)
@@ -132,9 +132,7 @@ async def reindex(args) -> None:
                 if row_id:
                     content = event_data.get("content") or event_data.get("summary", "") or event_data.get("title", "")
                     if content:
-                        vec_ok = await vectorize_event(
-                            store, row_id, event_data.get("event_id", ""), content
-                        )
+                        vec_ok = await vectorize_event(store, row_id, event_data.get("event_id", ""), content)
                         if vec_ok:
                             total_vectorized += 1
 
@@ -151,18 +149,20 @@ async def reindex(args) -> None:
             logger.warning(f"  {progress} 提取失败: {error_msg}")
             # 写入 pending 标记
             try:
-                store.add_event({
-                    "event_id": f"evt_reindex_pending_{chunk_id[:50]}",
-                    "chunk_id": chunk_id,
-                    "title": "[REINDEX PENDING]",
-                    "content": f"Reindex pending. Error: {error_msg[:200]}",
-                    "entities": [],
-                    "event_type": "pending",
-                    "file_hash": file_hash,
-                    "file_name": file_name,
-                    "status": "pending",
-                })
-            except Exception:  # TODO: Narrow exception type
+                store.add_event(
+                    {
+                        "event_id": f"evt_reindex_pending_{chunk_id[:50]}",
+                        "chunk_id": chunk_id,
+                        "title": "[REINDEX PENDING]",
+                        "content": f"Reindex pending. Error: {error_msg[:200]}",
+                        "entities": [],
+                        "event_type": "pending",
+                        "file_hash": file_hash,
+                        "file_name": file_name,
+                        "status": "pending",
+                    }
+                )
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
                 pass
 
         # 速率限制

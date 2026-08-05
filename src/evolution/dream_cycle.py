@@ -1,4 +1,5 @@
 import asyncio
+
 """
 dream_cycle.py — 第九宫·中宫：24/7 后台神经消化循环
 
@@ -25,7 +26,7 @@ import os
 import re
 import time
 from collections import Counter
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
@@ -61,8 +62,7 @@ ENTITY_PATTERNS: Dict[str, "re.Pattern"] = {
         r"|(?:\b[A-Z][a-zA-Z]*\s*(?:v?\d+(?:\.\d+)*)|(?:Pro|Lite|Ultra|Enterprise))\b",
     ),
     "date": re.compile(
-        r"\b\d{4}[-/\u5e74]\d{1,2}[-/\u6708]\d{1,2}[\u65e5\u53f7]?"
-        r"|\b\d{4}[-/]\d{1,2}[-/]\d{1,2}\b",
+        r"\b\d{4}[-/\u5e74]\d{1,2}[-/\u6708]\d{1,2}[\u65e5\u53f7]?" r"|\b\d{4}[-/]\d{1,2}[-/]\d{1,2}\b",
     ),
     "amount": re.compile(
         r"(?:\u00a5|\uffe5|CNY|USD|\$)\s*\d[\d,]*(?:\.\d{1,2})?"
@@ -118,12 +118,62 @@ class DreamCycle:
         self._start_time = time.time()
         logger.info("[DreamCycle] init report_dir=%s", self._report_dir)
 
+    async def _get_last_run_time(self) -> Optional[datetime]:
+        """获取上次 Dream Cycle 运行时间
+
+        从报告目录中最新的 dream_data_*.json 文件读取 timestamp。
+
+        Returns:
+            上次运行的 datetime（UTC），如果无记录则返回 None
+        """
+        try:
+            data_files = sorted(
+                self._report_dir.glob("dream_data_*.json"),
+                reverse=True,
+            )
+            if not data_files:
+                return None
+
+            import asyncio
+
+            data = await asyncio.to_thread(lambda: json.loads(data_files[0].read_text(encoding="utf-8")))
+            ts_str = data.get("timestamp", "")
+            if not ts_str:
+                return None
+
+            # 解析 ISO 格式时间戳
+            try:
+                return datetime.fromisoformat(ts_str.replace("Z", "+00:00"))
+            except (ValueError, TypeError):
+                # 尝试其他格式
+                try:
+                    return datetime.strptime(ts_str, "%Y-%m-%dT%H:%M:%S.%f").replace(tzinfo=timezone.utc)
+                except (ValueError, TypeError):
+                    return None
+
+        except (OSError, json.JSONDecodeError) as e:
+            logger.debug("[DreamCycle] 获取上次运行时间失败: %s", e)
+            return None
+
     # ========================================================================
     # 主循环入口
     # ========================================================================
 
     async def run(self) -> str:
-        """主循环入口，由 cron 调度或手动触发"""
+        """主循环入口，由 cron 调度或手动触发
+
+        v1.50 安全修复: 频率限制 — 距离上次运行不足 6 小时则跳过
+        """
+        # v1.50 频率限制检查
+        last_run = await self._get_last_run_time()
+        now = datetime.now(timezone.utc)
+        if last_run and (now - last_run) < timedelta(hours=6):
+            logger.warning(
+                "[DreamCycle] 跳过：距离上次运行不足 6 小时 "
+                f"(last_run={last_run.isoformat()}, now={now.isoformat()})"
+            )
+            return "[DreamCycle] 跳过：距离上次运行不足 6 小时"
+
         logger.info("[DreamCycle] === night cycle start ===")
         start_ts = time.time()
 
@@ -148,12 +198,11 @@ class DreamCycle:
     async def digest_new(self) -> dict:
         """消化当日新入库文档"""
         logger.info("[DreamCycle] Phase 1/4: digest_new")
-        result: Dict[str, Any] = {
-            "new_docs": 0, "embedded": 0, "total_docs": 0, "errors": []
-        }
+        result: Dict[str, Any] = {"new_docs": 0, "embedded": 0, "total_docs": 0, "errors": []}
 
         try:
             from src.db.memory_store import get_store
+
             store = get_store()
             today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
 
@@ -173,16 +222,21 @@ class DreamCycle:
             if not new_chunks:
                 logger.info("[DreamCycle] digest: no new docs today")
                 try:
-                    total = store._db_conn.execute(
-                        "SELECT COUNT(*) FROM chunks"
-                    ).fetchone()
+                    total = store._db_conn.execute("SELECT COUNT(*) FROM chunks").fetchone()
                     result["total_docs"] = total[0] if total else 0
-                except Exception:  # TODO: Narrow exception type
+                except (
+                    OSError,
+                    ValueError,
+                    KeyError,
+                    ConnectionError,
+                    TimeoutError,
+                ) as e:  # TODO: Narrow exception type
                     result["total_docs"] = 0
                 return result
 
             try:
                 from src.db.vector_store import get_vector_store
+
                 vs = get_vector_store()
                 if vs is not None:
                     embedded_count = 0
@@ -194,12 +248,16 @@ class DreamCycle:
                             existing = vs._collection.get(ids=batch, include=[])
                             if existing and existing.get("ids"):
                                 embedded_count += len(existing["ids"])
-                        except Exception:  # TODO: Narrow exception type
+                        except (
+                            OSError,
+                            ValueError,
+                            KeyError,
+                            ConnectionError,
+                            TimeoutError,
+                        ) as e:  # TODO: Narrow exception type
                             pass
                     result["embedded"] = embedded_count
-                    result["total_docs"] = (
-                        vs.count() if vs.count() > 0 else len(new_chunks)
-                    )
+                    result["total_docs"] = vs.count() if vs.count() > 0 else len(new_chunks)
                 else:
                     result["errors"].append("VectorStore unavailable")
                     result["total_docs"] = len(new_chunks)
@@ -210,7 +268,9 @@ class DreamCycle:
 
             logger.info(
                 "[DreamCycle] digest: new=%d embedded=%d total=%d",
-                result["new_docs"], result["embedded"], result["total_docs"],
+                result["new_docs"],
+                result["embedded"],
+                result["total_docs"],
             )
 
         except Exception as e:  # TODO: Narrow exception type
@@ -227,12 +287,17 @@ class DreamCycle:
         """丰富化：补全实体缺失属性"""
         logger.info("[DreamCycle] Phase 2/4: enrich_entities")
         result: Dict[str, Any] = {
-            "new_entities": 0, "new_edges": 0, "total_entities": 0,
-            "total_edges": 0, "enriched": 0, "errors": [],
+            "new_entities": 0,
+            "new_edges": 0,
+            "total_entities": 0,
+            "total_edges": 0,
+            "enriched": 0,
+            "errors": [],
         }
 
         try:
             from src.db.memory_store import get_store
+
             store = get_store()
 
             try:
@@ -251,11 +316,15 @@ class DreamCycle:
             if not bare_entities:
                 logger.info("[DreamCycle] enrich: no bare entities")
                 try:
-                    total = store._db_conn.execute(
-                        "SELECT COUNT(*) FROM entities WHERE status='active'"
-                    ).fetchone()
+                    total = store._db_conn.execute("SELECT COUNT(*) FROM entities WHERE status='active'").fetchone()
                     result["total_entities"] = total[0] if total else 0
-                except Exception:  # TODO: Narrow exception type
+                except (
+                    OSError,
+                    ValueError,
+                    KeyError,
+                    ConnectionError,
+                    TimeoutError,
+                ) as e:  # TODO: Narrow exception type
                     pass
                 return result
 
@@ -272,19 +341,13 @@ class DreamCycle:
                         continue
 
                     chunk_id = chunk_ids[0]
-                    row = store._db_conn.execute(
-                        "SELECT doc FROM chunks WHERE id = ?", (chunk_id,)
-                    ).fetchone()
+                    row = store._db_conn.execute("SELECT doc FROM chunks WHERE id = ?", (chunk_id,)).fetchone()
                     if not row:
                         continue
 
                     context = row["doc"] or ""
-                    inferred_type = self._infer_entity_type(
-                        entity["name"], context
-                    )
-                    description = self._extract_entity_description(
-                        entity["name"], context
-                    )
+                    inferred_type = self._infer_entity_type(entity["name"], context)
+                    description = self._extract_entity_description(entity["name"], context)
 
                     if inferred_type or description:
                         update_fields = []
@@ -298,8 +361,7 @@ class DreamCycle:
                         if update_fields:
                             update_values.append(entity["entity_id"])
                             store._db_conn.execute(
-                                f"UPDATE entities SET {', '.join(update_fields)} "
-                                f"WHERE entity_id = ?",
+                                f"UPDATE entities SET {', '.join(update_fields)} " f"WHERE entity_id = ?",
                                 update_values,
                             )
                             store._db_conn.commit()
@@ -307,29 +369,30 @@ class DreamCycle:
                 except Exception as e:  # TODO: Narrow exception type
                     logger.debug(
                         "[DreamCycle] enrich single fail %s: %s",
-                        entity.get("name", "?"), e,
+                        entity.get("name", "?"),
+                        e,
                     )
 
             result["enriched"] = enriched_count
 
             try:
-                total = store._db_conn.execute(
-                    "SELECT COUNT(*) FROM entities WHERE status='active'"
-                ).fetchone()
+                total = store._db_conn.execute("SELECT COUNT(*) FROM entities WHERE status='active'").fetchone()
                 result["total_entities"] = total[0] if total else 0
-            except Exception:  # TODO: Narrow exception type
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
                 pass
 
             try:
                 from src.db.data_store import load_graph
+
                 graph = await asyncio.to_thread(load_graph)
                 result["total_edges"] = len(graph.get("edges", []))
-            except Exception:  # TODO: Narrow exception type
+            except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
                 pass
 
             logger.info(
                 "[DreamCycle] enrich: entities=%d enriched=%d",
-                result["total_entities"], result["enriched"],
+                result["total_entities"],
+                result["enriched"],
             )
 
         except Exception as e:  # TODO: Narrow exception type
@@ -346,11 +409,15 @@ class DreamCycle:
         """整合：合并语义相似度 > 阈值的重复 chunk"""
         logger.info("[DreamCycle] Phase 3/4: consolidate_duplicates")
         result: Dict[str, Any] = {
-            "duplicates_found": 0, "merged": 0, "candidates": 0, "errors": [],
+            "duplicates_found": 0,
+            "merged": 0,
+            "candidates": 0,
+            "errors": [],
         }
 
         try:
             from src.db.vector_store import get_vector_store
+
             vs = get_vector_store()
             if vs is None:
                 result["errors"].append("VectorStore unavailable")
@@ -365,15 +432,14 @@ class DreamCycle:
             candidates = 0
 
             try:
-                existing = vs._collection.get(
-                    limit=sample_size, include=["embeddings", "metadatas"]
-                )
+                existing = vs._collection.get(limit=sample_size, include=["embeddings", "metadatas"])
                 if not existing or not existing.get("ids"):
                     return result
 
                 ids = existing["ids"]
                 embeddings = existing.get("embeddings", [])
                 from src.db.memory_store import get_store
+
                 store = get_store()
 
                 for i in range(0, len(ids), 100):
@@ -385,7 +451,8 @@ class DreamCycle:
                             if not batch_emb or j >= len(batch_emb):
                                 continue
                             qr = vs.query(
-                                query_embedding=batch_emb[j], n_results=3,
+                                query_embedding=batch_emb[j],
+                                n_results=3,
                             )
                             if qr.get("error"):
                                 continue
@@ -403,27 +470,34 @@ class DreamCycle:
                                     try:
                                         raw_id = chunk_id.replace("chunk_", "")
                                         store._db_conn.execute(
-                                            "UPDATE chunks SET status = "
-                                            "'duplicate_candidate' WHERE id = ?",
+                                            "UPDATE chunks SET status = " "'duplicate_candidate' WHERE id = ?",
                                             (raw_id,),
                                         )
-                                    except Exception:  # TODO: Narrow exception type
+                                    except (
+                                        OSError,
+                                        ValueError,
+                                        KeyError,
+                                        ConnectionError,
+                                        TimeoutError,
+                                    ) as e:  # TODO: Narrow exception type
                                         pass
                                     break
                         except Exception as e:  # TODO: Narrow exception type
-                            logger.debug(
-                                "[DreamCycle] consolidate single fail: %s", e
-                            )
+                            logger.debug("[DreamCycle] consolidate single fail: %s", e)
 
                 try:
                     store._db_conn.commit()
-                except Exception:  # TODO: Narrow exception type
+                except (
+                    OSError,
+                    ValueError,
+                    KeyError,
+                    ConnectionError,
+                    TimeoutError,
+                ) as e:  # TODO: Narrow exception type
                     pass
 
             except Exception as e:  # TODO: Narrow exception type
-                logger.warning(
-                    "[DreamCycle] consolidate vector fail: %s", e
-                )
+                logger.warning("[DreamCycle] consolidate vector fail: %s", e)
                 result["errors"].append(f"vector: {e}")
 
             result["duplicates_found"] = duplicates_found
@@ -432,7 +506,8 @@ class DreamCycle:
 
             logger.info(
                 "[DreamCycle] consolidate: duplicates=%d candidates=%d",
-                duplicates_found, candidates,
+                duplicates_found,
+                candidates,
             )
 
         except Exception as e:  # TODO: Narrow exception type
@@ -449,12 +524,16 @@ class DreamCycle:
         """扫描知识盲区"""
         logger.info("[DreamCycle] Phase 4/4: gap_scan")
         result: Dict[str, Any] = {
-            "frequent_no_result": [], "suggested_topics": [],
-            "total_searches": 0, "gap_queries": 0, "errors": [],
+            "frequent_no_result": [],
+            "suggested_topics": [],
+            "total_searches": 0,
+            "gap_queries": 0,
+            "errors": [],
         }
 
         try:
             from src.db.data_store import search_history
+
             history = search_history(days=GAP_SCAN_DAYS)
             result["total_searches"] = len(history)
 
@@ -473,14 +552,16 @@ class DreamCycle:
                     or (ts_val is not None and ts_val < GAP_LOW_SCORE_THRESHOLD)
                     or (avs is not None and avs < GAP_LOW_SCORE_THRESHOLD * 0.6)
                 ):
-                    low_quality.append({
-                        "query": query,
-                        "results": rc,
-                        "top_score": ts_val,
-                        "avg_score": avs,
-                        "is_no_result": rc == 0,
-                        "timestamp": entry.get("time", ""),
-                    })
+                    low_quality.append(
+                        {
+                            "query": query,
+                            "results": rc,
+                            "top_score": ts_val,
+                            "avg_score": avs,
+                            "is_no_result": rc == 0,
+                            "timestamp": entry.get("time", ""),
+                        }
+                    )
 
             qc: Counter = Counter()
             qd: Dict[str, List[dict]] = {}
@@ -494,28 +575,23 @@ class DreamCycle:
             for query, count in qc.most_common(20):
                 if count >= 2:
                     details = qd.get(query, [])
-                    result["frequent_no_result"].append({
-                        "query": query,
-                        "frequency": count,
-                        "avg_results": (
-                            sum(d.get("results", 0) for d in details) / len(details)
-                            if details else 0
-                        ),
-                        "last_seen": (
-                            max(d.get("timestamp", "") for d in details)
-                            if details else ""
-                        ),
-                        "samples": details[:3],
-                    })
+                    result["frequent_no_result"].append(
+                        {
+                            "query": query,
+                            "frequency": count,
+                            "avg_results": (sum(d.get("results", 0) for d in details) / len(details) if details else 0),
+                            "last_seen": (max(d.get("timestamp", "") for d in details) if details else ""),
+                            "samples": details[:3],
+                        }
+                    )
 
             result["gap_queries"] = len(result["frequent_no_result"])
-            result["suggested_topics"] = [
-                item["query"] for item in result["frequent_no_result"][:10]
-            ]
+            result["suggested_topics"] = [item["query"] for item in result["frequent_no_result"][:10]]
 
             logger.info(
                 "[DreamCycle] gap_scan: searches=%d gaps=%d",
-                result["total_searches"], result["gap_queries"],
+                result["total_searches"],
+                result["gap_queries"],
             )
 
         except Exception as e:  # TODO: Narrow exception type
@@ -572,11 +648,13 @@ class DreamCycle:
 
         # Digest
         if nd > 0:
-            lines.extend([
-                "## Digest",
-                f"New chunks: {nd}, Vectorized: {emb}, Total: {td}",
-                "",
-            ])
+            lines.extend(
+                [
+                    "## Digest",
+                    f"New chunks: {nd}, Vectorized: {emb}, Total: {td}",
+                    "",
+                ]
+            )
             if d.get("errors"):
                 all_errors.extend(d["errors"])
         else:
@@ -584,33 +662,39 @@ class DreamCycle:
 
         # Enrich
         if enr > 0:
-            lines.extend([
-                "## Enrich",
-                f"Enriched entities: {enr}, Total entities: {te}",
-                "",
-            ])
+            lines.extend(
+                [
+                    "## Enrich",
+                    f"Enriched entities: {enr}, Total entities: {te}",
+                    "",
+                ]
+            )
         else:
             lines.extend(["## Enrich", "All entities complete.", ""])
 
         # Consolidate
         if dup > 0:
-            lines.extend([
-                "## Consolidate",
-                f"Found {dup} duplicate pairs (threshold > {DUPLICATE_SIMILARITY_THRESHOLD})",
-                "Marked as duplicate_candidate for manual review.",
-                "",
-            ])
+            lines.extend(
+                [
+                    "## Consolidate",
+                    f"Found {dup} duplicate pairs (threshold > {DUPLICATE_SIMILARITY_THRESHOLD})",
+                    "Marked as duplicate_candidate for manual review.",
+                    "",
+                ]
+            )
         else:
             lines.extend(["## Consolidate", "No duplicates found.", ""])
 
         # Gap Scan
         if gq > 0:
-            lines.extend([
-                "## Gap Scan",
-                f"Searches: {tsearch}, Gap queries: {gq} (last {GAP_SCAN_DAYS} days)",
-                "",
-                "### Frequent No-Result Queries",
-            ])
+            lines.extend(
+                [
+                    "## Gap Scan",
+                    f"Searches: {tsearch}, Gap queries: {gq} (last {GAP_SCAN_DAYS} days)",
+                    "",
+                    "### Frequent No-Result Queries",
+                ]
+            )
             for item in g.get("frequent_no_result", [])[:10]:
                 freq = item.get("frequency", 0)
                 query = item.get("query", "?")
@@ -625,11 +709,13 @@ class DreamCycle:
                     lines.append(f"- {topic}")
                 lines.append("")
         else:
-            lines.extend([
-                "## Gap Scan",
-                f"No knowledge gaps found in last {GAP_SCAN_DAYS} days.",
-                "",
-            ])
+            lines.extend(
+                [
+                    "## Gap Scan",
+                    f"No knowledge gaps found in last {GAP_SCAN_DAYS} days.",
+                    "",
+                ]
+            )
 
         # Errors
         for _cat, data in results.items():
@@ -644,11 +730,13 @@ class DreamCycle:
                 lines.append(f"- {err}")
             lines.append("")
 
-        lines.extend([
-            "---",
-            "",
-            "*Fuxi Night Dream v1.50 -- Palace 9 Dream Cycle*",
-        ])
+        lines.extend(
+            [
+                "---",
+                "",
+                "*Fuxi Night Dream v1.50 -- Palace 9 Dream Cycle*",
+            ]
+        )
 
         report = "\n".join(lines)
         self._save_report(report, results)
@@ -664,11 +752,15 @@ class DreamCycle:
             fp.write_text(report, encoding="utf-8")
             jp = self._report_dir / f"dream_data_{ts}.json"
             jp.write_text(
-                json.dumps({
-                    "timestamp": now.isoformat(),
-                    "results": results,
-                    "report_path": str(fp),
-                }, ensure_ascii=False, indent=2),
+                json.dumps(
+                    {
+                        "timestamp": now.isoformat(),
+                        "results": results,
+                        "report_path": str(fp),
+                    },
+                    ensure_ascii=False,
+                    indent=2,
+                ),
                 encoding="utf-8",
             )
             logger.info("[DreamCycle] report saved: %s", fp)
@@ -681,6 +773,7 @@ class DreamCycle:
         try:
             try:
                 from src.services.feature_flags import is_enabled
+
                 if not is_enabled("enable_dream_cycle_notifications"):
                     logger.info("[DreamCycle] notifications disabled via flag")
                     return False
@@ -743,9 +836,7 @@ class DreamCycle:
                 return pattern_name
         return None
 
-    def _extract_entity_description(
-        self, name: str, context: str
-    ) -> Optional[str]:
+    def _extract_entity_description(self, name: str, context: str) -> Optional[str]:
         """从上下文中提取实体描述"""
         if not name or not context or name not in context:
             return None
