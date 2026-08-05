@@ -1021,7 +1021,7 @@ class QianGua(GuaBase):
         gua.stop()
 
     Attributes:
-        GUA_NAME:                   卦名 "乾"
+        GUA_NAME:                   卦名 "qian" (统一英文小写，v2.2)
         GUA_EMOJI:                  emoji "☰"
         GUA_DESCRIPTION:            卦述
         MAX_ROUNDS:                 最大循环轮数（默认 8）
@@ -1029,9 +1029,9 @@ class QianGua(GuaBase):
         MIN_CONFIDENCE_FOR_DONE:    DONE 最低置信度（默认 0.7）
     """
 
-    GUA_NAME: str = "乾"
+    GUA_NAME: str = "qian"
     GUA_EMOJI: str = "☰"
-    GUA_DESCRIPTION: str = "意识中枢 — 意图决策、调度协调、最终答案生成"
+    GUA_DESCRIPTION: str = "意识中枢 — 意图决策、调度协调、最终答案生成 (Qian/乾)"
 
     # 配置
     MAX_ROUNDS: int = 8

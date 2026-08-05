@@ -1,5 +1,37 @@
 """
-core/rag_engine.py — RAG 引擎核心 (v1.50)
+core/rag_engine.py — RAG 引擎核心 (v1.50, 🚫 DEPRECATED v2.2)
+
+⚠️ 弃用通知 (2026-08-05):
+  本模块已被 src.shaoyin.brain.ShaoyinBrain 取代为 RAG 权威入口。
+  ShaoyinBrain 提供更完整的管线：意图识别→策略选择→检索→
+  Self-RAG→CRAG→答案合成→L5 CRAG→校验→重试。
+
+  过渡期兼容性：
+    - 现有代码可继续使用，但新功能请使用 ShaoyinBrain
+    - 计划在下个主版本（v3.0）移除 RAGEngine
+
+  迁移指南:
+    # 旧方式
+    from src.core.rag_engine import RAGEngine, rag_query
+    result = await rag_query("你的问题")
+
+    # 新方式
+    from src.shaoyin.brain import ShaoyinBrain
+    brain = ShaoyinBrain(meridian)
+    result = await brain.think("你的问题")
+
+  功能对比:
+    RAGEngine              ShaoyinBrain
+    ──────────             ────────────
+    retrieve() ✓           _retrieve() ✓ (via hybrid_search)
+    rerank()   ✓           内建于 hybrid_search L4-L5
+    generate_answer() ✓    _compose() ✓ (LLM 合成)
+    prompt_guard ✓         内建 (shaoyin 安全模块)
+    意图识别   ✗            _classify_intent() ✓
+    Self-RAG   ✗            SmartSelfRAG ✓
+    CRAG       ✗            CRAGCorrector ✓
+    L5 CRAG    ✗            L5CRAGExecutor ✓
+    成长记录   ✗            GrowthRecordPoints ✓
 
 伏羲系统统一的 RAG（检索增强生成）引擎，整合检索、重排序和 LLM 生成，
 为整个系统提供统一的 RAG 能力入口。
@@ -37,10 +69,21 @@ Usage::
     )
 """
 
+import warnings
+
 import asyncio
 import logging
 import time
 from typing import Any, Dict, List, Optional, Union
+
+# ─── v2.2 DEPRECATION: 发出弃用警告 ───
+warnings.warn(
+    "core.rag_engine.RAGEngine 已弃用 (v2.2)。"
+    "请迁移到 src.shaoyin.brain.ShaoyinBrain（更完整的 RAG 管线）。"
+    "详见模块文档中的迁移指南。",
+    DeprecationWarning,
+    stacklevel=2,
+)
 
 logger = logging.getLogger(__name__)
 

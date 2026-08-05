@@ -108,7 +108,7 @@ def global_http_exception_handler(request: Request, exc: StarletteHTTPException)
         message = "请求处理失败" if exc.status_code >= 500 else "请求参数错误"
     else:
         message = str(exc.detail)
-    body = {"status": "error", "message": message, "status_code": exc.status_code}
+    body = {"status": "error", "message": message}
     return _JSONResponse(content=body, status_code=exc.status_code)
 
 
@@ -120,7 +120,7 @@ def global_fastapi_exception_handler(request: Request, exc: HTTPException):
         message = "请求处理失败" if exc.status_code >= 500 else "请求参数错误"
     else:
         message = str(exc.detail)
-    body = {"status": "error", "message": message, "status_code": exc.status_code}
+    body = {"status": "error", "message": message}
     return _JSONResponse(content=body, status_code=exc.status_code, headers=headers)
 
 
@@ -128,13 +128,13 @@ def global_fastapi_exception_handler(request: Request, exc: HTTPException):
 def validation_exception_handler(request: Request, exc: RequestValidationError):
     """Pydantic 验证错误处理器 — 生产环境隐藏内部结构"""
     if _is_production:
-        body = {"status": "error", "message": "请求参数验证失败", "status_code": 422}
+        body = {"status": "error", "message": "请求参数验证失败"}
     else:
         errors = []
         for error in exc.errors():
             loc = ".".join(str(l) for l in error["loc"])
             errors.append({"field": loc, "message": error["msg"], "type": error["type"]})
-        body = {"status": "error", "message": "请求参数验证失败", "status_code": 422, "errors": errors}
+        body = {"status": "error", "message": "请求参数验证失败", "errors": errors}
     return _JSONResponse(content=body, status_code=422)
 
 
@@ -147,9 +147,9 @@ def generic_exception_handler(request: Request, exc: Exception):
     logger.error(traceback.format_exc())
 
     if _is_production:
-        body = {"status": "error", "message": "服务器内部错误", "status_code": 500}
+        body = {"status": "error", "message": "服务器内部错误"}
     else:
-        body = {"status": "error", "message": str(exc), "status_code": 500}
+        body = {"status": "error", "message": str(exc)}
     return _JSONResponse(content=body, status_code=500)
 
 

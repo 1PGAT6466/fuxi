@@ -48,7 +48,7 @@ async def search_post(body: SearchBody, request: Request = None):
 
 
 # Round 5: 使用共享 tenant_utils 模块消除重复代码
-from src.api.tenant_utils import filter_results_by_tenant as _filter_by_tenant
+from src.auth.tenant_utils import filter_results_by_tenant as _filter_by_tenant
 
 
 async def _search_impl(q: str, top_k: int, page: int, page_size: int, granularity: str, request: Request = None):

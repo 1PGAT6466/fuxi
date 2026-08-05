@@ -86,7 +86,7 @@ class EventSearchRequest(BaseModel):
 # ============ POST /api/rag/search — 传统 chunk 粒度检索 ============
 
 # Round 5: 使用共享 tenant_utils 模块消除重复代码
-from src.api.tenant_utils import filter_results_by_tenant as _filter_by_tenant
+from src.auth.tenant_utils import filter_results_by_tenant as _filter_by_tenant
 
 
 @router.post("/api/rag/search")

@@ -236,13 +236,14 @@ async def stop_fuxi(app: FastAPI) -> None:
 def _register_bagua_guas(app: FastAPI, intent_bus: Any) -> None:
     """注册八卦所有卦到 IntentBus"""
     gua_registry = {
-        "坤": ("src.bagua.kun", "KunGua"),
-        "震(zhen)": ("src.bagua.zhen", "ZhenGua"),
-        "巽(xun)": ("src.bagua.xun", "XunGua"),
-        "坎(kan)": ("src.bagua.kan", "KanGua"),
-        "离(li)": ("src.bagua.li", "LiGua"),
-        "艮(gen)": ("src.bagua.gen", "GenGua"),
-        "兑(dui)": ("src.bagua.dui", "DuiGua"),
+        "qian": ("src.bagua.qian", "QianGua"),
+        "kun": ("src.bagua.kun", "KunGua"),
+        "zhen": ("src.bagua.zhen", "ZhenGua"),
+        "xun": ("src.bagua.xun", "XunGua"),
+        "kan": ("src.bagua.kan", "KanGua"),
+        "li": ("src.bagua.li", "LiGua"),
+        "gen": ("src.bagua.gen", "GenGua"),
+        "dui": ("src.bagua.dui", "DuiGua"),
     }
 
     for register_name, (module_path, class_name) in gua_registry.items():

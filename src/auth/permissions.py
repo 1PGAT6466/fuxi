@@ -24,7 +24,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-logger = logging.getLogger("api.permissions")
+logger = logging.getLogger("auth.permissions")
 
 # ============================================================================
 # 数据模型

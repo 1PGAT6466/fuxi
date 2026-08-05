@@ -63,7 +63,7 @@ class EvolutionGua(GuaBase):
     通过 execute() 统一入口以 action 参数区分操作。
 
     Attributes:
-        GUA_NAME:        卦名 "中宫"
+        GUA_NAME:        卦名 "zhonggong" (统一英文小写，v2.2)
         GUA_EMOJI:       emoji "⊙"
         GUA_DESCRIPTION: 卦述 "自进化中枢"
     """
@@ -72,9 +72,9 @@ class EvolutionGua(GuaBase):
     # 类级别常量
     # ========================================================================
 
-    GUA_NAME: str = "中宫"
+    GUA_NAME: str = "zhonggong"
     GUA_EMOJI: str = "⊙"
-    GUA_DESCRIPTION: str = "自进化中枢 — 反馈闭环、离线学习、知识进化、生命周期管理"
+    GUA_DESCRIPTION: str = "自进化中枢 — 反馈闭环、离线学习、知识进化、生命周期管理 (中宫/ZhongGong)"
 
     # 恢复探活间隔
     RECOVERY_LOOP_INTERVAL: float = 30.0

@@ -4,7 +4,7 @@ import asyncio
 import logging
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, File, HTTPException, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Request, UploadFile
 from fastapi.responses import JSONResponse
 from src.api.auth import require_admin
 
@@ -101,7 +101,7 @@ async def upload(file: UploadFile = File(...), relative_path: str = None, reques
             # 移除开头的 .. 和路径分隔符
             safe_relative = safe_relative.lstrip("..\\/ ")
             if not safe_relative or safe_relative in (".", ".."):
-                raise HTTPException(400, "无效的相对路径")
+                return error("无效的相对路径", status_code=400, detail="提供的相对路径无效或为空")
             # 构建完整路径
             target_dir = tmp_dir / safe_relative
             target_dir.parent.mkdir(parents=True, exist_ok=True)
@@ -109,16 +109,16 @@ async def upload(file: UploadFile = File(...), relative_path: str = None, reques
             target_path = target_dir.resolve()
             allowed_base = tmp_dir.resolve()
             if not str(target_path).startswith(str(allowed_base)):
-                raise HTTPException(400, "文件路径非法(路径穿越检测)")
+                return error("文件路径非法(路径穿越检测)", status_code=400, detail="检测到路径穿越攻击")
             safe_name = safe_relative
         else:
             # 单文件上传：仅取文件名部分（剥离路径分隔符）
             safe_name = os.path.basename(file.filename)
             if not safe_name or safe_name in (".", ".."):
-                raise HTTPException(400, "无效的文件名")
+                return error("无效的文件名", status_code=400, detail="文件名不可为空或为特殊字符")
             # v1.50 R5: 检测 null byte 注入
             if "\x00" in safe_name or "\0" in safe_name:
-                raise HTTPException(400, "文件名包含非法字符")
+                return error("文件名包含非法字符", status_code=400, detail="检测到 null byte 注入")
             # v1.50 R5: 文件名 HTML 实体编码（防止前端 XSS）
             import html as _html
 
@@ -126,12 +126,12 @@ async def upload(file: UploadFile = File(...), relative_path: str = None, reques
             # v1.44 R1: 检查文件扩展名
             file_ext = os.path.splitext(safe_name)[1].lower()
             if file_ext in BLOCKED_EXTENSIONS:
-                raise HTTPException(400, f"不允许上传 {file_ext} 类型的文件（安全限制）")
+                return error(f"不允许上传 {file_ext} 类型的文件（安全限制）", status_code=400, detail=f"文件类型 {file_ext} 在黑名单中")
             # 2. 规范化路径并验证最终路径在允许目录内
             target_path = (tmp_dir / safe_name).resolve()
             allowed_base = tmp_dir.resolve()
             if not str(target_path).startswith(str(allowed_base)):
-                raise HTTPException(400, "文件路径非法(路径穿越检测)")
+                return error("文件路径非法(路径穿越检测)", status_code=400, detail="检测到路径穿越攻击")
 
         content = await file.read()
         target_path.parent.mkdir(parents=True, exist_ok=True)
@@ -172,7 +172,7 @@ async def upload(file: UploadFile = File(...), relative_path: str = None, reques
         )
         if _wants_v2:
             return error("上传失败", status_code=500, detail=str(e))
-        raise HTTPException(500, f"处理失败: {str(e)}")
+        return server_error(detail=f"处理失败: {str(e)}")
 
 
 @router.get("/api/documents/tasks/{task_id}")
@@ -186,7 +186,7 @@ async def get_task_status(task_id: str, request: Request = None):
         task = await task_queue.get_task_status(task_id)
 
         if not task:
-            raise HTTPException(404, f"任务 {task_id} 未找到")
+            return error(f"任务 {task_id} 未找到", status_code=404, detail="任务不存在或已过期")
 
         task_data = {
             "task_id": task.task_id,
@@ -205,15 +205,13 @@ async def get_task_status(task_id: str, request: Request = None):
             return success(data=task_data, message="获取任务状态成功")
         return task_data
 
-    except HTTPException:
-        raise
     except (ValueError, KeyError, AttributeError) as e:
         _wants_v2 = request and (
             request.query_params.get("format") == "v2" or request.headers.get("X-API-Format", "").lower() == "v2"
         )
         if _wants_v2:
             return error("获取任务状态失败", status_code=500, detail=str(e))
-        raise HTTPException(500, f"获取任务状态失败: {str(e)}")
+        return server_error(detail=f"获取任务状态失败: {str(e)}")
 
 
 @router.delete("/api/documents/{file_hash}")
@@ -241,7 +239,7 @@ async def delete_document(file_hash: str, request: Request = None):
 
         chunks = await asyncio.to_thread(load_chunks)
         if not chunks:
-            raise HTTPException(404, f"无数据,无法删除 {file_hash}")
+            return error(f"无数据,无法删除 {file_hash}", status_code=404, detail="数据存储为空")
 
         # 按 file_hash 精确匹配
         matching = [c for c in chunks if c.get("file_hash", "") == file_hash]
@@ -249,13 +247,13 @@ async def delete_document(file_hash: str, request: Request = None):
             # 尝试模糊匹配文件名
             matching = [c for c in chunks if file_hash in c.get("file_name", "") or file_hash in c.get("file_hash", "")]
         if not matching:
-            raise HTTPException(404, f"文档 {file_hash} 未找到")
+            return error(f"文档 {file_hash} 未找到", status_code=404, detail="文档不存在")
 
         # v1.50 R2: 所有权检查 - 非管理员只能删除自己的文档
         if not is_admin:
             doc_owner = matching[0].get("owner_id") or matching[0].get("uploader", "")
             if doc_owner and doc_owner != current_user and current_user != "anonymous":
-                raise HTTPException(403, "无权删除他人文档")
+                return error("无权删除他人文档", status_code=403, detail="仅文档所有者和管理员可删除")
 
         file_name = matching[0].get("file_name", file_hash)
         kept = [c for c in chunks if c.get("file_hash", "") != file_hash and file_hash not in c.get("file_name", "")]
@@ -304,8 +302,6 @@ async def delete_document(file_hash: str, request: Request = None):
             return success(data=result_data, message=f"文档 {file_name} 已删除")
         return {"status": "ok", "message": f"文档 {file_name} 已删除", **result_data}
 
-    except HTTPException:
-        raise
     except (OSError, ValueError, KeyError) as e:
         _logger.exception(f"delete_document 失败: {e}")
         _wants_v2 = request and (
@@ -313,7 +309,7 @@ async def delete_document(file_hash: str, request: Request = None):
         )
         if _wants_v2:
             return error("删除失败", status_code=500, detail=str(e))
-        raise HTTPException(500, f"删除失败: {str(e)}")
+        return server_error(detail=f"删除失败: {str(e)}")
 
 
 # ============================================================================
@@ -347,7 +343,7 @@ async def update_document_visibility(doc_id: str, request: Request):
         team_id = body.get("team_id", "")
 
         # 验证权限字段
-        from src.api.permissions import PermissionManager, get_permission_manager
+        from src.auth.permissions import PermissionManager, get_permission_manager
 
         pm = get_permission_manager()
 

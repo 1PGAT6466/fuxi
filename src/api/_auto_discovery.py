@@ -103,6 +103,35 @@ _SKIP_FILES: set = {
     "plugin_phase2_routes.py",
     # 插件系统 Phase 3 — 已在 routes.py 中手动注册
     "plugin_phase3_routes.py",
+    # ── 修复 P0-1: 防止双重注册 ──
+    # 所有 *_new.py 文件已在 routes.py 中手动注册，此处必须跳过
+    "auth_new.py",
+    "clipboard_new.py",
+    "dashboard_new.py",
+    "evaluation_new.py",
+    "favorites_new.py",
+    "feature_flags_new.py",
+    "history_new.py",
+    "layouts_new.py",
+    "notifications_new.py",
+    "ops_new.py",
+    "search_new.py",
+    "user_new.py",
+    # ── 修复 P0-1: 防止双重注册 ──
+    # 以下文件在 routes.py 中手动注册，此处必须跳过
+    "system_routes.py",
+    "path_aliases.py",
+    "synthesis.py",
+    "v2_routes.py",
+    "modules.py",
+    "monitoring.py",
+    "scheduler.py",
+    "reports.py",
+    "config_api.py",
+    "symbols.py",
+    "market.py",
+    "ai_routes.py",
+    "ops_routes.py",
 }
 
 # ── 已发现的 router 信息 ──

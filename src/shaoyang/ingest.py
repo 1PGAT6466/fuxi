@@ -1,6 +1,6 @@
-﻿"""
-ingest.py - 鏂囨湰鎻愬彇銆佸垎绫汇€佸垎鍧椼€佹竻娲楁ā鍧?
-浠?server.py 鍒嗙锛屼緵涓昏矾鐢卞鍏ヤ娇鐢?
+"""
+ingest.py - 鏂囨湰鎻愬彇銆佸垎绫汇 佸垎鍧椼 佹竻娲楁 鍧?
+浠?server.py 鍒嗙 锛屼緵涓昏矾鐢卞 鍏 娇鐢?
 """
 
 import html
@@ -19,88 +19,14 @@ try:
 except ImportError:
     jieba = None
 
-
-# DEPRECATED: 鏈娇鐢紝v1.50 鏍囪寰呭垹闄?
-def _sanitize_filename(fn: str) -> str:
-    # 鍘婚櫎闈炴硶瀛楃 + 鎴柇鍒?180 瀛楃锛堢暀 buffer 缁?file_hash 鍓嶇紑锛?
-    safe = re.sub(r'[<>:"/\\|?*]', "_", fn).replace("..", "_").strip()
-    # 鍒嗙鍚嶇О鍜屾墿灞曞悕锛屽垎鍒埅鏂?
-    name, dot, ext = safe.rpartition(".")
-    if len(safe) > 180:
-        # 淇濈暀鍓?120 瀛楃 + 鎵╁睍鍚嶅悗 40 瀛楃
-        name = name[:120]
-        ext = ext[-40:] if len(ext) > 40 else ext
-        safe = f"{name}.{ext}"
-    return safe
-
-
-# DEPRECATED: 鏈娇鐢紝v1.50 鏍囪寰呭垹闄?
-
-
-def _classify_text(text: str, file_type: str = "") -> str:
-    """缁熶竴鍒嗙被锛氬熀浜庢枃浠跺悕+鎵╁睍鍚?鍐呭鐨勫姞鏉冩墦鍒嗭紙C1-C4 鍐呰仈鐗堟湰锛?""
-    t = text.lower() if text else ""
-    ft = (file_type or "").lower()
-    # 蹇€熻鍒欙細鎵╁睍鍚嶇洿鎺ユ槧灏?
-    EXT_MAP = {
-        ".cfg": "IT缃戠粶",
-        ".conf": "IT缃戠粶",
-        ".ini": "IT缃戠粶",
-        ".stp": "妯″叿璁捐",
-        ".step": "妯″叿璁捐",
-        ".dwg": "妯″叿璁捐",
-        ".dxf": "妯″叿璁捐",
-        ".awl": "鐢垫皵鑷姩鍖?,
-        ".scl": "鐢垫皵鑷姩鍖?,
-        ".xlsx": "渚涘簲鍟嗙鐞?,
-        ".xls": "渚涘簲鍟嗙鐞?,
-    }
-    if ft in EXT_MAP:
-        return EXT_MAP[ft]
-    # 鍐呭鍏抽敭璇嶅尮閰?
-    if any(k in t for k in ["vlan", "瀛愮綉", "缃戝叧", "dhcp", "璺敱", "浜ゆ崲鏈?, "鎷撴墤", "interface", "trunk"]):
-        return "IT缃戠粶"
-    if any(k in t for k in ["妯″叿", "瀵兼煴", "瀵煎", "椤堕拡", "婊戝潡", "娴囧彛", "鍒嗗瀷闈?, "妯℃灦", "鍨嬭厰"]):
-        return "妯″叿璁捐"
-    if any(k in t for k in ["plc", "浼犳劅鍣?, "浼烘湇", "鍙橀", "鐢电闃€", "姘旂几", "profinet", "npn", "pnp"]):
-        return "鐢垫皵鑷姩鍖?
-    if any(k in t for k in ["涓夊潗鏍?, "钄″徃", "contura", "calypso", "浣嶇疆搴?, "骞抽潰搴?, "gr&r", "cpk"]):
-        return "鍝佽川娴嬮噺"
-    if any(k in t for k in ["閲囪喘", "鎶ヤ环", "鍚堝悓", "渚涘簲鍟?, "浜よ揣", "浠樻"]):
-        return "渚涘簲鍟嗙鐞?
-    if any(k in t for k in ["娉ㄥ", "鎴愬瀷", "妯℃俯", "鏂欑瓛", "骞茬嚗", "鏀剁缉鐜?, "lcp", "pa66", "pbt", "pom"]):
-        return "宸ョ▼鎶€鏈鑼?
-    if any(k in t for k in ["鑰冨嫟", "璇峰亣", "钖祫", "浜轰簨", "鎶ラ攢", "鍒跺害"]):
-        return "琛屾斂浜轰簨"
-    if any(k in t for k in ["璐㈠姟", "棰勭畻", "绋庡姟", "瀹¤", "鍙戠エ"]):
-        return "璐㈠姟鏂囨。"
-    return "閫氱敤鍔炲叕"
-
-
-# DEPRECATED: 鏈娇鐢紝v1.50 鏍囪寰呭垹闄?
-
-
-def _audit_text(text: str, sensitive_patterns: list = None) -> tuple:
-    if sensitive_patterns is None:
-        sensitive_patterns = []
-    safe = text
-    flags = []
-    for pat in sensitive_patterns:
-        if pat.search(safe):
-            flags.append("妫€娴嬪埌鏁忔劅淇℃伅")
-            safe = pat.sub("[宸茶劚鏁廬", safe)
-    # DEPRECATED: 鏈娇鐢紝v1.50 鏍囪寰呭垹闄?
-    return safe, flags
-
-
 def _clean_text(raw: str) -> str:
     """
     鏁版嵁娓呮礂锛坴13.0 澧炲己锛夛細
     - 鍘婚櫎 HTML 瀹炰綋缂栫爜
     - 鍘婚櫎 URL 閾炬帴
     - 鍘婚櫎涓嶅彲瑙佹帶鍒跺瓧绗?
-    - 鍘婚櫎甯歌椤电湁椤佃剼锛堥〉鐮併€佽矾寰勩€侀偖浠剁鍚嶏級
-    - 鍘婚櫎杩炵画绌鸿
+    - 鍘婚櫎甯歌 椤电湁椤佃剼锛堥〉鐮併 佽矾寰勩 侀偖浠剁 鍚嶏級
+    - 鍘婚櫎杩炵画绌鸿 
     """
     raw = html.unescape(raw)
     raw = re.sub(r"https?://\S+", "", raw)
@@ -109,15 +35,14 @@ def _clean_text(raw: str) -> str:
     # 椤电湁椤佃剼娓呯悊
     raw = re.sub(r"^\s*绗琝s*\d+\s*椤礬s*(鍏盶s*\d+\s*椤??\s*$", "", raw, flags=re.MULTILINE)
     raw = re.sub(r"^\s*Page\s*\d+\s*(of\s*\d+)?\s*$", "", raw, flags=re.MULTILINE | re.IGNORECASE)
-    raw = re.sub(r"^\s*\d{4}-\d{2}-\d{2}\s*\d{1,2}:\d{2}(:\d{2})?\s*$", "", raw, flags=re.MULTILINE)  # 鐙珛鏃堕棿鎴宠
-    raw = re.sub(r"^\s*[A-Z]:\\[^\n]{10,80}\s*$", "", raw, flags=re.MULTILINE)  # 鏂囦欢璺緞琛?
-    # 閭欢绛惧悕
+    raw = re.sub(r"^\s*\d{4}-\d{2}-\d{2}\s*\d{1,2}:\d{2}(:\d{2})?\s*$", "", raw, flags=re.MULTILINE)  # 鐙 珛鏃堕棿鎴宠 
+    raw = re.sub(r"^\s*[A-Z]:\\[^\n]{10,80}\s*$", "", raw, flags=re.MULTILINE)  # 鏂囦欢璺 緞琛?
+    # 閭 欢绛惧悕
     raw = re.sub(r"--+\.?\s*$", "", raw, flags=re.MULTILINE)  # -- 鍒嗛殧绾?
-    raw = re.sub(r"(Best Regards|Sincerely|姝よ嚧|鏁ぜ|椤虹鍟嗙ズ)[\s\S]{0,200}$", "", raw, flags=re.IGNORECASE)
-    # 涔辩爜瀛楃锛堣繛缁?3+ 涓潪涓嫳鏁板瓧绗︼級
-    raw = re.sub(r"[^\w\s\u4e00-\u9fff\u3000-\u303f锛屻€傦紒锛燂紱锛氣€溾€濃€樷€欙紙锛夈€愩€戙€娿€嬨€佲€︹€斅穃-\+\.\/]{3,}", " ", raw)
+    raw = re.sub(r"(Best Regards|Sincerely|姝 嚧|鏁  |椤虹 鍟嗙 )[\s\S]{0,200}$", "", raw, flags=re.IGNORECASE)
+    # 涔辩爜瀛楃 锛堣繛缁?3+ 涓 潪涓 嫳鏁板瓧绗 級
+    raw = re.sub(r"[^\w\s\u4e00-\u9fff\u3000-\u303f锛屻 傦紒锛燂紱锛氣 溾 濃 樷 欙紙锛夈 愩 戙 娿 嬨 佲   斅穃-\+\.\/]{3,}", " ", raw)
 
-    # DEPRECATED: 鏈娇鐢紝v1.50 鏍囪寰呭垹闄?
     raw = re.sub(r"\n{4,}", "\n\n\n", raw)
     return raw.strip()
 
@@ -140,10 +65,9 @@ def _generate_summary(text: str, max_len: int = 200) -> str:
     except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.warning(f"[ingest] suppressed exception", exc_info=True)
         pass
-    kw_str = "銆?.join(keywords[:5]) if keywords else ""
-    summary = f"[鏂囨。鎽樿] {first_para}"
+    kw_str = "銆?".join(keywords[:5]) if keywords else ""
+    summary = f"[鏂囨。鎽樿 ] {first_para}"
     if kw_str:
-        # DEPRECATED: 鏈娇鐢紝v1.50 鏍囪寰呭垹闄?
         summary += f"\n[鍏抽敭璇峕 {kw_str}"
     return summary
 
@@ -161,9 +85,9 @@ def _smart_chunk(text: str, size: int = 1200, overlap: int = 100) -> list:
     while start < text_len:
         end = min(start + size, text_len)
 
-        # 灏濊瘯鍦ㄥ彞鍙枫€佹崲琛屽鏂紑
+        # 灏濊瘯鍦 彞鍙枫 佹崲琛屽 鏂 紑
         if end < text_len:
-            for sep in ["\n\n", "\n", "銆?, "锛?, ".", ";"]:
+            for sep in ["\n\n", "\n", "。", "，", ".", ";"]:
                 last_sep = text.rfind(sep, start + size // 2, end)
                 if last_sep > start:
                     end = last_sep + len(sep)
@@ -171,7 +95,7 @@ def _smart_chunk(text: str, size: int = 1200, overlap: int = 100) -> list:
 
         chunk = text[start:end].strip()
         if chunk and len(chunk) > 20:
-            # v4.0 琛ㄦ牸缁撴瀯鍖栨彁鍙?
+            # v4.0 琛 牸缁撴瀯鍖栨彁鍙?
             structured = None
             try:
                 from src.infra import extract_tables_from_markdown
@@ -196,12 +120,12 @@ def _smart_chunk(text: str, size: int = 1200, overlap: int = 100) -> list:
 def _extract_pdf_dual(file_path: str) -> str:
     """
     v10.0: PDF 鍙岃建瑙ｆ瀽
-    - pdfplumber 涓诲姏锛堜繚鐣欒〃鏍?鍙屾爮/椤电爜淇℃伅锛?
-    - PyPDF2 鍥為€€锛堝吋瀹规棫 PDF锛?
+    - pdfplumber 涓诲姏锛堜繚鐣欒鏍?鍙屾爮/椤电爜淇 伅锛?
+    - PyPDF2 鍥為  锛堝吋瀹规棫 PDF锛?
     """
     lines = []
 
-    # 璺?: fitz (PyMuPDF) - 涓枃鏈€浼橈紝浠呭 < 50MB 鏂囦欢浣跨敤
+    # 璺?: fitz (PyMuPDF) - 涓 枃鏈 浼橈紝浠呭  < 50MB 鏂囦欢浣跨敤
     file_size_mb = os.path.getsize(file_path) / (1024 * 1024)
     if file_size_mb < 50:
         try:
@@ -239,9 +163,9 @@ def _extract_pdf_dual(file_path: str) -> str:
             total = len(pdf.pages)
             for i, page in enumerate(pdf.pages):
                 try:
-                    # 鎻愬彇鏂囨湰锛堜繚鐣欏竷灞€锛?
+                    # 鎻愬彇鏂囨湰锛堜繚鐣欏竷灞 锛?
                     text = page.extract_text() or ""
-                    # 鎻愬彇琛ㄦ牸锛堢粨鏋勫寲鏍囨敞锛?
+                    # 鎻愬彇琛 牸锛堢粨鏋勫寲鏍囨敞锛?
                     from src.infra import enhance_table_extraction
 
                     combined = enhance_table_extraction(text, tables)
@@ -254,7 +178,7 @@ def _extract_pdf_dual(file_path: str) -> str:
                     ConnectionError,
                     TimeoutError,
                 ) as e:  # TODO: Narrow exception type
-                    # 鍗曢〉澶辫触锛屽洖閫€
+                    # 鍗曢〉澶辫触锛屽洖閫 
                     try:
                         from pypdf import PdfReader
 
@@ -277,7 +201,7 @@ def _extract_pdf_dual(file_path: str) -> str:
         logger.warning(f"[ingest] suppressed exception", exc_info=True)
         pass
 
-    # 璺?: pypdf 鍥為€€
+    # 璺?: pypdf 鍥為  
     try:
         from pypdf import PdfReader
 
@@ -291,7 +215,6 @@ def _extract_pdf_dual(file_path: str) -> str:
             except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
                 lines.append(f"[Page {i+1}/{total}] skipped")
         return "\n".join(lines)
-    # DEPRECATED: 鏈娇鐢紝v1.50 鏍囪寰呭垹闄?
     except Exception as e:  # TODO: Narrow exception type
         return f"[PDF 瑙ｆ瀽澶辫触: {e}]"
 
@@ -300,7 +223,7 @@ def _extract_pdf_dual(file_path: str) -> str:
 
 def _compute_file_hash(file_path: str) -> str:
     """
-    v10.0: 璁＄畻鏂囦欢 SHA256锛圡D5 鍘婚噸鐢級
+    v10.0: 璁畻鏂囦欢 SHA256锛圡D5 鍘婚噸鐢 級
     """
     import hashlib
 
@@ -312,10 +235,10 @@ def _compute_file_hash(file_path: str) -> str:
 
 
 # ============================================================
-# v16.0: _extract_text 绛栫暐妯″紡閲嶆瀯 鈥?姣忎釜鏂囦欢绫诲瀷鐙珛澶勭悊鍑芥暟
+# v16.0: _extract_text 绛栫暐妯″紡閲嶆瀯 鈥?姣忎釜鏂囦欢绫诲瀷鐙 珛澶勭悊鍑芥暟
 # ============================================================
 
-# 绾枃鏈墿灞曞悕闆嗗悎锛圲TF-8 鐩存帴璇诲彇锛?
+# 绾 枃鏈 墿灞曞悕闆嗗悎锛圲TF-8 鐩存帴璇诲彇锛?
 _PLAINTEXT_EXTS = frozenset(
     [
         ".txt",
@@ -344,7 +267,7 @@ _PLAINTEXT_EXTS = frozenset(
     ]
 )
 
-# 浜岃繘鍒?涓嶅彲璇绘牸寮忛泦鍚堬紙浠呰褰曟枃浠跺悕锛?
+# 浜岃繘鍒?涓嶅彲璇绘牸寮忛泦鍚堬紙浠呰 褰曟枃浠跺悕锛?
 _BINARY_EXTS = frozenset(
     [
         ".deb",
@@ -389,7 +312,7 @@ _BINARY_EXTS = frozenset(
     ]
 )
 
-# ZIP 鍐呮敮鎸侀€掑綊瑙ｆ瀽鐨勬枃浠舵墿灞曞悕
+# ZIP 鍐呮敮鎸侀 掑綊瑙ｆ瀽鐨勬枃浠舵墿灞曞悕
 _ZIP_SUPPORTED_EXTS = frozenset(
     [
         ".txt",
@@ -413,7 +336,7 @@ _ZIP_SUPPORTED_EXTS = frozenset(
     ]
 )
 
-# 鑷剤灞傦細鎵╁睍鍚?鈫?pip 瀹夎鍊欓€夛紙鎸変紭鍏堢骇鎺掑垪锛?
+# 鑷 剤灞傦細鎵 睍鍚?鈫?pip 瀹夎 鍊欓 夛紙鎸変紭鍏堢骇鎺掑垪锛?
 _SELF_HEAL_MAP = {
     "msg": ["extract-msg", "msg-parser"],
     "eml": ["mail-parser"],
@@ -435,19 +358,19 @@ _SELF_HEAL_MAP = {
 
 
 def _extract_plaintext(path: Path) -> str:
-    """鎻愬彇绾枃鏈枃浠跺唴瀹癸紙UTF-8 缂栫爜锛?""
+    """鎻愬彇绾 枃鏈 枃浠跺唴瀹癸紙UTF-8 缂栫爜锛?"""""
     return path.read_text(encoding="utf-8", errors="ignore")
 
 
 def _extract_docx(path: Path) -> str:
-    """鎻愬彇 .docx 鏂囦欢鍐呭"""
+    """鎻愬彇 .docx 鏂囦欢鍐呭"""
     from docx import Document
 
     return "\n".join(p.text for p in Document(str(path)).paragraphs if p.text.strip())
 
 
 def _extract_doc(path: Path) -> str:
-    """鎻愬彇 .doc 鏂囦欢鍐呭锛坅ntiword 鈫?python-docx 鍥為€€锛?""
+    """鎻愬彇 .doc 鏂囦欢鍐呭锛坅ntiword 鈫?python-docx 鍥為锛?"""""
     import subprocess
 
     # 璺?: antiword 鍛戒护琛屽伐鍏?
@@ -457,7 +380,7 @@ def _extract_doc(path: Path) -> str:
             return result.stdout.strip()
     except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         logger.warning(f"[ingest] suppressed exception", exc_info=True)
-    # 璺?: 鍥為€€鍒?python-docx
+    # 璺?: 鍥為  鍒?python-docx
     try:
         return _extract_docx(path)
     except Exception as e:  # TODO: Narrow exception type
@@ -466,7 +389,7 @@ def _extract_doc(path: Path) -> str:
 
 
 def _extract_wps(path: Path) -> str:
-    """鎻愬彇 .wps 鏂囦欢鍐呭锛堟柊鐗?WPS 鍙兘鏄?docx 鏍煎紡锛?""
+    """鎻愬彇 .wps 鏂囦欢鍐呭 锛堟柊鐗?WPS 鍙 兘鏄?docx 鏍煎紡锛?"""""
     try:
         return _extract_docx(path)
     except Exception as e:  # TODO: Narrow exception type
@@ -475,7 +398,7 @@ def _extract_wps(path: Path) -> str:
 
 
 def _extract_xlsx(path: Path) -> str:
-    """鎻愬彇 .xlsx 鏂囦欢鍐呭涓虹粨鏋勫寲鏂囨湰"""
+    """鎻愬彇 .xlsx 鏂囦欢鍐呭涓虹粨鏋勫寲鏂囨湰"""
     import openpyxl
 
     wb = openpyxl.load_workbook(str(path), read_only=True, data_only=True)
@@ -502,7 +425,7 @@ def _extract_xlsx(path: Path) -> str:
 
 
 def _extract_xls(path: Path) -> str:
-    """鎻愬彇 .xls 鏂囦欢鍐呭涓虹粨鏋勫寲鏂囨湰"""
+    """鎻愬彇 .xls 鏂囦欢鍐呭涓虹粨鏋勫寲鏂囨湰"""
     import xlrd
 
     wb = xlrd.open_workbook(str(path))
@@ -528,7 +451,7 @@ def _extract_xls(path: Path) -> str:
 
 
 def _extract_pptx_modern(path: Path) -> str:
-    """鎻愬彇 .pptx 鏂囦欢鍐呭锛坧ython-pptx锛?""
+    """鎻愬彇 .pptx 鏂囦欢鍐呭锛坧ython-pptx锛?"""""
     from pptx import Presentation
 
     slides = []
@@ -549,7 +472,7 @@ def _extract_pptx_modern(path: Path) -> str:
 
 
 def _extract_ppt_legacy(path: Path) -> str:
-    """鎻愬彇鏃х増 .ppt 鏂囦欢鍐呭锛坥lefile锛?""
+    """鎻愬彇鏃 増 .ppt 鏂囦欢鍐呭 锛坥lefile锛?"""""
     import olefile
 
     ole = olefile.OleFileIO(str(path))
@@ -575,7 +498,7 @@ def _extract_ppt_legacy(path: Path) -> str:
 
 
 def _extract_pptx(path: Path) -> str:
-    """鎻愬彇 .pptx/.ppt 鏂囦欢鍐呭锛坧ptx 浼樺厛锛宭egacy ole 鍥為€€锛?""
+    """鎻愬彇 .pptx/.ppt 鏂囦欢鍐呭锛坧ptx 浼樺厛锛宭egacy ole 鍥為锛?"""""
     try:
         result = _extract_pptx_modern(path)
         if result:
@@ -590,7 +513,7 @@ def _extract_pptx(path: Path) -> str:
 
 
 def _extract_zip(path: Path) -> str:
-    """鎻愬彇 .zip 鍘嬬缉鍖呭唴鍙鏂囦欢鐨勫唴瀹癸紙閫掑綊瑙ｆ瀽锛屾渶澶?20 涓唴閮ㄦ枃浠讹級"""
+    """鎻愬彇 .zip 鍘嬬缉鍖呭唴鍙  鏂囦欢鐨勫唴瀹癸紙閫掑綊瑙ｆ瀽锛屾渶澶?20 涓 唴閮 枃浠讹級"""
     import shutil
     import tempfile
     import zipfile
@@ -629,12 +552,12 @@ def _extract_zip(path: Path) -> str:
 
 
 def _extract_binary(path: Path) -> str:
-    """杩斿洖浜岃繘鍒?涓嶅彲璇绘牸寮忕殑鍗犱綅淇℃伅"""
-    return f"[鏂囦欢: {path.name}] (浜岃繘鍒舵牸寮忥紝鏃犳枃鏈彁鍙?"
+    """杩斿洖浜岃繘鍒?涓嶅彲璇绘牸寮忕殑鍗犱綅淇 伅"""
+    return f"[鏂囦欢: {path.name}] (浜岃繘鍒舵牸寮忥紝鏃犳枃鏈 彁鍙?"
 
 
 def _extract_generic_fallback(path: Path) -> str:
-    """閫氱敤闄嶇骇瑙ｆ瀽鍣細灏濊瘯 raw bytes 鈫?UTF-8 鈫?UTF-16 鈫?latin-1"""
+    """閫氱敤闄嶇骇瑙ｆ瀽鍣 細灏濊瘯 raw bytes 鈫?UTF-8 鈫?UTF-16 鈫?latin-1"""
     try:
         with open(str(path), "rb") as f:
             raw = f.read()
@@ -659,7 +582,7 @@ def _extract_generic_fallback(path: Path) -> str:
     except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
         pass
 
-    # 灏濊瘯 latin-1 + 鍙琛屾彁鍙?
+    # 灏濊瘯 latin-1 + 鍙  琛屾彁鍙?
     try:
         text = raw.decode("latin-1")
         lines_list = text.split("\n")
@@ -677,7 +600,7 @@ def _extract_generic_fallback(path: Path) -> str:
 
 
 def _extract_self_heal(path: Path, ext: str) -> str:
-    """鏅鸿兘鑷剤灞傦細妫€娴嬬己澶辩殑瑙ｆ瀽渚濊禆锛屾彁绀虹敤鎴峰畨瑁呭苟閲嶈瘯"""
+    """鏅鸿兘鑷 剤灞傦細妫 娴嬬己澶辩殑瑙ｆ瀽渚濊禆锛屾彁绀虹敤鎴峰畨瑁呭苟閲嶈瘯"""
     candidates = _SELF_HEAL_MAP.get(ext, [])
     if not candidates:
         return ""
@@ -692,13 +615,13 @@ def _extract_self_heal(path: Path, ext: str) -> str:
         except ImportError:
             continue
     if not installed:
-        logger.warning(f"[ingest] 缂哄皯瑙ｆ瀽渚濊禆 {candidates[0]} (ext={ext})锛岃鎵嬪姩瀹夎: pip install {candidates[0]}")
+        logger.warning(f"[ingest] 缂哄皯瑙ｆ瀽渚濊禆 {candidates[0]} (ext={ext})锛岃 鎵嬪姩瀹夎 : pip install {candidates[0]}")
         return ""
     # 渚濊禆宸插畨瑁咃紝閫掑綊璋冪敤 _extract_text 閲嶆柊瑙ｆ瀽
     return _extract_text(str(path), ext)
 
 
-# 鎵╁睍鍚?鈫?鎻愬彇鍑芥暟鐨勮皟搴﹀瓧鍏革紙绛栫暐妯″紡锛?
+# 鎵 睍鍚?鈫?鎻愬彇鍑芥暟鐨勮皟搴 瓧鍏革紙绛栫暐妯″紡锛?
 _EXTRACTOR_DISPATCH = {
     "docx": _extract_docx,
     "doc": _extract_doc,
@@ -714,30 +637,30 @@ _EXTRACTOR_DISPATCH = {
 
 def _extract_text(file_path: str, ext: str) -> str:
     """
-    缁熶竴鏂囨。鏂囨湰鎻愬彇鍏ュ彛锛坴16.0 绛栫暐妯″紡閲嶆瀯锛夈€?
+    缁熶竴鏂囨鏂囨湰鎻愬彇鍏 彛锛坴16.0 绛栫暐妯紡閲嶆瀯锛夈 ?
 
-    鏍规嵁鏂囦欢鎵╁睍鍚嶅垎娲惧埌瀵瑰簲鐨勬彁鍙栧嚱鏁帮細
-    - 绾枃鏈墿灞曞悕 鈫?UTF-8 鐩存帴璇诲彇
-    - 鍔炲叕鏂囨。锛坉ocx/doc/wps/xlsx/xls/pdf/pptx/ppt/zip锛夆啋 涓撶敤鎻愬彇鍣?
-    - 浜岃繘鍒舵牸寮忥紙鍥剧墖/闊抽/鍙墽琛屾枃浠剁瓑锛夆啋 鍗犱綅淇℃伅
-    - 鍏朵粬 鈫?閫氱敤闄嶇骇瑙ｆ瀽鍣?鈫?鑷剤灞?
+    鏍规嵁鏂囦欢鎵 睍鍚嶅垎娲惧埌瀵瑰簲鐨勬彁鍙栧嚱鏁帮細
+    - 绾 枃鏈 墿灞曞悕 鈫?UTF-8 鐩存帴璇诲彇
+    - 鍔炲叕鏂囨锛坉ocx/doc/wps/xlsx/xls/pdf/pptx/ppt/zip锛夆啋 涓撶敤鎻愬彇鍣?
+    - 浜岃繘鍒舵牸寮忥紙鍥剧墖/闊抽 /鍙 墽琛屾枃浠剁瓑锛夆啋 鍗犱綅淇 伅
+    - 鍏朵粬 鈫?閫氱敤闄嶇骇瑙ｆ瀽鍣?鈫?鑷 剤灞?
 
     Args:
-        file_path: 鏂囦欢璺緞瀛楃涓?
-        ext: 鏂囦欢鎵╁睍鍚嶏紙鍚偣鍙凤級锛屽 ".pdf"銆?.docx"
+        file_path: 鏂囦欢璺 緞瀛楃 涓?
+        ext: 鏂囦欢鎵 睍鍚嶏紙鍚 偣鍙凤級锛屽  ".pdf"銆?.docx""
 
     Returns:
-        鎻愬彇鐨勬枃鏈唴瀹瑰瓧绗︿覆銆傚け璐ユ椂杩斿洖閿欒鎻忚堪瀛楃涓层€?
+        鎻愬彇鐨勬枃鏈 唴瀹瑰瓧绗 覆銆傚 璐 椂杩斿洖閿欒 鎻忚堪瀛楃 涓层 ?
     """
     path = Path(file_path)
 
     # Phase 1: 宸茬煡鏍煎紡 鈥?鐩存帴璋冨害
     try:
-        # 绾枃鏈?
+        # 绾 枃鏈?
         if ext in _PLAINTEXT_EXTS:
             return _extract_plaintext(path)
 
-        # 涓撶敤鎻愬彇鍣紙绛栫暐瀛楀吀鏌ユ壘锛?
+        # 涓撶敤鎻愬彇鍣 紙绛栫暐瀛楀吀鏌 壘锛?
         ext_key = ext.lstrip(".").lower()
         extractor = _EXTRACTOR_DISPATCH.get(ext_key)
         if extractor is not None:
@@ -747,11 +670,11 @@ def _extract_text(file_path: str, ext: str) -> str:
         if ext in _BINARY_EXTS:
             return _extract_binary(path)
 
-        # 鏈煡鏍煎紡锛氬皾璇?UTF-8 鏂囨湰璇诲彇
+        # 鏈 煡鏍煎紡锛氬皾璇?UTF-8 鏂囨湰璇诲彇
         try:
             return path.read_text(encoding="utf-8", errors="replace")
         except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
-            return f"[鏂囦欢: {path.name}] (鏈煡鏍煎紡)"
+            return f"[鏂囦欢: {path.name}] (鏈 煡鏍煎紡)"
 
     except Exception as e:  # TODO: Narrow exception type
         return f"[鎻愬彇澶辫触: {e}]"
@@ -761,7 +684,7 @@ def _extract_text(file_path: str, ext: str) -> str:
     if result:
         return result
 
-    # Phase 3: 鏅鸿兘鑷剤
+    # Phase 3: 鏅鸿兘鑷 剤
     ext_key = ext.lstrip(".").lower() if "." in ext else ext
     healed = _extract_self_heal(path, ext_key)
     if healed:
@@ -772,13 +695,13 @@ def _extract_text(file_path: str, ext: str) -> str:
 
 # === merged from ingestion.py ===
 """
-浼忕静 Fuxi 路 缁熶竴鍏ュ簱寮曟搸
+浼忕静 Fuxi 路 缁熶竴鍏 簱寮曟搸
 ========================
-灏嗚В鏋愬櫒杈撳嚭鐨勬爣鍑嗗寲鏂囨。 鈫?鎸夌被鍨嬪垎鍧?鈫?鍚戦噺鍖?鈫?鍐欏叆 ChromaDB
+灏嗚 鏋愬櫒杈撳嚭鐨勬爣鍑嗗寲鏂囨 鈫?鎸夌被鍨嬪垎鍧?鈫?鍚戦噺鍖?鈫?鍐欏叆 ChromaDB
 
-娴佺▼:
+娴佺 :
   parse_result 鈫?type_router 鈫?chunker 鈫?embedder 鈫?ChromaDB
-             鈫?table_extractor 鈫?kb_tables 鐙珛绱㈠紩
+             鈫?table_extractor 鈫?kb_tables 鐙 珛绱 紩
 """
 import hashlib
 import logging
@@ -790,12 +713,12 @@ from typing import Dict, List
 logger = logging.getLogger(__name__)
 
 # ============================================================
-# 璇箟鍒嗗潡
+# 璇 箟鍒嗗潡
 # ============================================================
 
 
 def smart_chunk_semantic(text: str, chunk_size: int = 1500, overlap: int = 200) -> List[str]:
-    """璇箟鍒嗗潡锛氭寜娈佃惤杈圭晫鍒囧壊锛屼繚鎸佽涔夊畬鏁存€?""
+    """璇 箟鍒嗗潡锛氭寜娈佃惤杈圭晫鍒囧壊锛屼繚鎸佽 涔夊畬鏁存 ?"""""
     if not text:
         return []
 
@@ -804,15 +727,15 @@ def smart_chunk_semantic(text: str, chunk_size: int = 1500, overlap: int = 200) 
     current = ""
 
     for p in paragraphs:
-        # 濡傛灉鏄爣棰樿锛堝寘鍚?# 鎴栧叏閮ㄥぇ鍐欑瓑锛夛紝鏂拌捣涓€涓?chunk
-        is_heading = p.startswith("#") or p.startswith("銆?) or p.startswith("[")
+        # 濡傛灉鏄 爣棰樿 锛堝寘鍚?# 鎴栧叏閮  鍐欑瓑锛夛紝鏂拌捣涓 涓?chunk
+        is_heading = p.startswith("#") or p.startswith("(") or p.startswith("[")
 
         if is_heading and current and len(current) > 100:
             chunks.append(current.strip())
             current = p
         elif len(current) + len(p) > chunk_size:
             chunks.append(current.strip())
-            # 閲嶅彔锛氫繚鐣欎笂涓€娈佃惤鐨勬渶鍚庡唴瀹?
+            # 閲嶅彔锛氫繚鐣欎笂涓 娈佃惤鐨勬渶鍚庡唴瀹?
             if overlap and current:
                 overlap_text = current[-overlap:] if len(current) > overlap else current[-50:]
                 current = overlap_text + "\n\n" + p
@@ -831,7 +754,7 @@ def smart_chunk_semantic(text: str, chunk_size: int = 1500, overlap: int = 200) 
 
 
 def chunk_table(table_data: Dict) -> List[str]:
-    """琛ㄦ牸涓嶅垎鍧楋紝鏁磋〃淇濈暀涓轰竴涓?chunk"""
+    """琛 牸涓嶅垎鍧楋紝鏁磋淇濈暀涓轰竴涓?chunk"""
     if not table_data:
         return []
 
@@ -839,7 +762,7 @@ def chunk_table(table_data: Dict) -> List[str]:
     if table_data.get("markdown"):
         chunks.append(table_data["markdown"])
     else:
-        # 鐢熸垚 Markdown 琛ㄧず
+        # 鐢熸垚 Markdown 琛  
         header = table_data.get("header", [])
         rows = table_data.get("all_rows", table_data.get("sample_rows", []))
         if header:
@@ -853,44 +776,43 @@ def chunk_table(table_data: Dict) -> List[str]:
 
 
 def chunk_image(file_path: str, ocr_text: str = "") -> List[str]:
-    """鍥剧墖锛氬妯℃€佽浆褰?+ OCR 鏂囧瓧
-    浼樺厛浣跨敤 Vision 妯″瀷杞綍鍥剧墖鍐呭锛宖allback 鍒?OCR锛屾渶缁?fallback 鍒版枃浠跺悕
-    """
-    # 濡傛灉宸叉湁 OCR 鏂囨湰涓旇冻澶熼暱锛岀洿鎺ョ敤
+    """Image chunking with multimodal + OCR"""
+    # if ocr_text exists and is long enough, use directly
     if ocr_text and len(ocr_text) > 50:
         return [ocr_text]
 
-    # 灏濊瘯澶氭ā鎬?Vision 妯″瀷杞綍
+    # try multimodal Vision model
     try:
         from src.infra import transcribe_image
 
         transcription = transcribe_image(file_path)
         if transcription and len(transcription) > 20:
-            logger.info(f"[multimodal] 鍥剧墖杞綍鎴愬姛: {Path(file_path).name} ({len(transcription)}瀛?")
-            return [f"[鍥剧墖鍐呭] {transcription}"]
+            logger.info(f"[multimodal] 鍥剧墖杞 綍鎴愬姛: {Path(file_path).name} ({len(transcription)}瀛?")
+            return [f"[鍥剧墖鍐呭 ] {transcription}"]
     except Exception as e:  # TODO: Narrow exception type
-        logger.debug(f"[multimodal] 鍥剧墖杞綍璺宠繃: {e}")
+        logger.debug(f"[multimodal] 鍥剧墖杞 綍璺宠繃: {e}")
 
     # Fallback: OCR 鏂囨湰
     if ocr_text and len(ocr_text) > 10:
         return [ocr_text]
 
-    # 鏈€缁?Fallback: 鏂囦欢鍚嶅崰浣?
+    # 鏈 缁?Fallback: 鏂囦欢鍚嶅崰浣?
     return [f"[鍥剧墖: {Path(file_path).name}]"]
 
 
 # ============================================================
-# 鍏ュ簱寮曟搸
+# 鍏 簱寮曟搸
 # ============================================================
-# FAKE-ASYNC: 鏈嚱鏁版爣璁?async 浠呬负鎺ュ彛缁熶竴锛屽唴閮ㄥ悓姝ユ墽琛?
+# FAKE-ASYNC: 鏈 嚱鏁版爣璁?async 浠呬负鎺 彛缁熶竴锛屽唴閮 悓姝 墽琛?
 
 # ============================================================
-# v3.0: ingest_document 杈呭姪鍑芥暟 鈥?鍑嗗 / 瀛樺偍 / 绱㈠紩涓夐樁娈?
+# v3.0: ingest_document 杈呭姪鍑芥暟 鈥?鍑嗗  / 瀛樺偍 / 绱 紩涓夐樁娈?
 # ============================================================
 
 
 def _resolve_category(file_name: str, text: str, category: str) -> str:
-    """瑙ｆ瀽骞舵牎楠屾枃妗ｅ垎绫伙紝鍖呭惈闃插尽鎬х籂閿?""
+    """_resolve_category"""
+
     if not category or category == "閫氱敤鍔炲叕":
         try:
             from src.category_registry import match_category as _match_cat
@@ -901,7 +823,7 @@ def _resolve_category(file_name: str, text: str, category: str) -> str:
                 category = _cat
         except (OSError, ValueError, KeyError, ConnectionError, TimeoutError) as e:  # TODO: Narrow exception type
             logger.debug("[suppressed] category = _cat")
-    # 闃插尽鎬ф牎楠岋細category 涓嶈兘鏄?Python repr() 鏍煎紡
+    # 闃插尽鎬 牎楠岋細category 涓嶈兘鏄?Python repr() 鏍煎紡
     if category and ("[{" in category or "': " in category):
         m = re.search(r"'category':\s*'([^']+)'", category)
         category = m.group(1) if m else "閫氱敤鍔炲叕"
@@ -911,7 +833,7 @@ def _resolve_category(file_name: str, text: str, category: str) -> str:
 def _prepare_chunks(
     text: str, tables: list, images: list, file_hash: str, file_name: str, category: str, doc_type: str
 ) -> list:
-    """Phase 1: 灏嗚В鏋愮粨鏋滃垏鍒嗕负缁熶竴鐨?chunk 鍒楄〃锛堟枃鏈?琛ㄦ牸/鍥剧墖锛?""
+    """Phase 1: 灏嗚 鏋愮粨鏋滃垏鍒嗕负缁熶竴鐨?chunk 鍒楄锛堟枃鏈?琛 牸/鍥剧墖锛?"""""
     chunks = []
 
     # 鏂囨湰鍒嗗潡
@@ -931,7 +853,7 @@ def _prepare_chunks(
                 }
             )
 
-    # 琛ㄦ牸鍒嗗潡
+    # 琛 牸鍒嗗潡
     for t in tables:
         table_chunks = chunk_table(t)
         for tc in table_chunks:
@@ -972,7 +894,7 @@ def _prepare_chunks(
 
 
 async def _store_to_vector(chunks: list, file_hash: str, embed_fn, vector_store) -> int:
-    """Phase 2: 鍐欏叆鍚戦噺搴?(ChromaDB)锛岃繑鍥炴垚鍔熷啓鍏ョ殑 chunk 鏁?""
+    """Phase 2: 鍐欏叆鍚戦噺搴?(ChromaDB)锛岃繑鍥炴垚鍔熷啓鍏 殑 chunk 鏁?"""""
     if embed_fn and vector_store:
         texts = [c["text"][:1000] for c in chunks]
         embeddings = await embed_fn(texts)
@@ -987,14 +909,14 @@ async def _store_to_vector(chunks: list, file_hash: str, embed_fn, vector_store)
 
 
 def _store_to_memory(chunks: list, memory_store) -> None:
-    """Phase 2: 鍐欏叆 BM25 鍏ㄦ枃绱㈠紩"""
+    """Phase 2: 鍐欏叆 BM25 鍏 枃绱 紩"""
     if memory_store:
         for c in chunks:
             memory_store.add_document(c)
 
 
 async def _index_tables(chunks: list, tables: list, table_store) -> int:
-    """Phase 2: 鍐欏叆琛ㄦ牸鐙珛绱㈠紩锛屽苟娓呯悊姝ｆ枃涓殑琛ㄦ牸鍘熸枃锛岃繑鍥炵储寮曞叆鐨勮〃鏍兼暟"""
+    """Phase 2: 鍐欏叆琛 牸鐙 珛绱 紩锛屽苟娓呯悊姝ｆ枃涓 殑琛 牸鍘熸枃锛岃繑鍥炵储寮曞叆鐨勮鏍兼暟"""
     if not (table_store and tables):
         return 0
     from src.infra import index_tables_from_chunks
@@ -1002,7 +924,7 @@ async def _index_tables(chunks: list, tables: list, table_store) -> int:
     table_result = await index_tables_from_chunks(chunks, clear_first=False)
     indexed = table_result.get("tables_indexed", 0)
 
-    # 1.5.3b: 浠庢鏂囦腑绉婚櫎琛ㄦ牸鍘熸枃锛堝凡琚嫭绔嬬储寮曪級
+    # 1.5.3b: 浠庢 鏂囦腑绉婚櫎琛 牸鍘熸枃锛堝凡琚 嫭绔嬬储寮曪級
     if indexed > 0:
         table_pattern = re.compile(r"\|[^\n]+\|\n\|[\-\s|:]+\|\n(?:\|[^\n]+\|\n)+", re.MULTILINE)
         for c in chunks:
@@ -1024,21 +946,21 @@ async def ingest_document(
     memory_store=None,
 ) -> Dict:
     """
-    缁熶竴鍏ュ簱涓€涓枃妗?鈥?v3.0 涓夐樁娈甸噸鏋勩€?
+    缁熶竴鍏 簱涓 涓 枃妗?鈥?v3.0 涓夐樁娈甸噸鏋勩 ?
 
-    闃舵:
-      1. 鍑嗗 (prepare): 鍒嗙被瑙ｆ瀽 鈫?鏂囨湰/琛ㄦ牸/鍥剧墖缁熶竴鍒嗗潡
-      2. 瀛樺偍 (store): 鍐欏叆鍚戦噺搴?+ BM25 绱㈠紩 + 琛ㄦ牸鐙珛绱㈠紩
-      3. 姹囨€?(result): 杩斿洖缁熻淇℃伅
+    闃舵 :
+      1. 鍑嗗  (prepare): 鍒嗙被瑙ｆ瀽 鈫?鏂囨湰/琛 牸/鍥剧墖缁熶竴鍒嗗潡
+      2. 瀛樺偍 (store): 鍐欏叆鍚戦噺搴?+ BM25 绱 紩 + 琛 牸鐙 珛绱 紩
+      3. 姹囨 ?(result): 杩斿洖缁熻 淇 伅
 
     鍙傛暟:
-      parse_result: 瑙ｆ瀽鍣ㄨ緭鍑?{type, text, metadata, tables, images}
-      file_name: 鍘熷鏂囦欢鍚?
-      category: 鏂囨。鍒嗙被
+      parse_result: 瑙ｆ瀽鍣 緭鍑?{type, text, metadata, tables, images}
+      file_name: 鍘熷 鏂囦欢鍚?
+      category: 鏂囨鍒嗙被
       embed_fn: 鍚戦噺鍖栧嚱鏁?
       vector_store: ChromaDB kb_chunks 闆嗗悎
       table_store: ChromaDB kb_tables 闆嗗悎
-      memory_store: BM25 鍏ㄦ枃绱㈠紩
+      memory_store: BM25 鍏 枃绱 紩
 
     杩斿洖: {chunks_added, tables_indexed, errors, file_hash}
     """
@@ -1053,7 +975,7 @@ async def ingest_document(
 
     result = {"chunks_added": 0, "tables_indexed": 0, "errors": [], "file_hash": file_hash}
 
-    # Phase 1: 鍑嗗 chunk 鍒楄〃
+    # Phase 1: 鍑嗗  chunk 鍒楄〃
     chunks = _prepare_chunks(text, tables, images, file_hash, file_name, category, doc_type)
     if not chunks:
         logger.info(f"[Ingest] No content extracted from {file_name}")
@@ -1065,13 +987,13 @@ async def ingest_document(
     except Exception as e:  # TODO: Narrow exception type
         result["errors"].append(f"vector_store: {str(e)}")
 
-    # Phase 2: 鍐欏叆 BM25 绱㈠紩
+    # Phase 2: 鍐欏叆 BM25 绱 紩
     try:
         _store_to_memory(chunks, memory_store)
     except Exception as e:  # TODO: Narrow exception type
         result["errors"].append(f"memory_store: {str(e)}")
 
-    # Phase 2: 鍐欏叆琛ㄦ牸鐙珛绱㈠紩
+    # Phase 2: 鍐欏叆琛 牸鐙 珛绱 紩
     try:
         result["tables_indexed"] = await _index_tables(chunks, tables, table_store)
     except Exception as e:  # TODO: Narrow exception type
@@ -1083,7 +1005,7 @@ async def ingest_document(
 async def ingest_directory(
     dir_path: str, category: str = "", embed_fn=None, vector_store=None, table_store=None, memory_store=None
 ) -> Dict:
-    """鎵归噺鍏ュ簱鏁翠釜鐩綍"""
+    """鎵归噺鍏 簱鏁翠釜鐩 綍"""
     from src.infra import identify_file, parse_file
 
     total = {"chunks_added": 0, "tables_indexed": 0, "files_processed": 0, "errors": []}
@@ -1114,9 +1036,10 @@ async def ingest_directory(
 
 
 def minhash_dedup(texts: list, threshold: float = 0.85) -> list:
-    """MinHash 杩戜技鍘婚噸锛氳繑鍥炲幓閲嶅悗鐨勭储寮曞垪琛?
+    """MinHash approximate dedup.
 
-    鍘熺悊锛氱敤 MinHash 绛惧悕浼拌 Jaccard 鐩镐技搴︼紝璺宠繃鐩镐技搴?> 闃堝€肩殑鏂囨。
+    Estimates Jaccard similarity via MinHash signatures,
+    skipping documents above similarity threshold.
     """
     import hashlib
 
@@ -1126,7 +1049,7 @@ def minhash_dedup(texts: list, threshold: float = 0.85) -> list:
         return set(text[i : i + k] for i in range(max(0, len(text) - k + 1)))
 
     def _minhash(shingles, num_hashes=128):
-        """璁＄畻 MinHash 绛惧悕"""
+        """璁畻 MinHash 绛惧悕"""
         sig = []
         for i in range(num_hashes):
             min_val = float("inf")
@@ -1137,7 +1060,7 @@ def minhash_dedup(texts: list, threshold: float = 0.85) -> list:
         return sig
 
     def _jaccard_est(sig1, sig2):
-        """浼拌 Jaccard 鐩镐技搴?""
+        """Estimate Jaccard similarity"""
         matches = sum(1 for a, b in zip(sig1, sig2) if a == b)
         return matches / len(sig1)
 
@@ -1145,10 +1068,10 @@ def minhash_dedup(texts: list, threshold: float = 0.85) -> list:
     if n <= 1:
         return list(range(n))
 
-    # 璁＄畻鎵€鏈夌鍚?
+    # 璁＄畻鎵 鏈夌 鍚?
     sigs = [_minhash(_shingles(t)) for t in texts]
 
-    # 璐績鍘婚噸
+    # 璐 績鍘婚噸
     keep = [True] * n
     for i in range(n):
         if not keep[i]:

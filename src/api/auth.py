@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from fastapi import HTTPException, Request
+from fastapi import Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -195,6 +195,8 @@ def create_jwt_token(username: str, role: str, tenant_id: str = "default") -> st
 
 def verify_jwt_token(token: str) -> dict:
     """验证JWT token — v1.50 R4: 检查黑名单和 token 版本号"""
+    from fastapi import HTTPException
+
     try:
         payload = jwt.decode(token, _JWT_SECRET, algorithms=[JWT_ALGORITHM])
 
@@ -334,6 +336,8 @@ class AuthMiddleware(BaseHTTPMiddleware):
             token = auth[7:]
 
         if not token:
+            from src.api.response import error
+
             # v1.44 fix: 检查是否是已知API路径，不存在的路径返回404
             if path.startswith("/api/"):
                 # 检查路由是否存在
@@ -344,21 +348,23 @@ class AuthMiddleware(BaseHTTPMiddleware):
                 for route in request.app.routes:
                     match, _ = route.matches(scope)
                     if match == Match.FULL:
-                        return JSONResponse(status_code=401, content={"detail": "未登录"})
+                        return error("未登录", status_code=401, detail="请提供有效的认证 Token")
                 # 路由不存在，返回404
-                return JSONResponse(status_code=404, content={"detail": "接口不存在"})
+                return error("接口不存在", status_code=404, detail=f"路径 {path} 未找到")
             # v1.50 fix: 非API路径直接放行，由SPA catch-all处理
             return await call_next(request)
 
         # 验证 Token（v1.50 安全修复：此前只提取 Token 但从未验证）
+        from src.api.response import error
+
         try:
             payload = verify_jwt_token(token)
-        except HTTPException as e:
-            return JSONResponse(status_code=e.status_code, content={"detail": e.detail})
+        except HTTPException:
+            raise  # 交给全局异常处理器统一转换为 error() 格式
         except (jwt.DecodeError, jwt.ExpiredSignatureError, jwt.InvalidTokenError, ValueError, KeyError) as e:
             # v1.50 安全修复: 收窄异常捕获，只处理 JWT 相关异常
             logger.warning(f"JWT 验证异常: {type(e).__name__}: {e}")
-            return JSONResponse(status_code=401, content={"detail": "认证失败"})
+            return error("认证失败", status_code=401, detail=str(e))
 
         # 将用户信息注入 request.state，供下游路由使用
         request.state.user = payload.get("sub", "unknown")
@@ -387,6 +393,8 @@ def require_admin(request: Request):
     """
     role = getattr(request.state, "role", None)
     if role != "admin":
+        from fastapi import HTTPException
+
         raise HTTPException(status_code=403, detail="需要管理员权限")
 
 

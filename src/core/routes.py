@@ -365,16 +365,8 @@ def _register_inline_routes(app: FastAPI) -> None:
     async def admin_metrics_summary():
         return generate_health_summary()
 
-    # ── 认证 ──
-    @app.get("/api/auth/me")
-    async def auth_me(request: Request):
-        return success(
-            data={
-                "username": getattr(request.state, "user", "anonymous"),
-                "role": getattr(request.state, "role", "user"),
-            },
-            message="认证信息",
-        )
+    # ── 认证端点已移至 auth_new.py（通过手动注册），避免三重定义 ──
+    # 见: src/api/auth_new.py: GET /api/auth/me
 
     # ── 评测自动化 ──
     from src.services.eval_automation import get_eval_automation
@@ -535,7 +527,7 @@ def _register_static_routes(app: FastAPI) -> None:
     if STATIC_DIR.exists():
 
         class _CachedStaticFiles(_StaticFiles):
-            _BLOCKED_EXTS = {".vue", ".ts", ".tsx", ".jsx", ".json", ".lock", ".md"}
+            _BLOCKED_EXTS = {".vue", ".ts", ".tsx", ".jsx", ".json", ".lock", ".md", ".map"}
             _BLOCKED_NAMES = {
                 "package.json",
                 "package-lock.json",

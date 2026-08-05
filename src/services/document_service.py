@@ -140,7 +140,7 @@ def update_document_visibility(
     owner_id: str = "",
 ) -> Dict[str, Any]:
     """更新文档可见性"""
-    from src.api.permissions import PermissionManager
+    from src.auth.permissions import PermissionManager
     from src.db.data_store import load_chunks, save_chunks
     from src.db.vector_store import get_vector_store
 

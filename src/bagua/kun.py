@@ -708,7 +708,7 @@ class KunGua(GuaBase):
 
         # 步骤 2: 权限过滤
         try:
-            from src.api.permissions import get_permission_manager
+            from src.auth.permissions import get_permission_manager
             pm = get_permission_manager()
         except ImportError:
             logger.warning("☷ [坤] permissions 模块不可用，跳过权限过滤")

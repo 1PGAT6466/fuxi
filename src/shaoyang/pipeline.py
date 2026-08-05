@@ -1,6 +1,11 @@
 """
-pipeline.py — 少阳·消化 统一处理管线
+pipeline.py — 少阳·消化 统一处理管线 (🚫 逐步弃用中)
 合并胃(解析)+脾(存储)+肺(呼吸)+小肠(分类)的能力
+
+⚠️ v2.2: 核心消化逻辑已迁移到 bagua/zhen.py (ZhenGua.digest_and_store)。
+  新代码请使用 ZhenGua 而非 ShaoyangPipeline。ShaoyangPipeline 保留
+  向后兼容，但新功能将只在 ZhenGua 中开发。
+  迁移：ShaoyangPipeline.digest(file_path) → ZhenGua.digest_and_store(file_path)
 """
 
 import asyncio

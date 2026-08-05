@@ -2,7 +2,6 @@
 import logging
 
 from fastapi import APIRouter
-from fastapi.responses import JSONResponse
 
 logger = logging.getLogger(__name__)
 
@@ -13,8 +12,10 @@ router = APIRouter(tags=["v2"])
 # FAKE-ASYNC: 本函数标记 async 仅为接口统一，内部同步执行
 async def v2_status():
     """v2状态"""
+    from src.api.response import server_error
+
     try:
         return {"status": "ok"}
     except Exception as e:  # TODO: Narrow exception type
         logger.exception(f"v2_status 失败: {e}")
-        return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
+        return server_error(detail=str(e))

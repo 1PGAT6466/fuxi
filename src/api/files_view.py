@@ -5,8 +5,10 @@ import urllib.parse
 from pathlib import Path
 
 # 兼容层 - 文件查看/下载路由
-from fastapi import APIRouter, HTTPException, Request
+from fastapi import APIRouter, Request
 from fastapi.responses import FileResponse, JSONResponse
+
+from src.api.response import error, server_error
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +29,7 @@ async def view_document(file_hash: str, request: Request):
         # v1.50 security fix: 认证检查 — 未认证用户禁止访问
         user = getattr(request.state, "user", None)
         if user is None:
-            raise HTTPException(401, "未认证，请先登录")
+            return error("未认证，请先登录", status_code=401, detail="未认证用户无法查看文档")
 
         # Search in uploads directory
         if UPLOAD_DIR.exists():
@@ -51,12 +53,10 @@ async def view_document(file_hash: str, request: Request):
                     if fpath.exists():
                         return FileResponse(str(fpath))
 
-        raise HTTPException(404, detail="文档未找到")
-    except HTTPException:
-        raise
+        return error("文档未找到", status_code=404, detail="未找到匹配的文件")
     except (OSError, IOError, PermissionError, ValueError) as e:
         logger.exception(f"view_document 失败: {e}")
-        return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
+        return server_error(detail=str(e))
 
 
 @router.get("/api/download/{file_hash}")
@@ -66,7 +66,7 @@ async def download_document(file_hash: str, request: Request):
         # v1.50 security fix: 认证检查 — 未认证用户禁止访问
         user = getattr(request.state, "user", None)
         if user is None:
-            raise HTTPException(401, "未认证，请先登录")
+            return error("未认证，请先登录", status_code=401, detail="未认证用户无法查看文档")
 
         # Same search logic as view but with Content-Disposition header
         if UPLOAD_DIR.exists():
@@ -82,12 +82,10 @@ async def download_document(file_hash: str, request: Request):
                             return FileResponse(str(fpath), filename=fname, media_type="application/octet-stream")
                     except (OSError, IOError, PermissionError) as e:
                         logger.warning("文件下载哈希计算失败: %s", e, exc_info=True)
-        raise HTTPException(404, detail="文档未找到")
-    except HTTPException:
-        raise
+        return error("文档未找到", status_code=404, detail="未找到匹配的文件")
     except (OSError, IOError, PermissionError, ValueError) as e:
         logger.exception(f"download_document 失败: {e}")
-        return JSONResponse(status_code=500, content={"error": "Internal server error", "detail": str(e)})
+        return server_error(detail=str(e))
 
 
 @router.get("/api/antenna/search")

@@ -147,8 +147,10 @@ class GuaBase(ABC, GuaHandler):
     RECOVERY_LOOP_INTERVAL: float = 15.0
 
     # 八卦枚举映射：子类 GUA_NAME → Trigrams 枚举
+    # v2.2: 统一使用英文小写作为 GUA_NAME（与 IntentBus 注册名一致）
+    # QianGua 使用 "qian"、KunGua 使用 "kun"，以此类推
     _TRIGRAM_MAP: Dict[str, Trigrams] = {
-        "乾": Trigrams.QIAN,              # qian.py
+        "qian": Trigrams.QIAN,            # qian.py
         "kun": Trigrams.KUN,              # kun.py
         "zhen": Trigrams.ZHEN,            # zhen.py
         "xun": Trigrams.XUN,              # xun.py
@@ -156,7 +158,7 @@ class GuaBase(ABC, GuaHandler):
         "li": Trigrams.LI,                # li.py
         "gen": Trigrams.GEN,              # gen.py
         "dui": Trigrams.DUI,              # dui.py
-        "中宫": Trigrams.ZHONG_GONG,       # evolution/evolution_gua.py — 第九宫
+        "zhonggong": Trigrams.ZHONG_GONG, # evolution/evolution_gua.py — 第九宫
     }
 
     def __init__(self, intent_bus: Optional[IntentBus] = None) -> None:
@@ -395,8 +397,7 @@ class GuaBase(ABC, GuaHandler):
 
         Args:
             name: 注册名称，默认使用 self.GUA_NAME。
-                  注意：乾卦的 GUA_NAME="乾" 对应 IntentBus 的 "乾"，
-                  其他卦使用英文名（如 "kun"）与对应的 Trigrams 枚举一致。
+                  v2.2: 所有卦统一使用英文小写 GUA_NAME（如 "qian", "kun"）。
         """
         register_name = name or self.GUA_NAME
         try:
