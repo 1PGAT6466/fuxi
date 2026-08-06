@@ -6,7 +6,7 @@ import time
 from datetime import datetime, timedelta, timezone
 
 import jwt
-from fastapi import Request
+from fastapi import HTTPException, Request
 from fastapi.responses import JSONResponse
 from starlette.middleware.base import BaseHTTPMiddleware
 
@@ -195,8 +195,6 @@ def create_jwt_token(username: str, role: str, tenant_id: str = "default") -> st
 
 def verify_jwt_token(token: str) -> dict:
     """验证JWT token — v1.50 R4: 检查黑名单和 token 版本号"""
-    from fastapi import HTTPException
-
     try:
         payload = jwt.decode(token, _JWT_SECRET, algorithms=[JWT_ALGORITHM])
 
@@ -393,8 +391,6 @@ def require_admin(request: Request):
     """
     role = getattr(request.state, "role", None)
     if role != "admin":
-        from fastapi import HTTPException
-
         raise HTTPException(status_code=403, detail="需要管理员权限")
 
 
