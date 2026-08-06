@@ -41,8 +41,19 @@ from fastapi.testclient import TestClient
 from src.server import app
 
 # v1.51 fix: TestClient 不触发 startup 事件，需手动注册路由
-from src.core.routes import register_all_routes
-register_all_routes(app)
+# GitHub Actions CI 环境缺少部分可选依赖，降级不阻塞测试
+try:
+    from src.core.routes import register_all_routes
+    register_all_routes(app)
+except (ImportError, ModuleNotFoundError) as e:
+    import logging
+    logging.getLogger(__name__).warning(f"[TestSetup] register_all_routes 失败（缺依赖），局部注册降级: {e}")
+    # 降级：只手动注册测试必要的 auth 路由
+    try:
+        from src.api.auth_routes import router as auth_router
+        app.include_router(auth_router)
+    except ImportError:
+        pass
 
 client = TestClient(app)
 
