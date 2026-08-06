@@ -34,8 +34,15 @@ if _env_file.exists():
 sys.path.insert(0, str(Path(__file__).parent.parent))
 sys.path.insert(0, str(Path(__file__).parent.parent / "src"))
 
+# v1.51 fix: 测试环境禁用速率限制，避免多测试累积触发限流
+os.environ["FUXI_RATE_LIMIT_ENABLED"] = "false"
+
 from fastapi.testclient import TestClient
 from src.server import app
+
+# v1.51 fix: TestClient 不触发 startup 事件，需手动注册路由
+from src.core.routes import register_all_routes
+register_all_routes(app)
 
 client = TestClient(app)
 
@@ -63,13 +70,19 @@ def add_result(method, endpoint, name, status, code, rt, detail="", expected="",
     status_icon = "✅" if status == "PASS" else ("⚠️" if status == "WARN" else "❌")
     print(f"  {status_icon} {method:6s} {endpoint:40s} → {code} in {rt:.0f}ms {detail}")
 
+_cached_token = None
+
 def get_auth_header(token=None):
-    if token is None:
-        # Login to get token
-        resp = client.post("/api/auth/login", json={"username": "admin", "password": "fuxi2024"})
-        if resp.status_code == 200:
-            token = resp.json().get("token", "")
-    return {"Authorization": f"Bearer {token}"}
+    global _cached_token
+    if token is not None:
+        return {"Authorization": f"Bearer {token}"}
+    # v1.51 fix: 缓存 token，避免每次调用都登录触发速率限制
+    if _cached_token is not None:
+        return {"Authorization": f"Bearer {_cached_token}"}
+    resp = client.post("/api/auth/login", json={"username": "admin", "password": "123456"})
+    if resp.status_code == 200:
+        _cached_token = resp.json().get("token", "")
+    return {"Authorization": f"Bearer {_cached_token}"}
 
 # ══════════════════════════════════════════════════════
 # Section 1: API 接口清单完整测试
@@ -98,7 +111,7 @@ def test_auth_login_normal():
     """POST /api/auth/login — 正常登录"""
     method, endpoint = "POST", "/api/auth/login"
     t0 = time.time()
-    resp = client.post(endpoint, json={"username": "admin", "password": "fuxi2024"})
+    resp = client.post(endpoint, json={"username": "admin", "password": "123456"})
     rt = (time.time() - t0) * 1000
 
     issues = []
@@ -196,7 +209,7 @@ def test_auth_register_duplicate():
     """POST /api/auth/register — 重复注册"""
     method, endpoint = "POST", "/api/auth/register"
     t0 = time.time()
-    resp = client.post(endpoint, json={"username": "admin", "password": "fuxi2024"})
+    resp = client.post(endpoint, json={"username": "admin", "password": "123456"})
     rt = (time.time() - t0) * 1000
     if resp.status_code == 400:
         add_result(method, endpoint, "注册-重复用户", "PASS", resp.status_code, rt, "Correctly rejected duplicate")
