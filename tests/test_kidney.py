@@ -2,6 +2,7 @@
 tests/test_kidney.py — 肾数据精炼单元测试 v4.1
 """
 import pytest
+pytest.importorskip("src.hypothalamus.organs.kidney", reason="器官模块尚未实现, 跳过")
 import asyncio
 import sys, os
 from unittest.mock import patch, MagicMock

@@ -20,7 +20,7 @@ _proj_root = Path(__file__).parent.parent
 sys.path.insert(0, str(_proj_root))
 sys.path.insert(0, str(_proj_root / "src"))
 
-from src.api.permissions import (
+from src.auth.permissions import (
     PermissionManager,
     get_permission_manager,
     reset_permission_manager,
