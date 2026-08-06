@@ -14,9 +14,9 @@ jobs:
         with:
           python-version: '3.10'
       - name: Install deps
-        run: pip install fastapi uvicorn chromadb requests pytest pytest-asyncio
-      - name: Unit tests
-        run: python -m pytest tests/ -x --tb=short -q
+        run: pip install fastapi uvicorn chromadb requests pytest pytest-asyncio bcrypt pyjwt
+      - name: Unit tests (standalone only — full API tests require local env)
+        run: python -m pytest tests/ --tb=short -q -x --ignore=tests/api_comprehensive_test.py --ignore=tests/test_evaluation.py --ignore=tests/test_e2e.py --ignore=tests/run_full_tests.py --ignore=tests/performance_test.py --ignore=tests/api_compatibility_check.py
       - name: Smoke test (API)
         run: python scripts/eval_smoke_lite.py
       - name: Security check
